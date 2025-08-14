@@ -1,22 +1,72 @@
 # Scala
 *.class
 *.log
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
 
-# sbt
-/project/project/
-/project/target/
-/target/
+# sbt specific
+.cache/
+.history/
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+project/target/
+project/project/target/
 build.sbt.lock
+
+# Cross-platform sbt builds (sbt-crossproject)
+*/.jvm/target/
+*/.js/target/
+*/.native/target/
+**/.jvm/target/
+**/.js/target/
+**/.native/target/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
 
 # IDE-specific
 .bsp/
+.vscode/
 .ensime_cache/
 .idea/
 .metals/
+.bloop/
 *.iml
 *.ipr
 *.iws
+*~
+
+# ENSIME specific
+.ensime_cache/
+.ensime
 
 # OS-specific
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
 
