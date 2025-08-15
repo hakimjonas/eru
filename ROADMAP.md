@@ -34,7 +34,7 @@ Milestones and deliverables
 - Deliverables
   - Eru: attempt (to capture errors in Result), fromOption, unit helpers; zip for sequential composition.
   - Result: convenience constructors and syntax parity with Eru where appropriate.
-  - Documentation: README status update, quickstart examples using only synchronous APIs.
+  - Documentation: README status update; quickstart examples using only synchronous APIs; edge semantics clarified (NonFatal policy; unsafeRunSync Throwable rethrow vs EruException). Links: docs-src/quickstart.md, docs-src/design/async.md.
   - Quality gates: sbt check and eruCoreJVM/test pass on CI.
 
 0.2.0 — Resource safety and observability foundations (Target: 2025-12)
