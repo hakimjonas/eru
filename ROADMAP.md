@@ -19,9 +19,10 @@ Current status snapshot
   - Observability foundations: EruObserver primitives (ScopeId, Outcome, EruEvent), .debug, observer-aware interpreter emitting ProgramStart/ProgramEnd after finalizers.
   - Documentation: quickstart (attempt-first guidance), resources and observer guides; async direction notes; edge semantics clarified (NonFatal policy; unsafeRunSync behavior).
   - Tests: comprehensive unit tests for Eru, Resource, Observer; all green on JVM; Native parity planned.
+  - Property-based tests for Resource laws added (0.2.0 scope).
 - Not yet implemented
   - Concurrency runtime (fibers/scheduler), blocking region, and concurrency primitives (Ref, Deferred, Semaphore).
-  - Property-based tests for Resource laws (0.2.x) and diagnostics enhancements.
+  - Diagnostics enhancements and structured reporting for suppressed finalizer errors.
   - Integration: Valar (first integration target; major refactor deferred post 0.3.0); other modules (e.g., Future interop, fs2/http4s).
 
 ---

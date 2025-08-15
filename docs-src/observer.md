@@ -48,3 +48,10 @@ Edge semantics and NonFatal
 Future direction (0.3.0)
 - Fibers introduce per‑fiber identities (FiberId) and richer events: FiberStarted, FiberCompleted(exit), Interrupt(cause), Suspend/Resume.
 - Outcome generalizes to an Exit[E, A] model for joins and diagnostics.
+
+
+---
+
+## Notes
+
+- ScopeId is a simple process-local incrementer sufficient for synchronous runs in 0.2.x. In 0.3.0, fibers introduce per-fiber identities (FiberId), and events will carry FiberId instead.

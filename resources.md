@@ -73,3 +73,11 @@ Design notes
 - ensure is represented by a dedicated Ensure node. The interpreter collects finalizers on a stack and drains them after the program finishes, guaranteeing FILO ordering.
 - Finalizer failures are normalized via attempt and ignored to preserve the main outcome. Future versions may surface suppressed finalizer errors in structured diagnostics.
 - The synchronous interpreter remains stack‑safe via scala.util.control.TailCalls.
+
+
+---
+
+## Additional notes
+
+- Finalizers can themselves register further finalizers. Because Eru drains finalizers using a LIFO stack, any finalizers registered by a finalizer will run before earlier ones.
+- Finalizer/release errors are intentionally suppressed in 0.2.x to preserve the main program outcome. Future versions may surface suppressed finalizer errors as structured diagnostics via an Exit/Cause model.
