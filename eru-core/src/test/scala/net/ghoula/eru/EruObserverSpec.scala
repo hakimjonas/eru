@@ -94,4 +94,21 @@ class EruObserverSpec extends FunSuite {
     }
   }
 
+  test("ProgramEnd is emitted after finalizers are drained") {
+    var finalized = 0
+    class SnapObserver extends EruObserver {
+      var programEndFinalizedSeen: Option[Int] = None
+      def onEvent(event: EruEvent): Unit = event match {
+        case EruEvent.ProgramEnd(_, _) => programEndFinalizedSeen = Some(finalized)
+        case _ => ()
+      }
+    }
+    val obs = new SnapObserver
+    val prog = Eru.succeed(1).ensure(Eru.effect { finalized += 1; () })
+    val out = prog.unsafeRunSyncWith(obs)
+    assertEquals(out, 1)
+    assertEquals(finalized, 1)
+    assertEquals(obs.programEndFinalizedSeen, Some(1))
+  }
+
 }

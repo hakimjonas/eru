@@ -56,4 +56,49 @@ class EruResourceSpec extends FunSuite {
     assertEquals(released, 2)
   }
 
+  test("ensure suppresses finalizer typed error on success") {
+    val prog = Eru.succeed(99).ensure(Eru.fail("ferr"))
+    val out = prog.unsafeRunSync()
+    assertEquals(out, 99)
+  }
+
+  test("ensure suppresses finalizer Throwable on success") {
+    var side = 0
+    val ex = new RuntimeException("fin-err")
+    val fin: Eru[Throwable, Unit] = Eru.effect { side += 1; throw ex }
+    val prog = Eru.succeed(7).ensure(fin)
+    val out = prog.unsafeRunSync()
+    assertEquals(out, 7)
+    assertEquals(side, 1)
+  }
+
+  test("ensure finalizer failure does not change failure outcome") {
+    val prog: Eru[String, Int] = Eru.fail("boom").ensure(Eru.fail("ferr"))
+    val ex = intercept[EruException[String]] { prog.unsafeRunSync() }
+    assertEquals(ex.error, "boom")
+  }
+
+  test("ensure identity with unit for success and failure") {
+    val ok = Eru.succeed(1)
+    val okEnsured = ok.ensure(Eru.unit)
+    assertEquals(ok.attempt.unsafeRunSync(), okEnsured.attempt.unsafeRunSync())
+
+    val bad: Eru[String, Int] = Eru.fail("x")
+    val badEnsured = bad.ensure(Eru.unit)
+    assertEquals(bad.attempt.unsafeRunSync(), badEnsured.attempt.unsafeRunSync())
+  }
+
+  test("nested ensures across multiple depths follow FILO ordering") {
+    import scala.collection.mutable.ListBuffer
+    val order = ListBuffer.empty[Int]
+    val depth = 10
+    val base: Eru[Nothing, Unit] = Eru.unit
+    val prog = (1 to depth).foldLeft(base) { (acc, i) =>
+      val fin = Eru.effect { order += i; () }
+      acc.ensure(fin)
+    }
+    prog.unsafeRunSync()
+    assertEquals(order.toList, (1 to depth).reverse.toList)
+  }
+
 }

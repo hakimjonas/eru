@@ -29,6 +29,11 @@ For the point-by-point execution plan aligned with our Manifesto and guidelines,
 The path to fibers, Exit/Cause, cancellation, and observability:
 - Async Runtime Direction — Fibers, Exit/Cause, and Observability: [design/async.md](./design/async.md)
 
+## Guides
+
+- Resource Safety — ensure and bracket: [resources.md](./resources.md)
+- Observability — EruObserver, events, and .debug: [observer.md](./observer.md)
+
 ## Integrations
 
 - Valar Integration Plan — Refactoring Valar on Eru: [integrations/valar.md](./integrations/valar.md)
