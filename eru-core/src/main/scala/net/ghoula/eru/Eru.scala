@@ -3,6 +3,8 @@ package net.ghoula.eru
 import scala.util.control.NonFatal
 import scala.util.control.TailCalls.{done, tailcall, TailRec}
 
+import net.ghoula.eru.EruObserver.*
+
 /** A data type representing a pure, lazy, and composable computation that can produce a value of
   * type `A` or fail with an error of type `E`.
   *
@@ -49,6 +51,10 @@ enum Eru[+E, +A] {
   /** Represents interpreting a computation to a `Result` value without failure at the type level.
     */
   private case Attempt[E0, A0](source: Eru[E0, A0]) extends Eru[Nothing, Result[E0, A0]]
+
+  /** Represents a debugging marker around a computation with a lazily provided label. */
+  private case Debug[E0, A0](source: Eru[E0, A0], label: () => String) extends Eru[E0, A0]
+  private case Ensure[E0, A0](source: Eru[E0, A0], finalizer: () => Eru[Nothing, Unit]) extends Eru[E0, A0]
 
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
@@ -137,6 +143,45 @@ enum Eru[+E, +A] {
     */
   final def attempt: Eru[Nothing, Result[E, A]] = Attempt(this)
 
+  /** Ensures that the provided finalizer runs after this computation, regardless of success or
+    * failure.
+    *
+    * The finalizer is evaluated lazily and will be executed exactly once when the returned program
+    * is run.
+    *
+    * @param finalizer
+    *   the finalizer to run after this computation completes
+    * @return
+    *   a computation that yields the same result as this one but guarantees the finalizer runs
+    */
+  final def ensure[F](finalizer: => Eru[F, Unit]): Eru[E, A] =
+    Ensure(this, () => finalizer.attempt.flatMap(_ => Eru.unit))
+
+  /** Runs the provided `use` function with the acquired resource and releases it with `release`
+    * afterward.
+    *
+    * The release action is guaranteed to run after `use`, whether `use` succeeds or fails.
+    *
+    * @param release
+    *   the release action for the acquired resource
+    * @param use
+    *   the function that uses the acquired resource
+    * @return
+    *   a computation that uses the resource and then releases it
+    */
+  final def bracket[E1 >: E, F, B](release: A => Eru[F, Unit])(use: A => Eru[E1, B]): Eru[E1, B] =
+    this.flatMap(a => use(a).ensure(release(a)))
+
+  /** Adds a lazily evaluated debug label around this computation. When an observer is provided at
+    * run time, a Step event with the label will be emitted before this computation executes.
+    *
+    * @param label
+    *   the label to emit to the observer (evaluated lazily)
+    * @return
+    *   a computation that behaves like this one but emits a debug Step when observed
+    */
+  final def debug(label: => String): Eru[E, A] = Debug(this, () => label)
+
   /** Executes this computation synchronously and returns the result.
     *
     * WARNING: This method is unsafe because it can perform arbitrary side effects and may throw
@@ -155,6 +200,19 @@ enum Eru[+E, +A] {
     *   if the computation fails with an untyped exception (a `Throwable`).
     */
   final def unsafeRunSync(): A = Eru.interpreter.runSync(this)
+
+  /** Executes this computation synchronously with the provided observer, emitting lifecycle and
+    * step events.
+    *
+    * WARNING: Unsafe — may perform side effects and may throw at the edge with the same semantics
+    * as `unsafeRunSync`.
+    *
+    * @param observer
+    *   the observer to receive events for this run
+    * @return
+    *   the result of executing this computation
+    */
+  final def unsafeRunSyncWith(observer: EruObserver): A = Eru.interpreter.runSyncWithObserver(this, observer)
 }
 
 object Eru {
@@ -241,8 +299,10 @@ object Eru {
 
     /** The entry point for executing an Eru program.
       */
-    def runSync[E, A](start: Eru[E, A]): A =
-      run(start).result match {
+    def runSync[E, A](start: Eru[E, A]): A = {
+      val (either, fins) = runWithStack(start, Nil).result
+      drainFinalizers(fins).result
+      either match {
         case Left(error) =>
           error match {
             case t: Throwable => throw t
@@ -250,57 +310,145 @@ object Eru {
           }
         case Right(value) => value
       }
-
-    /** The core of the interpreter. It translates an `Eru` program into a `TailRec` computation,
-      * which is a description of a stack-safe, trampolined execution. This function is pure.
-      */
-    private def run[E, A](eru: Eru[E, A]): TailRec[Either[E, A]] = eru match {
-      case Succeed(value) =>
-        done(Right(value))
-
-      case Fail(error) =>
-        done(Left(error))
-
-      case Effect(thunk) =>
-        done(thunk())
-
-      case Chain(source, f) =>
-        tailcall(run(source)).flatMap {
-          case Right(value) => tailcall(run(f(value)))
-          case Left(error) => done(Left(error))
-        }
-
-      case RecoverWith(source, pf) =>
-        tailcall(run(source)).flatMap {
-          case Right(value) => done(Right(value))
-          case Left(error) =>
-            if (pf.isDefinedAt(error)) {
-              tailcall(run(pf(error)))
-            } else {
-              done(Left(error))
-            }
-        }
-
-      case MapError(source, f) =>
-        tailcall(run(source)).map { either =>
-          either.left.map(f)
-        }
-
-      case Zip(left, right) =>
-        tailcall(run(left)).flatMap {
-          case Right(a) =>
-            tailcall(run(right)).map {
-              case Right(b) => Right((a, b))
-              case Left(e1) => Left(e1)
-            }
-          case Left(e0) => done(Left(e0))
-        }
-
-      case Attempt(source) =>
-        tailcall(run(source)).map {
-          case Left(e) => Right(Result.Failure(e))
-          case Right(a) => Right(Result.Success(a))
-        }
     }
+
+    private type Finalizer = () => Eru[Nothing, Unit]
+
+    private def runWithStack[E, A](eru: Eru[E, A], fins: List[Finalizer]): TailRec[(Either[E, A], List[Finalizer])] =
+      eru match {
+        case Succeed(value) =>
+          done((Right(value), fins))
+
+        case Fail(error) =>
+          done((Left(error), fins))
+
+        case Effect(thunk) =>
+          done((thunk(), fins))
+
+        case Chain(source, f) =>
+          tailcall(runWithStack(source, fins)).flatMap {
+            case (Right(value), fs) => tailcall(runWithStack(f(value), fs))
+            case (Left(error), fs) => done((Left(error), fs))
+          }
+
+        case RecoverWith(source, pf) =>
+          tailcall(runWithStack(source, fins)).flatMap {
+            case (Right(value), fs) => done((Right(value), fs))
+            case (Left(error), fs) =>
+              if (pf.isDefinedAt(error)) {
+                tailcall(runWithStack(pf(error), fs))
+              } else {
+                done((Left(error), fs))
+              }
+          }
+
+        case MapError(source, f) =>
+          tailcall(runWithStack(source, fins)).map { case (either, fs) => (either.left.map(f), fs) }
+
+        case Zip(left, right) =>
+          tailcall(runWithStack(left, fins)).flatMap {
+            case (Right(a), fsL) =>
+              tailcall(runWithStack(right, fsL)).map {
+                case (Right(b), fsR) => (Right((a, b)), fsR)
+                case (Left(e1), fsR) => (Left(e1), fsR)
+              }
+            case (Left(e0), fsL) => done((Left(e0), fsL))
+          }
+
+        case Attempt(source) =>
+          tailcall(runWithStack(source, fins)).map {
+            case (Left(e), fs) => (Right(Result.Failure(e)), fs)
+            case (Right(a), fs) => (Right(Result.Success(a)), fs)
+          }
+
+        case Debug(source, _) =>
+          tailcall(runWithStack(source, fins))
+
+        case Ensure(source, fin) =>
+          tailcall(runWithStack(source, fins)).map { case (either, fs) => (either, fin :: fs) }
+      }
+
+    private def drainFinalizers(fins: List[Finalizer]): TailRec[Unit] =
+      fins match {
+        case Nil => done(())
+        case fin :: rest =>
+          tailcall(runWithStack(fin(), Nil)).flatMap { case (_, inner) =>
+            tailcall(drainFinalizers(inner ++ rest))
+          }
+      }
+
+    private def runWithObsStack[E, A](
+      eru: Eru[E, A],
+      scope: ScopeId,
+      observer: EruObserver,
+      fins: List[Finalizer]
+    ): TailRec[(Either[E, A], List[Finalizer])] =
+      eru match {
+        case Succeed(value) =>
+          done((Right(value), fins))
+        case Fail(error) =>
+          done((Left(error), fins))
+        case Effect(thunk) =>
+          done((thunk(), fins))
+        case Chain(source, f) =>
+          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
+            case (Right(value), fs) => tailcall(runWithObsStack(f(value), scope, observer, fs))
+            case (Left(error), fs) => done((Left(error), fs))
+          }
+        case RecoverWith(source, pf) =>
+          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
+            case (Right(value), fs) => done((Right(value), fs))
+            case (Left(error), fs) =>
+              if (pf.isDefinedAt(error)) {
+                tailcall(runWithObsStack(pf(error), scope, observer, fs))
+              } else {
+                done((Left(error), fs))
+              }
+          }
+        case MapError(source, f) =>
+          tailcall(runWithObsStack(source, scope, observer, fins)).map { case (either, fs) => (either.left.map(f), fs) }
+        case Zip(left, right) =>
+          tailcall(runWithObsStack(left, scope, observer, fins)).flatMap {
+            case (Right(a), fsL) =>
+              tailcall(runWithObsStack(right, scope, observer, fsL)).map {
+                case (Right(b), fsR) => (Right((a, b)), fsR)
+                case (Left(e1), fsR) => (Left(e1), fsR)
+              }
+            case (Left(e0), fsL) => done((Left(e0), fsL))
+          }
+        case Attempt(source) =>
+          tailcall(runWithObsStack(source, scope, observer, fins)).map {
+            case (Left(e), fs) => (Right(Result.Failure(e)), fs)
+            case (Right(a), fs) => (Right(Result.Success(a)), fs)
+          }
+        case Debug(source, label) =>
+          observer.onEvent(EruEvent.Step(scope, label()))
+          tailcall(runWithObsStack(source, scope, observer, fins))
+        case Ensure(source, fin) =>
+          tailcall(runWithObsStack(source, scope, observer, fin :: fins))
+      }
+
+    /** Observer-aware interpreter variant */
+    def runSyncWithObserver[E, A](start: Eru[E, A], observer: EruObserver): A = {
+      val scope = ScopeId.fresh()
+      observer.onEvent(EruEvent.ProgramStart(scope))
+      val (either, fins) = runWithObsStack(start, scope, observer, Nil).result
+      drainFinalizers(fins).result
+      either match {
+        case Left(error) =>
+          error match {
+            case t: Throwable =>
+              observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.Defect(t)))
+              throw t
+            case e =>
+              observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.TypedFailure(e)))
+              throw EruException(e)
+          }
+        case Right(value) =>
+          observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.Success))
+          value
+      }
+    }
+
   }
 }

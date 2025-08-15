@@ -13,7 +13,7 @@ package net.ghoula.eru
   */
 final class EruException[E](val error: E) extends RuntimeException {
 
-  /** Returns a string representation of this exception including the wrapped error. */
+  /** Returns a string representation of this exception, including the wrapped error. */
   override def toString: String = s"EruException($error)"
 
   /** Returns the error message, using the string representation of the wrapped error. */
