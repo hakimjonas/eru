@@ -107,3 +107,24 @@ This is illustrative only; the actual Valar API should maintain its existing use
 
 - Target: Post 0.3.0 — 0.4.0 window (earliest 2026-05)
 - Deliverables mirror ROADMAP: this document (updated), PoC branch in Valar post-0.3.0, aligned error model, migration guide, CI example suite.
+
+
+---
+
+## References
+
+- Valar repository: https://github.com/hakimjonas/valar
+- Availability: Valar is published on Maven Central. See the project’s README for exact coordinates, or search:
+  - Maven Central search: https://search.maven.org/search?q=valar%20hakimjonas
+  - Sonatype Central search: https://central.sonatype.com/search?q=valar%20hakimjonas
+
+## Observer mapping — research checklist
+
+To align EruObserver with Valar’s existing patterns in 0.2.0, review:
+- Event taxonomy in Valar (start/stop/step/failure and payloads)
+- Attachment model (global vs contextual observers; filtering/levels)
+- Error shaping (domain errors vs defects/exceptions)
+- Performance posture (by-name params, batching/buffering, allocation avoidance)
+- Testing approach (test observers, golden logs, probes)
+
+These findings will inform Eru’s event shapes and the Valar->Eru observer adapter.

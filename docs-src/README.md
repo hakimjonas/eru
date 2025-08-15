@@ -28,3 +28,9 @@ For the point-by-point execution plan aligned with our Manifesto and guidelines,
 
 The path to fibers, Exit/Cause, cancellation, and observability:
 - Async Runtime Direction — Fibers, Exit/Cause, and Observability: [design/async.md](./design/async.md)
+
+## Integrations
+
+- Valar Integration Plan — Refactoring Valar on Eru: [integrations/valar.md](./integrations/valar.md)
+- Valar repository (open-source): https://github.com/hakimjonas/valar
+- Valar on Maven Central: see coordinates in Valar’s README, or search: https://search.maven.org/search?q=valar%20hakimjonas
