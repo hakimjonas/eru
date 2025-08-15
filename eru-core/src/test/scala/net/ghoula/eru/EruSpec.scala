@@ -419,10 +419,9 @@ class EruSpec extends FunSuite {
     val t: Try[Int] = Failure(exception)
     val eru = Eru.fromTry(t)
 
-    val caught = intercept[EruException[Throwable]] {
+    intercept[RuntimeException] {
       eru.unsafeRunSync()
     }
-    assertEquals(caught.error, exception)
   }
 
   test("fromTry is lazy - Try evaluation is suspended") {
@@ -581,5 +580,73 @@ class EruSpec extends FunSuite {
       .recover { case "ERROR" => "recovered" }
 
     assertEquals(eru.unsafeRunSync(), "recovered")
+  }
+
+  test("attempt returns Result.Success on success") {
+    val res = Eru.succeed(42).attempt.unsafeRunSync()
+    assertEquals(res, Result.Success(42))
+  }
+
+  test("attempt returns Result.Failure on typed error") {
+    val res = Eru.fail("boom").attempt.unsafeRunSync()
+    assertEquals(res, Result.Failure("boom"))
+  }
+
+  test("attempt returns Result.Failure on Throwable from effect") {
+    val ex = new RuntimeException("boom")
+    val res = Eru.effect[Int](throw ex).attempt.unsafeRunSync()
+    assertEquals(res, Result.Failure(ex))
+  }
+
+  test("attempt is lazy and executes only once") {
+    var counter = 0
+    val prog = Eru.effect {
+      counter += 1
+      7
+    }.attempt
+
+    assertEquals(counter, 0)
+    val r1 = prog.unsafeRunSync()
+    assertEquals(r1, Result.Success(7))
+    assertEquals(counter, 1)
+  }
+
+  test("fromOption succeeds on Some and fails on None lazily") {
+    var optEvaluated = 0
+    var onNoneEvaluated = 0
+
+    def mkSome(): Option[Int] = { optEvaluated += 1; Some(1) }
+    def mkNone(): Option[Int] = { optEvaluated += 1; None }
+    def err(): String = { onNoneEvaluated += 1; "none" }
+
+    val success = Eru.fromOption(mkSome(), err())
+    assertEquals(optEvaluated, 0)
+    assertEquals(onNoneEvaluated, 0)
+    assertEquals(success.unsafeRunSync(), 1)
+    assertEquals(optEvaluated, 1)
+    assertEquals(onNoneEvaluated, 0)
+
+    optEvaluated = 0
+    onNoneEvaluated = 0
+    val failure = Eru.fromOption(mkNone(), err())
+    assertEquals(optEvaluated, 0)
+    assertEquals(onNoneEvaluated, 0)
+    val ex = intercept[EruException[String]] { failure.unsafeRunSync() }
+    assertEquals(ex.error, "none")
+    assertEquals(optEvaluated, 1)
+    assertEquals(onNoneEvaluated, 1)
+  }
+
+  test("unit returns () and composes") {
+    val prog = Eru.unit.flatMap(_ => Eru.succeed(123))
+    assertEquals(prog.unsafeRunSync(), 123)
+  }
+
+  test("unsafeRunSync rethrows Throwable even when typed via fail") {
+    val ex = new RuntimeException("typed throwable")
+    val prog: Eru[Throwable, Nothing] = Eru.fail(ex)
+    intercept[RuntimeException] {
+      prog.unsafeRunSync()
+    }
   }
 }

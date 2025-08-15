@@ -13,3 +13,18 @@ Eru is currently in the initial design and development phase.
 ## License
 
 Eru is licensed under the **MIT License**. See the [LICENSE](../LICENSE) file for details.
+
+## Quickstart
+
+Start here for the synchronous core and pure composition patterns:
+- Eru Quickstart — Synchronous Core: [quickstart.md](./quickstart.md)
+
+## Development Playbook
+
+For the point-by-point execution plan aligned with our Manifesto and guidelines, see:
+- Eru Development Playbook — Point-by-Point Plan: [PLAYBOOK.md](./PLAYBOOK.md)
+
+## Async Runtime Direction
+
+The path to fibers, Exit/Cause, cancellation, and observability:
+- Async Runtime Direction — Fibers, Exit/Cause, and Observability: [design/async.md](./design/async.md)

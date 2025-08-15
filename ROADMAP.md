@@ -10,10 +10,12 @@ Current status snapshot
 
 - Implemented
   - Core data type: enum Eru[E, A] with Succeed/Fail/Effect.
-  - Core combinators: map, flatMap, mapError, recover/recoverWith, orElse.
-  - Constructors and interop: succeed, fail, effect, fromEither, fromTry.
-  - Synchronous interpreter: unsafeRunSync using a stack-safe TailRec interpreter; EruException[E] for typed failures at the edge.
+  - Core combinators: map, flatMap, mapError, recover/recoverWith, orElse, zip.
+  - Constructors and interop: succeed, fail, effect, fromEither, fromTry, fromOption, unit.
+  - Safe interpreter helper: attempt (lazy, non-throwing) returning Result[E, A].
+  - Synchronous interpreter: unsafeRunSync using a stack-safe TailRec interpreter; rethrows Throwable failures and wraps non-Throwable typed failures in EruException[E].
   - Foundational data type: enum Result[E, A] with map/flatMap/fold and tests.
+  - Documentation: quickstart (attempt-first guidance) and async direction notes; edge semantics clarified (NonFatal policy; unsafeRunSync behavior).
   - Tests: comprehensive unit tests for Eru and Result via MUnit.
 - Not yet implemented
   - Resource management (Eru.Resource, bracket/ensure) and scopes.
@@ -25,12 +27,12 @@ Current status snapshot
 
 Milestones and deliverables
 
-0.1.0 — Core synchronous kernel (Target: 2025-09)
+0.1.0 — Core synchronous kernel (Target: 2025-09) — Completed (internal): 2025-08-15
 
 - Status-driven goals
-  - Finalize the minimal API surface for synchronous programs. [in progress]
-  - Ensure exhaustive Scaladoc for all public APIs (Eru, Result, EruException). [in progress]
-  - Strengthen unit tests to cover edge cases (nested recover, error mapping, left-biasing). [in progress]
+  - Finalize the minimal API surface for synchronous programs. [done]
+  - Ensure exhaustive Scaladoc for all public APIs (Eru, Result, EruException). [done]
+  - Strengthen unit tests to cover edge cases (nested recover, error mapping, left-biasing). [done]
 - Deliverables
   - Eru: attempt (to capture errors in Result), fromOption, unit helpers; zip for sequential composition.
   - Result: convenience constructors and syntax parity with Eru where appropriate.

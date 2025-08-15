@@ -46,6 +46,10 @@ enum Eru[+E, +A] {
     */
   private case Zip[E0, E1, A0, B0](left: Eru[E0, A0], right: Eru[E1, B0]) extends Eru[E0 | E1, (A0, B0)]
 
+  /** Represents interpreting a computation to a `Result` value without failure at the type level.
+    */
+  private case Attempt[E0, A0](source: Eru[E0, A0]) extends Eru[Nothing, Result[E0, A0]]
+
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
     *
@@ -124,17 +128,31 @@ enum Eru[+E, +A] {
     pf: PartialFunction[E, Eru[E2, A1]]
   ): Eru[E | E2, A1] = RecoverWith(this, pf)
 
+  /** Interprets this computation into a `Result[E, A]` value without throwing, preserving laziness.
+    *
+    * The returned program never fails at the type level.
+    *
+    * @return
+    *   an `Eru[Nothing, Result[E, A]]` that yields `Success(a)` or `Failure(e)` when run.
+    */
+  final def attempt: Eru[Nothing, Result[E, A]] = Attempt(this)
+
   /** Executes this computation synchronously and returns the result.
     *
     * WARNING: This method is unsafe because it can perform arbitrary side effects and may throw
     * exceptions. It should only be used at the edge of your program or in testing scenarios.
     *
+    * Failure semantics:
+    *   - If the computation fails with a `Throwable`, that throwable is rethrown as-is.
+    *   - If the computation fails with a non-`Throwable` typed error `E`, it is wrapped in an
+    *     `EruException[E]`.
+    *
     * @return
     *   the result of executing this computation.
     * @throws EruException
-    *   if the computation fails with a typed error `E`.
+    *   if the computation fails with a typed error `E` (non-`Throwable`).
     * @throws Throwable
-    *   if the computation fails with an untyped exception.
+    *   if the computation fails with an untyped exception (a `Throwable`).
     */
   final def unsafeRunSync(): A = Eru.interpreter.runSync(this)
 }
@@ -160,6 +178,8 @@ object Eru {
   /** Creates an `Eru[Throwable, A]` that represents a synchronous, side-effecting computation. The
     * computation is suspended lazily and will not be executed until `unsafeRunSync` is called. Any
     * `NonFatal` exception thrown during evaluation will be caught and returned as a failure.
+    *
+    * Fatal errors (e.g., `VirtualMachineError`) are not caught and will escape.
     *
     * @param computation
     *   the computation to suspend (by-name).
@@ -194,6 +214,28 @@ object Eru {
   def fromTry[A](t: => scala.util.Try[A]): Eru[Throwable, A] =
     effect(t.get)
 
+  /** Creates an `Eru[E, A]` from an `Option[A]`, failing with `onNone` when `opt` is `None`.
+    *
+    * Both `opt` and `onNone` are evaluated lazily when the returned program is run.
+    *
+    * @param opt
+    *   the optional value (by-name)
+    * @param onNone
+    *   the error to produce when `opt` is `None` (by-name)
+    * @return
+    *   an `Eru[E, A]` that succeeds with the contained value or fails with `onNone`
+    */
+  def fromOption[E, A](opt: => Option[A], onNone: => E): Eru[E, A] =
+    succeed(()).flatMap { _ =>
+      opt match {
+        case Some(a) => succeed(a)
+        case None => fail(onNone)
+      }
+    }
+
+  /** A successful `Eru` containing `Unit`. */
+  val unit: Eru[Nothing, Unit] = succeed(())
+
   /** The private, cast-free, and stack-safe interpreter for the Eru data type. */
   private object interpreter {
 
@@ -201,7 +243,11 @@ object Eru {
       */
     def runSync[E, A](start: Eru[E, A]): A =
       run(start).result match {
-        case Left(error) => throw EruException(error)
+        case Left(error) =>
+          error match {
+            case t: Throwable => throw t
+            case e => throw EruException(e)
+          }
         case Right(value) => value
       }
 
@@ -248,6 +294,12 @@ object Eru {
               case Left(e1) => Left(e1)
             }
           case Left(e0) => done(Left(e0))
+        }
+
+      case Attempt(source) =>
+        tailcall(run(source)).map {
+          case Left(e) => Right(Result.Failure(e))
+          case Right(a) => Right(Result.Success(a))
         }
     }
   }
