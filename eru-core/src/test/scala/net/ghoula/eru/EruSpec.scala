@@ -159,31 +159,36 @@ class EruSpec extends FunSuite {
   }
 
   test("Eru is covariant in success type") {
-    val stringValue: Eru[String] = Eru.succeed("value")
-    val anyValue: Eru[Any] = stringValue
+    val stringValue: Eru[Nothing, String] = Eru.succeed("value")
+    val anyValue: Eru[Nothing, Any] = stringValue
     assertEquals(anyValue.unsafeRunSync(), "value")
   }
 
   test("map preserves type covariance") {
-    val intEru: Eru[Int] = Eru.succeed(42)
-    val stringEru: Eru[String] = intEru.map(_.toString)
+    val intEru: Eru[Nothing, Int] = Eru.succeed(42)
+    val stringEru: Eru[Nothing, String] = intEru.map(_.toString)
     assertEquals(stringEru.unsafeRunSync(), "42")
   }
 
   test("flatMap maintains type safety") {
-    val eru: Eru[String] = Eru.succeed(5).flatMap(x => Eru.succeed(x.toString))
+    val eru: Eru[Nothing, String] = Eru.succeed(5).flatMap(x => Eru.succeed(x.toString))
     assertEquals(eru.unsafeRunSync(), "5")
   }
 
   test("effect with side effects executes correctly") {
     var sideEffectCounter = 0
     val eru = Eru.effect {
+      println(s"[DEBUG_LOG] Side effect executing, counter was: $sideEffectCounter")
       sideEffectCounter += 1
+      println(s"[DEBUG_LOG] Side effect executed, counter now: $sideEffectCounter")
       sideEffectCounter
     }
 
+    println(s"[DEBUG_LOG] Before assertions, counter: $sideEffectCounter")
     assertEquals(sideEffectCounter, 0, "Side effect should not execute until run")
+    println("[DEBUG_LOG] About to call unsafeRunSync")
     val result = eru.unsafeRunSync()
+    println(s"[DEBUG_LOG] After unsafeRunSync, result: $result, counter: $sideEffectCounter")
     assertEquals(result, 1)
     assertEquals(sideEffectCounter, 1, "Side effect should execute exactly once")
   }
@@ -247,5 +252,329 @@ class EruSpec extends FunSuite {
     intercept[RuntimeException] {
       eru.unsafeRunSync()
     }
+  }
+
+  // ================== ERROR HANDLING TESTS ==================
+
+  test("Eru.fail creates a failed Eru") {
+    val eru = Eru.fail("error message")
+
+    val exception = intercept[EruException[String]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, "error message")
+  }
+
+  test("Eru.fail is covariant in error type") {
+    val stringError: Eru[String, Nothing] = Eru.fail("error")
+    val anyError: Eru[Any, Nothing] = stringError
+
+    val exception = intercept[EruException[Any]] {
+      anyError.unsafeRunSync()
+    }
+    assertEquals(exception.error, "error")
+  }
+
+  test("mapError transforms error type on failure") {
+    val eru = Eru.fail("original error").mapError(_.length)
+
+    val exception = intercept[EruException[Int]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, 14) // "original error".length
+  }
+
+  test("mapError leaves success unchanged") {
+    val eru = Eru.succeed(42).mapError((_: String) => 999)
+    assertEquals(eru.unsafeRunSync(), 42)
+  }
+
+  test("mapError is lazy - transformation function not called on success") {
+    var called = false
+    val eru = Eru.succeed(42).mapError { (s: String) =>
+      called = true
+      s.length
+    }
+    assertEquals(eru.unsafeRunSync(), 42)
+    assert(!called, "mapError function should not be called on success")
+  }
+
+  test("recover converts specific errors to success values") {
+    val eru = Eru.fail("recoverable error").recover {
+      case "recoverable error" => "recovered"
+      case _ => "not recovered"
+    }
+    assertEquals(eru.unsafeRunSync(), "recovered")
+  }
+
+  test("recover leaves unmatched errors as failures") {
+    val eru = Eru.fail("unmatched error").recover { case "recoverable error" =>
+      "recovered"
+    }
+
+    val exception = intercept[EruException[String]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, "unmatched error")
+  }
+
+  test("recover leaves success values unchanged") {
+    val eru = Eru.succeed(42).recover { case _ =>
+      999
+    }
+    assertEquals(eru.unsafeRunSync(), 42)
+  }
+
+  test("recoverWith provides alternative computations for errors") {
+    val eru = Eru.fail("recoverable error").recoverWith {
+      case "recoverable error" => Eru.succeed("recovered")
+      case _ => Eru.fail("alternative error")
+    }
+    assertEquals(eru.unsafeRunSync(), "recovered")
+  }
+
+  test("recoverWith can transform to different error types") {
+    val eru = Eru.fail("string error").recoverWith { case "string error" =>
+      Eru.fail(404)
+    }
+
+    val exception = intercept[EruException[String | Int]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, 404)
+  }
+
+  test("recoverWith leaves unmatched errors as failures") {
+    val eru = Eru.fail("unmatched error").recoverWith { case "recoverable error" =>
+      Eru.succeed("recovered")
+    }
+
+    val exception = intercept[EruException[String]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, "unmatched error")
+  }
+
+  test("recoverWith leaves success values unchanged") {
+    val eru = Eru.succeed(42).recoverWith { case _ =>
+      Eru.succeed(999)
+    }
+    assertEquals(eru.unsafeRunSync(), 42)
+  }
+
+  test("orElse provides fallback computation on failure") {
+    val eru = Eru.fail("first error").orElse(Eru.succeed("fallback"))
+    assertEquals(eru.unsafeRunSync(), "fallback")
+  }
+
+  test("orElse returns original success without evaluating fallback") {
+    var fallbackEvaluated = false
+    val eru = Eru.succeed(42).orElse {
+      fallbackEvaluated = true
+      Eru.succeed(999)
+    }
+    assertEquals(eru.unsafeRunSync(), 42)
+    assert(!fallbackEvaluated, "Fallback should not be evaluated on success")
+  }
+
+  test("orElse can combine different error types") {
+    val eru = Eru.fail("string error").orElse(Eru.fail(404))
+
+    val exception = intercept[EruException[String | Int]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, 404)
+  }
+
+  test("orElse is lazy - fallback not evaluated immediately") {
+    var evaluated = false
+    val eru = Eru.fail("error").orElse {
+      evaluated = true
+      Eru.succeed("fallback")
+    }
+    assert(!evaluated, "Fallback should not be evaluated immediately")
+    assertEquals(eru.unsafeRunSync(), "fallback")
+    assert(evaluated, "Fallback should be evaluated when run")
+  }
+
+  // ================== CONSTRUCTOR TESTS ==================
+
+  test("fromEither creates success from Right") {
+    val either: Either[String, Int] = Right(42)
+    val eru = Eru.fromEither(either)
+    assertEquals(eru.unsafeRunSync(), 42)
+  }
+
+  test("fromEither creates failure from Left") {
+    val either: Either[String, Int] = Left("error")
+    val eru = Eru.fromEither(either)
+
+    val exception = intercept[EruException[String]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, "error")
+  }
+
+  test("fromTry creates success from successful Try") {
+    import scala.util.{Success, Try}
+    val t: Try[Int] = Success(42)
+    val eru = Eru.fromTry(t)
+    assertEquals(eru.unsafeRunSync(), 42)
+  }
+
+  test("fromTry creates failure from failed Try") {
+    import scala.util.{Failure, Try}
+    val exception = new RuntimeException("try error")
+    val t: Try[Int] = Failure(exception)
+    val eru = Eru.fromTry(t)
+
+    val caught = intercept[EruException[Throwable]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(caught.error, exception)
+  }
+
+  test("fromTry is lazy - Try evaluation is suspended") {
+    var evaluated = false
+    val eru = Eru.fromTry {
+      evaluated = true
+      scala.util.Success(42)
+    }
+    assert(!evaluated, "Try should not be evaluated immediately")
+    assertEquals(eru.unsafeRunSync(), 42)
+    assert(evaluated, "Try should be evaluated when run")
+  }
+
+  // ================== ERUEXCEPTION TESTS ==================
+
+  test("EruException wraps error correctly") {
+    val error = "test error"
+    val exception = EruException(error)
+    assertEquals(exception.error, error)
+  }
+
+  test("EruException toString includes error") {
+    val error = "test error"
+    val exception = EruException(error)
+    assertEquals(exception.toString, "EruException(test error)")
+  }
+
+  test("EruException getMessage uses error toString") {
+    val error = "test error"
+    val exception = EruException(error)
+    assertEquals(exception.getMessage, "test error")
+  }
+
+  test("EruException handles None error") {
+    val exception = EruException(None)
+    assertEquals(exception.getMessage, "None")
+  }
+
+  // ================== ERROR PROPAGATION TESTS ==================
+
+  test("map preserves errors") {
+    val eru = Eru.fail("error").map((_: Int) * 2)
+
+    val exception = intercept[EruException[String]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, "error")
+  }
+
+  test("flatMap preserves errors from source") {
+    val eru = Eru.fail("error").flatMap((_: Int) => Eru.succeed("transformed"))
+
+    val exception = intercept[EruException[String]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, "error")
+  }
+
+  test("flatMap preserves errors from transformation function") {
+    val eru = Eru.succeed(42).flatMap(_ => Eru.fail("transformation error"))
+
+    val exception = intercept[EruException[String]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, "transformation error")
+  }
+
+  test("chained operations preserve first error") {
+    val eru = Eru
+      .fail("first error")
+      .map((_: Int) * 2)
+      .flatMap(x => Eru.succeed(x.toString))
+      .map(_.length)
+
+    val exception = intercept[EruException[String]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, "first error")
+  }
+
+  // ================== COMPLEX ERROR SCENARIOS ==================
+
+  test("complex error recovery chain") {
+    val eru = Eru.fail("initial error").recover { case "initial error" =>
+      throw new RuntimeException("recovery failed")
+    }
+
+    intercept[RuntimeException] {
+      eru.unsafeRunSync()
+    }
+  }
+
+  test("single level recoverWith with error transformation") {
+    // Test that recoverWith can transform one error type to another
+    val eru = Eru.fail("string error").recoverWith { case "string error" =>
+      Eru.fail(404)
+    }
+
+    val exception = intercept[EruException[String | Int]] {
+      eru.unsafeRunSync()
+    }
+    assertEquals(exception.error, 404)
+  }
+
+  test("orElse with immediate success fallback") {
+    // Test simple orElse with success fallback
+    val eru = Eru.fail("error").orElse(Eru.succeed("fallback"))
+    assertEquals(eru.unsafeRunSync(), "fallback")
+  }
+
+  test("complex error recovery with mixed operations") {
+    // Test combination of mapError and recover
+    val eru = Eru
+      .fail("original")
+      .mapError(_.toUpperCase)
+      .recover { case "ORIGINAL" =>
+        "recovered from uppercase"
+      }
+    assertEquals(eru.unsafeRunSync(), "recovered from uppercase")
+  }
+
+  test("flatMap after recoverWith should not cause infinite loop") {
+    // This test reproduces the infinite loop bug in runLoop
+    // When Chain(RecoverWith(...), f) is processed, the current implementation
+    // creates subSource.recoverWith(pf).flatMap(f) which is structurally identical
+    val eru = Eru
+      .fail("error")
+      .recoverWith { case "error" => Eru.succeed(42) }
+      .flatMap(x => Eru.succeed(x * 2))
+
+    assertEquals(eru.unsafeRunSync(), 84)
+  }
+
+  test("flatMap after mapError should not cause infinite loop") {
+    // This test reproduces the infinite loop bug in runLoop
+    // When Chain(MapError(...), f) is processed, the current implementation
+    // creates subSource.mapError(g).flatMap(f) which is structurally identical
+    val eru = Eru
+      .fail("error")
+      .mapError(_.toUpperCase)
+      .flatMap(_ => Eru.succeed("should not reach here"))
+      .recover { case "ERROR" => "recovered" }
+
+    assertEquals(eru.unsafeRunSync(), "recovered")
   }
 }
