@@ -1,81 +1,89 @@
-Of course. Based on our finalized manifesto, here is a comprehensive roadmap for the **Eru** project. This roadmap is designed to build a library that is not just powerful and correct but is also a definitive example of what a Scala 3 effect system can and should be.
+# Eru Roadmap
 
-***
+Mission: Build the definitive effect system for the discerning Scala 3 developer, grounded in the pillars of Correctness, Radical Ergonomics, a Pit of Success, and Exceptional Observability.
 
-### **The Eru Project Roadmap**
-
-**Mission:** To create the definitive effect system for the discerning Scala 3 developer, built on the pillars of **Correctness**, **Radical Ergonomics**, a **"Pit of Success"**, and **Exceptional Observability**.
+Last updated: 2025-08-15
 
 ---
 
-### ## Phase 1: The Foundation (Core Implementation)
+Current status snapshot
 
-**Goal:** To build a stable, correct, and performant core that embodies our foundational principles. This phase focuses on the internal correctness and the initial, minimal public API.
-
-**Key Initiatives:**
-
-1.  **Establish the Core Data Types (Pillar: Correctness):**
-    * Create the `Eru[A]` data type as a pure, lawful, and immutable description of a program.
-    * Implement the `Eru.Resource[A]` data type, ensuring its logic for acquisition and release is provably safe and tightly integrated with `Eru`'s cancellation model.
-    * Use opaque types for internal concepts like `FiberId` and `Scope` to ensure domain integrity from day one.
-
-2.  **Develop the High-Performance Runtime (Pillar: A "Pit of Success"):**
-    * Implement the initial version of the fiber-based runtime scheduler, drawing inspiration from the work-stealing and fairness principles of best-in-class runtimes.
-    * Create the `Eru.blocking(...)` construct and ensure the runtime safely shifts this work to a dedicated, unbounded thread pool.
-
-3.  **Implement the Core API (Pillar: Radical Ergonomics):**
-    * Implement the fundamental, lawful combinators: `map`, `flatMap`, `zip`, `race`.
-    * Build the essential concurrency primitives: `Ref`, `Deferred`, `Semaphore`.
-    * Create the `unsafeRun...` methods that serve as the "end of the world" entry points for executing `Eru` programs.
-
-4.  **Initial Observability Hooks (Pillar: Exceptional Observability):**
-    * Implement the initial version of the `EruObserver` interface, establishing the standard pattern for runtime instrumentation.
-
-* **Outcome of Phase 1:** A minimal, but incredibly solid, `Eru` core. It will be usable, correct, and performant, ready to be consumed by its first user: the `Valar` library.
+- Implemented
+  - Core data type: enum Eru[E, A] with Succeed/Fail/Effect.
+  - Core combinators: map, flatMap, mapError, recover/recoverWith, orElse.
+  - Constructors and interop: succeed, fail, effect, fromEither, fromTry.
+  - Synchronous interpreter: unsafeRunSync using a stack-safe TailRec interpreter; EruException[E] for typed failures at the edge.
+  - Foundational data type: enum Result[E, A] with map/flatMap/fold and tests.
+  - Tests: comprehensive unit tests for Eru and Result via MUnit.
+- Not yet implemented
+  - Resource management (Eru.Resource, bracket/ensure) and scopes.
+  - Concurrency runtime (fibers/scheduler), blocking region, and concurrency primitives (Ref, Deferred, Semaphore).
+  - Observability (EruObserver), structured diagnostics, and debug combinators.
+  - Integration: Valar (first integration target; major refactor deferred post 0.3.0); other modules (e.g., Future interop, fs2/http4s).
 
 ---
 
-### ## Phase 2: Maturation (Enriching the Developer Experience)
+Milestones and deliverables
 
-**Goal:** To build upon the correct foundation with features that make `Eru` a joy to use, fulfilling the promise of radical ergonomics and exceptional observability.
+0.1.0 — Core synchronous kernel (Target: 2025-09)
 
-**Key Initiatives:**
+- Status-driven goals
+  - Finalize the minimal API surface for synchronous programs. [in progress]
+  - Ensure exhaustive Scaladoc for all public APIs (Eru, Result, EruException). [in progress]
+  - Strengthen unit tests to cover edge cases (nested recover, error mapping, left-biasing). [in progress]
+- Deliverables
+  - Eru: attempt (to capture errors in Result), fromOption, unit helpers; zip for sequential composition.
+  - Result: convenience constructors and syntax parity with Eru where appropriate.
+  - Documentation: README status update, quickstart examples using only synchronous APIs.
+  - Quality gates: sbt check and eruCoreJVM/test pass on CI.
 
-1.  **Enrich the Fluent API (Pillar: Radical Ergonomics):**
-    * Add the "batteries-included" helper methods directly to the `Eru` type: `.retry`, `.timeout`, `.cached`, `.debounce`, etc.
-    * Develop the powerful `.debug` combinator, which will tap into the runtime's observability hooks to provide beautifully formatted lifecycle tracing for any effect.
+0.2.0 — Resource safety and observability foundations (Target: 2025-12)
 
-2.  **Enhance the Type System Integration (Pillar: Correctness):**
-    * Explore and implement advanced APIs that leverage match types, intersection types, and union types to provide unprecedented compile-time safety and expressiveness.
-    * This is where we will create the type-safe error-handling patterns and dependency-injection mechanisms that set `Eru` apart.
+- Pillars: Correctness, Pit of Success, Exceptional Observability
+- Deliverables
+  - Eru.Resource with acquisition/use/release semantics; ensure and bracket patterns; opaque types for Scope/FiberId prepared.
+  - EruObserver interface and minimal event model; .debug combinator backed by observer.
+  - Typed error model guidance and structured diagnostics for interpreter failures.
+  - Property-based tests for Resource laws; documentation and guides in docs-src.
 
-3.  **Flesh out the Observability Suite (Pillar: Exceptional Observability):**
-    * Refine the `EruObserver` to provide rich, structured data for all runtime events.
-    * Ensure that all errors produced by the `Eru` runtime are rich diagnostic objects containing contextual information (e.g., Fiber IDs, source locations captured via macros).
+0.3.0 — Concurrency and interop beta (Target: 2026-03)
 
-4.  **The `Valar` Refactoring:**
-    * Throughout this phase, the `Valar` project will be refactored to use these new, maturing features. This "dogfooding" process provides a crucial, real-world feedback loop that ensures our ergonomic and observability features are genuinely practical and well-designed.
+- Pillars: Pit of Success, Radical Ergonomics
+- Deliverables
+  - Minimal fiber scheduler and safe blocking region (Eru.blocking).
+  - Concurrency primitives: Ref, Deferred, Semaphore; parallel combinators (zipPar, race).
+  - Time and resilience: timeout, retry policies.
+  - Interop: Future <-> Eru conversions.
 
-* **Outcome of Phase 2:** `Eru` becomes a truly compelling and unique library. It's no longer just correct; it's a pleasure to work with, debug, and reason about.
+0.4.0 — Ecosystem integrations and DX (Target: 2026-05)
+
+- Deliverables
+  - Modules: eru-fs2, eru-http4s and example apps.
+  - Valar: refactor validation runtime on Eru (post 0.3.0), migration docs, CI verification.
+  - Documentation site with guides, API docs, and deep-dive articles; Valar-based onboarding path.
+  - Benchmarks and performance regression checks.
+
+1.0.0 — Stability and stewardship (Target: 2026-08)
+
+- Deliverables
+  - API stabilization policy and semantic versioning guarantees.
+  - Lawfulness suite published and automated; migration guides.
+  - Final docs and examples; long-term maintenance plan.
 
 ---
 
-### ## Phase 3: The Ecosystem (Integration and Community)
+Development workflow (unbreakable)
 
-**Goal:** To establish `Eru` as a pillar of the Scala 3 ecosystem by providing seamless interoperability and fostering a community around it.
+- Understand the task by referencing the Manifesto pillars.
+- Implement with modern Scala 3 features (enum ADTs, opaque types, extension methods, given/using) to uphold domain integrity and ergonomics.
+- Tests: every public API change must be covered with comprehensive unit and, where applicable, property-based tests.
+- Local checks before pushing
+  - sbt check
+  - sbt eruCoreJVM/test and sbt eruCoreNative/test
+  - sbt prepare
 
-**Key Initiatives:**
+Notes on design directives
 
-1.  **Develop Core Integrations (Pillar: A "Pit of Success"):**
-    * Create and publish the essential integration modules: `eru-fs2`, `eru-http4s`, etc. These modules will provide the lawful and ergonomic bridges that allow developers to use `Eru` with their favorite specialized libraries.
-    * Provide best-in-class interoperability with `Future` and other standard library types to make adoption easy in existing codebases.
-
-2.  **World-Class Documentation and Onboarding (Pillar: Radical Ergonomics):**
-    * Write comprehensive documentation that is not just a reference, but a guide. It will explain the "why" behind the design decisions.
-    * Heavily feature the `Valar` library in the documentation as the primary "on-ramp," showing developers how to solve a real problem and learn `Eru` in the process.
-
-3.  **Community and Lawfulness (Pillar: Correctness):**
-    * Publish property-based tests that prove the lawfulness of `Eru`'s core typeclasses. This builds deep trust with the functional programming community.
-    * Reach a stable `1.0.0` release and establish a clear policy for API stability and evolution.
-
-* **Outcome of Phase 3:** `Eru` is a mature, trusted, and well-integrated member of the Scala 3 ecosystem, known for its unique combination of correctness, power, and developer-centric design.
+- Prefer enum for ADTs and opaque types for identities like FiberId and Scope.
+- Favor extension methods for fluent APIs on Eru[A].
+- Embrace intersection/union types to precisely encode requirements and outcomes.

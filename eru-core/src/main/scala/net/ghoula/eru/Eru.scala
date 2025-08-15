@@ -17,8 +17,6 @@ import scala.util.control.TailCalls.{done, tailcall, TailRec}
   */
 enum Eru[+E, +A] {
 
-  // --- Core Data Constructors (private to enforce use of smart constructors) ---
-
   /** Represents a pure, succeeding computation containing a value of type `A`. */
   private case Succeed(value: A) extends Eru[Nothing, A]
 
@@ -43,7 +41,10 @@ enum Eru[+E, +A] {
   /** Represents a transformation of the error type. */
   private case MapError[E0, A0, +E2](source: Eru[E0, A0], f: E0 => E2) extends Eru[E2, A0]
 
-  // --- Public API ---
+  /** Represents the combination of two computations, evaluated left then right, producing a pair of
+    * their results.
+    */
+  private case Zip[E0, E1, A0, B0](left: Eru[E0, A0], right: Eru[E1, B0]) extends Eru[E0 | E1, (A0, B0)]
 
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
@@ -74,6 +75,23 @@ enum Eru[+E, +A] {
     *   a new `Eru` with the transformed error type.
     */
   final def mapError[E2](f: E => E2): Eru[E2, A] = MapError(this, f)
+
+  /** Combines this computation with another, producing a pair of their results.
+    *
+    * The resulting computation first evaluates this computation. If it succeeds, it then evaluates
+    * the other computation. If either computation fails, the combined computation fails with that
+    * error.
+    *
+    * @param that
+    *   the other computation to combine with this one.
+    * @tparam E2
+    *   the error type of the other computation.
+    * @tparam B
+    *   the success type of the other computation.
+    * @return
+    *   an `Eru[E | E2, (A, B)]` that represents the sequential combination of both computations.
+    */
+  final def zip[E2, B](that: Eru[E2, B]): Eru[E | E2, (A, B)] = Zip(this, that)
 
   /** Provides a fallback computation to run if this one fails, regardless of the error.
     *
@@ -220,6 +238,16 @@ object Eru {
       case MapError(source, f) =>
         tailcall(run(source)).map { either =>
           either.left.map(f)
+        }
+
+      case Zip(left, right) =>
+        tailcall(run(left)).flatMap {
+          case Right(a) =>
+            tailcall(run(right)).map {
+              case Right(b) => Right((a, b))
+              case Left(e1) => Left(e1)
+            }
+          case Left(e0) => done(Left(e0))
         }
     }
   }

@@ -445,6 +445,37 @@ class EruSpec extends FunSuite {
     assert(evaluated, "Try should be evaluated when run")
   }
 
+  // ================== ZIP COMBINATOR TESTS ==================
+
+  test("zip combines two successful computations into a tuple") {
+    val a = Eru.succeed(1)
+    val b = Eru.succeed("a")
+    val zipped = a.zip(b)
+    assertEquals(zipped.unsafeRunSync(), (1, "a"))
+  }
+
+  test("zip short-circuits on left failure and does not evaluate right") {
+    var rightEvaluated = false
+    val left = Eru.fail("left error")
+    val right = Eru.effect { rightEvaluated = true; 42 }
+
+    val ex = intercept[EruException[String | Throwable]] {
+      left.zip(right).unsafeRunSync()
+    }
+    assertEquals(ex.error, "left error")
+    assert(!rightEvaluated, "Right side should not be evaluated when left fails")
+  }
+
+  test("zip propagates right failure when left succeeds") {
+    val left = Eru.succeed(1)
+    val right = Eru.fail("right error")
+
+    val ex = intercept[EruException[String]] {
+      left.zip(right).unsafeRunSync()
+    }
+    assertEquals(ex.error, "right error")
+  }
+
   // ================== ERUEXCEPTION TESTS ==================
 
   test("EruException wraps error correctly") {
