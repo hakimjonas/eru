@@ -8,7 +8,7 @@ This project is guided by a strong philosophical vision for what a modern effect
 
 ## Status
 
-Eru is currently in the initial design and development phase.
+0.2.0 — Resource safety and observability foundations are complete (internal waypoint; not released). See the [ROADMAP](../ROADMAP.md) for upcoming milestones.
 
 ## License
 

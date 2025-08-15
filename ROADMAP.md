@@ -15,12 +15,13 @@ Current status snapshot
   - Safe interpreter helper: attempt (lazy, non-throwing) returning Result[E, A].
   - Synchronous interpreter: unsafeRunSync using a stack-safe TailRec interpreter; rethrows Throwable failures and wraps non-Throwable typed failures in EruException[E].
   - Foundational data type: enum Result[E, A] with map/flatMap/fold and tests.
-  - Documentation: quickstart (attempt-first guidance) and async direction notes; edge semantics clarified (NonFatal policy; unsafeRunSync behavior).
-  - Tests: comprehensive unit tests for Eru and Result via MUnit.
+  - Resource safety foundations: ensure/bracket with FILO finalizer ordering; finalizer error suppression; tests.
+  - Observability foundations: EruObserver primitives (ScopeId, Outcome, EruEvent), .debug, observer-aware interpreter emitting ProgramStart/ProgramEnd after finalizers.
+  - Documentation: quickstart (attempt-first guidance), resources and observer guides; async direction notes; edge semantics clarified (NonFatal policy; unsafeRunSync behavior).
+  - Tests: comprehensive unit tests for Eru, Resource, Observer; all green on JVM; Native parity planned.
 - Not yet implemented
-  - Resource management (Eru.Resource, bracket/ensure) and scopes.
   - Concurrency runtime (fibers/scheduler), blocking region, and concurrency primitives (Ref, Deferred, Semaphore).
-  - Observability (EruObserver), structured diagnostics, and debug combinators.
+  - Property-based tests for Resource laws (0.2.x) and diagnostics enhancements.
   - Integration: Valar (first integration target; major refactor deferred post 0.3.0); other modules (e.g., Future interop, fs2/http4s).
 
 ---
@@ -39,7 +40,7 @@ Milestones and deliverables
   - Documentation: README status update; quickstart examples using only synchronous APIs; edge semantics clarified (NonFatal policy; unsafeRunSync Throwable rethrow vs EruException). Links: docs-src/quickstart.md, docs-src/design/async.md.
   - Quality gates: sbt check and eruCoreJVM/test pass on CI.
 
-0.2.0 — Resource safety and observability foundations (Target: 2025-12)
+0.2.0 — Resource safety and observability foundations (Target: 2025-12) — Foundations implemented (internal): 2025-08-15
 
 - Pillars: Correctness, Pit of Success, Exceptional Observability
 - Deliverables
