@@ -178,17 +178,12 @@ class EruSpec extends FunSuite {
   test("effect with side effects executes correctly") {
     var sideEffectCounter = 0
     val eru = Eru.effect {
-      println(s"[DEBUG_LOG] Side effect executing, counter was: $sideEffectCounter")
       sideEffectCounter += 1
-      println(s"[DEBUG_LOG] Side effect executed, counter now: $sideEffectCounter")
       sideEffectCounter
     }
 
-    println(s"[DEBUG_LOG] Before assertions, counter: $sideEffectCounter")
     assertEquals(sideEffectCounter, 0, "Side effect should not execute until run")
-    println("[DEBUG_LOG] About to call unsafeRunSync")
     val result = eru.unsafeRunSync()
-    println(s"[DEBUG_LOG] After unsafeRunSync, result: $result, counter: $sideEffectCounter")
     assertEquals(result, 1)
     assertEquals(sideEffectCounter, 1, "Side effect should execute exactly once")
   }
@@ -254,8 +249,6 @@ class EruSpec extends FunSuite {
     }
   }
 
-  // ================== ERROR HANDLING TESTS ==================
-
   test("Eru.fail creates a failed Eru") {
     val eru = Eru.fail("error message")
 
@@ -281,7 +274,7 @@ class EruSpec extends FunSuite {
     val exception = intercept[EruException[Int]] {
       eru.unsafeRunSync()
     }
-    assertEquals(exception.error, 14) // "original error".length
+    assertEquals(exception.error, 14)
   }
 
   test("mapError leaves success unchanged") {
@@ -397,8 +390,6 @@ class EruSpec extends FunSuite {
     assert(evaluated, "Fallback should be evaluated when run")
   }
 
-  // ================== CONSTRUCTOR TESTS ==================
-
   test("fromEither creates success from Right") {
     val either: Either[String, Int] = Right(42)
     val eru = Eru.fromEither(either)
@@ -445,8 +436,6 @@ class EruSpec extends FunSuite {
     assert(evaluated, "Try should be evaluated when run")
   }
 
-  // ================== ZIP COMBINATOR TESTS ==================
-
   test("zip combines two successful computations into a tuple") {
     val a = Eru.succeed(1)
     val b = Eru.succeed("a")
@@ -476,8 +465,6 @@ class EruSpec extends FunSuite {
     assertEquals(ex.error, "right error")
   }
 
-  // ================== ERUEXCEPTION TESTS ==================
-
   test("EruException wraps error correctly") {
     val error = "test error"
     val exception = EruException(error)
@@ -500,8 +487,6 @@ class EruSpec extends FunSuite {
     val exception = EruException(None)
     assertEquals(exception.getMessage, "None")
   }
-
-  // ================== ERROR PROPAGATION TESTS ==================
 
   test("map preserves errors") {
     val eru = Eru.fail("error").map((_: Int) * 2)
@@ -543,8 +528,6 @@ class EruSpec extends FunSuite {
     assertEquals(exception.error, "first error")
   }
 
-  // ================== COMPLEX ERROR SCENARIOS ==================
-
   test("complex error recovery chain") {
     val eru = Eru.fail("initial error").recover { case "initial error" =>
       throw new RuntimeException("recovery failed")
@@ -556,7 +539,6 @@ class EruSpec extends FunSuite {
   }
 
   test("single level recoverWith with error transformation") {
-    // Test that recoverWith can transform one error type to another
     val eru = Eru.fail("string error").recoverWith { case "string error" =>
       Eru.fail(404)
     }
@@ -568,13 +550,11 @@ class EruSpec extends FunSuite {
   }
 
   test("orElse with immediate success fallback") {
-    // Test simple orElse with success fallback
     val eru = Eru.fail("error").orElse(Eru.succeed("fallback"))
     assertEquals(eru.unsafeRunSync(), "fallback")
   }
 
   test("complex error recovery with mixed operations") {
-    // Test combination of mapError and recover
     val eru = Eru
       .fail("original")
       .mapError(_.toUpperCase)
@@ -585,9 +565,6 @@ class EruSpec extends FunSuite {
   }
 
   test("flatMap after recoverWith should not cause infinite loop") {
-    // This test reproduces the infinite loop bug in runLoop
-    // When Chain(RecoverWith(...), f) is processed, the current implementation
-    // creates subSource.recoverWith(pf).flatMap(f) which is structurally identical
     val eru = Eru
       .fail("error")
       .recoverWith { case "error" => Eru.succeed(42) }
@@ -597,9 +574,6 @@ class EruSpec extends FunSuite {
   }
 
   test("flatMap after mapError should not cause infinite loop") {
-    // This test reproduces the infinite loop bug in runLoop
-    // When Chain(MapError(...), f) is processed, the current implementation
-    // creates subSource.mapError(g).flatMap(f) which is structurally identical
     val eru = Eru
       .fail("error")
       .mapError(_.toUpperCase)
