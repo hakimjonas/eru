@@ -59,21 +59,11 @@ object EruRuntime {
       queue.enqueue(thunk)
 
     def pumpUntil(done: () => Boolean): Unit =
-      while (!done() && queue.nonEmpty) do {
+      while !done() && queue.nonEmpty do {
         val task = queue.dequeue()
         task()
       }
   }
-
-  private def exitFromResult[E, A](result: Result[E, A]): Exit[E, A] =
-    result match {
-      case Result.Success(value) => Exit.Success(value)
-      case Result.Failure(err) =>
-        err match {
-          case t: Throwable => Exit.Die(t)
-          case e => Exit.Failure(e)
-        }
-    }
 
   /** Forks a computation into a fiber and returns it immediately.
     *
@@ -112,8 +102,9 @@ object EruRuntime {
         new CompletedFiber[E, A](fid, exit)
     }
 
-  /** Cooperative yield (placeholder). */
-  def yieldNow: Eru[Nothing, Unit] = Eru.unit
+  /** Cooperative yield: suspends the current fiber and reschedules it on the next turn. */
+  private val YieldMarker = "__eru_yield_now__"
+  def yieldNow: Eru[Nothing, Unit] = Eru.unit.debug(YieldMarker)
 
   /** Makes a region uninterruptible (placeholder semantics for now). */
   def uninterruptible[E, A](fa: Eru[E, A]): Eru[E, A] = fa
@@ -125,8 +116,19 @@ object EruRuntime {
 
   private final class RuntimeFiber[E, A](val id: FiberId, fa: Eru[E, A], observer: Option[EruObserver])
       extends Fiber[E, A] {
+
     private var interrupted: Option[InterruptCause] = None
     private var exit0: Option[Exit[E, A]] = None
+
+    private def exitFromResult(result: Result[E, A]): Exit[E, A] =
+      result match {
+        case Result.Success(value) => Exit.Success(value)
+        case Result.Failure(err) =>
+          err match {
+            case t: Throwable => Exit.Die(t)
+            case e => Exit.Failure(e)
+          }
+      }
 
     def run(): Unit = {
       if (exit0.isEmpty) {

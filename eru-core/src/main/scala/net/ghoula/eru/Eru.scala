@@ -467,4 +467,35 @@ object Eru {
     }
 
   }
+
+  // Internal, package-private view of the Eru ADT for the runtime stepper.
+  private[eru] object Internals {
+    enum View[+E, +A] {
+      case VSucceed(value: A)
+      case VFail(error: E)
+      case VEffect(thunk: () => Either[Throwable, A])
+      case VChain[E0, From, To](source: Eru[E0, From], f: From => Eru[E0, To]) extends View[E0, To]
+      case VRecoverWith[E0, A0, E2, A1 >: A0](source: Eru[E0, A0], pf: PartialFunction[E0, Eru[E2, A1]])
+          extends View[E0 | E2, A1]
+      case VMapError[E0, A0, E2](source: Eru[E0, A0], f: E0 => E2) extends View[E2, A0]
+      case VZip[E0, E1, A0, B0](left: Eru[E0, A0], right: Eru[E1, B0]) extends View[E0 | E1, (A0, B0)]
+      case VAttempt[E0, A0](source: Eru[E0, A0]) extends View[Nothing, Result[E0, A0]]
+      case VDebug[E0, A0](source: Eru[E0, A0], label: () => String) extends View[E0, A0]
+      case VEnsure[E0, A0](source: Eru[E0, A0], finalizer: () => Eru[Nothing, Unit]) extends View[E0, A0]
+    }
+
+    import View.*
+    def view[E, A](e: Eru[E, A]): View[E, A] = e match {
+      case Succeed(value) => VSucceed(value)
+      case Fail(error) => VFail(error)
+      case Effect(thunk) => VEffect(thunk)
+      case Chain(source, f) => VChain(source, f)
+      case RecoverWith(source, pf) => VRecoverWith(source, pf)
+      case MapError(source, f) => VMapError(source, f)
+      case Zip(left, right) => VZip(left, right)
+      case Attempt(source) => VAttempt(source)
+      case Debug(source, label) => VDebug(source, label)
+      case Ensure(source, finalizer) => VEnsure(source, finalizer)
+    }
+  }
 }

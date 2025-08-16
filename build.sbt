@@ -65,7 +65,8 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
     libraryDependencies ++= Seq(
       "io.github.cquiroz" %%% "scala-java-time" % "2.6.0",
       "io.github.cquiroz" %%% "scala-java-time-tzdb" % "2.6.0" % "runtime",
-      "org.scalameta" %%% "munit" % "1.1.1" % Test
+      "org.scalameta" %%% "munit" % "1.1.1" % Test,
+      "org.scalameta" %%% "munit-scalacheck" % "1.1.0" % Test
     )
   )
   .jvmSettings(
