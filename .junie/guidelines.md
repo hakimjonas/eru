@@ -9,7 +9,7 @@ Your primary directive is to help build **Eru**, the definitive effect system fo
 Every line of code you write must be in service of this goal. You are not just writing code; you are building a
 benchmark for what a modern, principled, and ergonomic library can be.
 
-Refer to the **[MANIFESTO.md](./docs-src/MANIFESTO.md)** as your guiding star. Its principles are not suggestions; they
+Refer to the **[MANIFESTO.md](https://github.com/hakimjonas/eru/blob/main/docs-src/MANIFESTO.md)** as your guiding star. Its principles are not suggestions; they
 are the law of this project.
 
 ## 2. The Four Pillars: Your Decision-Making Framework

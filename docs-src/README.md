@@ -4,34 +4,34 @@ Eru is a pragmatic and ergonomic effect system for Scala 3, built for correctnes
 
 This project is guided by a strong philosophical vision for what a modern effect system should be. To understand the design principles and goals of Eru, please read our core document:
 
-### [**The Eru Manifesto**](./MANIFESTO.md)
+### [**The Eru Manifesto**](https://github.com/hakimjonas/eru/blob/main/docs-src/MANIFESTO.md)
 
 ## Status
 
-0.2.0 — Resource safety and observability foundations are complete (internal waypoint; not released). See the [ROADMAP](../ROADMAP.md) for upcoming milestones.
+0.2.0 — Resource safety and observability foundations are complete (internal waypoint; not released). See the [ROADMAP](https://github.com/hakimjonas/eru/blob/main/ROADMAP.md) for upcoming milestones.
 
 ## License
 
-Eru is licensed under the **MIT License**. See the [LICENSE](../LICENSE) file for details.
+Eru is licensed under the **MIT License**. See the [LICENSE](https://github.com/hakimjonas/eru/blob/main/LICENSE) file for details.
 
 ## Quickstart
 
 Start here for the synchronous core and pure composition patterns:
-- Eru Quickstart — Synchronous Core: [quickstart.md](./quickstart.md)
+- Eru Quickstart — Synchronous Core: [quickstart.md](https://github.com/hakimjonas/eru/blob/main/quickstart.md)
 
 ## Development Playbook
 
 For the point-by-point execution plan aligned with our Manifesto and guidelines, see:
-- Eru Development Playbook — Point-by-Point Plan: [PLAYBOOK.md](./PLAYBOOK.md)
+- Eru Development Playbook — Point-by-Point Plan: [PLAYBOOK.md](https://github.com/hakimjonas/eru/blob/main/docs-src/PLAYBOOK.md)
 
 ## Async Runtime Direction
 
 The path to fibers, Exit/Cause, cancellation, and observability:
-- Async Runtime Direction — Fibers, Exit/Cause, and Observability: [design/async.md](./design/async.md)
+- Async Runtime Direction — Fibers, Exit/Cause, and Observability: [design/async.md](https://github.com/hakimjonas/eru/blob/main/docs-src/design/async.md)
 
 ## Guides
 
-- Resource Safety — ensure and bracket: [resources.md](./resources.md)
+- Resource Safety — ensure and bracket: [resources.md](https://github.com/hakimjonas/eru/blob/main/docs-src/resources.md)
 - Observability — EruObserver, events, and .debug: [observer.md](./observer.md)
 
 ## Integrations
@@ -39,3 +39,8 @@ The path to fibers, Exit/Cause, cancellation, and observability:
 - Valar Integration Plan — Refactoring Valar on Eru: [integrations/valar.md](./integrations/valar.md)
 - Valar repository (open-source): https://github.com/hakimjonas/valar
 - Valar on Maven Central: see coordinates in Valar’s README, or search: https://search.maven.org/search?q=valar%20hakimjonas
+
+
+## Developer Benchmarks
+
+- Benchmarks — Measuring Eru Core (JVM): [dev/benchmarks.md](./dev/benchmarks.md)

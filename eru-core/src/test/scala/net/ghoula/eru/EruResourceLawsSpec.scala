@@ -9,17 +9,25 @@ class EruResourceLawsSpec extends FunSuite {
   private val samples = 200
   private val maxDepth = 8
 
-  // Generate a small random Eru[String, Int] program using only succeed/fail/map/flatMap
-  // to keep the error channel stable (String) for equivalence via attempt.
+  /** Generates a small random `Eru[String, Int]` program.
+    *
+    * This generator only uses `succeed`, `fail`, and `map` to keep the error channel stable as
+    * `String` for equivalence checking via `attempt`.
+    *
+    * @param rng
+    *   The random number generator.
+    * @param depth
+    *   The maximum recursion depth of generation.
+    * @return
+    *   A randomly generated `Eru` program.
+    */
   private def genProgram(rng: Random, depth: Int): Eru[String, Int] = {
     if (depth <= 0) {
       if (rng.nextBoolean()) Eru.succeed(rng.nextInt(20)) else Eru.fail("e0")
     } else {
       if (rng.nextBoolean()) {
-        // map branch
         genProgram(rng, depth - 1).map(_ + 1)
       } else {
-        // base
         if (rng.nextBoolean()) Eru.succeed(rng.nextInt(20)) else Eru.fail("e2")
       }
     }

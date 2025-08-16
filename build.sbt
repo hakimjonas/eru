@@ -29,14 +29,17 @@ ThisBuild / scmInfo := Some(
 
 // ===== Compiler Settings =====
 ThisBuild / scalacOptions ++= Seq(
-  "-deprecation",
   "-feature",
-  "-unchecked",
   "-Xfatal-warnings",
   "-Wunused:all",
   "-Wunused:imports",
   "-no-indent"
 )
+// Deduplicate scalacOptions across scopes to avoid repeated-flag warnings
+ThisBuild / scalacOptions := (ThisBuild / scalacOptions).value.distinct
+Compile / scalacOptions := (Compile / scalacOptions).value.distinct
+Test / scalacOptions := (Test / scalacOptions).value.distinct
+
 ThisBuild / javacOptions ++= Seq("--release", "21")
 
 // ===== Project Definitions =====
@@ -44,7 +47,8 @@ lazy val root = (project in file("."))
   .aggregate(eruCoreJVM, eruCoreNative)
   .settings(
     name := "eru-root",
-    publish / skip := true
+    publish / skip := true,
+    addCommandAlias("bench", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1")
   )
 
 lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
@@ -68,6 +72,7 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
     // --- MDoc Configuration ---
     mdocIn := file("docs-src"),
     mdocOut := file("."),
+    // Deduplicate scalac options for mdoc to avoid repeated-flag warnings
     addCommandAlias("prepare", "mdoc; scalafixAll; scalafmtAll; scalafmtSbt"),
     addCommandAlias(
       "check",
@@ -85,3 +90,12 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
 // ===== Convenience Aliases =====
 lazy val eruCoreJVM = eruCore.jvm
 lazy val eruCoreNative = eruCore.native
+
+// ===== Benchmarks (JVM only) =====
+lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
+  .dependsOn(eruCoreJVM)
+  .enablePlugins(JmhPlugin)
+  .settings(
+    name := "eru-bench-jvm",
+    publish / skip := true
+  )

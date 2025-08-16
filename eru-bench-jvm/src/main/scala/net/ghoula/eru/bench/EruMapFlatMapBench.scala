@@ -1,0 +1,55 @@
+package net.ghoula.eru.bench
+
+import net.ghoula.eru.Eru
+import org.openjdk.jmh.annotations.{
+  Benchmark,
+  BenchmarkMode,
+  Fork,
+  Measurement,
+  Mode,
+  OutputTimeUnit,
+  Param,
+  Scope,
+  Setup,
+  State,
+  Warmup
+}
+import org.openjdk.jmh.infra.Blackhole
+import java.util.concurrent.TimeUnit
+
+@State(Scope.Thread)
+@BenchmarkMode(Array(Mode.Throughput))
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@Fork(value = 2)
+@Warmup(iterations = 5)
+@Measurement(iterations = 10)
+class EruMapFlatMapBench {
+
+  @Param(Array("10", "100", "1000"))
+  var depthStr: String = "10"
+  private var depth: Int = 10
+
+  private var mapped: Eru[Nothing, Int] = Eru.succeed(0)
+  private var flatMapped: Eru[Nothing, Int] = Eru.succeed(0)
+
+  @Setup
+  def setup(): Unit = {
+    depth = depthStr.toInt
+    mapped = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, _) =>
+      acc.map(_ + 1)
+    }
+    flatMapped = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, _) =>
+      acc.flatMap(i => Eru.succeed(i + 1))
+    }
+  }
+
+  @Benchmark
+  def runMapped(h: Blackhole): Unit = {
+    h.consume(mapped.unsafeRunSync())
+  }
+
+  @Benchmark
+  def runFlatMapped(h: Blackhole): Unit = {
+    h.consume(flatMapped.unsafeRunSync())
+  }
+}

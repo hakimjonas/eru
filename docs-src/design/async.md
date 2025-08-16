@@ -69,7 +69,7 @@ Keep the pure Eru ADT minimal and synchronous. Provide async in a runtime module
 High-level combinators (0.3.0):
 - zipPar, race
 - timeout, sleep, schedule-based retry policies (exponential backoff with jitter)
-- blocking region: Eru.blocking[A](thunk)
+- blocking region: `Eru.blocking[A](thunk)`
 
 ---
 
@@ -114,6 +114,6 @@ High-level combinators (0.3.0):
   - Future interop on JVM
 
 References:
-- Quickstart (sync core): ../quickstart.md
-- Roadmap: ../../ROADMAP.md
-- Manifesto: ../../MANIFESTO.md
+- Quickstart (sync core): https://github.com/hakimjonas/eru/blob/main/quickstart.md
+- Roadmap: https://github.com/hakimjonas/eru/blob/main/ROADMAP.md
+- Manifesto: https://github.com/hakimjonas/eru/blob/main/MANIFESTO.md
