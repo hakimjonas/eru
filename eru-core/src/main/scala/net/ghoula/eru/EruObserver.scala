@@ -43,9 +43,15 @@ object EruObserver {
     * Each event carries a ScopeId that identifies the run scope.
     */
   enum EruEvent {
+    // Program-level events (synchronous runs)
     case ProgramStart(scopeId: ScopeId)
     case ProgramEnd(scopeId: ScopeId, outcome: Outcome)
     case Step(scopeId: ScopeId, label: String)
+
+    // Fiber-level events (introduced for 0.3.x runtime)
+    case FiberStarted(fiberId: FiberId)
+    case FiberCompleted(fiberId: FiberId, exit: Exit[Any, Any])
+    case FiberInterrupted(fiberId: FiberId, cause: InterruptCause)
   }
 
   /** Observer interface for receiving events.

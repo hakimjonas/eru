@@ -44,7 +44,7 @@ ThisBuild / javacOptions ++= Seq("--release", "21")
 
 // ===== Project Definitions =====
 lazy val root = (project in file("."))
-  .aggregate(eruCoreJVM, eruCoreNative)
+  .aggregate(eruCoreJVM, eruCoreNative, eruRuntimeJVM, eruRuntimeNative)
   .settings(
     name := "eru-root",
     publish / skip := true,
@@ -90,6 +90,33 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
 // ===== Convenience Aliases =====
 lazy val eruCoreJVM = eruCore.jvm
 lazy val eruCoreNative = eruCore.native
+
+// ===== Runtime (JVM & Native) =====
+lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
+  .crossType(CrossType.Pure)
+  .in(file("eru-runtime"))
+  .settings(sonatypeSettings *)
+  .settings(
+    name := "eru-runtime",
+    usePgpKeyHex("9614A0CE1CE76975"),
+    useGpgAgent := true,
+    mimaPreviousArtifacts := Set.empty,
+    tastyMiMaPreviousArtifacts := Set.empty,
+    mimaFailOnNoPrevious := false,
+    libraryDependencies ++= Seq(
+      "org.scalameta" %%% "munit" % "1.1.1" % Test
+    )
+  )
+  .nativeSettings(
+    testFrameworks += new TestFramework("munit.Framework"),
+    nativeConfig ~= { c =>
+      c.withLTO(LTO.thin).withMode(Mode.releaseFast).withGC(GC.immix)
+    }
+  )
+  .dependsOn(eruCore)
+
+lazy val eruRuntimeJVM = eruRuntime.jvm
+lazy val eruRuntimeNative = eruRuntime.native
 
 // ===== Benchmarks (JVM only) =====
 lazy val eruBenchJVM = (project in file("eru-bench-jvm"))

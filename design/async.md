@@ -120,3 +120,17 @@ References:
 - Quickstart (sync core): https://github.com/hakimjonas/eru/blob/main/quickstart.md
 - Roadmap: https://github.com/hakimjonas/eru/blob/main/ROADMAP.md
 - Manifesto: https://github.com/hakimjonas/eru/blob/main/MANIFESTO.md
+
+
+---
+
+## Milestone A (0.3.0) — Minimal synchronous fork stub
+
+A minimal runtime surface is now available to establish the async-facing API without introducing true concurrency yet:
+
+- EruRuntime.fork evaluates the computation synchronously and returns a completed Fiber capturing Exit (Success | Failure | Die).
+- EruRuntime.forkWithObserver emits FiberStarted and FiberCompleted events.
+- yieldNow, uninterruptible, and mask exist as placeholders to be refined with the upcoming scheduler.
+- interrupt on the returned Fiber records an InterruptCause; await yields Exit.Interrupt if the fiber was interrupted after completion.
+
+These stubs unblock tests, documentation, and integration work while we implement the cooperative scheduler and masking semantics in subsequent milestones.
