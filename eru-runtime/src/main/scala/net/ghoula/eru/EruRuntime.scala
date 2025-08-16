@@ -21,6 +21,19 @@ object EruRuntime {
     def apply[E, A](fa: Eru[E, A]): Eru[E, A] = fa
   }
 
+  private object Scheduler {
+    private val queue = scala.collection.mutable.Queue[() => Unit]()
+
+    def schedule(thunk: () => Unit): Unit =
+      queue.enqueue(thunk)
+
+    def pumpUntil(done: () => Boolean): Unit =
+      while (!done() && queue.nonEmpty) do {
+        val task = queue.dequeue()
+        task()
+      }
+  }
+
   private def exitFromResult[E, A](result: Result[E, A]): Exit[E, A] =
     result match {
       case Result.Success(value) => Exit.Success(value)
@@ -33,17 +46,18 @@ object EruRuntime {
 
   /** Forks a computation into a fiber and returns it immediately.
     *
-    * Current minimal behavior: evaluates the computation synchronously and returns a completed
-    * Fiber capturing the Exit. No concurrent scheduling yet.
+    * Minimal cooperative behavior: schedules the computation on the internal event loop and returns
+    * a running fiber. The fiber completes when scheduled; awaiting will pump the scheduler until
+    * completion.
     */
   def fork[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] =
     Eru.effect {
       val fid = FiberId.fresh()
-      val result: Result[E, A] = fa.attempt.unsafeRunSync()
-      val exit: Exit[E, A] = exitFromResult(result)
-      new CompletedFiber[E, A](fid, exit)
+      val fiber = new RuntimeFiber[E, A](fid, fa, None)
+      Scheduler.schedule(() => fiber.run())
+      fiber
     }.attempt.map {
-      case Result.Success(fiber) => fiber
+      case Result.Success(f) => f
       case Result.Failure(t: Throwable) =>
         val fid = FiberId.fresh()
         val exit: Exit[E, A] = Exit.Die(t)
@@ -54,18 +68,16 @@ object EruRuntime {
   def forkWithObserver[E, A](fa: Eru[E, A], observer: EruObserver): Eru[Nothing, Fiber[E, A]] =
     Eru.effect {
       val fid = FiberId.fresh()
+      val fiber = new RuntimeFiber[E, A](fid, fa, Some(observer))
       observer.onEvent(EruEvent.FiberStarted(fid))
-      val noop = new EruObserver { def onEvent(event: EruEvent): Unit = () }
-      val result: Result[E, A] = fa.attempt.unsafeRunSyncWith(noop)
-      val exit: Exit[E, A] = exitFromResult(result)
-      observer.onEvent(EruEvent.FiberCompleted(fid, exit))
-      new CompletedFiber[E, A](fid, exit)
+      Scheduler.schedule(() => fiber.run())
+      fiber
     }.attempt.map {
-      case Result.Success(fiber) => fiber
+      case Result.Success(f) => f
       case Result.Failure(t: Throwable) =>
         val fid = FiberId.fresh()
-        observer.onEvent(EruEvent.FiberCompleted(fid, Exit.Die(t)))
         val exit: Exit[E, A] = Exit.Die(t)
+        observer.onEvent(EruEvent.FiberCompleted(fid, exit))
         new CompletedFiber[E, A](fid, exit)
     }
 
@@ -80,19 +92,55 @@ object EruRuntime {
     */
   def mask[E, A](k: Unmask => Eru[E, A]): Eru[E, A] = k(IdentityUnmask)
 
-  private final class CompletedFiber[E, A](val id: FiberId, exit0: Exit[E, A]) extends Fiber[E, A] {
+  private final class RuntimeFiber[E, A](val id: FiberId, fa: Eru[E, A], observer: Option[EruObserver])
+      extends Fiber[E, A] {
     private var interrupted: Option[InterruptCause] = None
+    private var exit0: Option[Exit[E, A]] = None
 
-    def await: Eru[Nothing, Exit[E, A]] = Eru.succeed {
-      interrupted match {
-        case Some(cause) => Exit.Interrupt(id, cause)
-        case None => exit0
+    def run(): Unit = {
+      if (exit0.isEmpty) {
+        val ex: Exit[E, A] =
+          interrupted match {
+            case Some(cause) => Exit.Interrupt(id, cause)
+            case None =>
+              val res: Result[E, A] = observer match {
+                case Some(_) =>
+                  val noop = new EruObserver { def onEvent(event: EruEvent): Unit = () }
+                  fa.attempt.unsafeRunSyncWith(noop)
+                case None => fa.attempt.unsafeRunSync()
+              }
+              val out = exitFromResult(res)
+              interrupted match {
+                case Some(cause) => Exit.Interrupt(id, cause)
+                case None => out
+              }
+          }
+        exit0 = Some(ex)
+        observer.foreach(_.onEvent(EruEvent.FiberCompleted(id, ex)))
       }
     }
 
-    def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = Eru.effect {
-      interrupted = Some(cause)
-      ()
-    }.attempt.flatMap(_ => Eru.unit)
+    def await: Eru[Nothing, Exit[E, A]] =
+      Eru.effect {
+        Scheduler.pumpUntil(() => exit0.nonEmpty)
+        exit0.get
+      }.attempt.map {
+        case Result.Success(ex) => ex
+        case Result.Failure(t: Throwable) => Exit.Die(t)
+      }
+
+    def interrupt(cause: InterruptCause): Eru[Nothing, Unit] =
+      Eru.effect {
+        if (exit0.isEmpty) {
+          interrupted = Some(cause)
+          observer.foreach(_.onEvent(EruEvent.FiberInterrupted(id, cause)))
+        }
+        ()
+      }.attempt.flatMap(_ => Eru.unit)
   }
+}
+
+private final class CompletedFiber[E, A](val id: FiberId, exit0: Exit[E, A]) extends Fiber[E, A] {
+  def await: Eru[Nothing, Exit[E, A]] = Eru.succeed(exit0)
+  def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = Eru.unit
 }

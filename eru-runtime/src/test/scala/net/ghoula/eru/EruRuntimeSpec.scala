@@ -53,7 +53,8 @@ class EruRuntimeSpec extends FunSuite {
     }
     val obs = new Obs
     val fiber = EruRuntime.forkWithObserver(Eru.succeed(5), obs).unsafeRunSync()
-    // In this minimal runtime, fiber is already completed
+    // Drive the scheduler by awaiting completion so events are emitted
+    fiber.await.unsafeRunSync()
     val evs = obs.buf.toList
     assert(evs.nonEmpty)
     val (fidStarted, fidCompleted) = evs match {
