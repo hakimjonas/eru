@@ -1,6 +1,9 @@
 # Async Runtime Direction — Fibers, Exit/Cause, and Observability
 
-Status: Design notes (targets 0.2.0–0.3.0)
+Status: Core types available; runtime in progress (0.3.0)
+
+Available now in core: Exit[E, A], FiberId, InterruptCause, and the Fiber[E, A] interface.
+The minimal scheduler/runtime and parallel combinators will land during 0.3.0.
 
 This document records foundational choices for Eru’s asynchronous evolution while preserving the small, pure synchronous core. It aligns with the Manifesto pillars and informs API stability to minimize churn.
 

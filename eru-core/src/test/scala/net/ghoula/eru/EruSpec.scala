@@ -649,4 +649,29 @@ class EruSpec extends FunSuite {
       prog.unsafeRunSync()
     }
   }
+
+  // --- Eru.blocking tests ---
+  test("Eru.blocking is lazy - does not execute computation immediately") {
+    var counter = 0
+    val eru = Eru.blocking {
+      counter += 1
+      42
+    }
+    assertEquals(counter, 0, "Computation should not be executed when creating Eru.blocking")
+    assertEquals(eru.unsafeRunSync(), 42, "blocking should return computed value")
+    assertEquals(counter, 1, "Computation should be executed exactly once when running")
+  }
+
+  test("Eru.blocking returns success for pure computation") {
+    val eru = Eru.blocking(21 * 2)
+    assertEquals(eru.unsafeRunSync(), 42, "blocking should evaluate the pure expression")
+  }
+
+  test("Eru.blocking captures NonFatal and rethrows at the edge") {
+    val ex = new RuntimeException("boom-blocking")
+    val prog: Eru[Throwable, Int] = Eru.blocking[Int](throw ex)
+    intercept[RuntimeException] {
+      prog.unsafeRunSync()
+    }
+  }
 }

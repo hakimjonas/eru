@@ -250,6 +250,22 @@ object Eru {
       catch { case NonFatal(t) => Left(t) }
     )
 
+  /** Executes a synchronous computation in a blocking region.
+    *
+    * In the synchronous kernel (0.2.x), this is equivalent to [[effect]]: it suspends the
+    * computation lazily and captures `NonFatal` exceptions into the `Throwable` error channel.
+    * Fatal errors (e.g., `VirtualMachineError`) are not caught and will escape.
+    *
+    * In the asynchronous runtime (0.3.x), the runtime may treat blocking regions specially to avoid
+    * starving the scheduler while maintaining correctness and resource-safety guarantees.
+    *
+    * @param thunk
+    *   the computation to suspend (by-name)
+    * @return
+    *   an `Eru[Throwable, A]` representing the suspended computation
+    */
+  def blocking[A](thunk: => A): Eru[Throwable, A] = effect(thunk)
+
   /** Creates an `Eru` from an `Either`. `Left` values become failures, `Right` values become
     * successes.
     *
