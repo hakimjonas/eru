@@ -29,6 +29,11 @@ For the point-by-point execution plan aligned with our Manifesto and guidelines,
 The path to fibers, Exit/Cause, cancellation, and observability:
 - Async Runtime Direction — Fibers, Exit/Cause, and Observability: [design/async.md](https://github.com/hakimjonas/eru/blob/main/docs-src/design/async.md)
 
+### Async Runtime (0.3.0 in progress)
+- The asynchronous runtime lives in the dedicated module `eru-runtime` (JVM and Native).
+- The kernel remains purely synchronous in `eru-core`. Use the runtime module for fork/await and upcoming parallel/time combinators.
+- See the async design notes for details and updates during 0.3.0.
+
 ## Guides
 
 - Resource Safety — ensure and bracket: [resources.md](https://github.com/hakimjonas/eru/blob/main/docs-src/resources.md)

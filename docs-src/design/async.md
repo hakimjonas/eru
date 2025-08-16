@@ -2,6 +2,9 @@
 
 Status: Core types available; runtime in progress (0.3.0)
 
+Module layout: The asynchronous runtime lives in the dedicated module `eru-runtime` (JVM and Native).
+The pure kernel remains in `eru-core`. Use the runtime module for fork/await and upcoming parallel/time combinators.
+
 Available now in core: Exit[E, A], FiberId, InterruptCause, and the Fiber[E, A] interface.
 The minimal scheduler/runtime and parallel combinators will land during 0.3.0.
 
