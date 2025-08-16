@@ -69,4 +69,34 @@ class EruRuntimeSpec extends FunSuite {
     assertEquals(fidStarted, fiber.id)
     assertEquals(fidCompleted, fiber.id)
   }
+
+  // New tests for zipPar and race placeholders
+  test("zipPar success-success returns tuple") {
+    val eff = EruRuntime.zipPar(Eru.succeed(1), Eru.succeed("ok"))
+    val res = eff.unsafeRunSync()
+    assertEquals(res, (1, "ok"))
+  }
+
+  test("race returns Left when left succeeds first") {
+    val eff = EruRuntime.race(Eru.succeed(10), Eru.succeed("r"))
+    val res = eff.unsafeRunSync()
+    res match {
+      case Left(a) => assertEquals(a, 10)
+      case Right(_) => fail("expected Left winner")
+    }
+  }
+
+  test("race returns Right when left fails and right succeeds") {
+    val eff = EruRuntime.race(Eru.fail("boom"), Eru.succeed(99))
+    val res = eff.unsafeRunSync()
+    res match {
+      case Right(b) => assertEquals(b, 99)
+      case Left(_) => fail("expected Right winner")
+    }
+  }
+
+  test("yieldNow is a no-op and returns Unit") {
+    val u = EruRuntime.yieldNow.unsafeRunSync()
+    assertEquals((), u)
+  }
 }

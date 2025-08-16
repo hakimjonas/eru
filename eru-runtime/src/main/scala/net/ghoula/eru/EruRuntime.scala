@@ -12,6 +12,37 @@ package net.ghoula.eru
   */
 object EruRuntime {
 
+  /** Combines two effects, intended to run in parallel in the async runtime.
+    *
+    * Placeholder semantics (0.3.0 Milestone A): this version is sequential and will be upgraded to
+    * true parallel execution in a later increment without changing the API.
+    *
+    * @param fa
+    *   the left effect
+    * @param fb
+    *   the right effect
+    * @return
+    *   an effect that yields a pair of results
+    */
+  def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2, (A, B)] =
+    fa.zip(fb)
+
+  /** Competes two effects, returning the first successful result, tagged with its side.
+    *
+    * Placeholder semantics (0.3.0 Milestone A): evaluates left first; if it succeeds, returns
+    * Left(a); otherwise evaluates right and returns Right(b) on success. Failure/defect propagation
+    * is consistent with the core interpreter and will be upgraded to true racing.
+    *
+    * @param fa
+    *   the left effect
+    * @param fb
+    *   the right effect
+    * @return
+    *   an effect yielding Left(a) or Right(b)
+    */
+  def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2, Either[A, B]] =
+    fa.map(Left(_)).orElse(fb.map(Right(_)))
+
   /** A token that re-enables interruptibility inside a masked region. */
   trait Unmask {
     def apply[E, A](fa: Eru[E, A]): Eru[E, A]
