@@ -272,9 +272,22 @@ object EruRuntime {
 
   private final class RuntimeFiber[E, A](val id: FiberId, fa: Eru[E, A], observer: Option[EruObserver])
       extends Fiber[E, A] {
+    import Eru.Internals.View
 
     private var interrupted: Option[InterruptCause] = None
     private var exit0: Option[Exit[E, A]] = None
+
+    // Step-wise interpreter state
+    private var current: Eru[Any, Any] = fa.asInstanceOf[Eru[Any, Any]]
+    private var conts: List[Any => Eru[Any, Any]] = Nil
+    private var handlers: List[Handler] = Nil
+    private var finalizers: List[() => Eru[Nothing, Unit]] = Nil
+
+    // Handler types for error handling stack
+    private sealed trait Handler
+    private case class Recover(pf: PartialFunction[Any, Eru[Any, Any]]) extends Handler
+    private case class MapErr(f: Any => Any) extends Handler
+    private case object AttemptH extends Handler
 
     private def exitFromResult(result: Result[E, A]): Exit[E, A] =
       result match {
@@ -287,7 +300,6 @@ object EruRuntime {
       }
 
     private def collectEnsures[E, A](e0: Eru[E, A]): List[() => Eru[Nothing, Unit]] = {
-      import Eru.Internals.View
       def loop[E1, A1](e: Eru[E1, A1]): List[() => Eru[Nothing, Unit]] =
         Eru.Internals.view(e) match {
           case View.VEnsure(source, fin) => fin :: loop(source)
@@ -302,31 +314,228 @@ object EruRuntime {
       loop(e0)
     }
 
-    private def drainFinalizersList(fins: List[() => Eru[Nothing, Unit]]): Unit =
-      fins.foreach(fin => fin().attempt.unsafeRunSync())
+    private def drainFinalizers(): Unit = {
+      val toRun = finalizers.reverse
+      finalizers = Nil
+      toRun.foreach(fin => fin().attempt.unsafeRunSync())
+    }
+
+
+    private def completeWith(exit: Exit[E, A]): Unit = {
+      if (exit0.isEmpty) {
+        val finalExit = interrupted match {
+          case Some(cause) => Exit.Interrupt(id, cause)
+          case None => exit
+        }
+        drainFinalizers()
+        exit0 = Some(finalExit)
+        observer.foreach(_.onEvent(EruEvent.FiberCompleted(id, finalExit)))
+      }
+    }
+
+    private def scheduleIfPending(): Unit = {
+      if (exit0.isEmpty) {
+        Scheduler.schedule(() => run())
+      }
+    }
+
+    private def handleFailure(error: Any): Unit = {
+      var e: Any = error
+      var hs = handlers
+      var handled = false
+
+      while (!handled && hs.nonEmpty) {
+        hs.head match {
+          case MapErr(f) =>
+            e = f(e)
+            hs = hs.tail
+          case Recover(pf) if pf.isDefinedAt(e) =>
+            handlers = hs.tail
+            current = pf(e)
+            handled = true
+          case AttemptH =>
+            handlers = hs.tail
+            current = Eru.succeed(Result.Failure(e)).asInstanceOf[Eru[Any, Any]]
+            handled = true
+          case _ =>
+            hs = hs.tail
+        }
+      }
+
+      if (!handled) {
+        completeWith(Exit.Failure(e.asInstanceOf[E]))
+      } else {
+        scheduleIfPending()
+      }
+    }
+
+    private def handleSuccess(value: Any): Unit = {
+      if (conts.nonEmpty) {
+        val k = conts.head
+        conts = conts.tail
+        
+        // Map chain optimization: try to detect and execute simple map operations directly
+        try {
+          k(value) match {
+            case Eru.Succeed(mappedValue) =>
+              // This continuation was a simple map - continue with the mapped value
+              // without creating an intermediate Eru instance
+              if (conts.nonEmpty) {
+                handleSuccess(mappedValue)  // Tail-recursive optimization
+                return
+              } else {
+                completeWith(Exit.Success(mappedValue.asInstanceOf[A]))
+                return
+              }
+            case other =>
+              current = other.asInstanceOf[Eru[Any, Any]]
+              scheduleIfPending()
+          }
+        } catch {
+          case _: Throwable =>
+            // Fallback to normal execution if optimization fails
+            current = k(value).asInstanceOf[Eru[Any, Any]]
+            scheduleIfPending()
+        }
+      } else {
+        completeWith(Exit.Success(value.asInstanceOf[A]))
+      }
+    }
 
     def run(): Unit = {
-      if (exit0.isEmpty) {
-        val ex: Exit[E, A] =
-          interrupted match {
-            case Some(cause) =>
-              drainFinalizersList(collectEnsures(fa))
-              Exit.Interrupt(id, cause)
-            case None =>
-              val res: Result[E, A] = observer match {
-                case Some(_) =>
-                  val noop = new EruObserver { def onEvent(event: EruEvent): Unit = () }
-                  fa.attempt.unsafeRunSyncWith(noop)
-                case None => fa.attempt.unsafeRunSync()
+      if (exit0.nonEmpty) return
+
+      // Check for interruption before each step
+      interrupted match {
+        case Some(cause) =>
+          completeWith(Exit.Interrupt(id, cause))
+          return
+        case None => ()
+      }
+
+      Eru.Internals.view(current) match {
+        case View.VSucceed(value) =>
+          // Direct execution optimization: if we have continuations, try to execute simple ones directly
+          if (conts.nonEmpty) {
+            val k = conts.head
+            conts = conts.tail
+            // Check if the continuation produces a simple succeed - execute directly
+            try {
+              k(value) match {
+                case s @ Eru.Succeed(directValue) =>
+                  current = s.asInstanceOf[Eru[Any, Any]]
+                  // Don't reschedule, continue in the same cycle
+                case other =>
+                  current = other.asInstanceOf[Eru[Any, Any]]
+                  scheduleIfPending()
               }
-              val out = exitFromResult(res)
-              interrupted match {
-                case Some(cause) => Exit.Interrupt(id, cause)
-                case None => out
-              }
+            } catch {
+              case _: Throwable =>
+                current = k(value).asInstanceOf[Eru[Any, Any]]
+                scheduleIfPending()
+            }
+          } else {
+            completeWith(Exit.Success(value.asInstanceOf[A]))
           }
-        exit0 = Some(ex)
-        observer.foreach(_.onEvent(EruEvent.FiberCompleted(id, ex)))
+
+        case View.VFail(error) =>
+          conts = Nil  // Clear continuations on failure
+          handleFailure(error)
+
+        case View.VEffect(thunk) =>
+          thunk() match {
+            case Right(value) => 
+              // Same direct execution optimization for effect results
+              if (conts.nonEmpty) {
+                val k = conts.head
+                conts = conts.tail
+                try {
+                  k(value) match {
+                    case s @ Eru.Succeed(directValue) =>
+                      current = s.asInstanceOf[Eru[Any, Any]]
+                    case other =>
+                      current = other.asInstanceOf[Eru[Any, Any]]
+                      scheduleIfPending()
+                  }
+                } catch {
+                  case _: Throwable =>
+                    current = k(value).asInstanceOf[Eru[Any, Any]]
+                    scheduleIfPending()
+                }
+              } else {
+                completeWith(Exit.Success(value.asInstanceOf[A]))
+              }
+            case Left(t) => completeWith(Exit.Die(t).asInstanceOf[Exit[E, A]])
+          }
+
+        case View.VChain(source, f) =>
+          // Continuation stacking: unwind nested Chain operations in one step
+          conts = f.asInstanceOf[Any => Eru[Any, Any]] :: conts
+          current = source.asInstanceOf[Eru[Any, Any]]
+          
+          // Optimization: if the source is also a Chain, unwind it immediately
+          var unwinding = true
+          while (unwinding) {
+            Eru.Internals.view(current) match {
+              case View.VChain(nextSource, nextF) =>
+                conts = nextF.asInstanceOf[Any => Eru[Any, Any]] :: conts
+                current = nextSource.asInstanceOf[Eru[Any, Any]]
+              case _ =>
+                unwinding = false
+            }
+          }
+          scheduleIfPending()
+
+        case View.VRecoverWith(source, pf) =>
+          handlers = Recover(pf.asInstanceOf[PartialFunction[Any, Eru[Any, Any]]]) :: handlers
+          current = source.asInstanceOf[Eru[Any, Any]]
+          scheduleIfPending()
+
+        case View.VMapError(source, f) =>
+          handlers = MapErr(f.asInstanceOf[Any => Any]) :: handlers
+          current = source.asInstanceOf[Eru[Any, Any]]
+          scheduleIfPending()
+
+        case View.VZip(left, right) =>
+          val zipCont: Any => Eru[Any, Any] = { leftValue =>
+            right.asInstanceOf[Eru[Any, Any]].map(rightValue => (leftValue, rightValue)).asInstanceOf[Eru[Any, Any]]
+          }
+          conts = zipCont :: conts
+          current = left.asInstanceOf[Eru[Any, Any]]
+          scheduleIfPending()
+
+        case View.VAttempt(source) =>
+          handlers = AttemptH :: handlers
+          current = source.asInstanceOf[Eru[Any, Any]]
+          scheduleIfPending()
+
+        case View.VDebug(source, label) =>
+          if (label() == YieldMarker) {
+            // Yield: reschedule to allow other fibers to run
+            current = source.asInstanceOf[Eru[Any, Any]]
+            scheduleIfPending()
+          } else {
+            observer.foreach(_.onEvent(EruEvent.Step(ScopeId.fresh(), label())))
+            current = source.asInstanceOf[Eru[Any, Any]]
+            scheduleIfPending()
+          }
+
+        case View.VEnsure(source, finalizer) =>
+          finalizers = finalizer :: finalizers
+          current = source.asInstanceOf[Eru[Any, Any]]
+          scheduleIfPending()
+
+        case View.VSuspend(register) =>
+          // Suspend implementation would go here if needed
+          // For now, fallback to synchronous execution
+          val res = observer match {
+            case Some(_) =>
+              val noop = new EruObserver { def onEvent(event: EruEvent): Unit = () }
+              current.asInstanceOf[Eru[E, A]].attempt.unsafeRunSyncWith(noop)
+            case None => current.asInstanceOf[Eru[E, A]].attempt.unsafeRunSync()
+          }
+          val out = exitFromResult(res)
+          completeWith(out)
       }
     }
 

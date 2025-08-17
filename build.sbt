@@ -48,7 +48,12 @@ lazy val root = (project in file("."))
   .settings(
     name := "eru-root",
     publish / skip := true,
-    addCommandAlias("bench", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1")
+    addCommandAlias("bench", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1"),
+    addCommandAlias("prepare", "eruCoreJVM/mdoc; scalafixAll; scalafmtAll; scalafmtSbt"),
+    addCommandAlias(
+      "check",
+      "eruCoreJVM/mdoc --check; scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
+    )
   )
 
 lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
@@ -72,13 +77,7 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
   .jvmSettings(
     // --- MDoc Configuration ---
     mdocIn := file("docs-src"),
-    mdocOut := file("."),
-    // Deduplicate scalac options for mdoc to avoid repeated-flag warnings
-    addCommandAlias("prepare", "mdoc; scalafixAll; scalafmtAll; scalafmtSbt"),
-    addCommandAlias(
-      "check",
-      "mdoc --check; scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
-    )
+    mdocOut := file(".")
   )
   .jvmConfigure(_.enablePlugins(MdocPlugin))
   .nativeSettings(

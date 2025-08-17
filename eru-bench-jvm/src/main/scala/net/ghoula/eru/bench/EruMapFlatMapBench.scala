@@ -1,6 +1,5 @@
 package net.ghoula.eru.bench
 
-import net.ghoula.eru.Eru
 import org.openjdk.jmh.annotations.{
   Benchmark,
   BenchmarkMode,
@@ -15,7 +14,10 @@ import org.openjdk.jmh.annotations.{
   Warmup
 }
 import org.openjdk.jmh.infra.Blackhole
+
 import java.util.concurrent.TimeUnit
+
+import net.ghoula.eru.Eru
 
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
