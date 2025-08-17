@@ -781,7 +781,7 @@ class EruSpec extends FunSuite {
     assertEquals(effectCallCount, 1, "Effect should be called once during execution")
   }
 
-  // Tests for Pure FlatMap Construction-Time Optimizations (Currently Disabled)
+  // Tests for Safe FlatMap Construction-Time Optimizations
 
   test("flatMap optimization disabled: succeed().flatMap(pure) remains lazy") {
     var flatMapCallCount = 0
@@ -877,6 +877,22 @@ class EruSpec extends FunSuite {
       computation.unsafeRunSync()
     }
     assertEquals(caught.getMessage, "FlatMap function failed")
+  }
+
+  test("flatMap optimization disabled: side effects only occur during execution") {
+    var sideEffectCount = 0
+    val computation = Eru.succeed(42).flatMap { x =>
+      sideEffectCount += 1
+      Eru.effect(x * 2)  // Non-pure continuation
+    }
+    
+    // No side effects during construction since optimization is disabled
+    assertEquals(sideEffectCount, 0, "Side effect should not occur during construction (optimization disabled)")
+    
+    val result = computation.unsafeRunSync()
+    assertEquals(result, 84)
+    // Side effect should occur once during execution
+    assertEquals(sideEffectCount, 1, "Side effect should occur once during execution")
   }
 
   test("construction-time optimizations preserve correctness for complex chains") {

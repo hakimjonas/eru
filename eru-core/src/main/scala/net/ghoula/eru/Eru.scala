@@ -1,9 +1,9 @@
 package net.ghoula.eru
 
-import scala.util.control.NonFatal
-import scala.util.control.TailCalls.{done, tailcall, TailRec}
-
 import net.ghoula.eru.EruObserver.*
+
+import scala.util.control.NonFatal
+import scala.util.control.TailCalls.{TailRec, done, tailcall}
 
 /** A data type representing a pure, lazy, and composable computation that can produce a value of
   * type `A` or fail with an error of type `E`.
