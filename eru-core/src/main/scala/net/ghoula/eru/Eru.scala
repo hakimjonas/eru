@@ -34,8 +34,8 @@ enum Eru[+E, +A] {
     */
   private case Chain[E0, From, +To](source: Eru[E0, From], f: From => Eru[E0, To]) extends Eru[E0, To]
 
-  /** Represents a chain of pure map operations fused together for performance.
-    * This avoids creating multiple Chain nodes for consecutive map operations.
+  /** Represents a chain of pure map operations fused together for performance. This avoids creating
+    * multiple Chain nodes for consecutive map operations.
     */
   private case MapChain[E0, From, +To](source: Eru[E0, From], f: From => To) extends Eru[E0, To]
 
@@ -65,8 +65,8 @@ enum Eru[+E, +A] {
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
     *
-    * Construction-time optimization: Uses `MapChain` to fuse consecutive map operations,
-    * avoiding the creation of multiple Chain nodes and improving performance.
+    * Construction-time optimization: Uses `MapChain` to fuse consecutive map operations, avoiding
+    * the creation of multiple Chain nodes and improving performance.
     *
     * @param f
     *   the function to apply to the success value.

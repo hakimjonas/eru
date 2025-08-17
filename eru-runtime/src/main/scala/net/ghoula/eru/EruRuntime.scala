@@ -273,15 +273,16 @@ object EruRuntime {
   private final class RuntimeFiber[E, A](val id: FiberId, fa: Eru[E, A], observer: Option[EruObserver])
       extends Fiber[E, A] {
     import Eru.Internals.View
+    import scala.collection.mutable
 
     private var interrupted: Option[InterruptCause] = None
     private var exit0: Option[Exit[E, A]] = None
 
-    // Step-wise interpreter state
+    // Step-wise interpreter state with optimized stacks
     private var current: Eru[Any, Any] = fa.asInstanceOf[Eru[Any, Any]]
-    private var conts: List[Any => Eru[Any, Any]] = Nil
-    private var handlers: List[Handler] = Nil
-    private var finalizers: List[() => Eru[Nothing, Unit]] = Nil
+    private val conts: mutable.ArrayDeque[Any => Eru[Any, Any]] = mutable.ArrayDeque.empty
+    private val handlers: mutable.ArrayDeque[Handler] = mutable.ArrayDeque.empty
+    private val finalizers: mutable.ArrayDeque[() => Eru[Nothing, Unit]] = mutable.ArrayDeque.empty
 
     // Handler types for error handling stack
     private sealed trait Handler
@@ -315,9 +316,11 @@ object EruRuntime {
     }
 
     private def drainFinalizers(): Unit = {
-      val toRun = finalizers.reverse
-      finalizers = Nil
-      toRun.foreach(fin => fin().attempt.unsafeRunSync())
+      // ArrayDeque allows efficient removal from tail (LIFO order for finalizers)
+      while (finalizers.nonEmpty) {
+        val fin = finalizers.removeLast()  // Execute in reverse order (LIFO)
+        fin().attempt.unsafeRunSync()
+      }
     }
 
 
@@ -341,24 +344,20 @@ object EruRuntime {
 
     private def handleFailure(error: Any): Unit = {
       var e: Any = error
-      var hs = handlers
       var handled = false
 
-      while (!handled && hs.nonEmpty) {
-        hs.head match {
+      while (!handled && handlers.nonEmpty) {
+        handlers.removeHead() match {
           case MapErr(f) =>
             e = f(e)
-            hs = hs.tail
           case Recover(pf) if pf.isDefinedAt(e) =>
-            handlers = hs.tail
             current = pf(e)
             handled = true
           case AttemptH =>
-            handlers = hs.tail
             current = Eru.succeed(Result.Failure(e)).asInstanceOf[Eru[Any, Any]]
             handled = true
           case _ =>
-            hs = hs.tail
+            // Continue to next handler
         }
       }
 
@@ -371,8 +370,7 @@ object EruRuntime {
 
     private def handleSuccess(value: Any): Unit = {
       if (conts.nonEmpty) {
-        val k = conts.head
-        conts = conts.tail
+        val k = conts.removeHead()  // O(1) operation with ArrayDeque
         
         // Map chain optimization: try to detect and execute simple map operations directly
         try {
@@ -417,8 +415,7 @@ object EruRuntime {
         case View.VSucceed(value) =>
           // Direct execution optimization: if we have continuations, try to execute simple ones directly
           if (conts.nonEmpty) {
-            val k = conts.head
-            conts = conts.tail
+            val k = conts.removeHead()
             // Check if the continuation produces a simple succeed - execute directly
             try {
               k(value) match {
@@ -439,7 +436,7 @@ object EruRuntime {
           }
 
         case View.VFail(error) =>
-          conts = Nil  // Clear continuations on failure
+          conts.clear()  // Clear continuations on failure
           handleFailure(error)
 
         case View.VEffect(thunk) =>
@@ -447,8 +444,7 @@ object EruRuntime {
             case Right(value) => 
               // Same direct execution optimization for effect results
               if (conts.nonEmpty) {
-                val k = conts.head
-                conts = conts.tail
+                val k = conts.removeHead()
                 try {
                   k(value) match {
                     case s @ Eru.Succeed(directValue) =>
@@ -470,7 +466,7 @@ object EruRuntime {
 
         case View.VChain(source, f) =>
           // Continuation stacking: unwind nested Chain operations in one step
-          conts = f.asInstanceOf[Any => Eru[Any, Any]] :: conts
+          conts.prepend(f.asInstanceOf[Any => Eru[Any, Any]])
           current = source.asInstanceOf[Eru[Any, Any]]
           
           // Optimization: if the source is also a Chain, unwind it immediately
@@ -478,7 +474,7 @@ object EruRuntime {
           while (unwinding) {
             Eru.Internals.view(current) match {
               case View.VChain(nextSource, nextF) =>
-                conts = nextF.asInstanceOf[Any => Eru[Any, Any]] :: conts
+                conts.prepend(nextF.asInstanceOf[Any => Eru[Any, Any]])
                 current = nextSource.asInstanceOf[Eru[Any, Any]]
               case _ =>
                 unwinding = false
@@ -491,17 +487,17 @@ object EruRuntime {
           val mapCont: Any => Eru[Any, Any] = { value =>
             Eru.succeed(f.asInstanceOf[Any => Any](value)).asInstanceOf[Eru[Any, Any]]
           }
-          conts = mapCont :: conts
+          conts.prepend(mapCont)
           current = source.asInstanceOf[Eru[Any, Any]]
           scheduleIfPending()
 
         case View.VRecoverWith(source, pf) =>
-          handlers = Recover(pf.asInstanceOf[PartialFunction[Any, Eru[Any, Any]]]) :: handlers
+          handlers.prepend(Recover(pf.asInstanceOf[PartialFunction[Any, Eru[Any, Any]]]))
           current = source.asInstanceOf[Eru[Any, Any]]
           scheduleIfPending()
 
         case View.VMapError(source, f) =>
-          handlers = MapErr(f.asInstanceOf[Any => Any]) :: handlers
+          handlers.prepend(MapErr(f.asInstanceOf[Any => Any]))
           current = source.asInstanceOf[Eru[Any, Any]]
           scheduleIfPending()
 
@@ -509,12 +505,12 @@ object EruRuntime {
           val zipCont: Any => Eru[Any, Any] = { leftValue =>
             right.asInstanceOf[Eru[Any, Any]].map(rightValue => (leftValue, rightValue)).asInstanceOf[Eru[Any, Any]]
           }
-          conts = zipCont :: conts
+          conts.prepend(zipCont)
           current = left.asInstanceOf[Eru[Any, Any]]
           scheduleIfPending()
 
         case View.VAttempt(source) =>
-          handlers = AttemptH :: handlers
+          handlers.prepend(AttemptH)
           current = source.asInstanceOf[Eru[Any, Any]]
           scheduleIfPending()
 
@@ -530,7 +526,7 @@ object EruRuntime {
           }
 
         case View.VEnsure(source, finalizer) =>
-          finalizers = finalizer :: finalizers
+          finalizers.prepend(finalizer)
           current = source.asInstanceOf[Eru[Any, Any]]
           scheduleIfPending()
 
