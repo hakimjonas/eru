@@ -111,9 +111,11 @@ enum Eru[+E, +A] {
     *   a new `Eru` describing the composed computation.
     */
   final def flatMap[E1 >: E, B](f: A => Eru[E1, B]): Eru[E1, B] = {
-    // Very conservative FlatMap chain optimization: disabled for now to prevent regressions
-    // The optimization was causing side effects to be executed multiple times
-    // TODO: Re-enable with a more sophisticated approach that can detect truly pure continuations
+    // FlatMap optimization disabled: the previous implementation was too aggressive
+    // and caused side effects to be evaluated during construction when they should remain lazy.
+    // For now, use Chain for all flatMap operations to preserve correct laziness semantics.
+    // Future work: implement a more sophisticated purity analysis to safely detect
+    // truly pure flatMap chains that can be optimized without side effects.
     Chain(this, f)
   }
 
