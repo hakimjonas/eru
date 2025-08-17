@@ -22,9 +22,14 @@ import net.ghoula.eru.Eru
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Fork(value = 2)
-@Warmup(iterations = 5)
-@Measurement(iterations = 10)
+@Fork(value = 3, jvmArgs = Array(
+  "-server",
+  "-Xms2G", "-Xmx2G",  // Fixed heap to reduce GC variance
+  "-XX:+UseG1GC",       // Consistent garbage collector
+  "-XX:+UnlockExperimentalVMOptions"
+))
+@Warmup(iterations = 10, time = 2, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 15, time = 3, timeUnit = TimeUnit.SECONDS)
 class EruMapFlatMapBench {
 
   @Param(Array("10", "100", "1000"))
