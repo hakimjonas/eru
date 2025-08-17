@@ -55,6 +55,7 @@ enum Eru[+E, +A] {
   /** Represents a debugging marker around a computation with a lazily provided label. */
   private case Debug[E0, A0](source: Eru[E0, A0], label: () => String) extends Eru[E0, A0]
   private case Ensure[E0, A0](source: Eru[E0, A0], finalizer: () => Eru[Nothing, Unit]) extends Eru[E0, A0]
+  private case Suspend[E0, A0](register: (Either[E0, A0] => Unit) => Eru[Nothing, Unit]) extends Eru[E0, A0]
 
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
@@ -216,6 +217,25 @@ enum Eru[+E, +A] {
 }
 
 object Eru {
+
+  /** Creates an asynchronous, suspending effect by registering a callback with an external source.
+    *
+    * The provided `register` function receives a callback that must be invoked exactly once by the
+    * asynchronous source when the result is ready. The registration itself is described by
+    * `Eru[Nothing, Unit]` to remain pure; it will be evaluated by the runtime.
+    *
+    * @param register
+    *   a function that, given a resume callback, returns an effect describing how to register that
+    *   callback with the asynchronous source
+    * @tparam E
+    *   the typed error of the asynchronous computation
+    * @tparam A
+    *   the success type of the asynchronous computation
+    * @return
+    *   an effect that suspends until the callback is invoked
+    */
+  def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E, A] =
+    Suspend(register)
 
   /** Creates an `Eru[Nothing, A]` that succeeds with the given pure value.
     * @param value
@@ -382,6 +402,15 @@ object Eru {
 
         case Ensure(source, fin) =>
           tailcall(runWithStack(source, fins)).map { case (either, fs) => (either, fin :: fs) }
+        case Suspend(register) =>
+          val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
+          val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
+          val (_, fsAfterReg) = runWithStack(register(cb), fins).result
+          while (cbBox.get.isEmpty) {
+            try java.lang.Thread.sleep(0)
+            catch { case _: InterruptedException => () }
+          }
+          done((cbBox.get.get, fsAfterReg))
       }
 
     private def drainFinalizers(fins: List[Finalizer]): TailRec[Unit] =
@@ -442,6 +471,15 @@ object Eru {
           tailcall(runWithObsStack(source, scope, observer, fins))
         case Ensure(source, fin) =>
           tailcall(runWithObsStack(source, scope, observer, fin :: fins))
+        case Suspend(register) =>
+          val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
+          val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
+          val (_, fsAfterReg) = runWithObsStack(register(cb), scope, observer, fins).result
+          while (cbBox.get.isEmpty) {
+            try java.lang.Thread.sleep(0)
+            catch { case _: InterruptedException => () }
+          }
+          done((cbBox.get.get, fsAfterReg))
       }
 
     /** Observer-aware interpreter variant */
@@ -482,6 +520,7 @@ object Eru {
       case VAttempt[E0, A0](source: Eru[E0, A0]) extends View[Nothing, Result[E0, A0]]
       case VDebug[E0, A0](source: Eru[E0, A0], label: () => String) extends View[E0, A0]
       case VEnsure[E0, A0](source: Eru[E0, A0], finalizer: () => Eru[Nothing, Unit]) extends View[E0, A0]
+      case VSuspend[E0, A0](register: (Either[E0, A0] => Unit) => Eru[Nothing, Unit]) extends View[E0, A0]
     }
 
     import View.*
@@ -496,6 +535,7 @@ object Eru {
       case Attempt(source) => VAttempt(source)
       case Debug(source, label) => VDebug(source, label)
       case Ensure(source, finalizer) => VEnsure(source, finalizer)
+      case Suspend(register) => VSuspend(register)
     }
   }
 }

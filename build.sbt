@@ -94,7 +94,7 @@ lazy val eruCoreNative = eruCore.native
 
 // ===== Runtime (JVM & Native) =====
 lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
-  .crossType(CrossType.Pure)
+  .crossType(CrossType.Full)
   .in(file("eru-runtime"))
   .settings(sonatypeSettings *)
   .settings(
@@ -105,6 +105,7 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
     tastyMiMaPreviousArtifacts := Set.empty,
     mimaFailOnNoPrevious := false,
     libraryDependencies ++= Seq(
+      "io.github.cquiroz" %%% "scala-java-time" % "2.6.0",
       "org.scalameta" %%% "munit" % "1.1.1" % Test
     )
   )

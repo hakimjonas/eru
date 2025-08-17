@@ -1,5 +1,7 @@
 package net.ghoula.eru
 
+import java.time.Duration
+
 /** Minimal runtime surface for 0.3.0 Milestone A.
   *
   * This object provides a synchronous stub for fiber operations to establish the public API surface
@@ -10,38 +12,92 @@ package net.ghoula.eru
   * The goal is to unblock tests and documentation while we iterate on the scheduler in subsequent
   * milestones.
   */
+/** Timer abstraction for platform-specific timer implementations. */
+private[eru] trait Timer {
+  def schedule(delay: Duration, task: () => Unit): Unit
+}
+
 object EruRuntime {
 
-  /** Combines two effects, intended to run in parallel in the async runtime.
-    *
-    * Placeholder semantics (0.3.0 Milestone A): this version is sequential and will be upgraded to
-    * true parallel execution in a later increment without changing the API.
-    *
-    * @param fa
-    *   the left effect
-    * @param fb
-    *   the right effect
-    * @return
-    *   an effect that yields a pair of results
-    */
-  def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2, (A, B)] =
-    fa.zip(fb)
 
-  /** Competes two effects, returning the first successful result, tagged with its side.
+  /** Combines two effects, executing them in parallel on separate fibers.
     *
-    * Placeholder semantics (0.3.0 Milestone A): evaluates left first; if it succeeds, returns
-    * Left(a); otherwise evaluates right and returns Right(b) on success. Failure/defect propagation
-    * is consistent with the core interpreter and will be upgraded to true racing.
-    *
-    * @param fa
-    *   the left effect
-    * @param fb
-    *   the right effect
-    * @return
-    *   an effect yielding Left(a) or Right(b)
+    * Semantics:
+    *   - If both succeed, returns the pair of results.
+    *   - If either fails (typed failure) or dies (defect), interrupts the other fiber and waits for
+    *     its completion (finalizers included) before returning the original failure/defect.
     */
-  def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2, Either[A, B]] =
-    fa.map(Left(_)).orElse(fb.map(Right(_)))
+  def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, (A, B)] =
+    for {
+      leftRef <- Ref.make(Option.empty[Exit[E1, A]])
+      rightRef <- Ref.make(Option.empty[Exit[E2, B]])
+      lf <- fork(fa)
+      rf <- fork(fb)
+      _ <- fork(lf.await.flatMap(ex => leftRef.set(Some(ex)))).flatMap(_ => Eru.unit)
+      _ <- fork(rf.await.flatMap(ex => rightRef.set(Some(ex)))).flatMap(_ => Eru.unit)
+      _ <- Eru.effect {
+        def failedL(e: Exit[E1, A]): Boolean = e match { case Exit.Success(_) => false; case _ => true }
+        def failedR(e: Exit[E2, B]): Boolean = e match { case Exit.Success(_) => false; case _ => true }
+        Scheduler.pumpUntil { () =>
+          val l = leftRef.get.unsafeRunSync()
+          val r = rightRef.get.unsafeRunSync()
+          (l.isDefined && r.isDefined) || l.exists(failedL) || r.exists(failedR)
+        }
+      }.attempt.flatMap(_ => Eru.unit)
+      le <- leftRef.get
+      re <- rightRef.get
+      out <- (le, re) match {
+        case (Some(Exit.Success(a)), Some(Exit.Success(b))) => Eru.succeed((a, b))
+        case (Some(Exit.Success(_)), Some(Exit.Failure(e))) =>
+          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+        case (Some(Exit.Success(_)), Some(Exit.Die(t))) =>
+          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+        case (Some(Exit.Failure(e)), _) =>
+          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+        case (Some(Exit.Die(t)), _) =>
+          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+        case _ => Eru.effect(throw new RuntimeException("zipPar interrupted"))
+      }
+    } yield out
+
+  /** Races two effects in parallel and yields the first termination result.
+    *
+    * The winner can be a success, typed failure, or defect. The losing fiber is interrupted and
+    * fully awaited before the race completes to ensure finalizers are run.
+    */
+  def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
+    for {
+      leftRef <- Ref.make(Option.empty[Exit[E1, A]])
+      rightRef <- Ref.make(Option.empty[Exit[E2, B]])
+      lf <- fork(fa)
+      rf <- fork(fb)
+      _ <- fork(lf.await.flatMap(ex => leftRef.set(Some(ex)))).flatMap(_ => Eru.unit)
+      _ <- fork(rf.await.flatMap(ex => rightRef.set(Some(ex)))).flatMap(_ => Eru.unit)
+      _ <- Eru.effect {
+        Scheduler.pumpUntil { () =>
+          val l = leftRef.get.unsafeRunSync()
+          val r = rightRef.get.unsafeRunSync()
+          l.isDefined || r.isDefined
+        }
+      }.attempt.flatMap(_ => Eru.unit)
+      le <- leftRef.get
+      re <- rightRef.get
+      res <- (le, re) match {
+        case (Some(Exit.Success(a)), _) =>
+          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.succeed(Left(a)))
+        case (_, Some(Exit.Success(b))) =>
+          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => lf.await).flatMap(_ => Eru.succeed(Right(b)))
+        case (Some(Exit.Failure(e)), _) =>
+          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+        case (_, Some(Exit.Failure(e))) =>
+          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => lf.await).flatMap(_ => Eru.fail(e))
+        case (Some(Exit.Die(t)), _) =>
+          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+        case (_, Some(Exit.Die(t))) =>
+          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => lf.await).flatMap(_ => Eru.effect(throw t))
+        case _ => Eru.effect(throw new RuntimeException("race interrupted"))
+      }
+    } yield res
 
   /** A token that re-enables interruptibility inside a masked region. */
   trait Unmask {
@@ -54,15 +110,32 @@ object EruRuntime {
 
   private object Scheduler {
     private val queue = scala.collection.mutable.Queue[() => Unit]()
+    private var parkedFibers: Int = 0
 
     def schedule(thunk: () => Unit): Unit =
       queue.enqueue(thunk)
 
-    def pumpUntil(done: () => Boolean): Unit =
-      while !done() && queue.nonEmpty do {
-        val task = queue.dequeue()
-        task()
+    def parkFiber(): Unit =
+      parkedFibers += 1
+
+    def unparkFiber(): Unit =
+      parkedFibers = Math.max(0, parkedFibers - 1)
+
+    def pumpUntil(done: () => Boolean): Unit = {
+      while !done() || (parkedFibers > 0 && queue.nonEmpty) do {
+        if queue.nonEmpty then {
+          val task = queue.dequeue()
+          task()
+        } else if parkedFibers > 0 then {
+          // Non-blocking wait when there are parked fibers waiting for external events
+          try java.lang.Thread.sleep(1)
+          catch { case _: InterruptedException => () }
+        } else {
+          // No parked fibers and condition not met, exit
+          return
+        }
       }
+    }
   }
 
   /** Forks a computation into a fiber and returns it immediately.
@@ -114,6 +187,89 @@ object EruRuntime {
     */
   def mask[E, A](k: Unmask => Eru[E, A]): Eru[E, A] = k(IdentityUnmask)
 
+  /** Suspends for approximately the specified duration without blocking a thread.
+    *
+    * The scheduler remains responsive: completion is enqueued onto the event loop via a timer
+    * callback, and this effect pumps the scheduler until the wakeup has been processed.
+    *
+    * @param duration
+    *   the delay before completion
+    * @return
+    *   an effect that completes with Unit after the delay
+    */
+  def sleep(duration: Duration): Eru[Nothing, Unit] =
+    Eru.effect {
+      var completed = false
+      Platform.timer.schedule(duration, () => {
+        Scheduler.schedule(() => completed = true)
+      })
+      Scheduler.pumpUntil(() => completed)
+      ()
+    }.attempt.flatMap(_ => Eru.unit)
+
+  /** Fails with a TimeoutException if the given effect does not complete within the duration.
+    *
+    * Implemented via race with [[sleep]]. If the timeout wins, the original effect is interrupted
+    * and its finalizers are awaited by the race machinery before this returns.
+    *
+    * @param duration
+    *   the maximum allowed duration
+    * @param fa
+    *   the effect to run with a timeout
+    * @tparam E
+    *   the error type of the effect
+    * @tparam A
+    *   the success type of the effect
+    * @return
+    *   an effect that either succeeds with A or fails with TimeoutException
+    */
+  def timeout[E, A](
+    duration: Duration
+  )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] = {
+    import java.util.concurrent.TimeoutException
+    race(fa, sleep(duration)).flatMap {
+      case Left(a) => Eru.succeed(a)
+      case Right(_) => Eru.effect(throw new TimeoutException())
+    }
+  }
+
+  /** Retry policy describing how to reschedule failures. */
+  sealed trait Policy
+  object Policy {
+
+    /** Retry up to `n` times without delay. */
+    final case class Recurs(n: Int) extends Policy
+
+    /** Exponential backoff: base * 2^i, up to `maxRetries` attempts (not counting the initial try).
+      */
+    final case class Exponential(base: Duration, maxRetries: Int) extends Policy
+  }
+
+  /** Re-executes an effect on typed failure according to the given policy.
+    *
+    * Defects (Throwable) are propagated as defects; only typed failures participate in retry.
+    *
+    * @param policy
+    *   the retry policy to apply
+    * @param fa
+    *   the effect to retry
+    */
+  def retry[E, A](policy: Policy)(fa: Eru[E, A]): Eru[E, A] = {
+    import Policy.*
+    def delayFor(i: Int): Option[Duration] = policy match {
+      case Recurs(n) => if (i < n) Some(Duration.ZERO) else None
+      case Exponential(base, max) => if (i < max) Some(base.multipliedBy(1L << i)) else None
+    }
+    def loop(i: Int): Eru[E, A] =
+      fa.recoverWith { case e =>
+        delayFor(i) match {
+          case Some(d) => sleep(d).flatMap(_ => loop(i + 1))
+          case None => Eru.fail(e)
+        }
+      }
+    loop(0)
+  }
+
   private final class RuntimeFiber[E, A](val id: FiberId, fa: Eru[E, A], observer: Option[EruObserver])
       extends Fiber[E, A] {
 
@@ -130,11 +286,32 @@ object EruRuntime {
           }
       }
 
+    private def collectEnsures[E, A](e0: Eru[E, A]): List[() => Eru[Nothing, Unit]] = {
+      import Eru.Internals.View
+      def loop[E1, A1](e: Eru[E1, A1]): List[() => Eru[Nothing, Unit]] =
+        Eru.Internals.view(e) match {
+          case View.VEnsure(source, fin) => fin :: loop(source)
+          case View.VChain(source, _) => loop(source)
+          case View.VRecoverWith(source, _) => loop(source)
+          case View.VMapError(source, _) => loop(source)
+          case View.VDebug(source, _) => loop(source)
+          case View.VAttempt(source) => loop(source)
+          case View.VZip(left, right) => loop(left) ++ loop(right)
+          case _ => Nil
+        }
+      loop(e0)
+    }
+
+    private def drainFinalizersList(fins: List[() => Eru[Nothing, Unit]]): Unit =
+      fins.foreach(fin => fin().attempt.unsafeRunSync())
+
     def run(): Unit = {
       if (exit0.isEmpty) {
         val ex: Exit[E, A] =
           interrupted match {
-            case Some(cause) => Exit.Interrupt(id, cause)
+            case Some(cause) =>
+              drainFinalizersList(collectEnsures(fa))
+              Exit.Interrupt(id, cause)
             case None =>
               val res: Result[E, A] = observer match {
                 case Some(_) =>
