@@ -674,4 +674,126 @@ class EruSpec extends FunSuite {
       prog.unsafeRunSync()
     }
   }
+
+  // Tests for Pure Construction-Time Optimizations
+
+  test("eager evaluation: succeed().map() evaluates immediately at construction time") {
+    var mapCallCount = 0
+    val computation = Eru.succeed(42).map { x =>
+      mapCallCount += 1
+      x * 2
+    }
+    
+    // The map function should be called immediately during construction
+    assertEquals(mapCallCount, 1, "Map function should be evaluated at construction time for pure chains")
+    
+    // Running should not call the map function again
+    val result = computation.unsafeRunSync()
+    assertEquals(result, 84)
+    assertEquals(mapCallCount, 1, "Map function should only be called once during construction")
+  }
+
+  test("eager evaluation: chained maps on succeed() are evaluated immediately") {
+    var map1CallCount = 0
+    var map2CallCount = 0
+    
+    val computation = Eru.succeed(10)
+      .map { x =>
+        map1CallCount += 1
+        x * 2
+      }
+      .map { x =>
+        map2CallCount += 1
+        x + 5
+      }
+    
+    // Both map functions should be called during construction
+    assertEquals(map1CallCount, 1, "First map should be evaluated at construction time")
+    assertEquals(map2CallCount, 1, "Second map should be evaluated at construction time")
+    
+    val result = computation.unsafeRunSync()
+    assertEquals(result, 25) // (10 * 2) + 5 = 25
+    assertEquals(map1CallCount, 1, "First map should only be called once")
+    assertEquals(map2CallCount, 1, "Second map should only be called once")
+  }
+
+  test("eager evaluation: map on Effect is not evaluated immediately") {
+    var effectCallCount = 0
+    var mapCallCount = 0
+    
+    val computation = Eru.effect {
+      effectCallCount += 1
+      42
+    }.map { x =>
+      mapCallCount += 1
+      x * 2
+    }
+    
+    // Neither the effect nor map should be called during construction
+    assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
+    assertEquals(mapCallCount, 0, "Map should not be evaluated at construction time for non-pure source")
+    
+    val result = computation.unsafeRunSync()
+    assertEquals(result, 84)
+    assertEquals(effectCallCount, 1, "Effect should be called once during execution")
+    assertEquals(mapCallCount, 1, "Map should be called once during execution")
+  }
+
+  test("eager evaluation: map exception handling converts to Effect") {
+    val computation = Eru.succeed(42).map { _ =>
+      throw new RuntimeException("Map function failed")
+    }
+    
+    // The computation should be converted to an Effect that captures the exception
+    val caught = intercept[RuntimeException] {
+      computation.unsafeRunSync()
+    }
+    assertEquals(caught.getMessage, "Map function failed")
+  }
+
+  test("mixed pure/impure chains behave correctly without flatMap optimization") {
+    var mapCallCount = 0
+    var effectCallCount = 0
+    var flatMapCallCount = 0
+    
+    val computation = Eru.succeed(10)
+      .map { x =>
+        mapCallCount += 1
+        x * 2  // This should be evaluated immediately
+      }
+      .flatMap { x =>
+        flatMapCallCount += 1
+        Eru.effect {
+          effectCallCount += 1
+          x + 5  // This should be deferred
+        }
+      }
+    
+    // Only the map should be evaluated immediately, flatMap remains lazy
+    assertEquals(mapCallCount, 1, "Map on succeed should be evaluated at construction time")
+    assertEquals(flatMapCallCount, 0, "FlatMap should not be evaluated at construction time (optimization disabled)")
+    assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
+    
+    val result = computation.unsafeRunSync()
+    assertEquals(result, 25) // (10 * 2) + 5 = 25
+    assertEquals(mapCallCount, 1, "Map should only be called once")
+    assertEquals(flatMapCallCount, 1, "FlatMap should be called once during execution")
+    assertEquals(effectCallCount, 1, "Effect should be called once during execution")
+  }
+
+  test("construction-time optimizations preserve correctness for complex chains") {
+    // Test that optimized and non-optimized paths produce the same results
+    val pureChain = Eru.succeed(5)
+      .map(_ * 2)
+      .flatMap(x => Eru.succeed(x + 3))
+      .map(_ * 2)
+    
+    val mixedChain = Eru.succeed(5)
+      .map(_ * 2)
+      .flatMap(x => Eru.effect(x + 3))
+      .map(_ * 2)
+    
+    assertEquals(pureChain.unsafeRunSync(), 26)
+    assertEquals(mixedChain.unsafeRunSync(), 26)
+  }
 }

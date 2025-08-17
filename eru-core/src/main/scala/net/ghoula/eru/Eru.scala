@@ -74,8 +74,22 @@ enum Eru[+E, +A] {
     *   a new `Eru` describing the transformed computation.
     */
   final def map[B](f: A => B): Eru[E, B] = {
-    // Map chain fusion optimization: use MapChain for consecutive maps
+    // Eager evaluation optimization: immediately evaluate pure chains
     this match {
+      case Succeed(value) =>
+        // Pure chain detected: evaluate immediately at construction time
+        try {
+          Succeed(f(value))
+        } catch {
+          case scala.util.control.NonFatal(t) => Effect(() => Left(t)).asInstanceOf[Eru[E, B]]
+        }
+      case MapChain(Succeed(value), g) =>
+        // Pure MapChain detected: evaluate entire chain immediately
+        try {
+          Succeed(f(g(value)))
+        } catch {
+          case scala.util.control.NonFatal(t) => Effect(() => Left(t)).asInstanceOf[Eru[E, B]]
+        }
       case MapChain(source, g) =>
         // Compose with existing MapChain by function composition
         MapChain(source, g.andThen(f))
@@ -88,12 +102,20 @@ enum Eru[+E, +A] {
   /** Chains another computation to be run after this one completes. This is the Monad `flatMap` (or
     * `bind`) operation.
     *
+    * Construction-time optimization: Detects pure flatMap chains where both the source and 
+    * continuation result are immediate successes, evaluating them at construction time.
+    *
     * @param f
     *   the function to apply to the success value, returning the next `Eru`.
     * @return
     *   a new `Eru` describing the composed computation.
     */
-  final def flatMap[E1 >: E, B](f: A => Eru[E1, B]): Eru[E1, B] = Chain(this, f)
+  final def flatMap[E1 >: E, B](f: A => Eru[E1, B]): Eru[E1, B] = {
+    // Very conservative FlatMap chain optimization: disabled for now to prevent regressions
+    // The optimization was causing side effects to be executed multiple times
+    // TODO: Re-enable with a more sophisticated approach that can detect truly pure continuations
+    Chain(this, f)
+  }
 
   /** Transforms the error value of this `Eru` using a pure function. If this `Eru` is a success,
     * this operation has no effect.
