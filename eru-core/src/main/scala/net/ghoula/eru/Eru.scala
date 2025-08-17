@@ -34,6 +34,11 @@ enum Eru[+E, +A] {
     */
   private case Chain[E0, From, +To](source: Eru[E0, From], f: From => Eru[E0, To]) extends Eru[E0, To]
 
+  /** Represents a chain of pure map operations fused together for performance.
+    * This avoids creating multiple Chain nodes for consecutive map operations.
+    */
+  private case MapChain[E0, From, +To](source: Eru[E0, From], f: From => To) extends Eru[E0, To]
+
   /** Represents an error-handling computation. */
   private case RecoverWith[E0, A0, +E2, +A1 >: A0](
     source: Eru[E0, A0],
@@ -60,12 +65,25 @@ enum Eru[+E, +A] {
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
     *
+    * Construction-time optimization: Uses `MapChain` to fuse consecutive map operations,
+    * avoiding the creation of multiple Chain nodes and improving performance.
+    *
     * @param f
     *   the function to apply to the success value.
     * @return
     *   a new `Eru` describing the transformed computation.
     */
-  final def map[B](f: A => B): Eru[E, B] = flatMap(a => Eru.succeed(f(a)))
+  final def map[B](f: A => B): Eru[E, B] = {
+    // Map chain fusion optimization: use MapChain for consecutive maps
+    this match {
+      case MapChain(source, g) =>
+        // Compose with existing MapChain by function composition
+        MapChain(source, g.andThen(f))
+      case _ =>
+        // Create a new MapChain for this map operation
+        MapChain(this, f)
+    }
+  }
 
   /** Chains another computation to be run after this one completes. This is the Monad `flatMap` (or
     * `bind`) operation.
@@ -367,6 +385,12 @@ object Eru {
             case (Left(error), fs) => done((Left(error), fs))
           }
 
+        case MapChain(source, f) =>
+          tailcall(runWithStack(source, fins)).map {
+            case (Right(value), fs) => (Right(f(value)), fs)
+            case (Left(error), fs) => (Left(error), fs)
+          }
+
         case RecoverWith(source, pf) =>
           tailcall(runWithStack(source, fins)).flatMap {
             case (Right(value), fs) => done((Right(value), fs))
@@ -439,6 +463,12 @@ object Eru {
           tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
             case (Right(value), fs) => tailcall(runWithObsStack(f(value), scope, observer, fs))
             case (Left(error), fs) => done((Left(error), fs))
+          }
+
+        case MapChain(source, f) =>
+          tailcall(runWithObsStack(source, scope, observer, fins)).map {
+            case (Right(value), fs) => (Right(f(value)), fs)
+            case (Left(error), fs) => (Left(error), fs)
           }
         case RecoverWith(source, pf) =>
           tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
@@ -513,6 +543,7 @@ object Eru {
       case VFail(error: E)
       case VEffect(thunk: () => Either[Throwable, A])
       case VChain[E0, From, To](source: Eru[E0, From], f: From => Eru[E0, To]) extends View[E0, To]
+      case VMapChain[E0, From, To](source: Eru[E0, From], f: From => To) extends View[E0, To]
       case VRecoverWith[E0, A0, E2, A1 >: A0](source: Eru[E0, A0], pf: PartialFunction[E0, Eru[E2, A1]])
           extends View[E0 | E2, A1]
       case VMapError[E0, A0, E2](source: Eru[E0, A0], f: E0 => E2) extends View[E2, A0]
@@ -529,6 +560,7 @@ object Eru {
       case Fail(error) => VFail(error)
       case Effect(thunk) => VEffect(thunk)
       case Chain(source, f) => VChain(source, f)
+      case MapChain(source, f) => VMapChain(source, f)
       case RecoverWith(source, pf) => VRecoverWith(source, pf)
       case MapError(source, f) => VMapError(source, f)
       case Zip(left, right) => VZip(left, right)

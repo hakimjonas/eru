@@ -486,6 +486,15 @@ object EruRuntime {
           }
           scheduleIfPending()
 
+        case View.VMapChain(source, f) =>
+          // Fused map chain: create a continuation that applies the composed function directly
+          val mapCont: Any => Eru[Any, Any] = { value =>
+            Eru.succeed(f.asInstanceOf[Any => Any](value)).asInstanceOf[Eru[Any, Any]]
+          }
+          conts = mapCont :: conts
+          current = source.asInstanceOf[Eru[Any, Any]]
+          scheduleIfPending()
+
         case View.VRecoverWith(source, pf) =>
           handlers = Recover(pf.asInstanceOf[PartialFunction[Any, Eru[Any, Any]]]) :: handlers
           current = source.asInstanceOf[Eru[Any, Any]]
