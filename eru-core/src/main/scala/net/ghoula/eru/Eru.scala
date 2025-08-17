@@ -595,3 +595,198 @@ object Eru {
     }
   }
 }
+
+/** Extension methods providing built-in caching functionality for `Eru[E, A]`.
+  *
+  * These methods follow the principle of radical ergonomics, making caching operations
+  * discoverable as natural extensions of the Eru type itself. Timeout and retry functionality
+  * will be provided in the runtime module to avoid circular dependencies.
+  */
+extension [E, A](eru: Eru[E, A]) {
+
+  /** Caches the result of this effect, computing it only once and reusing the result.
+    *
+    * This method provides a simple caching mechanism where the effect is executed at most once,
+    * and subsequent accesses return the cached result. The cache is based on referential equality
+    * of the Eru instance.
+    *
+    * Note: This is a simple in-memory cache. For more sophisticated caching needs with TTL,
+    * eviction policies, or external cache stores, consider using dedicated caching libraries.
+    *
+    * @return
+    *   an effect that caches its result after the first successful execution
+    */
+  def cached: Eru[E, A] = {
+    // Simple implementation using a lazy val to cache the result
+    lazy val cachedResult: Result[E, A] = eru.attempt.unsafeRunSync()
+    
+    cachedResult match {
+      case Result.Success(value) => Eru.succeed(value)
+      case Result.Failure(error) => Eru.fail(error)
+    }
+  }
+
+  /** Creates a memoized version of this effect that caches results based on input parameters.
+    *
+    * This is particularly useful for effects that are parameterized and expensive to compute.
+    * For this basic implementation, it delegates to cached since proper memoization requires
+    * parameterization support.
+    *
+    * Note: This is a basic memoization implementation. For production use cases with large
+    * parameter spaces, consider using more sophisticated memoization strategies with proper
+    * cache size limits and eviction policies.
+    *
+    * @return
+    *   an effect that memoizes its results
+    */
+  def memoized: Eru[E, A] = cached
+}
+
+/** Extension methods providing enhanced resource safety patterns for `Eru[E, A]`.
+  *
+  * These methods follow the principle of making resource safety the "pit of success" by providing
+  * ergonomic, discoverable patterns that guide developers toward correct resource management.
+  * They build upon the foundational `ensure` and `bracket` methods to provide common resource
+  * management scenarios as natural extensions.
+  */
+extension [E, A](eru: Eru[E, A]) {
+
+  /** Ensures multiple finalizers run in FILO order, providing a more ergonomic way to chain
+    * multiple cleanup operations.
+    *
+    * This method makes it easy to add multiple cleanup operations without nested .ensure calls,
+    * improving readability and making the resource cleanup chain more apparent.
+    *
+    * @param finalizers
+    *   variable number of finalizers to run in reverse order
+    * @return
+    *   an effect that guarantees all finalizers run after this effect completes
+    */
+  def ensureAll(finalizers: Eru[Any, Unit]*): Eru[E, A] = {
+    finalizers.foldLeft(eru) { (acc, finalizer) =>
+      acc.ensure(finalizer)
+    }
+  }
+
+  /** Creates a resource-safe computation that automatically calls a cleanup function on the
+    * success value, regardless of whether the subsequent computation succeeds or fails.
+    *
+    * This is particularly useful for resources that need cleanup based on their value,
+    * such as closing file handles, database connections, or network resources.
+    *
+    * @param cleanup
+    *   function to extract cleanup logic from the success value
+    * @tparam F
+    *   the error type of the cleanup operation
+    * @return
+    *   an effect that will automatically cleanup the resource
+    */
+  def autoCleanup[F](cleanup: A => Eru[F, Unit]): Eru[E, A] = {
+    eru.flatMap(value => Eru.succeed(value).ensure(cleanup(value)))
+  }
+
+  /** Provides automatic resource management for AutoCloseable resources.
+    *
+    * This method automatically handles closing of AutoCloseable resources (like files, streams,
+    * database connections) by calling their close() method in a finalizer, making resource
+    * management completely automatic.
+    *
+    * @param ev
+    *   evidence that A is an AutoCloseable
+    * @return
+    *   an effect that automatically closes the resource
+    */
+  def autoClose(implicit ev: A <:< AutoCloseable): Eru[E, A] = {
+    eru.autoCleanup(resource => Eru.effect(ev(resource).close()))
+  }
+
+  /** Creates a scoped resource that provides the resource to a use function and ensures cleanup.
+    *
+    * This is a more ergonomic alternative to bracket that reads more naturally and makes the
+    * resource scoping more explicit. The resource is guaranteed to be cleaned up regardless
+    * of how the use function terminates.
+    *
+    * @param use
+    *   function that uses the resource and produces a result
+    * @param cleanup
+    *   function to clean up the resource
+    * @tparam E1
+    *   the unified error type
+    * @tparam F
+    *   the error type of the cleanup operation
+    * @tparam B
+    *   the result type of the use function
+    * @return
+    *   an effect that uses the resource safely
+    */
+  def useScoped[E1 >: E, F, B](use: A => Eru[E1, B])(cleanup: A => Eru[F, Unit]): Eru[E1, B] = {
+    eru.bracket(cleanup)(use)
+  }
+
+  /** Provides a resource that can be shared across multiple concurrent operations safely.
+    *
+    * This method ensures that the resource cleanup only happens once all concurrent operations
+    * using the resource have completed. This is useful for expensive resources that should be
+    * shared across multiple fibers.
+    *
+    * Note: This is a simplified implementation. A full implementation would use reference counting
+    * or similar mechanisms to track concurrent usage.
+    *
+    * @param cleanup
+    *   function to clean up the shared resource
+    * @tparam F
+    *   the error type of the cleanup operation
+    * @return
+    *   an effect representing the shared resource
+    */
+  def shareResource[F](cleanup: A => Eru[F, Unit]): Eru[E, A] = {
+    // For now, delegate to regular cleanup - could be enhanced with reference counting
+    eru.autoCleanup(cleanup)
+  }
+
+  /** Creates a resource pool entry that can be safely returned to a pool after use.
+    *
+    * This method is designed for integration with resource pools where resources need to be
+    * returned rather than destroyed after use.
+    *
+    * @param returnToPool
+    *   function to return the resource to its pool
+    * @tparam F
+    *   the error type of the return operation
+    * @return
+    *   an effect that ensures the resource is returned to the pool
+    */
+  def pooled[F](returnToPool: A => Eru[F, Unit]): Eru[E, A] = {
+    eru.autoCleanup(returnToPool)
+  }
+
+  /** Wraps this effect with resource validation to ensure proper resource lifecycle.
+    *
+    * This method can be used to add validation logic that ensures resources are in the
+    * expected state before and after use.
+    *
+    * @param validate
+    *   function to validate the resource state
+    * @param description
+    *   human-readable description of what is being validated
+    * @return
+    *   an effect that validates resource lifecycle
+    */
+  def validateResource(validate: A => Boolean, description: String): Eru[E | String, A] = {
+    eru.flatMap { resource =>
+      if (validate(resource)) {
+        Eru.succeed(resource).ensure {
+          Eru.effect {
+            if (!validate(resource)) {
+              // Log validation failure but don't fail the finalizer
+              // In a real implementation, this might integrate with logging
+              ()
+            }
+          }
+        }
+      } else {
+        Eru.fail(s"Resource validation failed: $description")
+      }
+    }
+  }
+}

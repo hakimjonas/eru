@@ -36,12 +36,12 @@ class EruRuntimeSpec extends FunSuite {
 
   test("interrupt records cause and await returns Exit.Interrupt") {
     val fiber = EruRuntime.fork(Eru.succeed(1)).unsafeRunSync()
-    fiber.interrupt(InterruptCause.Cancelled).unsafeRunSync()
+    fiber.interrupt(InterruptCause.Cancelled()).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
     exit match {
       case Exit.Interrupt(fid, cause) =>
         assertEquals(fid, fiber.id)
-        assertEquals(cause, InterruptCause.Cancelled)
+        assertEquals(cause, InterruptCause.Cancelled())
       case other => fail(s"expected Interrupt, got $other")
     }
   }

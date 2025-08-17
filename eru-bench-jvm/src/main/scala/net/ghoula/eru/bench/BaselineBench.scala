@@ -14,8 +14,8 @@ import net.ghoula.eru.Eru
   *   - Raw function composition without Eru effects
   *   - Simple value operations for comparison
   *
-  * These baselines help validate that other benchmarks are measuring
-  * real work and not being optimized away by the JVM.
+  * These baselines help validate that other benchmarks are measuring real work and not being
+  * optimized away by the JVM.
   *
   * Run with: sbt "project eruBenchJVM; jmh:run .*BaselineBench.*"
   */
@@ -29,9 +29,9 @@ class BaselineBench {
 
   /** Measures absolute minimum JMH overhead.
     *
-    * This benchmark does the absolute minimum amount of work possible -
-    * just consuming a constant value through the blackhole. This establishes
-    * the baseline overhead of the JMH framework itself.
+    * This benchmark does the absolute minimum amount of work possible - just consuming a constant
+    * value through the blackhole. This establishes the baseline overhead of the JMH framework
+    * itself.
     */
   @Benchmark
   def absoluteBaseline(h: Blackhole): Unit = {
@@ -40,9 +40,9 @@ class BaselineBench {
 
   /** Measures raw function composition overhead without any effects.
     *
-    * This benchmark chains 10 simple functions together without using
-    * any effect system. This provides a baseline for what raw function
-    * composition costs, which we can compare against Eru's map chains.
+    * This benchmark chains 10 simple functions together without using any effect system. This
+    * provides a baseline for what raw function composition costs, which we can compare against
+    * Eru's map chains.
     */
   @Benchmark
   def rawFunctionComposition(h: Blackhole): Unit = {
@@ -51,19 +51,26 @@ class BaselineBench {
     val f3: Int => Int = _ + 1
     val f4: Int => Int = _ * 2
     val f5: Int => Int = _ + 1
-    
-    val composed = f1.andThen(f2).andThen(f3).andThen(f4).andThen(f5)
-      .andThen(f1).andThen(f2).andThen(f3).andThen(f4).andThen(f5)
-    
+
+    val composed = f1
+      .andThen(f2)
+      .andThen(f3)
+      .andThen(f4)
+      .andThen(f5)
+      .andThen(f1)
+      .andThen(f2)
+      .andThen(f3)
+      .andThen(f4)
+      .andThen(f5)
+
     val result = composed(0)
     h.consume(result)
   }
 
   /** Measures raw computation without function composition.
     *
-    * This benchmark performs the same arithmetic operations as
-    * rawFunctionComposition but without function composition overhead.
-    * This helps isolate the cost of function composition itself.
+    * This benchmark performs the same arithmetic operations as rawFunctionComposition but without
+    * function composition overhead. This helps isolate the cost of function composition itself.
     */
   @Benchmark
   def rawComputation(h: Blackhole): Unit = {
@@ -83,9 +90,9 @@ class BaselineBench {
 
   /** Measures simple Eru effect creation overhead.
     *
-    * This benchmark creates and executes a simple Eru.succeed effect
-    * without any composition. This establishes the baseline overhead
-    * of the Eru effect system for the simplest possible operation.
+    * This benchmark creates and executes a simple Eru.succeed effect without any composition. This
+    * establishes the baseline overhead of the Eru effect system for the simplest possible
+    * operation.
     */
   @Benchmark
   def simpleEruBaseline(h: Blackhole): Unit = {
@@ -95,28 +102,32 @@ class BaselineBench {
 
   /** Measures Eru map chain vs equivalent raw function composition.
     *
-    * This benchmark creates a 10-deep map chain in Eru and compares it
-    * to the raw function composition baseline. This helps validate that
-    * Eru's map optimization is working effectively.
+    * This benchmark creates a 10-deep map chain in Eru and compares it to the raw function
+    * composition baseline. This helps validate that Eru's map optimization is working effectively.
     */
   @Benchmark
   def eruMapChainBaseline(h: Blackhole): Unit = {
-    val program = Eru.succeed(0)
-      .map(_ + 1).map(_ * 2)
-      .map(_ + 1).map(_ * 2)
-      .map(_ + 1).map(_ * 2)
-      .map(_ + 1).map(_ * 2)
-      .map(_ + 1).map(_ * 2)
-    
+    val program = Eru
+      .succeed(0)
+      .map(_ + 1)
+      .map(_ * 2)
+      .map(_ + 1)
+      .map(_ * 2)
+      .map(_ + 1)
+      .map(_ * 2)
+      .map(_ + 1)
+      .map(_ * 2)
+      .map(_ + 1)
+      .map(_ * 2)
+
     val result = program.unsafeRunSync()
     h.consume(result)
   }
 
   /** Measures object allocation overhead.
     *
-    * This benchmark creates and consumes simple objects to establish
-    * the baseline cost of object allocation, which can help interpret
-    * other benchmark results in terms of allocation overhead.
+    * This benchmark creates and consumes simple objects to establish the baseline cost of object
+    * allocation, which can help interpret other benchmark results in terms of allocation overhead.
     */
   @Benchmark
   def allocationBaseline(h: Blackhole): Unit = {

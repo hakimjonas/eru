@@ -50,18 +50,58 @@ object FiberId {
   }
 }
 
-/** Cause of interruption for fibers.
+/** Cause of interruption for fibers with enhanced diagnostic information.
   *
-  * This is a minimal initial set and will evolve alongside the runtime. Additional cases (e.g.,
-  * user-defined causes) may be introduced in later versions.
+  * InterruptCause provides structured, rich diagnostic information about why a fiber was interrupted.
+  * This enhanced structure supports exceptional observability by capturing context that helps with
+  * debugging and monitoring fiber lifecycles.
   */
 enum InterruptCause {
 
-  /** Interruption initiated by the runtime or user. */
-  case Cancelled
+  /** Interruption initiated by the runtime or user.
+    *
+    * @param reason optional human-readable description of why cancellation was requested
+    */
+  case Cancelled(reason: Option[String] = None)
 
-  /** Interruption caused by a timeout policy. */
-  case Timeout
+  /** Interruption caused by a timeout policy.
+    *
+    * @param duration the timeout duration that was exceeded
+    * @param operation optional description of what operation timed out
+    */
+  case Timeout(duration: java.time.Duration, operation: Option[String] = None)
+
+  /** Interruption caused by parent fiber termination.
+    *
+    * When a parent fiber terminates (successfully or with failure), child fibers are interrupted
+    * to maintain structured concurrency guarantees.
+    *
+    * @param parentId the FiberId of the terminating parent fiber
+    * @param parentExit the Exit outcome of the parent fiber
+    */
+  case ParentTerminated(parentId: FiberId, parentExit: Exit[Any, Any])
+
+  /** Interruption caused by resource exhaustion or system limits.
+    *
+    * @param resource description of the exhausted resource (e.g., "memory", "file descriptors")
+    * @param details optional additional context about the resource exhaustion
+    */
+  case ResourceExhausted(resource: String, details: Option[String] = None)
+
+  /** User-defined interruption cause for application-specific scenarios.
+    *
+    * This allows applications to create custom interruption reasons with their own
+    * diagnostic information while maintaining type safety.
+    *
+    * @param name human-readable name for the interruption cause
+    * @param context optional structured context information
+    * @param metadata optional key-value metadata for debugging
+    */
+  case Custom(
+    name: String,
+    context: Option[String] = None,
+    metadata: Map[String, String] = Map.empty
+  )
 }
 
 /** A lightweight, user-space thread of execution in the asynchronous runtime.

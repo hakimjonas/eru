@@ -1,8 +1,15 @@
 # Performance Baseline and Optimization History
 
-This document provides performance baselines, optimization history, and performance characteristics of the Eru effect system. All benchmarks are conducted on the JVM using JMH with standard warmup and measurement iterations.
+This document provides performance baselines, optimization history, and performance characteristics of the Eru effect system. All benchmarks are conducted on the JVM using JMH with statistical analysis.
 
-## Current Performance Status (v0.3.0)
+**⚠️ Benchmarking Methodology Note**: All performance claims are based on JMH microbenchmarks with proper statistical analysis. Results should be interpreted with caution and validated in real-world usage patterns.
+
+## Current Performance Status (August 18, 2025)
+
+**Environment:**
+- JDK 21.0.8, OpenJDK 64-Bit Server VM
+- JVM Options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+- JMH 1.37 with experimental Compiler Blackholes
 
 As of August 2025, Eru has evolved from "correct-but-slow" to "correct-and-selectively-fast" through targeted optimizations that maintain architectural purity.
 
@@ -10,12 +17,12 @@ As of August 2025, Eru has evolved from "correct-but-slow" to "correct-and-selec
 
 #### ✅ **MapChain Optimization (Construction-Time Map Fusion)**
 **Status**: Implemented and highly successful  
-**Performance Impact**: 6-8x improvement for consecutive map operations
+**Performance Impact**: 40-140x improvement for consecutive map operations over flatMap equivalents
 
-**Before vs After:**
-- **Depth 10**: ~4.4M → 28.3M ops/sec (**6.3x improvement**)
-- **Depth 100**: ~400K → 3.7M ops/sec (**9.3x improvement**)
-- **Depth 1000**: ~37K → 306K ops/sec (**8.3x improvement**)
+**Latest Results (August 18, 2025):**
+- **Map operations maintain consistent 120M-135M ops/sec across all chain depths**
+- **FlatMap operations show expected linear degradation: 3M → 312K → 28K ops/sec**
+- **Optimization effectiveness: 42x-4,314x faster than equivalent flatMap operations**
 
 **Technical Approach**: Modified `Eru.map()` to detect consecutive map operations and fuse them using function composition (`f.andThen(g)`), creating specialized `MapChain` nodes that eliminate intermediate Chain creation.
 
@@ -23,41 +30,40 @@ As of August 2025, Eru has evolved from "correct-but-slow" to "correct-and-selec
 **Status**: Complete and production-ready  
 **Features**: Cast-free continuation management, true cooperative yielding, fair scheduling
 
-### Benchmark Results (JVM, August 2025)
+### Latest Benchmark Results (JMH, August 18, 2025)
 
 #### Sequential Composition Performance
 
-**FlatMap Operations (Baseline Performance):**
-- **Depth 10**: 1,688 ops/ms (~1.7M ops/sec)
-- **Depth 100**: 258 ops/ms (~6.5x slower than depth 10)
-- **Depth 1000**: 25.9 ops/ms (~65x slower than depth 10)
+**FlatMap Operations (Throughput):**
+- **Depth 10**: 3,046 ± 79 ops/ms (~3.0M ops/sec)
+- **Depth 100**: 312 ± 26 ops/ms (~312K ops/sec)
+- **Depth 1000**: 28 ± 3 ops/ms (~28K ops/sec)
 
-**Map Operations (With Eager Evaluation + MapChain Optimization):**
-- **Depth 10**: 102,531 ops/ms (~102.5M ops/sec) - **60.8x faster than flatMap**
-- **Depth 100**: 124,613 ops/ms (~124.6M ops/sec) - **482.8x faster than flatMap**
-- **Depth 1000**: 124,525 ops/ms (~124.5M ops/sec) - **4,814x faster than flatMap**
-
-**Key Insights:**
-- MapChain optimization provides consistent 6-8x improvement across all depth levels
-- Performance scaling is predictable and linear
-- Optimization effectiveness increases with chain depth
-
-#### Concurrent Runtime Performance
-
-**Core Operation Benchmarks:**
-- **Basic Composition**: 130.8 ns/op (succeed.flatMap chain)
-- **Effect Overhead**: 126.9 ns/op (baseline effect creation/execution)
-- **Deep Composition** (10 flatMaps): 2,061 ns/op (~206 ns per operation)
-- **Error Handling**: 97.7 ns/op (very efficient error path)
-- **Attempt Handling**: 136.3 ns/op (Result type conversion)
-- **Ensure Handling**: 171.5 ns/op (finalizer management)
-- **Sequential Zip**: 1,733 ns/op (tuple coordination)
+**Map Operations (With MapChain Optimization):**
+- **Depth 10**: 127,608 ± 3,236 ops/ms (~127.6M ops/sec) - **42x faster than flatMap**
+- **Depth 100**: 135,376 ± 16,040 ops/ms (~135.4M ops/sec) - **434x faster than flatMap**
+- **Depth 1000**: 120,770 ± 6,962 ops/ms (~120.8M ops/sec) - **4,314x faster than flatMap**
 
 **Performance Analysis:**
-- **Excellent Baseline**: ~127 ns per basic operation is competitive
-- **Consistent Scaling**: Deep composition shows predictable per-operation overhead
-- **Efficient Error Handling**: Error paths are actually faster than success paths
-- **Resource Management**: Ensure operations have acceptable overhead
+- **Map optimization effectiveness**: 42x-4,314x faster than flatMap operations
+- **Map performance scaling**: Excellent - maintains ~125M ops/sec across all depths
+- **FlatMap scaling characteristics**: Linear degradation as expected (O(n))
+
+#### Runtime Operation Performance (Average Time)
+
+**Core Operations:**
+- **Basic Composition**: 155.7 ± 11.6 ns/op
+- **Effect Overhead**: 177.1 ± 4.9 ns/op  
+- **Deep Composition** (100 flatMaps): 2,596.9 ± 96.5 ns/op (~26 ns per operation)
+- **Error Handling**: 150.6 ± 4.8 ns/op
+- **Attempt Handling**: 204.0 ± 3.9 ns/op
+- **Ensure Handling**: 255.4 ± 3.8 ns/op
+- **Sequential Zip**: 2,857.5 ± 151.7 ns/op
+
+**Key Insights:**
+- Consistent sub-microsecond latency for basic operations
+- Error handling paths are efficient (~150ns)
+- Deep composition scales predictably (~26ns per flatMap)
 
 ## Optimization History
 
@@ -184,82 +190,182 @@ Eru maintains a "correctness-first, optimize-selectively" approach:
 
 The successful MapChain optimization demonstrates that significant performance improvements (6-8x) are achievable while maintaining Eru's commitment to correctness, ergonomics, and observability.
 
-## Competitive Analysis vs Industry Standards
+## Benchmarking Methodology and Validation
 
-### Performance Comparison with ZIO and Cats Effect
+### Current Benchmark Limitations
 
-Eru's performance characteristics demonstrate significant advantages over industry-standard effect systems:
+**⚠️ Important Disclaimers:**
+Following JMH recommendations, these results should be interpreted with caution:
 
-#### **Map Operation Performance**
-- **Eru (Optimized)**: 102M-124M ops/sec across all depths
-- **Industry Typical**: 1M-10M ops/sec for map chains
-- **Advantage**: **10-124x faster** through construction-time optimization and eager evaluation
+1. **Microbenchmark Nature**: Results may not reflect real-world performance
+2. **JVM Optimizations**: Experimental Compiler Blackholes are in use
+3. **Single Environment**: Results from one specific hardware/JVM configuration
+4. **Missing Baselines**: Need baseline and negative control benchmarks for full validation
 
-#### **Basic Effect Overhead**
-- **Eru**: ~127 ns/op for basic composition
-- **ZIO/Cats Effect Typical**: 200-500 ns/op for similar operations
-- **Advantage**: **1.6-4x lower latency** for basic effect operations
+### Recommended Validation Process
 
-#### **Sequential Composition (FlatMap)**
-- **Eru**: 1.7M ops/sec (depth 10), graceful degradation
-- **Industry Typical**: 500K-2M ops/sec for similar workloads
-- **Advantage**: **Competitive baseline** with significant optimization headroom
+To make performance claims more defensible, the following validation is required:
 
-### Eru's Competitive Advantages
+#### **Priority 1: Establish Proper Baselines**
+```scala
+// Example baseline benchmarks (implemented in BaselineBench.scala)
+@Benchmark
+def absoluteBaseline(h: Blackhole): Unit = {
+  h.consume(42) // Absolute minimum work
+}
 
-#### **1. Construction-Time Optimization Leadership**
-- **Unique Approach**: Eru pioneered aggressive construction-time optimization for effect systems
-- **Results**: 60-4,814x performance improvements for map-heavy workloads
-- **Industry Impact**: No other effect system achieves similar optimization ratios
+@Benchmark
+def rawFunctionComposition(h: Blackhole): Unit = {
+  val f1: Int => Int = _ + 1
+  val f2: Int => Int = _ * 2
+  // Chain 10 functions directly
+  val composed = f1.andThen(f2).andThen(f1).andThen(f2)...
+  h.consume(composed(0))
+}
+```
 
-#### **2. Zero-Overhead Abstractions for Pure Operations**
-- **Achievement**: Pure map chains approach direct function call performance
-- **Benchmark**: 124M ops/sec sustained performance regardless of chain depth
-- **Comparison**: Traditional effect systems show linear degradation with depth
+#### **Priority 2: Add JVM Optimization Validation**
+```scala
+// Example validation benchmarks (implemented in ValidationBench.scala)
+@Benchmark
+def deadCodeEliminationTest(): Unit = {
+  // Create complex effects but don't consume - should be eliminated
+  val unused = Eru.succeed(42).map(_ + 1).flatMap(x => Eru.succeed(x + 10))
+  // Don't consume - JVM should eliminate this work
+}
 
-#### **3. Architectural Purity with Performance**
-- **Correctness**: 134/134 tests passing with zero casting throughout codebase
-- **Performance**: Exceptional results without architectural compromises
-- **Sustainability**: Optimizations maintain all correctness and observability guarantees
+@Benchmark
+def constantFoldingTest(h: Blackhole): Unit = {
+  // Operations that should be folded to constants
+  val constant = Eru.succeed(42).map(_ + 0).map(identity).unsafeRunSync()
+  h.consume(constant)
+}
+```
 
-#### **4. Platform Excellence**
-- **Cross-Platform**: Full JVM + Scala Native support with identical performance characteristics
-- **Integration**: Seamless Future interoperability without performance penalties
-- **Deployment**: Production-ready with comprehensive observability
+#### **Priority 3: Add Profiling Integration**
+```bash
+# Run with GC profiling
+sbt "project eruBenchJVM; jmh:run -prof gc"
 
-### Industry Positioning
+# Run with assembly code analysis  
+sbt "project eruBenchJVM; jmh:run -prof perfasm"
 
-Eru establishes a new performance category for effect systems:
+# Run with async profiler integration (requires setup)
+sbt "project eruBenchJVM; jmh:run -prof async:output=flamegraph"
+```
 
-**Traditional Effect Systems (ZIO, Cats Effect):**
-- Focus: Correctness, expressiveness, ecosystem
-- Performance: Good baseline, some optimizations
-- Trade-offs: Performance vs feature richness
+#### **Priority 4: Environmental Controls**
+- Multiple JVM versions (17, 21, latest)
+- Different GC algorithms (G1, Parallel, ZGC)
+- Different hardware configurations
+- Scala Native baseline comparisons
 
-**Eru's Position:**
-- Focus: Correctness + exceptional performance + ergonomics
-- Performance: Industry-leading through principled optimization
-- Trade-offs: Zero compromises - all three pillars achieved simultaneously
+### Performance Claims Policy
 
-### When to Choose Eru
+**Current Policy:**
+- All claims include statistical confidence intervals (±values)
+- Results are environment-specific and clearly documented
+- Relative comparisons preferred over absolute numbers
+- No competitive analysis without proper baseline studies
 
-**Eru Excels For:**
-- **Data Transformation Pipelines**: 10-4,814x faster map operations
-- **High-Throughput Services**: Exceptional baseline performance (127 ns/op)
-- **Resource-Constrained Environments**: Minimal overhead, efficient scaling
-- **Performance-Critical Applications**: Industry-leading benchmarks with full correctness
+**Validation Status (August 18, 2025):**
+1. ✅ **Baseline benchmarks established** - Raw operation costs documented
+2. ✅ **JVM optimization validation confirmed** - Dead code elimination working (6.7x faster when unused)
+3. ✅ **Benchmark integrity verified** - Results show real work is being measured
+4. ⏳ **Profiler analysis** - Available on-demand with integrated commands
+5. ⏳ **Cross-environment validation** - Single environment results documented with disclaimers
 
-**Complementary to Existing Ecosystems:**
-- **Migration Path**: Seamless interop with Future-based systems
-- **Learning Curve**: Familiar effect system patterns with performance benefits
-- **Ecosystem**: Designed for integration rather than replacement
+**Latest Baseline Results (August 18, 2025):**
+- **JMH Framework Overhead**: 0.300 ± 0.009 ns/op (absolute minimum)
+- **Raw Computation**: 0.282 ± 0.005 ns/op (direct arithmetic)
+- **Simple Eru Effect**: 7.559 ± 0.136 ns/op (**only 7.3ns overhead**)
+- **Raw Function Composition**: 60.971 ± 0.782 ns/op (10 function chain)
+- **Eru Map Chain (10 ops)**: 90.063 ± 1.270 ns/op (optimized effect chain)
+- **Object Allocation**: 17.338 ± 0.237 ns/op (allocation baseline)
 
-## Benchmarking Notes
+**JVM Optimization Validation:**
+- **Dead Code Elimination**: ✅ Confirmed working (35ns vs 239ns = 6.7x faster when unused)
+- **Constant Folding**: ✅ Confirmed working (consistent 61ns for foldable operations)
+- **Blackhole Usage**: ✅ Validated (minimal difference suggests return values consumed)
 
-- **Environment**: JVM-based benchmarks using JMH
-- **Consistency**: Multiple runs with proper warmup ensure reliable results
-- **Methodology**: Standard JMH practices with statistical confidence intervals
-- **Reproducibility**: Benchmarks available in `eru-bench-jvm` module
-- **Comparison Methodology**: Industry benchmarks based on published ZIO/Cats Effect performance studies
+**Key Insights from Validation:**
+- Eru's basic effect overhead is exceptionally low at ~7.5ns
+- Map chain optimization adds only ~30ns overhead vs raw function composition
+- JVM optimizations are working correctly, confirming benchmark validity
+- Dead code elimination provides strong validation that unused effects are optimized away
+
+## Current Performance Characteristics (Internal Analysis)
+
+**Note**: The following analysis is based on single-environment JMH microbenchmarks and should be validated independently before making comparative claims.
+
+### Eru's Performance Profile
+
+#### **Strengths:**
+- **Map Chain Optimization**: Exceptional performance through construction-time fusion
+- **Consistent Scaling**: Map operations maintain performance regardless of chain depth
+- **Low Latency Baseline**: Sub-200ns latency for basic operations
+- **Predictable Degradation**: FlatMap scaling follows expected O(n) characteristics
+
+#### **Performance Categories:**
+
+**Map-Heavy Workloads**: ⭐⭐⭐⭐⭐ Exceptional**
+- 120M+ ops/sec sustained throughput
+- Zero performance degradation with chain depth
+- Construction-time optimization eliminates runtime overhead
+
+**Sequential Composition**: ⭐⭐⭐⭐ Strong**
+- 3M ops/sec baseline for shallow chains
+- Predictable linear scaling characteristics
+- Competitive with similar effect systems
+
+**Basic Operations**: ⭐⭐⭐⭐ Solid**
+- ~155-180ns average latency
+- Consistent performance profile
+- Minimal allocation overhead
+
+### When Eru Shows Strong Performance
+
+**Optimal Use Cases:**
+- Data transformation pipelines with heavy map usage
+- Performance-critical applications requiring predictable latency
+- Systems with constrained computational budgets
+- Applications requiring both correctness and speed
+
+**Requires Further Validation For:**
+- Ecosystem-dependent applications (until Eru ecosystem matures)
+- Direct competitive comparisons (need controlled baseline studies)
+- Production workload performance (microbenchmarks may not reflect real usage)
+
+## Benchmarking Environment and Methodology
+
+**Hardware/Software Environment:**
+- JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+- JVM Options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+- JMH 1.37 with experimental Compiler Blackholes
+- Single-threaded execution (-t1) for consistency
+
+**JMH Configuration:**
+- Warmup: 5-10 iterations, 1-2s each
+- Measurement: 10-15 iterations, 2-3s each
+- Multiple forks for statistical reliability
+- Blackhole consumption to prevent dead code elimination
+
+**Available Benchmarks:**
+- `EruMapFlatMapBench`: Throughput comparison of map vs flatMap chains
+- `EruRuntimeBench`: Average time for core operations
+- `BaselineBench`: Minimum overhead and baseline measurements
+- `ValidationBench`: JVM optimization validation tests
+
+**Running Benchmarks:**
+```bash
+# Run all benchmarks
+sbt bench
+
+# Run specific benchmark with profiling
+sbt "project eruBenchJVM; jmh:run .*BaselineBench.* -prof gc"
+
+# Run validation benchmarks
+sbt "project eruBenchJVM; jmh:run .*ValidationBench.*"
+```
 
 For current benchmark execution: `sbt bench`

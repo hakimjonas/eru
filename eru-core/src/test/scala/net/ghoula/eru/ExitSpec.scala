@@ -31,11 +31,11 @@ class ExitSpec extends FunSuite {
 
   test("Exit.Interrupt holds fiber id and cause") {
     val fid = FiberId.fresh()
-    val ex: Exit[Nothing, Nothing] = Exit.Interrupt(fid, InterruptCause.Cancelled)
+    val ex: Exit[Nothing, Nothing] = Exit.Interrupt(fid, InterruptCause.Cancelled())
     ex match {
       case Exit.Interrupt(id, cause) =>
         assertEquals(id, fid)
-        assertEquals(cause, InterruptCause.Cancelled)
+        assertEquals(cause, InterruptCause.Cancelled())
       case _ => fail("expected Interrupt")
     }
   }

@@ -49,13 +49,13 @@ object EruRuntime {
       out <- (le, re) match {
         case (Some(Exit.Success(a)), Some(Exit.Success(b))) => Eru.succeed((a, b))
         case (Some(Exit.Success(_)), Some(Exit.Failure(e))) =>
-          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+          lf.interrupt(InterruptCause.Cancelled(Some("zipPar partner failed"))).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
         case (Some(Exit.Success(_)), Some(Exit.Die(t))) =>
-          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+          lf.interrupt(InterruptCause.Cancelled(Some("zipPar partner died"))).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
         case (Some(Exit.Failure(e)), _) =>
-          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+          rf.interrupt(InterruptCause.Cancelled(Some("zipPar partner failed"))).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
         case (Some(Exit.Die(t)), _) =>
-          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+          rf.interrupt(InterruptCause.Cancelled(Some("zipPar partner died"))).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
         case _ => Eru.effect(throw new RuntimeException("zipPar interrupted"))
       }
     } yield out
@@ -84,17 +84,17 @@ object EruRuntime {
       re <- rightRef.get
       res <- (le, re) match {
         case (Some(Exit.Success(a)), _) =>
-          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.succeed(Left(a)))
+          rf.interrupt(InterruptCause.Cancelled(Some("race lost - left won"))).flatMap(_ => rf.await).flatMap(_ => Eru.succeed(Left(a)))
         case (_, Some(Exit.Success(b))) =>
-          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => lf.await).flatMap(_ => Eru.succeed(Right(b)))
+          lf.interrupt(InterruptCause.Cancelled(Some("race lost - right won"))).flatMap(_ => lf.await).flatMap(_ => Eru.succeed(Right(b)))
         case (Some(Exit.Failure(e)), _) =>
-          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+          rf.interrupt(InterruptCause.Cancelled(Some("race terminated - left failed"))).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
         case (_, Some(Exit.Failure(e))) =>
-          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => lf.await).flatMap(_ => Eru.fail(e))
+          lf.interrupt(InterruptCause.Cancelled(Some("race terminated - right failed"))).flatMap(_ => lf.await).flatMap(_ => Eru.fail(e))
         case (Some(Exit.Die(t)), _) =>
-          rf.interrupt(InterruptCause.Cancelled).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+          rf.interrupt(InterruptCause.Cancelled(Some("race terminated - left died"))).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
         case (_, Some(Exit.Die(t))) =>
-          lf.interrupt(InterruptCause.Cancelled).flatMap(_ => lf.await).flatMap(_ => Eru.effect(throw t))
+          lf.interrupt(InterruptCause.Cancelled(Some("race terminated - right died"))).flatMap(_ => lf.await).flatMap(_ => Eru.effect(throw t))
         case _ => Eru.effect(throw new RuntimeException("race interrupted"))
       }
     } yield res
@@ -229,7 +229,7 @@ object EruRuntime {
     import java.util.concurrent.TimeoutException
     race(fa, sleep(duration)).flatMap {
       case Left(a) => Eru.succeed(a)
-      case Right(_) => Eru.effect(throw new TimeoutException())
+      case Right(_) => Eru.effect(throw new TimeoutException(s"Operation timed out after ${duration}"))
     }
   }
 
@@ -534,4 +534,144 @@ object EruRuntime {
 private final class CompletedFiber[E, A](val id: FiberId, exit0: Exit[E, A]) extends Fiber[E, A] {
   def await: Eru[Nothing, Exit[E, A]] = Eru.succeed(exit0)
   def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = Eru.unit
+}
+
+/** Extension methods providing runtime-dependent timeout and retry functionality for `Eru[E, A]`.
+  *
+  * These methods follow the principle of radical ergonomics, making powerful concurrent operations
+  * like timeouts and retries discoverable as natural extensions of the Eru type itself when using
+  * the runtime module. They integrate seamlessly with the concurrent runtime infrastructure.
+  */
+extension [E, A](eru: Eru[E, A]) {
+
+  /** Fails with a TimeoutException if this effect does not complete within the specified duration.
+    *
+    * This method provides a convenient, discoverable way to add timeouts to any Eru effect.
+    * The timeout is implemented via racing with a sleep effect, ensuring proper interruption
+    * and finalizer execution if the timeout wins.
+    *
+    * @param duration
+    *   the maximum allowed duration
+    * @return
+    *   an effect that either succeeds with A or fails with TimeoutException
+    */
+  def timeout(duration: java.time.Duration): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] = {
+    EruRuntime.timeout(duration)(eru)
+  }
+
+  /** Fails with a TimeoutException if this effect does not complete within the specified duration,
+    * or returns the fallback value instead of failing.
+    *
+    * This variant provides graceful degradation when timeouts occur, allowing applications to
+    * continue with a reasonable default rather than failing.
+    *
+    * @param duration
+    *   the maximum allowed duration
+    * @param fallback
+    *   the value to return if timeout occurs
+    * @return
+    *   an effect that either succeeds with A or the fallback value
+    */
+  def timeoutTo[A1 >: A](duration: java.time.Duration, fallback: A1): Eru[E | Throwable, A1] = {
+    EruRuntime.timeout(duration)(eru).recover {
+      case _: java.util.concurrent.TimeoutException => fallback
+    }
+  }
+
+  /** Retries this effect according to the specified policy when it fails with a typed error.
+    *
+    * This method provides a discoverable way to add retry logic to any Eru effect. Only typed
+    * failures participate in retry; defects (Throwables) are propagated immediately without retry.
+    *
+    * @param policy
+    *   the retry policy defining retry count and delay strategy
+    * @return
+    *   an effect that retries on typed failure according to the policy
+    */
+  def retry(policy: EruRuntime.Policy): Eru[E, A] = {
+    EruRuntime.retry(policy)(eru)
+  }
+
+  /** Retries this effect up to the specified number of times without delay.
+    *
+    * This is a convenience method for simple retry scenarios where you just want to retry
+    * a fixed number of times immediately upon failure.
+    *
+    * @param maxRetries
+    *   the maximum number of retry attempts (not counting the initial try)
+    * @return
+    *   an effect that retries up to maxRetries times on typed failure
+    */
+  def retryN(maxRetries: Int): Eru[E, A] = {
+    EruRuntime.retry(EruRuntime.Policy.Recurs(maxRetries))(eru)
+  }
+
+  /** Retries this effect with exponential backoff starting from the base duration.
+    *
+    * This method implements a common retry pattern with exponential backoff, where each retry
+    * waits longer than the previous one (base * 2^attempt).
+    *
+    * @param baseDuration
+    *   the initial delay duration
+    * @param maxRetries
+    *   the maximum number of retry attempts
+    * @return
+    *   an effect that retries with exponential backoff on typed failure
+    */
+  def retryWithBackoff(baseDuration: java.time.Duration, maxRetries: Int): Eru[E, A] = {
+    EruRuntime.retry(EruRuntime.Policy.Exponential(baseDuration, maxRetries))(eru)
+  }
+
+  /** Runs two effects in parallel, combining their results into a tuple.
+    *
+    * This provides a discoverable way to run effects in parallel. If either effect fails,
+    * the other is interrupted and the failure is propagated.
+    *
+    * @param other
+    *   the effect to run in parallel with this one
+    * @return
+    *   an effect that produces a tuple of both results
+    */
+  def zipPar[E1 >: E, B](other: Eru[E1, B]): Eru[E1 | Throwable, (A, B)] = {
+    EruRuntime.zipPar(eru, other)
+  }
+
+  /** Races this effect against another, returning the first to complete.
+    *
+    * This provides a discoverable way to race effects. The winner can be either success
+    * or failure. The losing effect is interrupted and fully awaited.
+    *
+    * @param other
+    *   the effect to race against this one
+    * @return
+    *   an effect that produces Either[A, B] representing which effect won
+    */
+  def race[E1 >: E, B](other: Eru[E1, B]): Eru[E1 | Throwable, Either[A, B]] = {
+    EruRuntime.race(eru, other)
+  }
+
+  /** Forks this effect into a fiber, returning the fiber immediately.
+    *
+    * This provides a discoverable way to run effects concurrently. The fiber can be
+    * awaited or interrupted later.
+    *
+    * @return
+    *   an effect that produces a Fiber representing the concurrent computation
+    */
+  def fork: Eru[Nothing, Fiber[E, A]] = {
+    EruRuntime.fork(eru)
+  }
+
+  /** Forks this effect with an observer for debugging and monitoring.
+    *
+    * This variant allows you to observe fiber lifecycle events and execution steps.
+    *
+    * @param observer
+    *   the observer to receive lifecycle events
+    * @return
+    *   an effect that produces a Fiber representing the concurrent computation
+    */
+  def forkWithObserver(observer: EruObserver): Eru[Nothing, Fiber[E, A]] = {
+    EruRuntime.forkWithObserver(eru, observer)
+  }
 }

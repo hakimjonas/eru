@@ -34,7 +34,7 @@ class FiberSpec extends FunSuite {
 
   test("interrupt records cause and returns unit") {
     val fib = new TestFiber[Nothing, Int](FiberId.fresh(), Exit.Success(1))
-    fib.interrupt(InterruptCause.Cancelled).unsafeRunSync()
-    assertEquals(fib.interrupted, Some(InterruptCause.Cancelled))
+    fib.interrupt(InterruptCause.Cancelled()).unsafeRunSync()
+    assertEquals(fib.interrupted, Some(InterruptCause.Cancelled()))
   }
 }
