@@ -122,7 +122,7 @@ lazy val eruRuntimeNative = eruRuntime.native
 
 // ===== Benchmarks (JVM only) =====
 lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
-  .dependsOn(eruCoreJVM)
+  .dependsOn(eruCoreJVM, eruRuntimeJVM)
   .enablePlugins(JmhPlugin)
   .settings(
     name := "eru-bench-jvm",
