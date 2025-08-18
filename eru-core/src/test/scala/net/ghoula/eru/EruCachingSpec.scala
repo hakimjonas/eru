@@ -24,10 +24,12 @@ class EruCachingSpec extends FunSuite {
 
   test("cached preserves failure and doesn't cache across different instances") {
     var executions = 0
-    def createFailingEffect = Eru.effect[Int] {
-      executions += 1
-      throw new RuntimeException("boom")
-    }.cached
+    def createFailingEffect = Eru
+      .effect[Int] {
+        executions += 1
+        throw new RuntimeException("boom")
+      }
+      .cached
 
     val effect1 = createFailingEffect
     val effect2 = createFailingEffect
@@ -95,12 +97,15 @@ class EruCachingSpec extends FunSuite {
 
   test("cached works with complex effect chains") {
     var counter = 0
-    val effect = Eru.succeed(10)
+    val effect = Eru
+      .succeed(10)
       .map(_ + 5)
-      .flatMap(x => Eru.effect {
-        counter += 1
-        x * 2
-      })
+      .flatMap(x =>
+        Eru.effect {
+          counter += 1
+          x * 2
+        }
+      )
       .map(_ + 1)
       .cached
 
@@ -116,7 +121,7 @@ class EruCachingSpec extends FunSuite {
   test("cached interacts properly with ensure") {
     var effectRuns = 0
     var finalizerRuns = 0
-    
+
     val effect = Eru.effect {
       effectRuns += 1
       "cached-with-ensure"

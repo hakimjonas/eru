@@ -1,6 +1,7 @@
 package net.ghoula.eru
 
 import munit.FunSuite
+
 import scala.collection.mutable.ListBuffer
 
 class EruResourceSafetyExtensionsSpec extends FunSuite {
@@ -52,11 +53,14 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     var cleanupCalled = false
     var cleanedValue: Option[String] = None
 
-    val program = Eru.succeed("resource").autoCleanup { value =>
-      cleanupCalled = true
-      cleanedValue = Some(value)
-      Eru.unit
-    }.flatMap(_ => Eru.fail("subsequent failure"))
+    val program = Eru
+      .succeed("resource")
+      .autoCleanup { value =>
+        cleanupCalled = true
+        cleanedValue = Some(value)
+        Eru.unit
+      }
+      .flatMap(_ => Eru.fail("subsequent failure"))
 
     val ex = intercept[EruException[String]] {
       program.unsafeRunSync()
@@ -98,14 +102,16 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     var cleanupCalled = false
     var usedValue: Option[String] = None
 
-    val program = Eru.succeed("resource").useScoped { resource =>
-      usedValue = Some(resource)
-      Eru.succeed(resource.length)
-    } { resource =>
-      cleanupCalled = true
-      assertEquals(resource, "resource")
-      Eru.unit
-    }
+    val program = Eru
+      .succeed("resource")
+      .useScoped { resource =>
+        usedValue = Some(resource)
+        Eru.succeed(resource.length)
+      } { resource =>
+        cleanupCalled = true
+        assertEquals(resource, "resource")
+        Eru.unit
+      }
 
     val result = program.unsafeRunSync()
     assertEquals(result, 8) // "resource".length
@@ -116,13 +122,15 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
   test("useScoped ensures cleanup even when use function fails") {
     var cleanupCalled = false
 
-    val program = Eru.succeed("resource").useScoped { _ =>
-      Eru.fail("use failed")
-    } { resource =>
-      cleanupCalled = true
-      assertEquals(resource, "resource")
-      Eru.unit
-    }
+    val program = Eru
+      .succeed("resource")
+      .useScoped { _ =>
+        Eru.fail("use failed")
+      } { resource =>
+        cleanupCalled = true
+        assertEquals(resource, "resource")
+        Eru.unit
+      }
 
     val ex = intercept[EruException[String]] {
       program.unsafeRunSync()
@@ -191,7 +199,7 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
 
   test("complex resource safety scenario with multiple patterns") {
     val log = ListBuffer.empty[String]
-    
+
     class TestResource(val name: String) extends AutoCloseable {
       log += s"$name created"
       def close(): Unit = log += s"$name closed"
@@ -200,9 +208,11 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     val program = for {
       // Create resource with validation
       resource <- Eru.succeed(new TestResource("main")).validateResource(_.name.nonEmpty, "named resource")
-      
+
       // Use resource with auto-cleanup and additional finalizers
-      result <- Eru.succeed(resource).autoClose
+      result <- Eru
+        .succeed(resource)
+        .autoClose
         .ensureAll(
           Eru.effect { log += "finalizer1" },
           Eru.effect { log += "finalizer2" }
@@ -214,7 +224,7 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
 
     val result = program.unsafeRunSync()
     assertEquals(result, "MAIN")
-    
+
     // Check that all cleanup operations happened
     val logList = log.toList
     assert(logList.contains("main created"))
@@ -227,10 +237,12 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
   test("nested resource patterns work correctly") {
     val cleanupOrder = ListBuffer.empty[String]
 
-    val program = Eru.succeed("outer")
+    val program = Eru
+      .succeed("outer")
       .autoCleanup(v => Eru.effect { cleanupOrder += s"cleanup-$v" })
       .flatMap(outer =>
-        Eru.succeed("inner")
+        Eru
+          .succeed("inner")
           .autoCleanup(v => Eru.effect { cleanupOrder += s"cleanup-$v" })
           .map(inner => s"$outer-$inner")
       )

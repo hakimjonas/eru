@@ -52,13 +52,19 @@ lazy val root = (project in file("."))
     addCommandAlias("bench", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1"),
     addCommandAlias("benchBaseline", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 .*BaselineBench.*"),
     addCommandAlias("benchValidation", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 .*ValidationBench.*"),
-    addCommandAlias("benchCore", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 .*EruMapFlatMapBench.* .*EruRuntimeBench.*"),
+    addCommandAlias(
+      "benchCore",
+      "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 .*EruMapFlatMapBench.* .*EruRuntimeBench.*"
+    ),
     addCommandAlias("benchWithGC", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 -prof gc"),
     addCommandAlias("benchWithStack", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 -prof stack"),
-    addCommandAlias("benchWithPerfasm", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 -prof perfasm .*BaselineBench.*"),
+    addCommandAlias(
+      "benchWithPerfasm",
+      "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 -prof perfasm .*BaselineBench.*"
+    ),
     addCommandAlias("benchValidationSuite", "benchBaseline; benchValidation; benchCore"),
-    
-    // Build and documentation aliases  
+
+    // Build and documentation aliases
     addCommandAlias("prepare", "eruCoreJVM/mdoc; scalafixAll; scalafmtAll; scalafmtSbt"),
     addCommandAlias(
       "check",

@@ -1,9 +1,9 @@
 package net.ghoula.eru
 
-import net.ghoula.eru.EruObserver.*
-
 import scala.util.control.NonFatal
-import scala.util.control.TailCalls.{TailRec, done, tailcall}
+import scala.util.control.TailCalls.{done, tailcall, TailRec}
+
+import net.ghoula.eru.EruObserver.*
 
 /** A data type representing a pure, lazy, and composable computation that can produce a value of
   * type `A` or fail with an error of type `E`.
@@ -74,27 +74,22 @@ enum Eru[+E, +A] {
     *   a new `Eru` describing the transformed computation.
     */
   final def map[B](f: A => B): Eru[E, B] = {
-    // Eager evaluation optimization: immediately evaluate pure chains
     this match {
       case Succeed(value) =>
-        // Pure chain detected: evaluate immediately at construction time
         try {
           Succeed(f(value))
         } catch {
-          case scala.util.control.NonFatal(t) => Effect(() => Left(t)).asInstanceOf[Eru[E, B]]
+          case scala.util.control.NonFatal(_) => MapChain(this, f)
         }
       case MapChain(Succeed(value), g) =>
-        // Pure MapChain detected: evaluate entire chain immediately
         try {
           Succeed(f(g(value)))
         } catch {
-          case scala.util.control.NonFatal(t) => Effect(() => Left(t)).asInstanceOf[Eru[E, B]]
+          case scala.util.control.NonFatal(_) => MapChain(this, f)
         }
       case MapChain(source, g) =>
-        // Compose with existing MapChain by function composition
         MapChain(source, g.andThen(f))
       case _ =>
-        // Create a new MapChain for this map operation
         MapChain(this, f)
     }
   }
@@ -102,7 +97,7 @@ enum Eru[+E, +A] {
   /** Chains another computation to be run after this one completes. This is the Monad `flatMap` (or
     * `bind`) operation.
     *
-    * Construction-time optimization: Detects pure flatMap chains where both the source and 
+    * Construction-time optimization: Detects pure flatMap chains where both the source and
     * continuation result are immediate successes, evaluating them at construction time.
     *
     * @param f
@@ -598,17 +593,17 @@ object Eru {
 
 /** Extension methods providing built-in caching functionality for `Eru[E, A]`.
   *
-  * These methods follow the principle of radical ergonomics, making caching operations
-  * discoverable as natural extensions of the Eru type itself. Timeout and retry functionality
-  * will be provided in the runtime module to avoid circular dependencies.
+  * These methods follow the principle of radical ergonomics, making caching operations discoverable
+  * as natural extensions of the Eru type itself. Timeout and retry functionality will be provided
+  * in the runtime module to avoid circular dependencies.
   */
 extension [E, A](eru: Eru[E, A]) {
 
   /** Caches the result of this effect, computing it only once and reusing the result.
     *
-    * This method provides a simple caching mechanism where the effect is executed at most once,
-    * and subsequent accesses return the cached result. The cache is based on referential equality
-    * of the Eru instance.
+    * This method provides a simple caching mechanism where the effect is executed at most once, and
+    * subsequent accesses return the cached result. The cache is based on referential equality of
+    * the Eru instance.
     *
     * Note: This is a simple in-memory cache. For more sophisticated caching needs with TTL,
     * eviction policies, or external cache stores, consider using dedicated caching libraries.
@@ -619,14 +614,15 @@ extension [E, A](eru: Eru[E, A]) {
   def cached: Eru[E, A] = {
     // Simple implementation using a lazy val to cache the result per instance
     lazy val cachedResult: Result[E, A] = eru.attempt.unsafeRunSync()
-    
+
     // Return an effect that uses the cached result when executed
     Eru.effect(cachedResult).attempt.flatMap {
-      case Result.Success(result) => result match {
-        case Result.Success(value) => Eru.succeed(value)
-        case Result.Failure(error) => Eru.fail(error)
-      }
-      case Result.Failure(_) => 
+      case Result.Success(result) =>
+        result match {
+          case Result.Success(value) => Eru.succeed(value)
+          case Result.Failure(error) => Eru.fail(error)
+        }
+      case Result.Failure(_) =>
         // This shouldn't happen since accessing a lazy val is safe
         eru // Fallback to original effect
     }
@@ -634,13 +630,13 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Creates a memoized version of this effect that caches results based on input parameters.
     *
-    * This is particularly useful for effects that are parameterized and expensive to compute.
-    * For this basic implementation, it delegates to cached since proper memoization requires
+    * This is particularly useful for effects that are parameterized and expensive to compute. For
+    * this basic implementation, it delegates to cached since proper memoization requires
     * parameterization support.
     *
     * Note: This is a basic memoization implementation. For production use cases with large
-    * parameter spaces, consider using more sophisticated memoization strategies with proper
-    * cache size limits and eviction policies.
+    * parameter spaces, consider using more sophisticated memoization strategies with proper cache
+    * size limits and eviction policies.
     *
     * @return
     *   an effect that memoizes its results
@@ -651,9 +647,9 @@ extension [E, A](eru: Eru[E, A]) {
 /** Extension methods providing enhanced resource safety patterns for `Eru[E, A]`.
   *
   * These methods follow the principle of making resource safety the "pit of success" by providing
-  * ergonomic, discoverable patterns that guide developers toward correct resource management.
-  * They build upon the foundational `ensure` and `bracket` methods to provide common resource
-  * management scenarios as natural extensions.
+  * ergonomic, discoverable patterns that guide developers toward correct resource management. They
+  * build upon the foundational `ensure` and `bracket` methods to provide common resource management
+  * scenarios as natural extensions.
   */
 extension [E, A](eru: Eru[E, A]) {
 
@@ -674,11 +670,11 @@ extension [E, A](eru: Eru[E, A]) {
     }
   }
 
-  /** Creates a resource-safe computation that automatically calls a cleanup function on the
-    * success value, regardless of whether the subsequent computation succeeds or fails.
+  /** Creates a resource-safe computation that automatically calls a cleanup function on the success
+    * value, regardless of whether the subsequent computation succeeds or fails.
     *
-    * This is particularly useful for resources that need cleanup based on their value,
-    * such as closing file handles, database connections, or network resources.
+    * This is particularly useful for resources that need cleanup based on their value, such as
+    * closing file handles, database connections, or network resources.
     *
     * @param cleanup
     *   function to extract cleanup logic from the success value
@@ -709,8 +705,8 @@ extension [E, A](eru: Eru[E, A]) {
   /** Creates a scoped resource that provides the resource to a use function and ensures cleanup.
     *
     * This is a more ergonomic alternative to bracket that reads more naturally and makes the
-    * resource scoping more explicit. The resource is guaranteed to be cleaned up regardless
-    * of how the use function terminates.
+    * resource scoping more explicit. The resource is guaranteed to be cleaned up regardless of how
+    * the use function terminates.
     *
     * @param use
     *   function that uses the resource and produces a result
@@ -768,8 +764,8 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Wraps this effect with resource validation to ensure proper resource lifecycle.
     *
-    * This method can be used to add validation logic that ensures resources are in the
-    * expected state before and after use.
+    * This method can be used to add validation logic that ensures resources are in the expected
+    * state before and after use.
     *
     * @param validate
     *   function to validate the resource state

@@ -17,7 +17,7 @@ val program = for {
 } yield s"Composed: $result"
 // program: Eru[Nothing, String] = Chain(
 //   source = Succeed(value = 42),
-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a49c558@31d710c2
+//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f7661c38558@1f36aa95
 // )
 
 program.unsafeRunSync()
@@ -51,7 +51,7 @@ val errorProgram = for {
 //     source = Fail(error = "Something went wrong"),
 //     pf = <function1>
 //   ),
-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4a4a78@171900
+//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f7663204a78@2665c69f
 // )
 
 errorProgram.unsafeRunSync()
@@ -69,7 +69,7 @@ val leftEffect = Eru.effect {
   "Left result"
 }
 // leftEffect: Eru[Throwable, String] = Effect(
-//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007faf5a4ac508@3e8f3867
+//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f7663203918@1461a1bc
 // )
 
 val rightEffect = Eru.effect {
@@ -77,7 +77,7 @@ val rightEffect = Eru.effect {
   "Right result"
 }
 // rightEffect: Eru[Throwable, String] = Effect(
-//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007faf5a4ac508@18a5316e
+//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f7663203918@66df8c10
 // )
 
 val zipProgram = for {
@@ -87,13 +87,13 @@ val zipProgram = for {
 // zipProgram: Eru[Throwable, String] = MapChain(
 //   source = Zip(
 //     left = Effect(
-//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007faf5a4ac508@3e8f3867
+//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f7663203918@1461a1bc
 //     ),
 //     right = Effect(
-//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007faf5a4ac508@18a5316e
+//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f7663203918@66df8c10
 //     )
 //   ),
-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4b04e0@5865169c
+//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f76632064e0@394c9754
 // )
 
 zipProgram.unsafeRunSync()
@@ -125,13 +125,13 @@ val resourceProgram = for {
 //   source = Chain(
 //     source = Ensure(
 //       source = Effect(
-//         thunk = net.ghoula.eru.Eru$$$Lambda/0x00007faf5a4ac508@2b27eb97
+//         thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f7663203918@620d87ca
 //       ),
-//       finalizer = net.ghoula.eru.Eru$$Lambda/0x00007faf5a4ad928@471475ed
+//       finalizer = net.ghoula.eru.Eru$$Lambda/0x00007f766320c000@4947be36
 //     ),
-//     f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4b1270@48195bda
+//     f = repl.MdocSession$MdocApp$$Lambda/0x00007f76632082c0@50c12ac6
 //   ),
-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4b1640@76186b15
+//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f7663208690@69323c56
 // )
 
 resourceProgram.unsafeRunSync()
@@ -166,14 +166,14 @@ val sideEffectProgram = for {
 } yield s"Random: $result1, Result: $result2"
 // sideEffectProgram: Eru[Throwable, String] = Chain(
 //   source = Effect(
-//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007faf5a4ac508@7fe75ab7
+//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f7663203918@4f8d70d5
 //   ),
-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4b2690@8fba52e
+//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f76632096e0@1a8ad794
 // )
 
 sideEffectProgram.unsafeRunSync()
-// Generated random number: 44
-// res4: String = "Random: 44, Result: Recovered from low number"
+// Generated random number: 65
+// res4: String = "Random: 65, Result: High number"
 ```
 
 ## Advanced Error Handling Patterns
@@ -203,7 +203,7 @@ val advancedErrorHandling = for {
 } yield s"Results: $result1, $result2, $result3"
 // advancedErrorHandling: Eru[String | Throwable, String] = Chain(
 //   source = RecoverWith(source = Fail(error = "network-error"), pf = <function1>),
-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4b4000@77d2bbe4
+//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f766320ae90@4e33262e
 // )
 
 advancedErrorHandling.unsafeRunSync()
@@ -242,7 +242,7 @@ val conversionProgram = for {
 }
 // conversionProgram: Eru[String | Throwable, String] = Chain(
 //   source = Succeed(value = "success"),
-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4b6320@5c81204b
+//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f7663211218@7267209a
 // )
 
 conversionProgram.unsafeRunSync()
@@ -273,9 +273,9 @@ val nestedProgram = for {
 // nestedProgram: Eru[Throwable, String] = Chain(
 //   source = Chain(
 //     source = Succeed(value = 20),
-//     f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4b7c20@1f49b66d
+//     f = repl.MdocSession$MdocApp$$Lambda/0x00007f7663212f08@347f6b18
 //   ),
-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007faf5a4b83f0@7f9f2c83
+//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f76632132d8@6f1bcd3f
 // )
 
 nestedProgram.unsafeRunSync()

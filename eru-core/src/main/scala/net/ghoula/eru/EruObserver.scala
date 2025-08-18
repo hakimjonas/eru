@@ -52,6 +52,9 @@ object EruObserver {
     case FiberStarted(fiberId: FiberId)
     case FiberCompleted(fiberId: FiberId, exit: Exit[Any, Any])
     case FiberInterrupted(fiberId: FiberId, cause: InterruptCause)
+
+    // Tracing events for observability
+    case TraceSpan(span: net.ghoula.eru.trace.EruTrace.Span)
   }
 
   /** Observer interface for receiving events.

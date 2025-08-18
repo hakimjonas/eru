@@ -683,10 +683,10 @@ class EruSpec extends FunSuite {
       mapCallCount += 1
       x * 2
     }
-    
+
     // The map function should be called immediately during construction
     assertEquals(mapCallCount, 1, "Map function should be evaluated at construction time for pure chains")
-    
+
     // Running should not call the map function again
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
@@ -696,8 +696,9 @@ class EruSpec extends FunSuite {
   test("eager evaluation: chained maps on succeed() are evaluated immediately") {
     var map1CallCount = 0
     var map2CallCount = 0
-    
-    val computation = Eru.succeed(10)
+
+    val computation = Eru
+      .succeed(10)
       .map { x =>
         map1CallCount += 1
         x * 2
@@ -706,11 +707,11 @@ class EruSpec extends FunSuite {
         map2CallCount += 1
         x + 5
       }
-    
+
     // Both map functions should be called during construction
     assertEquals(map1CallCount, 1, "First map should be evaluated at construction time")
     assertEquals(map2CallCount, 1, "Second map should be evaluated at construction time")
-    
+
     val result = computation.unsafeRunSync()
     assertEquals(result, 25) // (10 * 2) + 5 = 25
     assertEquals(map1CallCount, 1, "First map should only be called once")
@@ -720,7 +721,7 @@ class EruSpec extends FunSuite {
   test("eager evaluation: map on Effect is not evaluated immediately") {
     var effectCallCount = 0
     var mapCallCount = 0
-    
+
     val computation = Eru.effect {
       effectCallCount += 1
       42
@@ -728,11 +729,11 @@ class EruSpec extends FunSuite {
       mapCallCount += 1
       x * 2
     }
-    
+
     // Neither the effect nor map should be called during construction
     assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
     assertEquals(mapCallCount, 0, "Map should not be evaluated at construction time for non-pure source")
-    
+
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
     assertEquals(effectCallCount, 1, "Effect should be called once during execution")
@@ -743,7 +744,7 @@ class EruSpec extends FunSuite {
     val computation = Eru.succeed(42).map { _ =>
       throw new RuntimeException("Map function failed")
     }
-    
+
     // The computation should be converted to an Effect that captures the exception
     val caught = intercept[RuntimeException] {
       computation.unsafeRunSync()
@@ -755,25 +756,26 @@ class EruSpec extends FunSuite {
     var mapCallCount = 0
     var effectCallCount = 0
     var flatMapCallCount = 0
-    
-    val computation = Eru.succeed(10)
+
+    val computation = Eru
+      .succeed(10)
       .map { x =>
         mapCallCount += 1
-        x * 2  // This should be evaluated immediately
+        x * 2 // This should be evaluated immediately
       }
       .flatMap { x =>
         flatMapCallCount += 1
         Eru.effect {
           effectCallCount += 1
-          x + 5  // This should be deferred (not pure)
+          x + 5 // This should be deferred (not pure)
         }
       }
-    
+
     // Only the map should be evaluated immediately, flatMap with Effect remains lazy
     assertEquals(mapCallCount, 1, "Map on succeed should be evaluated at construction time")
     assertEquals(flatMapCallCount, 0, "FlatMap with Effect should not be evaluated at construction time")
     assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
-    
+
     val result = computation.unsafeRunSync()
     assertEquals(result, 25) // (10 * 2) + 5 = 25
     assertEquals(mapCallCount, 1, "Map should only be called once")
@@ -787,12 +789,16 @@ class EruSpec extends FunSuite {
     var flatMapCallCount = 0
     val computation = Eru.succeed(42).flatMap { x =>
       flatMapCallCount += 1
-      Eru.succeed(x * 2)  // Pure continuation
+      Eru.succeed(x * 2) // Pure continuation
     }
-    
+
     // The flatMap function should NOT be called during construction (optimization disabled)
-    assertEquals(flatMapCallCount, 0, "FlatMap function should not be evaluated at construction time (optimization disabled)")
-    
+    assertEquals(
+      flatMapCallCount,
+      0,
+      "FlatMap function should not be evaluated at construction time (optimization disabled)"
+    )
+
     // Running should call the flatMap function
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
@@ -802,21 +808,30 @@ class EruSpec extends FunSuite {
   test("flatMap optimization disabled: chained pure flatMaps remain lazy") {
     var flatMap1CallCount = 0
     var flatMap2CallCount = 0
-    
-    val computation = Eru.succeed(10)
+
+    val computation = Eru
+      .succeed(10)
       .flatMap { x =>
         flatMap1CallCount += 1
-        Eru.succeed(x * 2)  // Pure continuation
+        Eru.succeed(x * 2) // Pure continuation
       }
       .flatMap { x =>
         flatMap2CallCount += 1
-        Eru.succeed(x + 5)  // Pure continuation
+        Eru.succeed(x + 5) // Pure continuation
       }
-    
+
     // Both flatMap functions should NOT be called during construction (optimization disabled)
-    assertEquals(flatMap1CallCount, 0, "First flatMap should not be evaluated at construction time (optimization disabled)")
-    assertEquals(flatMap2CallCount, 0, "Second flatMap should not be evaluated at construction time (optimization disabled)")
-    
+    assertEquals(
+      flatMap1CallCount,
+      0,
+      "First flatMap should not be evaluated at construction time (optimization disabled)"
+    )
+    assertEquals(
+      flatMap2CallCount,
+      0,
+      "Second flatMap should not be evaluated at construction time (optimization disabled)"
+    )
+
     val result = computation.unsafeRunSync()
     assertEquals(result, 25) // (10 * 2) + 5 = 25
     assertEquals(flatMap1CallCount, 1, "First flatMap should be called once during execution")
@@ -826,19 +841,19 @@ class EruSpec extends FunSuite {
   test("eager evaluation: flatMap on Effect is not evaluated immediately") {
     var effectCallCount = 0
     var flatMapCallCount = 0
-    
+
     val computation = Eru.effect {
       effectCallCount += 1
       42
     }.flatMap { x =>
       flatMapCallCount += 1
-      Eru.succeed(x * 2)  // Pure continuation but impure source
+      Eru.succeed(x * 2) // Pure continuation but impure source
     }
-    
+
     // Neither the effect nor flatMap should be called during construction
     assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
     assertEquals(flatMapCallCount, 0, "FlatMap should not be evaluated at construction time for non-pure source")
-    
+
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
     assertEquals(effectCallCount, 1, "Effect should be called once during execution")
@@ -848,19 +863,19 @@ class EruSpec extends FunSuite {
   test("eager evaluation: flatMap with non-pure continuation falls back to Chain") {
     var flatMapCallCount = 0
     var effectCallCount = 0
-    
+
     val computation = Eru.succeed(42).flatMap { x =>
       flatMapCallCount += 1
-      Eru.effect {  // Non-pure continuation
+      Eru.effect { // Non-pure continuation
         effectCallCount += 1
         x * 2
       }
     }
-    
+
     // FlatMap should not be evaluated at construction time due to non-pure continuation
     assertEquals(flatMapCallCount, 0, "FlatMap with non-pure continuation should not be evaluated at construction time")
     assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
-    
+
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
     assertEquals(flatMapCallCount, 1, "FlatMap should be called once during execution")
@@ -871,7 +886,7 @@ class EruSpec extends FunSuite {
     val computation = Eru.succeed(42).flatMap { _ =>
       throw new RuntimeException("FlatMap function failed")
     }
-    
+
     // The exception should be thrown during execution (not construction since optimization is disabled)
     val caught = intercept[RuntimeException] {
       computation.unsafeRunSync()
@@ -883,12 +898,12 @@ class EruSpec extends FunSuite {
     var sideEffectCount = 0
     val computation = Eru.succeed(42).flatMap { x =>
       sideEffectCount += 1
-      Eru.effect(x * 2)  // Non-pure continuation
+      Eru.effect(x * 2) // Non-pure continuation
     }
-    
+
     // No side effects during construction since optimization is disabled
     assertEquals(sideEffectCount, 0, "Side effect should not occur during construction (optimization disabled)")
-    
+
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
     // Side effect should occur once during execution
@@ -897,16 +912,18 @@ class EruSpec extends FunSuite {
 
   test("construction-time optimizations preserve correctness for complex chains") {
     // Test that optimized and non-optimized paths produce the same results
-    val pureChain = Eru.succeed(5)
+    val pureChain = Eru
+      .succeed(5)
       .map(_ * 2)
       .flatMap(x => Eru.succeed(x + 3))
       .map(_ * 2)
-    
-    val mixedChain = Eru.succeed(5)
+
+    val mixedChain = Eru
+      .succeed(5)
       .map(_ * 2)
       .flatMap(x => Eru.effect(x + 3))
       .map(_ * 2)
-    
+
     assertEquals(pureChain.unsafeRunSync(), 26)
     assertEquals(mixedChain.unsafeRunSync(), 26)
   }
