@@ -34,6 +34,16 @@ enum Eru[+E, +A] {
     */
   private case Chain[E0, From, +To](source: Eru[E0, From], f: From => Eru[E0, To]) extends Eru[E0, To]
 
+  // Right-associated shallow chain nodes for selective flattening
+  private case Chain2[E0, From, Mid, +To](source: Eru[E0, From], f1: From => Eru[E0, Mid], f2: Mid => Eru[E0, To])
+      extends Eru[E0, To]
+  private case Chain3[E0, From, Mid1, Mid2, +To](
+    source: Eru[E0, From],
+    f1: From => Eru[E0, Mid1],
+    f2: Mid1 => Eru[E0, Mid2],
+    f3: Mid2 => Eru[E0, To]
+  ) extends Eru[E0, To]
+
   /** Represents a chain of pure map operations fused together for performance. This avoids creating
     * multiple Chain nodes for consecutive map operations.
     */
@@ -106,12 +116,19 @@ enum Eru[+E, +A] {
     *   a new `Eru` describing the composed computation.
     */
   final def flatMap[E1 >: E, B](f: A => Eru[E1, B]): Eru[E1, B] = {
-    // FlatMap optimization disabled: the previous implementation was too aggressive
-    // and caused side effects to be evaluated during construction when they should remain lazy.
-    // For now, use Chain for all flatMap operations to preserve correct laziness semantics.
-    // Future work: implement a more sophisticated purity analysis to safely detect
-    // truly pure flatMap chains that can be optimized without side effects.
-    Chain(this, f)
+    this match {
+      case Chain(source, prevF) =>
+        Chain2(source, prevF, f)
+
+      case Chain2(source, f1, f2) =>
+        Chain3(source, f1, f2, f)
+
+      case Chain3(_, _, _, _) =>
+        Chain(this, f)
+
+      case _ =>
+        Chain(this, f)
+    }
   }
 
   /** Transforms the error value of this `Eru` using a pure function. If this `Eru` is a success,
@@ -429,6 +446,30 @@ object Eru {
             case (Left(error), fs) => done((Left(error), fs))
           }
 
+        case Chain2(source, f1, f2) =>
+          tailcall(runWithStack(source, fins)).flatMap {
+            case (Right(a), fs1) =>
+              tailcall(runWithStack(f1(a), fs1)).flatMap {
+                case (Right(b), fs2) => tailcall(runWithStack(f2(b), fs2))
+                case (Left(e), fs2) => done((Left(e), fs2))
+              }
+            case (Left(e), fs1) => done((Left(e), fs1))
+          }
+
+        case Chain3(source, f1, f2, f3) =>
+          tailcall(runWithStack(source, fins)).flatMap {
+            case (Right(a), fs1) =>
+              tailcall(runWithStack(f1(a), fs1)).flatMap {
+                case (Right(b), fs2) =>
+                  tailcall(runWithStack(f2(b), fs2)).flatMap {
+                    case (Right(c), fs3) => tailcall(runWithStack(f3(c), fs3))
+                    case (Left(e2), fs3) => done((Left(e2), fs3))
+                  }
+                case (Left(e1), fs2) => done((Left(e1), fs2))
+              }
+            case (Left(e0), fs1) => done((Left(e0), fs1))
+          }
+
         case MapChain(source, f) =>
           tailcall(runWithStack(source, fins)).map {
             case (Right(value), fs) => (Right(f(value)), fs)
@@ -534,6 +575,30 @@ object Eru {
             case (Left(error), fs) => done((Left(error), fs))
           }
 
+        case Chain2(source, f1, f2) =>
+          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
+            case (Right(a), fs1) =>
+              tailcall(runWithObsStack(f1(a), scope, observer, fs1)).flatMap {
+                case (Right(b), fs2) => tailcall(runWithObsStack(f2(b), scope, observer, fs2))
+                case (Left(e), fs2) => done((Left(e), fs2))
+              }
+            case (Left(e), fs1) => done((Left(e), fs1))
+          }
+
+        case Chain3(source, f1, f2, f3) =>
+          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
+            case (Right(a), fs1) =>
+              tailcall(runWithObsStack(f1(a), scope, observer, fs1)).flatMap {
+                case (Right(b), fs2) =>
+                  tailcall(runWithObsStack(f2(b), scope, observer, fs2)).flatMap {
+                    case (Right(c), fs3) => tailcall(runWithObsStack(f3(c), scope, observer, fs3))
+                    case (Left(e2), fs3) => done((Left(e2), fs3))
+                  }
+                case (Left(e1), fs2) => done((Left(e1), fs2))
+              }
+            case (Left(e0), fs1) => done((Left(e0), fs1))
+          }
+
         case MapChain(source, f) =>
           tailcall(runWithObsStack(source, scope, observer, fins)).map {
             case (Right(value), fs) => (Right(f(value)), fs)
@@ -612,6 +677,14 @@ object Eru {
       case VFail(error: E)
       case VEffect(thunk: () => Either[Throwable, A])
       case VChain[E0, From, To](source: Eru[E0, From], f: From => Eru[E0, To]) extends View[E0, To]
+      case VChain2[E0, From, Mid, To](source: Eru[E0, From], f1: From => Eru[E0, Mid], f2: Mid => Eru[E0, To])
+          extends View[E0, To]
+      case VChain3[E0, From, Mid1, Mid2, To](
+        source: Eru[E0, From],
+        f1: From => Eru[E0, Mid1],
+        f2: Mid1 => Eru[E0, Mid2],
+        f3: Mid2 => Eru[E0, To]
+      ) extends View[E0, To]
       case VMapChain[E0, From, To](source: Eru[E0, From], f: From => To) extends View[E0, To]
       case VRecoverWith[E0, A0, E2, A1 >: A0](source: Eru[E0, A0], pf: PartialFunction[E0, Eru[E2, A1]])
           extends View[E0 | E2, A1]
@@ -629,6 +702,8 @@ object Eru {
       case Fail(error) => VFail(error)
       case Effect(thunk) => VEffect(thunk)
       case Chain(source, f) => VChain(source, f)
+      case Chain2(source, f1, f2) => VChain2(source, f1, f2)
+      case Chain3(source, f1, f2, f3) => VChain3(source, f1, f2, f3)
       case MapChain(source, f) => VMapChain(source, f)
       case RecoverWith(source, pf) => VRecoverWith(source, pf)
       case MapError(source, f) => VMapError(source, f)

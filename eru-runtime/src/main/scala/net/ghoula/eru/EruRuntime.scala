@@ -517,10 +517,30 @@ object EruRuntime {
                 conts = nextF.asInstanceOf[Any => Eru[Any, Any]] :: conts
                 current = nextSource.asInstanceOf[Eru[Any, Any]]
                 unwindDepth += 1
+              case View.VChain2(nextSource, nextF1, nextF2) =>
+                conts = nextF2.asInstanceOf[Any => Eru[Any, Any]] :: nextF1.asInstanceOf[Any => Eru[Any, Any]] :: conts
+                current = nextSource.asInstanceOf[Eru[Any, Any]]
+                unwindDepth += 1
+              case View.VChain3(nextSource, nextF1, nextF2, nextF3) =>
+                conts = nextF3.asInstanceOf[Any => Eru[Any, Any]] :: nextF2.asInstanceOf[Any => Eru[Any, Any]] :: nextF1
+                  .asInstanceOf[Any => Eru[Any, Any]] :: conts
+                current = nextSource.asInstanceOf[Eru[Any, Any]]
+                unwindDepth += 1
               case _ =>
                 unwinding = false
             }
           }
+          scheduleIfPending()
+
+        case View.VChain2(source, f1, f2) =>
+          conts = f2.asInstanceOf[Any => Eru[Any, Any]] :: f1.asInstanceOf[Any => Eru[Any, Any]] :: conts
+          current = source.asInstanceOf[Eru[Any, Any]]
+          scheduleIfPending()
+
+        case View.VChain3(source, f1, f2, f3) =>
+          conts = f3.asInstanceOf[Any => Eru[Any, Any]] :: f2.asInstanceOf[Any => Eru[Any, Any]] :: f1
+            .asInstanceOf[Any => Eru[Any, Any]] :: conts
+          current = source.asInstanceOf[Eru[Any, Any]]
           scheduleIfPending()
 
         case View.VMapChain(source, f) =>
