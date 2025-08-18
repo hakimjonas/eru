@@ -42,19 +42,16 @@ object Deferred {
     }
 
   private final class RuntimeDeferred[A] extends Deferred[A] {
-    private var value: Option[A] = None
+    private final val state = new java.util.concurrent.atomic.AtomicReference[Option[A]](None)
 
     def complete(a: A): Eru[Nothing, Boolean] =
       Eru.effect {
-        value match {
-          case None => value = Some(a); true
-          case Some(_) => false
-        }
+        state.compareAndSet(None, Some(a))
       }.attempt.map {
         case Result.Success(b) => b
-        case Result.Failure(_) => value.isDefined
+        case Result.Failure(_) => state.get().isDefined
       }
 
-    def poll: Eru[Nothing, Option[A]] = Eru.succeed(value)
+    def poll: Eru[Nothing, Option[A]] = Eru.succeed(state.get())
   }
 }

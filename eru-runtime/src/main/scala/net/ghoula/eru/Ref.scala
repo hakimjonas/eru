@@ -59,33 +59,43 @@ object Ref {
     Eru.succeed(new RuntimeRef[A](initial))
 
   private final class RuntimeRef[A](init: A) extends Ref[A] {
-    private var state: A = init
+    private final val state = new java.util.concurrent.atomic.AtomicReference(init)
 
-    def get: Eru[Nothing, A] = Eru.effect(state).attempt.map {
+    def get: Eru[Nothing, A] = Eru.effect(state.get()).attempt.map {
       case Result.Success(v) => v
-      case Result.Failure(_) => state
+      case Result.Failure(_) => state.get()
     }
 
-    def set(a: A): Eru[Nothing, Unit] = Eru.effect { state = a }.attempt.flatMap(_ => Eru.unit)
+    def set(a: A): Eru[Nothing, Unit] = Eru.effect { state.set(a) }.attempt.flatMap(_ => Eru.unit)
 
     def update(f: A => A): Eru[Nothing, A] =
       Eru.effect {
-        val next = f(state)
-        state = next
-        next
+        @annotation.tailrec
+        def loop(): A = {
+          val current = state.get()
+          val next = f(current)
+          if (state.compareAndSet(current, next)) next
+          else loop()
+        }
+        loop()
       }.attempt.map {
         case Result.Success(v) => v
-        case Result.Failure(_) => state
+        case Result.Failure(_) => state.get()
       }
 
     def modify[B](f: A => (A, B)): Eru[Nothing, B] =
       Eru.effect {
-        val (next, out) = f(state)
-        state = next
-        out
+        @annotation.tailrec
+        def loop(): B = {
+          val current = state.get()
+          val (next, out) = f(current)
+          if (state.compareAndSet(current, next)) out
+          else loop()
+        }
+        loop()
       }.attempt.map {
         case Result.Success(v) => v
-        case Result.Failure(_) => f(state)._2
+        case Result.Failure(_) => f(state.get())._2
       }
   }
 }

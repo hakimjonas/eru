@@ -2,15 +2,22 @@ package net.ghoula.eru
 
 import java.time.Duration
 
-/** Minimal runtime surface for 0.3.0 Milestone A.
+/** Single-threaded fiber runtime for Eru effects.
   *
-  * This object provides a synchronous stub for fiber operations to establish the public API surface
-  * and semantics. It does not introduce true concurrency yet; effects are evaluated immediately
-  * when a fiber is forked and the resulting Fiber is already completed. Interruption is recorded
-  * but not enforced.
+  * This runtime provides a complete fiber-based execution model with proper interruption support,
+  * resource management, and cooperative scheduling. Effects are executed on lightweight fibers
+  * managed by an internal scheduler queue. The runtime supports:
   *
-  * The goal is to unblock tests and documentation while we iterate on the scheduler in subsequent
-  * milestones.
+  * - Fiber forking with `fork` - creates new fibers for concurrent execution
+  * - Interruption masking with `uninterruptible` and `mask`
+  * - Proper suspension/resumption for asynchronous operations
+  * - Resource cleanup through finalizers
+  * - Cooperative yielding and timeout support
+  * - Parallel composition with `zipPar` and `race`
+  *
+  * While single-threaded, this runtime provides the full semantic foundation for
+  * future multi-threaded implementations and serves as the reference implementation
+  * for Eru's effect system.
   */
 /** Timer abstraction for platform-specific timer implementations. */
 private[eru] trait Timer {
@@ -108,6 +115,29 @@ object EruRuntime {
     def apply[E, A](fa: Eru[E, A]): Eru[E, A] = fa
   }
 
+  /** Effect that runs its source with interruption disabled */
+  private final class UninterruptibleEffect[E, A](val source: Eru[E, A]) extends Eru[E, A] {
+    def attempt: Eru[Nothing, Result[E, A]] = source.attempt
+    override def toString: String = s"Uninterruptible($source)"
+  }
+
+  /** Effect that runs its source with interruption masked, providing unmask capability */
+  private final class MaskEffect[E, A](val k: Unmask => Eru[E, A]) extends Eru[E, A] {
+    def attempt: Eru[Nothing, Result[E, A]] = k(IdentityUnmask).attempt
+    override def toString: String = s"Mask($k)"
+  }
+
+  /** Unmask implementation that can restore interruptibility */
+  private final class RuntimeUnmask(originalState: Boolean) extends Unmask {
+    def apply[E, A](fa: Eru[E, A]): Eru[E, A] = new RestoreInterruptibilityEffect(fa, originalState)
+  }
+
+  /** Effect that temporarily restores a specific interruptibility state */
+  private final class RestoreInterruptibilityEffect[E, A](val source: Eru[E, A], val restoreState: Boolean) extends Eru[E, A] {
+    def attempt: Eru[Nothing, Result[E, A]] = source.attempt
+    override def toString: String = s"RestoreInterruptibility($source, $restoreState)"
+  }
+
   private object Scheduler {
     private val queue = scala.collection.mutable.Queue[() => Unit]()
     private var parkedFibers: Int = 0
@@ -179,13 +209,30 @@ object EruRuntime {
   private val YieldMarker = "__eru_yield_now__"
   def yieldNow: Eru[Nothing, Unit] = Eru.unit.debug(YieldMarker)
 
-  /** Makes a region uninterruptible (placeholder semantics for now). */
-  def uninterruptible[E, A](fa: Eru[E, A]): Eru[E, A] = fa
+  /** Makes a region uninterruptible.
+    *
+    * During execution of the provided effect, interruption is disabled. If the fiber
+    * is interrupted while uninterruptible, the interruption will be recorded but
+    * not acted upon until interruptibility is restored.
+    *
+    * @param fa the effect to run without interruption
+    * @return an effect that runs fa with interruption disabled
+    */
+  def uninterruptible[E, A](fa: Eru[E, A]): Eru[E, A] = {
+    new UninterruptibleEffect(fa)
+  }
 
   /** Masks interruption within a region, providing an Unmask to selectively restore
-    * interruptibility (placeholder semantics for now).
+    * interruptibility.
+    *
+    * The provided function receives an Unmask token that can be used to temporarily
+    * restore interruptibility within the masked region. This is useful for operations
+    * that need to be interruptible within an otherwise uninterruptible context.
+    *
+    * @param k function that receives an Unmask and produces an effect
+    * @return an effect that runs with interruption masked
     */
-  def mask[E, A](k: Unmask => Eru[E, A]): Eru[E, A] = k(IdentityUnmask)
+  def mask[E, A](k: Unmask => Eru[E, A]): Eru[E, A] = new MaskEffect(k)
 
   /** Suspends for approximately the specified duration without blocking a thread.
     *
@@ -270,12 +317,27 @@ object EruRuntime {
     loop(0)
   }
 
+  /** Internal fiber implementation for the single-threaded runtime.
+    *
+    * This class manages the execution state of a fiber, including:
+    * - current: The current effect being executed
+    * - conts: Stack of continuations (functions to apply to successful results)
+    * - handlers: Stack of error handlers (recovery functions, mapError, attempt)
+    * - finalizers: Stack of cleanup actions to run on completion or interruption
+    * - interruptible: Whether this fiber can be interrupted (managed by mask/uninterruptible)
+    * - interrupted: The interruption cause if this fiber has been interrupted
+    * - exit0: The final exit result once the fiber completes
+    *
+    * The main execution happens in the run() method which interprets the effect DSL
+    * step by step, managing stacks and scheduling continuations appropriately.
+    */
   private final class RuntimeFiber[E, A](val id: FiberId, fa: Eru[E, A], observer: Option[EruObserver])
       extends Fiber[E, A] {
     import Eru.Internals.View
 
     private var interrupted: Option[InterruptCause] = None
     private var exit0: Option[Exit[E, A]] = None
+    private var interruptible: Boolean = true
 
     // Simplified step-wise interpreter state using List-based stacks
     private var current: Eru[Any, Any] = fa.asInstanceOf[Eru[Any, Any]]
@@ -341,6 +403,16 @@ object EruRuntime {
       }
     }
 
+    /** Sets the interruptible flag and returns the previous value */
+    private def setInterruptible(value: Boolean): Boolean = {
+      val prev = interruptible
+      interruptible = value
+      prev
+    }
+
+    /** Gets the current interruptible flag */
+    private def isInterruptible: Boolean = interruptible
+
     private def handleFailure(error: Any): Unit = {
       var e: Any = error
       var hs = handlers
@@ -405,12 +477,14 @@ object EruRuntime {
     def run(): Unit = {
       if (exit0.nonEmpty) return
 
-      // Check for interruption before each step
-      interrupted match {
-        case Some(cause) =>
-          completeWith(Exit.Interrupt(id, cause))
-          return
-        case None => ()
+      // Check for interruption before each step, but only if interruptible
+      if (interruptible) {
+        interrupted match {
+          case Some(cause) =>
+            completeWith(Exit.Interrupt(id, cause))
+            return
+          case None => ()
+        }
       }
 
       Eru.Internals.view(current) match {
@@ -498,16 +572,40 @@ object EruRuntime {
           scheduleIfPending()
 
         case View.VSuspend(register) =>
-          // Suspend implementation would go here if needed
-          // For now, fallback to synchronous execution
-          val res = observer match {
-            case Some(_) =>
-              val noop = new EruObserver { def onEvent(event: EruEvent): Unit = () }
-              current.asInstanceOf[Eru[E, A]].attempt.unsafeRunSyncWith(noop)
-            case None => current.asInstanceOf[Eru[E, A]].attempt.unsafeRunSync()
+          // Proper suspend implementation: park the fiber and register callback to unparkfiber
+          Scheduler.parkFiber()
+          val callback: Either[Any, Any] => Unit = { result =>
+            result match {
+              case Right(value) =>
+                handleSuccess(value)
+              case Left(error) =>
+                handleFailure(error)
+            }
+            Scheduler.unparkFiber()
           }
-          val out = exitFromResult(res)
-          completeWith(out)
+          // Register the callback - when it's invoked, it will resume this fiber
+          register(callback)
+
+        // Handle interruption masking effects
+        case _ if current.isInstanceOf[UninterruptibleEffect[_, _]] =>
+          val uninterruptible = current.asInstanceOf[UninterruptibleEffect[Any, Any]]
+          val previousState = setInterruptible(false)
+          // Use ensure to restore the previous interruptible state
+          current = uninterruptible.source.ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
+          scheduleIfPending()
+
+        case _ if current.isInstanceOf[MaskEffect[_, _]] =>
+          val maskEffect = current.asInstanceOf[MaskEffect[Any, Any]]
+          val previousState = setInterruptible(false)
+          val unmask = new RuntimeUnmask(previousState)
+          current = maskEffect.k(unmask).ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
+          scheduleIfPending()
+
+        case _ if current.isInstanceOf[RestoreInterruptibilityEffect[_, _]] =>
+          val restore = current.asInstanceOf[RestoreInterruptibilityEffect[Any, Any]]
+          val previousState = setInterruptible(restore.restoreState)
+          current = restore.source.ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
+          scheduleIfPending()
       }
     }
 

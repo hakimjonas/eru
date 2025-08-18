@@ -57,36 +57,50 @@ object Semaphore {
     Eru.succeed(new RuntimeSemaphore(if (n < 0) 0L else n))
 
   private final class RuntimeSemaphore(init: Long) extends Semaphore {
-    private var permits: Long = init
+    private final val permits = new java.util.concurrent.atomic.AtomicLong(init)
 
-    def permitsAvailable: Eru[Nothing, Long] = Eru.succeed(permits)
+    def permitsAvailable: Eru[Nothing, Long] = Eru.succeed(permits.get())
 
     def tryAcquire: Eru[Nothing, Boolean] =
       Eru.effect {
-        if (permits > 0) { permits = permits - 1; true }
-        else false
+        @annotation.tailrec
+        def loop(): Boolean = {
+          val current = permits.get()
+          if (current > 0) {
+            if (permits.compareAndSet(current, current - 1)) true
+            else loop()
+          } else false
+        }
+        loop()
       }.attempt.map {
         case Result.Success(b) => b
-        case Result.Failure(_) => permits > 0
+        case Result.Failure(_) => permits.get() > 0
       }
 
     def tryAcquireN(n: Long): Eru[Nothing, Boolean] =
       if (n <= 0) Eru.succeed(true)
       else
         Eru.effect {
-          if (permits >= n) { permits = permits - n; true }
-          else false
+          @annotation.tailrec
+          def loop(): Boolean = {
+            val current = permits.get()
+            if (current >= n) {
+              if (permits.compareAndSet(current, current - n)) true
+              else loop()
+            } else false
+          }
+          loop()
         }.attempt.map {
           case Result.Success(b) => b
-          case Result.Failure(_) => permits >= n
+          case Result.Failure(_) => permits.get() >= n
         }
 
     def release: Eru[Nothing, Unit] =
-      Eru.effect { permits = permits + 1 }.attempt.flatMap(_ => Eru.unit)
+      Eru.effect { permits.getAndAdd(1) }.attempt.flatMap(_ => Eru.unit)
 
     def releaseN(n: Long): Eru[Nothing, Unit] =
       if (n <= 0) Eru.unit
-      else Eru.effect { permits = permits + n }.attempt.flatMap(_ => Eru.unit)
+      else Eru.effect { permits.getAndAdd(n) }.attempt.flatMap(_ => Eru.unit)
 
     def withPermit[E, A](fa: => Eru[E, A]): Eru[E, Option[A]] =
       withPermits(1)(fa)
