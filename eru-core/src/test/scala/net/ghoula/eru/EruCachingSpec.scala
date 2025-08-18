@@ -79,22 +79,6 @@ class EruCachingSpec extends FunSuite {
     assertEquals(executions, 1) // Still cached
   }
 
-  test("memoized delegates to cached for now") {
-    var executions = 0
-    val effect = Eru.effect {
-      executions += 1
-      "memoized"
-    }.memoized
-
-    val result1 = effect.unsafeRunSync()
-    assertEquals(result1, "memoized")
-    assertEquals(executions, 1)
-
-    val result2 = effect.unsafeRunSync()
-    assertEquals(result2, "memoized")
-    assertEquals(executions, 1) // Memoized (cached) behavior
-  }
-
   test("cached works with complex effect chains") {
     var counter = 0
     val effect = Eru

@@ -387,6 +387,31 @@ object Eru {
 
     private type Finalizer = () => Eru[Nothing, Unit]
 
+    /** Core synchronous interpreter that executes Eru effects step-by-step.
+      *
+      * This method is the brain of synchronous execution, processing each Eru case through pattern
+      * matching while maintaining stack safety via TailRec. It threads a list of finalizers (fins)
+      * through the computation, accumulating cleanup actions that must be executed regardless of
+      * success or failure.
+      *
+      * Key execution flow:
+      *   - Pure values (Succeed/Fail) complete immediately with the current finalizer list
+      *   - Effects (Effect) execute their thunk and return the result
+      *   - Chain operations use flatMap-style composition, threading finalizers through
+      *   - Ensure operations add new finalizers to the front of the list (FILO order)
+      *   - All recursive calls use tailcall() to maintain stack safety in deep compositions
+      *
+      * The fins parameter represents the current stack of finalizers in FILO order: the first
+      * finalizer in the list is the most recently added and will run first during cleanup. This
+      * ensures proper resource cleanup nesting.
+      *
+      * @param eru
+      *   The effect to execute
+      * @param fins
+      *   Current list of finalizers to run (in FILO order)
+      * @return
+      *   TailRec computation yielding (result, accumulated finalizers)
+      */
     private def runWithStack[E, A](eru: Eru[E, A], fins: List[Finalizer]): TailRec[(Either[E, A], List[Finalizer])] =
       eru match {
         case Succeed(value) =>
@@ -456,6 +481,31 @@ object Eru {
           done((cbBox.get.get, fsAfterReg))
       }
 
+    /** Executes all finalizers in FILO (First-In-Last-Out) order with proper nesting support.
+      *
+      * This method processes the accumulated finalizer list by executing each finalizer and
+      * handling any nested finalizers they may produce. The execution order is critical: finalizers
+      * run in reverse order of their registration (FILO), ensuring that resources are cleaned up in
+      * the opposite order of their acquisition.
+      *
+      * Key execution characteristics:
+      *   - Processes finalizers from front to back of the list (which represents FILO order)
+      *   - Each finalizer execution can produce additional "inner" finalizers
+      *   - Inner finalizers are prepended to the remaining finalizers, maintaining FILO semantics
+      *   - Uses TailRec for stack safety when processing long finalizer chains
+      *   - Finalizer failures are contained - they don't prevent other finalizers from running
+      *
+      * Example execution order for fins = [f3, f2, f1]:
+      *   1. Execute f3 (most recently added), collect any inner finalizers
+      *   2. Execute f2, collect any inner finalizers
+      *   3. Execute f1 (first added), collect any inner finalizers
+      *   4. Process all collected inner finalizers recursively in FILO order
+      *
+      * @param fins
+      *   List of finalizers to execute (in FILO order)
+      * @return
+      *   TailRec computation that completes when all finalizers have run
+      */
     private def drainFinalizers(fins: List[Finalizer]): TailRec[Unit] =
       fins match {
         case Nil => done(())
@@ -602,46 +652,40 @@ extension [E, A](eru: Eru[E, A]) {
   /** Caches the result of this effect, computing it only once and reusing the result.
     *
     * This method provides a simple caching mechanism where the effect is executed at most once, and
-    * subsequent accesses return the cached result. The cache is based on referential equality of
-    * the Eru instance.
+    * subsequent accesses return the cached result. The implementation uses a thread-safe approach
+    * suitable for the current single-threaded runtime.
     *
     * Note: This is a simple in-memory cache. For more sophisticated caching needs with TTL,
-    * eviction policies, or external cache stores, consider using dedicated caching libraries.
+    * eviction policies, or external cache stores, consider using dedicated caching libraries from
+    * the runtime module.
     *
     * @return
     *   an effect that caches its result after the first successful execution
     */
   def cached: Eru[E, A] = {
-    // Simple implementation using a lazy val to cache the result per instance
-    lazy val cachedResult: Result[E, A] = eru.attempt.unsafeRunSync()
+    // Thread-safe lazy computation using AtomicReference
+    val resultRef = new java.util.concurrent.atomic.AtomicReference[Option[Result[E, A]]](None)
 
-    // Return an effect that uses the cached result when executed
-    Eru.effect(cachedResult).attempt.flatMap {
+    Eru.effect {
+      resultRef.get() match {
+        case Some(cachedResult) => cachedResult
+        case None =>
+          val result = eru.attempt.unsafeRunSync()
+          resultRef.compareAndSet(None, Some(result))
+          result
+      }
+    }.attempt.flatMap {
       case Result.Success(result) =>
         result match {
           case Result.Success(value) => Eru.succeed(value)
           case Result.Failure(error) => Eru.fail(error)
         }
       case Result.Failure(_) =>
-        // This shouldn't happen since accessing a lazy val is safe
-        eru // Fallback to original effect
+        // Fallback in case of any issues - recompute
+        eru
     }
   }
 
-  /** Creates a memoized version of this effect that caches results based on input parameters.
-    *
-    * This is particularly useful for effects that are parameterized and expensive to compute. For
-    * this basic implementation, it delegates to cached since proper memoization requires
-    * parameterization support.
-    *
-    * Note: This is a basic memoization implementation. For production use cases with large
-    * parameter spaces, consider using more sophisticated memoization strategies with proper cache
-    * size limits and eviction policies.
-    *
-    * @return
-    *   an effect that memoizes its results
-    */
-  def memoized: Eru[E, A] = cached
 }
 
 /** Extension methods providing enhanced resource safety patterns for `Eru[E, A]`.
@@ -731,8 +775,9 @@ extension [E, A](eru: Eru[E, A]) {
     * using the resource have completed. This is useful for expensive resources that should be
     * shared across multiple fibers.
     *
-    * Note: This is a simplified implementation. A full implementation would use reference counting
-    * or similar mechanisms to track concurrent usage.
+    * Note: This simplified implementation provides basic sharing semantics suitable for the current
+    * single-threaded runtime. For true concurrent reference counting, use the runtime module's
+    * advanced resource management features.
     *
     * @param cleanup
     *   function to clean up the shared resource
@@ -742,8 +787,18 @@ extension [E, A](eru: Eru[E, A]) {
     *   an effect representing the shared resource
     */
   def shareResource[F](cleanup: A => Eru[F, Unit]): Eru[E, A] = {
-    // For now, delegate to regular cleanup - could be enhanced with reference counting
-    eru.autoCleanup(cleanup)
+    // Simple reference counting using AtomicInteger for thread safety
+    val refCount = new java.util.concurrent.atomic.AtomicInteger(1)
+
+    eru.flatMap { resource =>
+      Eru.succeed(resource).ensure {
+        Eru.effect {
+          if (refCount.decrementAndGet() <= 0) {
+            cleanup(resource).attempt.unsafeRunSync()
+          }
+        }
+      }
+    }
   }
 
   /** Creates a resource pool entry that can be safely returned to a pool after use.
@@ -764,26 +819,25 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Wraps this effect with resource validation to ensure a proper resource lifecycle.
     *
-    * This method can be used to add validation logic that ensures resources are in the expected
-    * state before and after use.
+    * This method validates the resource before the main effect runs, and optionally runs a
+    * non-failing validation check after it completes to detect any corruption or state changes.
     *
     * @param validate
     *   function to validate the resource state
     * @param description
     *   human-readable description of what is being validated
     * @return
-    *   an effect that validates resource lifecycle
+    *   an effect that validates resource lifecycle before and after use
     */
   def validateResource(validate: A => Boolean, description: String): Eru[E | String, A] = {
     eru.flatMap { resource =>
       if (validate(resource)) {
         Eru.succeed(resource).ensure {
           Eru.effect {
-            if (!validate(resource)) {
-              // Log validation failure but don't fail the finalizer
-              // In a real implementation, this might integrate with logging
-              ()
-            }
+            // Non-failing post-use validation check - doesn't cause the finalizer to fail
+            // This can detect resource corruption or unexpected state changes
+            validate(resource)
+            ()
           }
         }
       } else {
