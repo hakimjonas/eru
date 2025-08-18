@@ -617,12 +617,18 @@ extension [E, A](eru: Eru[E, A]) {
     *   an effect that caches its result after the first successful execution
     */
   def cached: Eru[E, A] = {
-    // Simple implementation using a lazy val to cache the result
+    // Simple implementation using a lazy val to cache the result per instance
     lazy val cachedResult: Result[E, A] = eru.attempt.unsafeRunSync()
     
-    cachedResult match {
-      case Result.Success(value) => Eru.succeed(value)
-      case Result.Failure(error) => Eru.fail(error)
+    // Return an effect that uses the cached result when executed
+    Eru.effect(cachedResult).attempt.flatMap {
+      case Result.Success(result) => result match {
+        case Result.Success(value) => Eru.succeed(value)
+        case Result.Failure(error) => Eru.fail(error)
+      }
+      case Result.Failure(_) => 
+        // This shouldn't happen since accessing a lazy val is safe
+        eru // Fallback to original effect
     }
   }
 
