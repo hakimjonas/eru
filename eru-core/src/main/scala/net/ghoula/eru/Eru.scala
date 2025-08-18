@@ -657,7 +657,7 @@ extension [E, A](eru: Eru[E, A]) {
     * multiple cleanup operations.
     *
     * This method makes it easy to add multiple cleanup operations without nested .ensure calls,
-    * improving readability and making the resource cleanup chain more apparent.
+    * improving readability, and making the resource cleanup chain more visible.
     *
     * @param finalizers
     *   variable number of finalizers to run in reverse order
@@ -762,7 +762,7 @@ extension [E, A](eru: Eru[E, A]) {
     eru.autoCleanup(returnToPool)
   }
 
-  /** Wraps this effect with resource validation to ensure proper resource lifecycle.
+  /** Wraps this effect with resource validation to ensure a proper resource lifecycle.
     *
     * This method can be used to add validation logic that ensures resources are in the expected
     * state before and after use.
