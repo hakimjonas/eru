@@ -180,7 +180,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     exit match {
       case Exit.Die(throwable) => 
         assertEquals(throwable.getMessage, "kaboom")
-        assert(throwable.isInstanceOf[RuntimeException])
+        assert(throwable.isgit InstanceOf[RuntimeException])
       case other => fail(s"Expected Die, got $other")
     }
   }

@@ -139,7 +139,7 @@ enum Eru[+E, +A] {
           val mapped = g(sourceValue)
           f(mapped) match {
             case Succeed(result) => Succeed(result)
-            case _ => Chain(this, f)
+            case other => other
           }
         } catch {
           case NonFatal(ex) => Chain(this, (_: A) => throw ex)
