@@ -1,7 +1,7 @@
 package net.ghoula.eru
 
 import scala.util.control.NonFatal
-import scala.util.control.TailCalls.{TailRec, done, tailcall}
+import scala.util.control.TailCalls.{done, tailcall, TailRec}
 
 import net.ghoula.eru.EruObserver.*
 
@@ -22,11 +22,6 @@ enum Eru[+E, +A] {
   /** Represents a pure, succeeding computation containing a value of type `A`. */
   private case Succeed(value: A) extends Eru[Nothing, A]
 
-  /** Represents a pure, succeeding computation within the pure GADT. This case is restricted to
-    * computations that cannot fail at the type level.
-    */
-  private case PureSucceed[+A](value: A) extends Eru[Nothing, A]
-
   /** Represents a pure, failing computation containing an error of type `E`. */
   private case Fail(error: E) extends Eru[E, Nothing]
 
@@ -37,11 +32,6 @@ enum Eru[+E, +A] {
     * parameter is the key to the GADT, allowing us to preserve the intermediate type information.
     */
   private case Chain[E0, From, +To](source: Eru[E0, From], f: From => Eru[E0, To]) extends Eru[E0, To]
-
-  /** Represents a pure, chained computation within the pure GADT. Only non-failing computations can
-    * participate in this chain at the type level.
-    */
-  private case PureChain[From, +To](source: Eru[Nothing, From], f: From => Eru[Nothing, To]) extends Eru[Nothing, To]
 
   /** Represents a right-associated shallow chain node for selective flattening. */
   private case Chain2[E0, From, Mid, +To](source: Eru[E0, From], f1: From => Eru[E0, Mid], f2: Mid => Eru[E0, To])
@@ -138,19 +128,6 @@ enum Eru[+E, +A] {
         try {
           f(value) match {
             case Succeed(result) => Succeed(result)
-            case PureSucceed(result) => Succeed(result)
-            case other => other
-          }
-        } catch {
-          case NonFatal(ex) => Chain(this, (_: A) => throw ex)
-        }
-
-      case PureSucceed(value) =>
-        try {
-          f(value) match {
-            case Succeed(result) => Succeed(result)
-            case PureSucceed(result) => Succeed(result)
-            case PureChain(src, g) => PureChain(src, g)
             case other => other
           }
         } catch {
@@ -162,16 +139,11 @@ enum Eru[+E, +A] {
           val mapped = g(sourceValue)
           f(mapped) match {
             case Succeed(result) => Succeed(result)
-            case PureSucceed(result) => Succeed(result)
-            case PureChain(src, gg) => PureChain(src, gg)
-            case other => other
+            case _ => Chain(this, f)
           }
         } catch {
           case NonFatal(ex) => Chain(this, (_: A) => throw ex)
         }
-
-      case PureChain(src, g) =>
-        Chain2(src, g, f)
 
       case Chain(source, prevF) =>
         Chain2(source, prevF, f)
@@ -491,9 +463,6 @@ object Eru {
         case Succeed(value) =>
           done((Right(value), fins))
 
-        case PureSucceed(value) =>
-          done((Right(value), fins))
-
         case Fail(error) =>
           done((Left(error), fins))
 
@@ -501,12 +470,6 @@ object Eru {
           done((thunk(), fins))
 
         case Chain(source, f) =>
-          tailcall(runWithStack(source, fins)).flatMap {
-            case (Right(value), fs) => tailcall(runWithStack(f(value), fs))
-            case (Left(error), fs) => done((Left(error), fs))
-          }
-
-        case PureChain(source, f) =>
           tailcall(runWithStack(source, fins)).flatMap {
             case (Right(value), fs) => tailcall(runWithStack(f(value), fs))
             case (Left(error), fs) => done((Left(error), fs))
@@ -631,18 +594,11 @@ object Eru {
       eru match {
         case Succeed(value) =>
           done((Right(value), fins))
-        case PureSucceed(value) =>
-          done((Right(value), fins))
         case Fail(error) =>
           done((Left(error), fins))
         case Effect(thunk) =>
           done((thunk(), fins))
         case Chain(source, f) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
-            case (Right(value), fs) => tailcall(runWithObsStack(f(value), scope, observer, fs))
-            case (Left(error), fs) => done((Left(error), fs))
-          }
-        case PureChain(source, f) =>
           tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
             case (Right(value), fs) => tailcall(runWithObsStack(f(value), scope, observer, fs))
             case (Left(error), fs) => done((Left(error), fs))
@@ -772,11 +728,9 @@ object Eru {
     import View.*
     def view[E, A](e: Eru[E, A]): View[E, A] = e match {
       case Succeed(value) => VSucceed(value)
-      case PureSucceed(value) => VSucceed(value)
       case Fail(error) => VFail(error)
       case Effect(thunk) => VEffect(thunk)
       case Chain(source, f) => VChain(source, f)
-      case PureChain(source, f) => VChain(source, f)
       case Chain2(source, f1, f2) => VChain2(source, f1, f2)
       case Chain3(source, f1, f2, f3) => VChain3(source, f1, f2, f3)
       case MapChain(source, f) => VMapChain(source, f)
@@ -789,46 +743,6 @@ object Eru {
       case Suspend(register) => VSuspend(register)
     }
 
-    def tryEvalPure[E, A](e: Eru[E, A]): Option[A] = {
-      var cur: Eru[Any, Any] = e.asInstanceOf[Eru[Any, Any]]
-      var stack: List[Any => Eru[Nothing, Any]] = Nil
-      var pure = true
-      var done = false
-      var out: Any = null
-
-      while (!done && pure) {
-        cur match {
-          case PureSucceed(v) =>
-            if (stack.isEmpty) {
-              out = v
-              done = true
-            } else {
-              val k = stack.head
-              stack = stack.tail
-              cur = k(v).asInstanceOf[Eru[Any, Any]]
-            }
-
-          case Succeed(v) =>
-            if (stack.isEmpty) {
-              out = v
-              done = true
-            } else {
-              val k = stack.head
-              stack = stack.tail
-              cur = k(v).asInstanceOf[Eru[Any, Any]]
-            }
-
-          case PureChain(src, f) =>
-            stack = f.asInstanceOf[Any => Eru[Nothing, Any]] :: stack
-            cur = src.asInstanceOf[Eru[Any, Any]]
-
-          case _ =>
-            pure = false
-        }
-      }
-
-      if (done && pure) Some(out.asInstanceOf[A]) else None
-    }
   }
 }
 

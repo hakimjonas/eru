@@ -341,28 +341,13 @@ object EruRuntime {
     private var interruptible: Boolean = true
 
     // Simplified step-wise interpreter state using List-based stacks
-    private var current: Eru[Any, Any] = fa.asInstanceOf[Eru[Any, Any]]
+    private var current: Eru[Any, Any] = fa
     private var conts: List[Any => Eru[Any, Any]] = Nil
     private var handlers: List[Handler] = Nil
     private var finalizers: List[() => Eru[Nothing, Unit]] = Nil
 
     @tailrec
     private def runLoop[E1, A1](eru0: Eru[E1, A1], cont: A1 => Eru[Any, Any]): Unit = {
-      // Pure fast path: evaluate fully pure chains without yielding to scheduler
-      try {
-        Eru.Internals.tryEvalPure(eru0) match {
-          case Some(v) =>
-            current = cont(v)
-            scheduleIfPending()
-            return
-          case None => ()
-        }
-      } catch {
-        case t: Throwable =>
-          completeWith(Exit.Die(t).asInstanceOf[Exit[E, A]])
-          return
-      }
-
       Eru.Internals.view(eru0) match {
         case View.VChain[E1a, From, To](source, f) =>
           val cont2: From => Eru[Any, Any] = (a: From) => f(a).flatMap(cont)
@@ -380,9 +365,7 @@ object EruRuntime {
           current = cont(value)
           scheduleIfPending()
         case _ =>
-          val k: Any => Eru[Any, Any] = (x: Any) => cont(x.asInstanceOf[A1])
-          conts = k :: conts
-          current = eru0.asInstanceOf[Eru[Any, Any]]
+          // Unreachable: runLoop is only invoked for chain/mapchain/succeed nodes from run()
           scheduleIfPending()
       }
     }
@@ -471,7 +454,7 @@ object EruRuntime {
             handled = true
           case AttemptH =>
             handlers = hs.tail
-            current = Eru.succeed(Result.Failure(e)).asInstanceOf[Eru[Any, Any]]
+            current = Eru.succeed[Result[Any, Any]](Result.Failure(e))
             handled = true
           case _ =>
             hs = hs.tail
@@ -502,13 +485,13 @@ object EruRuntime {
               }
             case other =>
               // Complex case: schedule normally
-              current = other.asInstanceOf[Eru[Any, Any]]
+              current = other
               scheduleIfPending()
           }
         } catch {
           case _: Throwable =>
             // Fallback: if anything goes wrong, use normal execution path
-            current = k(value).asInstanceOf[Eru[Any, Any]]
+            current = k(value)
             scheduleIfPending()
         }
       } else {
@@ -540,62 +523,62 @@ object EruRuntime {
         case View.VEffect(thunk) =>
           thunk() match {
             case Right(value) => handleSuccess(value)
-            case Left(t) => completeWith(Exit.Die(t).asInstanceOf[Exit[E, A]])
+            case Left(t) => completeWith(Exit.Die(t))
           }
 
         case View.VChain(_, _) =>
           val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
-          runLoop(current.asInstanceOf[Eru[Any, Any]], idCont)
+          runLoop(current, idCont)
 
         case View.VChain2(_, _, _) =>
           val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
-          runLoop(current.asInstanceOf[Eru[Any, Any]], idCont)
+          runLoop(current, idCont)
 
         case View.VChain3(_, _, _, _) =>
           val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
-          runLoop(current.asInstanceOf[Eru[Any, Any]], idCont)
+          runLoop(current, idCont)
 
         case View.VMapChain(_, _) =>
           val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
-          runLoop(current.asInstanceOf[Eru[Any, Any]], idCont)
+          runLoop(current, idCont)
 
         case View.VRecoverWith(source, pf) =>
           handlers = Recover(pf.asInstanceOf[PartialFunction[Any, Eru[Any, Any]]]) :: handlers
-          current = source.asInstanceOf[Eru[Any, Any]]
+          current = source
           scheduleIfPending()
 
         case View.VMapError(source, f) =>
           handlers = MapErr(f.asInstanceOf[Any => Any]) :: handlers
-          current = source.asInstanceOf[Eru[Any, Any]]
+          current = source
           scheduleIfPending()
 
         case View.VZip(left, right) =>
           val zipCont: Any => Eru[Any, Any] = { leftValue =>
-            right.asInstanceOf[Eru[Any, Any]].map(rightValue => (leftValue, rightValue)).asInstanceOf[Eru[Any, Any]]
+            right.map(rightValue => (leftValue, rightValue))
           }
           conts = zipCont :: conts
-          current = left.asInstanceOf[Eru[Any, Any]]
+          current = left
           scheduleIfPending()
 
         case View.VAttempt(source) =>
           handlers = AttemptH :: handlers
-          current = source.asInstanceOf[Eru[Any, Any]]
+          current = source
           scheduleIfPending()
 
         case View.VDebug(source, label) =>
           if (label() == YieldMarker) {
             // Yield: reschedule to allow other fibers to run
-            current = source.asInstanceOf[Eru[Any, Any]]
+            current = source
             scheduleIfPending()
           } else {
             observer.foreach(_.onEvent(EruEvent.Step(ScopeId.fresh(), label())))
-            current = source.asInstanceOf[Eru[Any, Any]]
+            current = source
             scheduleIfPending()
           }
 
         case View.VEnsure(source, finalizer) =>
           finalizers = finalizer :: finalizers
-          current = source.asInstanceOf[Eru[Any, Any]]
+          current = source
           scheduleIfPending()
 
         case View.VSuspend(register) =>
@@ -614,24 +597,20 @@ object EruRuntime {
           register(callback)
 
         // Handle interruption masking effects
-        case _ if current.isInstanceOf[UninterruptibleEffect[_, _]] =>
-          val uninterruptible = current.asInstanceOf[UninterruptibleEffect[Any, Any]]
+        case u: UninterruptibleEffect[?, ?] =>
           val previousState = setInterruptible(false)
-          // Use ensure to restore the previous interruptible state
-          current = uninterruptible.source.ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
+          current = u.source.ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
           scheduleIfPending()
 
-        case _ if current.isInstanceOf[MaskEffect[_, _]] =>
-          val maskEffect = current.asInstanceOf[MaskEffect[Any, Any]]
+        case m: MaskEffect[?, ?] =>
           val previousState = setInterruptible(false)
           val unmask = new RuntimeUnmask(previousState)
-          current = maskEffect.k(unmask).ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
+          current = m.k(unmask).ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
           scheduleIfPending()
 
-        case _ if current.isInstanceOf[RestoreInterruptibilityEffect[_, _]] =>
-          val restore = current.asInstanceOf[RestoreInterruptibilityEffect[Any, Any]]
-          val previousState = setInterruptible(restore.restoreState)
-          current = restore.source.ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
+        case r: RestoreInterruptibilityEffect[?, ?] =>
+          val previousState = setInterruptible(r.restoreState)
+          current = r.source.ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
           scheduleIfPending()
       }
     }
