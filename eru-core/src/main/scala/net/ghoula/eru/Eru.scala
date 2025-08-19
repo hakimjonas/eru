@@ -127,7 +127,7 @@ enum Eru[+E, +A] {
       case Succeed(value) =>
         try {
           f(value) match {
-            case Succeed(result) => Succeed(result)
+            case s @ Succeed(_) => s
             case other => other
           }
         } catch {
@@ -138,7 +138,7 @@ enum Eru[+E, +A] {
         try {
           val mapped = g(sourceValue)
           f(mapped) match {
-            case Succeed(result) => Succeed(result)
+            case s @ Succeed(_) => s
             case other => other
           }
         } catch {
