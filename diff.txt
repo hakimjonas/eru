@@ -1,0 +1,266 @@
+diff --git a/PLAYBOOK.md b/PLAYBOOK.md
+index 1b0036d..e239cf3 100644
+--- a/PLAYBOOK.md
++++ b/PLAYBOOK.md
+@@ -154,6 +154,16 @@ These are the top items to start now for 0.1.0.
+ 
+ ## Acceptance Criteria (Global)
+ 
++### Performance Optimization Acceptance Criteria
++
++An optimization is "done" when:
++- AST inspection tests verify expected structure transformations
++- Correctness comparison tests pass (optimized = unoptimized results)
++- Exception safety tests demonstrate proper error handling
++- Benchmark validation shows expected performance characteristics
++- Allocation profiling confirms memory optimization goals
++- Cross-platform validation passes on multiple JVMs
++
+ A feature is “done” when:
+ - It is implemented with Scala 3 idioms as per the guidelines.
+ - It has comprehensive unit tests; where applicable, property‑based tests.
+diff --git a/concurrency.md b/concurrency.md
+index ed70d93..0136953 100644
+--- a/concurrency.md
++++ b/concurrency.md
+@@ -48,7 +48,7 @@ val errorProgram = for {
+ //     source = Fail(error = "Something went wrong"),
+ //     pf = <function1>
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d81a78@dfb2026
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109ccd218@2593cb04
+ // )
+ 
+ errorProgram.unsafeRunSync()
+@@ -66,7 +66,7 @@ val leftEffect = Eru.effect {
+   "Left result"
+ }
+ // leftEffect: Eru[Throwable, String] = Effect(
+-//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@21369f7a
++//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109cd1b68@2273c2fc
+ // )
+ 
+ val rightEffect = Eru.effect {
+@@ -74,7 +74,7 @@ val rightEffect = Eru.effect {
+   "Right result"
+ }
+ // rightEffect: Eru[Throwable, String] = Effect(
+-//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@3ef8b24b
++//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109cd1b68@2d64ff63
+ // )
+ 
+ val zipProgram = for {
+@@ -84,13 +84,13 @@ val zipProgram = for {
+ // zipProgram: Eru[Throwable, String] = MapChain(
+ //   source = Zip(
+ //     left = Effect(
+-//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@21369f7a
++//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109cd1b68@2273c2fc
+ //     ),
+ //     right = Effect(
+-//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@3ef8b24b
++//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109cd1b68@2d64ff63
+ //     )
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d895a0@634d4cc4
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109cd4be0@5559526f
+ // )
+ 
+ zipProgram.unsafeRunSync()
+@@ -122,13 +122,13 @@ val resourceProgram = for {
+ //   source = Chain(
+ //     source = Ensure(
+ //       source = Effect(
+-//         thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@1e0f427a
++//         thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109cd1b68@6c9589b7
+ //       ),
+-//       finalizer = net.ghoula.eru.Eru$$Lambda/0x00007f2109d8a5f0@59930604
++//       finalizer = net.ghoula.eru.Eru$$Lambda/0x00007f2109cd2f88@57520424
+ //     ),
+-//     f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d94580@5452dcf3
++//     f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109cd5970@2f0d5087
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d94950@745f403a
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109cd5d40@12ed5115
+ // )
+ 
+ resourceProgram.unsafeRunSync()
+@@ -163,14 +163,14 @@ val sideEffectProgram = for {
+ } yield s"Random: $result1, Result: $result2"
+ // sideEffectProgram: Eru[Throwable, String] = Chain(
+ //   source = Effect(
+-//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@4b7d37d4
++//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109cd1b68@34ed67e3
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d95780@22f00108
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109cd6d90@6e810bee
+ // )
+ 
+ sideEffectProgram.unsafeRunSync()
+-// Generated random number: 68
+-// res4: String = "Random: 68, Result: High number"
++// Generated random number: 66
++// res4: String = "Random: 66, Result: High number"
+ ```
+ 
+ ## Advanced Error Handling Patterns
+@@ -200,7 +200,7 @@ val advancedErrorHandling = for {
+ } yield s"Results: $result1, $result2, $result3"
+ // advancedErrorHandling: Eru[String | Throwable, String] = Chain(
+ //   source = RecoverWith(source = Fail(error = "network-error"), pf = <function1>),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d96f30@1e63544d
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109cdc6a8@5bd8b7a8
+ // )
+ 
+ advancedErrorHandling.unsafeRunSync()
+@@ -239,9 +239,9 @@ val conversionProgram = for {
+ }
+ // conversionProgram: Eru[String | Throwable, String] = Chain(
+ //   source = Effect(
+-//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@50de4b9d
++//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109cd1b68@19ca4dfb
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d99a58@67bd2201
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109cdf058@111ab616
+ // )
+ 
+ conversionProgram.unsafeRunSync()
+@@ -271,9 +271,9 @@ val nestedProgram = for {
+ } yield s"Final: $outer"
+ // nestedProgram: Eru[Throwable, String] = MapChain(
+ //   source = Effect(
+-//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@e6bca05
++//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109cd1b68@2028c503
+ //   ),
+-//   f = scala.Function1$$Lambda/0x00007f2109d90df8@463a3abf
++//   f = scala.Function1$$Lambda/0x00007f2109d90df8@69c9307b
+ // )
+ 
+ nestedProgram.unsafeRunSync()
+diff --git a/docs-src/PERFORMANCE.md b/docs-src/PERFORMANCE.md
+index 74fdae5..8052b9b 100644
+--- a/docs-src/PERFORMANCE.md
++++ b/docs-src/PERFORMANCE.md
+@@ -65,6 +65,34 @@ As of August 2025, Eru has evolved from "correct-but-slow" to "correct-and-selec
+ - Error handling paths are efficient (~150ns)
+ - Deep composition scales predictably (~26ns per flatMap)
+ 
++## Benchmark Validation Results
++
++### Expected Performance Characteristics
++
++| Benchmark | Expected Range | Validates |
++|-----------|---------------|-----------|
++| `constructionOnlyPureFlat` | ~100-1000 ns | Construction overhead |
++| `runPureFlat` | ~5-50 ns | Runtime after fusion |
++| `constructionPlusRuntimePureFlat` | ~100-1000 ns | Total cost |
++| `pureFusionOptimized` | ~5-50 ns | Fusion effectiveness |
++| `pureFusionForced` | ~1000+ ns | Non-fusion baseline |
++
++### Red Flags
++- If `constructionOnlyPureFlat` is significantly slower than `runPureFlat`, construction cost may be too high
++- If `pureFusionOptimized` ≈ `pureFusionForced`, fusion is not working
++- If allocation rates are high for fused operations, memory optimization failed
++
++### Memory Allocation Analysis
++
++```bash
++# Measure allocation patterns - should show near-zero for fused operations
++sbt "project eruBenchJVM; jmh:run -prof gc .*constructionOnlyPureFlat.*"
++sbt "project eruBenchJVM; jmh:run -prof gc .*runPureFlat.*"
++
++# Compare against non-optimized patterns
++sbt "project eruBenchJVM; jmh:run -prof gc .*runMixedPure.*"
++```
++
+ ## Optimization History
+ 
+ ### ✅ Successful Optimizations
+diff --git a/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruMapFlatMapBench.scala b/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruMapFlatMapBench.scala
+index f046d51..7f13906 100644
+--- a/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruMapFlatMapBench.scala
++++ b/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruMapFlatMapBench.scala
+@@ -93,4 +93,28 @@ class EruMapFlatMapBench {
+   def runMixedPure(h: Blackhole): Unit = {
+     h.consume(mixedPure.unsafeRunSync())
+   }
++
++  @Benchmark
++  def constructionOnlyPureFlat(h: Blackhole): Unit = {
++    val prog = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, _) =>
++      acc.flatMap(i => Eru.succeed(i + 1))
++    }
++    h.consume(prog)
++  }
++
++  @Benchmark
++  def constructionPlusRuntimePureFlat(h: Blackhole): Unit = {
++    val prog = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, _) =>
++      acc.flatMap(i => Eru.succeed(i + 1))
++    }
++    h.consume(prog.unsafeRunSync())
++  }
++
++  @Benchmark
++  def constructionOnlyMixed(h: Blackhole): Unit = {
++    val prog = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, idx) =>
++      if ((idx & 1) == 0) acc.map(_ + 1) else acc.flatMap(i => Eru.succeed(i + 1))
++    }
++    h.consume(prog)
++  }
+ }
+diff --git a/eru-core/src/main/scala/net/ghoula/eru/Eru.scala b/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
+index ada0d3b..c8b625f 100644
+--- a/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
++++ b/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
+@@ -124,7 +124,7 @@ enum Eru[+E, +A] {
+             case other => other
+           }
+         } catch {
+-          case NonFatal(_) => Chain(this, f)
++          case NonFatal(ex) => Chain(this, (_: A) => throw ex)
+         }
+ 
+       case MapChain(Succeed(sourceValue), g) =>
+@@ -135,7 +135,7 @@ enum Eru[+E, +A] {
+             case other => other
+           }
+         } catch {
+-          case NonFatal(_) => Chain(this, f)
++          case NonFatal(ex) => Chain(this, (_: A) => throw ex)
+         }
+ 
+       case Chain(source, prevF) =>
+@@ -395,15 +395,14 @@ object Eru {
+     *   an `Eru[E, A]` that succeeds with the contained value or fails with `onNone`
+     */
+   def fromOption[E, A](opt: => Option[A], onNone: => E): Eru[E, A] =
+-    suspend[E, A] { resume =>
+-      effect {
+-        val ea: Either[E, A] = opt match {
+-          case Some(a) => Right(a)
+-          case None => Left(onNone)
+-        }
+-        resume(ea)
+-        ()
+-      }.attempt.flatMap(_ => unit)
++    effect {
++      opt match {
++        case Some(a) => a
++        case None => throw EruException(onNone)
++      }
++    }.mapError {
++      case ex: EruException[?] => ex.error.asInstanceOf[E]
++      case t => throw t
+     }
+ 
+   /** A successful `Eru` containing `Unit`. */
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
+index c6fff58..bc698c9 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
+@@ -924,3 +924,4 @@ class EruSpec extends FunSuite {
+     assertEquals(mixedChain.unsafeRunSync(), 26)
+   }
+ }
++

@@ -124,7 +124,7 @@ enum Eru[+E, +A] {
             case other => other
           }
         } catch {
-          case NonFatal(_) => Chain(this, f)
+          case NonFatal(ex) => Chain(this, (_: A) => throw ex)
         }
 
       case MapChain(Succeed(sourceValue), g) =>
@@ -135,7 +135,7 @@ enum Eru[+E, +A] {
             case other => other
           }
         } catch {
-          case NonFatal(_) => Chain(this, f)
+          case NonFatal(ex) => Chain(this, (_: A) => throw ex)
         }
 
       case Chain(source, prevF) =>
@@ -395,15 +395,14 @@ object Eru {
     *   an `Eru[E, A]` that succeeds with the contained value or fails with `onNone`
     */
   def fromOption[E, A](opt: => Option[A], onNone: => E): Eru[E, A] =
-    suspend[E, A] { resume =>
-      effect {
-        val ea: Either[E, A] = opt match {
-          case Some(a) => Right(a)
-          case None => Left(onNone)
-        }
-        resume(ea)
-        ()
-      }.attempt.flatMap(_ => unit)
+    effect {
+      opt match {
+        case Some(a) => a
+        case None => throw EruException(onNone)
+      }
+    }.mapError {
+      case ex: EruException[?] => ex.error.asInstanceOf[E]
+      case t => throw t
     }
 
   /** A successful `Eru` containing `Unit`. */

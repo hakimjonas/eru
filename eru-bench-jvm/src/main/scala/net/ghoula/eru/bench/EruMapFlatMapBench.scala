@@ -93,4 +93,28 @@ class EruMapFlatMapBench {
   def runMixedPure(h: Blackhole): Unit = {
     h.consume(mixedPure.unsafeRunSync())
   }
+
+  @Benchmark
+  def constructionOnlyPureFlat(h: Blackhole): Unit = {
+    val prog = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, _) =>
+      acc.flatMap(i => Eru.succeed(i + 1))
+    }
+    h.consume(prog)
+  }
+
+  @Benchmark
+  def constructionPlusRuntimePureFlat(h: Blackhole): Unit = {
+    val prog = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, _) =>
+      acc.flatMap(i => Eru.succeed(i + 1))
+    }
+    h.consume(prog.unsafeRunSync())
+  }
+
+  @Benchmark
+  def constructionOnlyMixed(h: Blackhole): Unit = {
+    val prog = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, idx) =>
+      if ((idx & 1) == 0) acc.map(_ + 1) else acc.flatMap(i => Eru.succeed(i + 1))
+    }
+    h.consume(prog)
+  }
 }

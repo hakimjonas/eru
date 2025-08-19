@@ -65,6 +65,34 @@ As of August 2025, Eru has evolved from "correct-but-slow" to "correct-and-selec
 - Error handling paths are efficient (~150ns)
 - Deep composition scales predictably (~26ns per flatMap)
 
+## Benchmark Validation Results
+
+### Expected Performance Characteristics
+
+| Benchmark | Expected Range | Validates |
+|-----------|---------------|-----------|
+| `constructionOnlyPureFlat` | ~100-1000 ns | Construction overhead |
+| `runPureFlat` | ~5-50 ns | Runtime after fusion |
+| `constructionPlusRuntimePureFlat` | ~100-1000 ns | Total cost |
+| `pureFusionOptimized` | ~5-50 ns | Fusion effectiveness |
+| `pureFusionForced` | ~1000+ ns | Non-fusion baseline |
+
+### Red Flags
+- If `constructionOnlyPureFlat` is significantly slower than `runPureFlat`, construction cost may be too high
+- If `pureFusionOptimized` ≈ `pureFusionForced`, fusion is not working
+- If allocation rates are high for fused operations, memory optimization failed
+
+### Memory Allocation Analysis
+
+```bash
+# Measure allocation patterns - should show near-zero for fused operations
+sbt "project eruBenchJVM; jmh:run -prof gc .*constructionOnlyPureFlat.*"
+sbt "project eruBenchJVM; jmh:run -prof gc .*runPureFlat.*"
+
+# Compare against non-optimized patterns
+sbt "project eruBenchJVM; jmh:run -prof gc .*runMixedPure.*"
+```
+
 ## Optimization History
 
 ### ✅ Successful Optimizations

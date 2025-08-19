@@ -924,3 +924,4 @@ class EruSpec extends FunSuite {
     assertEquals(mixedChain.unsafeRunSync(), 26)
   }
 }
+
