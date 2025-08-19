@@ -22,6 +22,11 @@ enum Eru[+E, +A] {
   /** Represents a pure, succeeding computation containing a value of type `A`. */
   private case Succeed(value: A) extends Eru[Nothing, A]
 
+  /** Represents a pure, succeeding computation within the pure GADT. This case is restricted to
+    * computations that cannot fail at the type level.
+    */
+  private case PureSucceed[+A](value: A) extends Eru[Nothing, A]
+
   /** Represents a pure, failing computation containing an error of type `E`. */
   private case Fail(error: E) extends Eru[E, Nothing]
 
@@ -29,14 +34,20 @@ enum Eru[+E, +A] {
   private case Effect(thunk: () => Either[Throwable, A]) extends Eru[Throwable, A]
 
   /** Represents a chained computation resulting from a `flatMap` operation. The `From` type
-    * parameter is the key to the GADT, allowing us to preserve the intermediate type information
-    * and avoid casting.
+    * parameter is the key to the GADT, allowing us to preserve the intermediate type information.
     */
   private case Chain[E0, From, +To](source: Eru[E0, From], f: From => Eru[E0, To]) extends Eru[E0, To]
 
-  // Right-associated shallow chain nodes for selective flattening
+  /** Represents a pure, chained computation within the pure GADT. Only non-failing computations can
+    * participate in this chain at the type level.
+    */
+  private case PureChain[From, +To](source: Eru[Nothing, From], f: From => Eru[Nothing, To]) extends Eru[Nothing, To]
+
+  /** Represents a right-associated shallow chain node for selective flattening. */
   private case Chain2[E0, From, Mid, +To](source: Eru[E0, From], f1: From => Eru[E0, Mid], f2: Mid => Eru[E0, To])
       extends Eru[E0, To]
+
+  /** Represents a right-associated shallow chain node for selective flattening. */
   private case Chain3[E0, From, Mid1, Mid2, +To](
     source: Eru[E0, From],
     f1: From => Eru[E0, Mid1],
@@ -69,7 +80,11 @@ enum Eru[+E, +A] {
 
   /** Represents a debugging marker around a computation with a lazily provided label. */
   private case Debug[E0, A0](source: Eru[E0, A0], label: () => String) extends Eru[E0, A0]
+
+  /** Represents a computation that runs a finalizer after it completes. */
   private case Ensure[E0, A0](source: Eru[E0, A0], finalizer: () => Eru[Nothing, Unit]) extends Eru[E0, A0]
+
+  /** Represents an asynchronous, suspending computation. */
   private case Suspend[E0, A0](register: (Either[E0, A0] => Unit) => Eru[Nothing, Unit]) extends Eru[E0, A0]
 
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
@@ -107,9 +122,11 @@ enum Eru[+E, +A] {
   /** Chains another computation to be run after this one completes. This is the Monad `flatMap` (or
     * `bind`) operation.
     *
-    * Construction-time optimization: Detects pure flatMap chains where both the source and
-    * continuation result are immediate successes, evaluating them at construction time.
-    *
+    * @note
+    *   This implementation includes a construction-time optimization that detects pure flatMap
+    *   chains where both the source and continuation result are immediate successes, evaluating
+    *   them at construction time. It also flattens chains of `flatMap` calls to a certain depth to
+    *   improve performance.
     * @param f
     *   the function to apply to the success value, returning the next `Eru`.
     * @return
@@ -121,6 +138,19 @@ enum Eru[+E, +A] {
         try {
           f(value) match {
             case Succeed(result) => Succeed(result)
+            case PureSucceed(result) => Succeed(result)
+            case other => other
+          }
+        } catch {
+          case NonFatal(ex) => Chain(this, (_: A) => throw ex)
+        }
+
+      case PureSucceed(value) =>
+        try {
+          f(value) match {
+            case Succeed(result) => Succeed(result)
+            case PureSucceed(result) => Succeed(result)
+            case PureChain(src, g) => PureChain(src, g)
             case other => other
           }
         } catch {
@@ -132,11 +162,16 @@ enum Eru[+E, +A] {
           val mapped = g(sourceValue)
           f(mapped) match {
             case Succeed(result) => Succeed(result)
+            case PureSucceed(result) => Succeed(result)
+            case PureChain(src, gg) => PureChain(src, gg)
             case other => other
           }
         } catch {
           case NonFatal(ex) => Chain(this, (_: A) => throw ex)
         }
+
+      case PureChain(src, g) =>
+        Chain2(src, g, f)
 
       case Chain(source, prevF) =>
         Chain2(source, prevF, f)
@@ -456,6 +491,9 @@ object Eru {
         case Succeed(value) =>
           done((Right(value), fins))
 
+        case PureSucceed(value) =>
+          done((Right(value), fins))
+
         case Fail(error) =>
           done((Left(error), fins))
 
@@ -463,6 +501,12 @@ object Eru {
           done((thunk(), fins))
 
         case Chain(source, f) =>
+          tailcall(runWithStack(source, fins)).flatMap {
+            case (Right(value), fs) => tailcall(runWithStack(f(value), fs))
+            case (Left(error), fs) => done((Left(error), fs))
+          }
+
+        case PureChain(source, f) =>
           tailcall(runWithStack(source, fins)).flatMap {
             case (Right(value), fs) => tailcall(runWithStack(f(value), fs))
             case (Left(error), fs) => done((Left(error), fs))
@@ -587,11 +631,18 @@ object Eru {
       eru match {
         case Succeed(value) =>
           done((Right(value), fins))
+        case PureSucceed(value) =>
+          done((Right(value), fins))
         case Fail(error) =>
           done((Left(error), fins))
         case Effect(thunk) =>
           done((thunk(), fins))
         case Chain(source, f) =>
+          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
+            case (Right(value), fs) => tailcall(runWithObsStack(f(value), scope, observer, fs))
+            case (Left(error), fs) => done((Left(error), fs))
+          }
+        case PureChain(source, f) =>
           tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
             case (Right(value), fs) => tailcall(runWithObsStack(f(value), scope, observer, fs))
             case (Left(error), fs) => done((Left(error), fs))
@@ -721,9 +772,11 @@ object Eru {
     import View.*
     def view[E, A](e: Eru[E, A]): View[E, A] = e match {
       case Succeed(value) => VSucceed(value)
+      case PureSucceed(value) => VSucceed(value)
       case Fail(error) => VFail(error)
       case Effect(thunk) => VEffect(thunk)
       case Chain(source, f) => VChain(source, f)
+      case PureChain(source, f) => VChain(source, f)
       case Chain2(source, f1, f2) => VChain2(source, f1, f2)
       case Chain3(source, f1, f2, f3) => VChain3(source, f1, f2, f3)
       case MapChain(source, f) => VMapChain(source, f)
@@ -872,9 +925,10 @@ extension [E, A](eru: Eru[E, A]) {
     * using the resource have completed. This is useful for expensive resources that should be
     * shared across multiple fibers.
     *
-    * Note: This simplified implementation provides basic sharing semantics suitable for the current
-    * single-threaded runtime. For true concurrent reference counting, use the runtime module's
-    * advanced resource management features.
+    * @note
+    *   This simplified implementation provides basic sharing semantics suitable for the current
+    *   single-threaded runtime. For true concurrent reference counting, use the runtime module's
+    *   advanced resource management features.
     *
     * @param cleanup
     *   function to clean up the shared resource
@@ -884,7 +938,6 @@ extension [E, A](eru: Eru[E, A]) {
     *   an effect representing the shared resource
     */
   def shareResource[F](cleanup: A => Eru[F, Unit]): Eru[E, A] = {
-    // Simple reference counting using AtomicInteger for thread safety
     val refCount = new java.util.concurrent.atomic.AtomicInteger(1)
 
     eru.flatMap { resource =>
@@ -916,23 +969,23 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Wraps this effect with resource validation to ensure a proper resource lifecycle.
     *
-    * This method validates the resource before the main effect runs, and optionally runs a
-    * non-failing validation check after it completes to detect any corruption or state changes.
+    * This method first validates the resource. If successful, it proceeds with the resource while
+    * scheduling a post-use validation check. This post-use check, which runs in a finalizer, is
+    * non-failing and serves to detect potential resource corruption or unexpected state changes
+    * after use without altering the outcome of the main computation.
     *
     * @param validate
-    *   function to validate the resource state
+    *   function to validate the resource state, run before and after the resource is used.
     * @param description
-    *   human-readable description of what is being validated
+    *   human-readable description of what is being validated, used in the failure message.
     * @return
-    *   an effect that validates resource lifecycle before and after use
+    *   an effect that validates the resource lifecycle before and after use.
     */
   def validateResource(validate: A => Boolean, description: String): Eru[E | String, A] = {
     eru.flatMap { resource =>
       if (validate(resource)) {
         Eru.succeed(resource).ensure {
           Eru.effect {
-            // Non-failing post-use validation check - doesn't cause the finalizer to fail
-            // This can detect resource corruption or unexpected state changes
             validate(resource)
             ()
           }

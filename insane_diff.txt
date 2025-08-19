@@ -1,0 +1,378 @@
+commit eddfeb29df13f29fe699f8e142276b8ae4af57ea
+Author: Hakim Jonas Ghoula <hakim@walkthisway.dk>
+Date:   Tue Aug 19 03:32:21 2025 +0200
+
+    insanity?
+
+diff --git a/concurrency.md b/concurrency.md
+index c0029d4..ed70d93 100644
+--- a/concurrency.md
++++ b/concurrency.md
+@@ -15,10 +15,7 @@ val program = for {
+   b <- Eru.succeed("hello")
+   result <- Eru.succeed(s"$a-$b")
+ } yield s"Composed: $result"
+-// program: Eru[Nothing, String] = Chain(
+-//   source = Succeed(value = 42),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f10000@772aeb4e
+-// )
++// program: Eru[Nothing, String] = Succeed(value = "Composed: 42-hello")
+ 
+ program.unsafeRunSync()
+ // res0: String = "Composed: 42-hello"
+@@ -51,7 +48,7 @@ val errorProgram = for {
+ //     source = Fail(error = "Something went wrong"),
+ //     pf = <function1>
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f11218@48a530ab
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d81a78@dfb2026
+ // )
+ 
+ errorProgram.unsafeRunSync()
+@@ -69,7 +66,7 @@ val leftEffect = Eru.effect {
+   "Left result"
+ }
+ // leftEffect: Eru[Throwable, String] = Effect(
+-//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f5d75f18508@74365aec
++//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@21369f7a
+ // )
+ 
+ val rightEffect = Eru.effect {
+@@ -77,7 +74,7 @@ val rightEffect = Eru.effect {
+   "Right result"
+ }
+ // rightEffect: Eru[Throwable, String] = Effect(
+-//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f5d75f18508@4d5fcb9f
++//   thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@3ef8b24b
+ // )
+ 
+ val zipProgram = for {
+@@ -87,13 +84,13 @@ val zipProgram = for {
+ // zipProgram: Eru[Throwable, String] = MapChain(
+ //   source = Zip(
+ //     left = Effect(
+-//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f5d75f18508@74365aec
++//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@21369f7a
+ //     ),
+ //     right = Effect(
+-//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f5d75f18508@4d5fcb9f
++//       thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@3ef8b24b
+ //     )
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f1cbe0@6a38963c
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d895a0@634d4cc4
+ // )
+ 
+ zipProgram.unsafeRunSync()
+@@ -125,13 +122,13 @@ val resourceProgram = for {
+ //   source = Chain(
+ //     source = Ensure(
+ //       source = Effect(
+-//         thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f5d75f18508@2591d9c3
++//         thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@1e0f427a
+ //       ),
+-//       finalizer = net.ghoula.eru.Eru$$Lambda/0x00007f5d75f19928@7211925
++//       finalizer = net.ghoula.eru.Eru$$Lambda/0x00007f2109d8a5f0@59930604
+ //     ),
+-//     f = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f1d970@5d63a0a0
++//     f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d94580@5452dcf3
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f20000@5b8ede58
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d94950@745f403a
+ // )
+ 
+ resourceProgram.unsafeRunSync()
+@@ -166,14 +163,14 @@ val sideEffectProgram = for {
+ } yield s"Random: $result1, Result: $result2"
+ // sideEffectProgram: Eru[Throwable, String] = Chain(
+ //   source = Effect(
+-//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f5d75f18508@78d4e7af
++//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@4b7d37d4
+ //   ),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f20e30@7797b820
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d95780@22f00108
+ // )
+ 
+ sideEffectProgram.unsafeRunSync()
+-// Generated random number: 56
+-// res4: String = "Random: 56, Result: High number"
++// Generated random number: 68
++// res4: String = "Random: 68, Result: High number"
+ ```
+ 
+ ## Advanced Error Handling Patterns
+@@ -203,7 +200,7 @@ val advancedErrorHandling = for {
+ } yield s"Results: $result1, $result2, $result3"
+ // advancedErrorHandling: Eru[String | Throwable, String] = Chain(
+ //   source = RecoverWith(source = Fail(error = "network-error"), pf = <function1>),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f225e0@55ac57ae
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d96f30@1e63544d
+ // )
+ 
+ advancedErrorHandling.unsafeRunSync()
+@@ -241,8 +238,10 @@ val conversionProgram = for {
+   s"Either: $fromEither, Try: $fromTry, Success: $successMsg, Failure: $failureMsg"
+ }
+ // conversionProgram: Eru[String | Throwable, String] = Chain(
+-//   source = Succeed(value = "success"),
+-//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f24900@1410d8a0
++//   source = Effect(
++//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@50de4b9d
++//   ),
++//   f = repl.MdocSession$MdocApp$$Lambda/0x00007f2109d99a58@67bd2201
+ // )
+ 
+ conversionProgram.unsafeRunSync()
+@@ -270,10 +269,11 @@ val nestedProgram = for {
+   }.map(_.toUpperCase)
+   
+ } yield s"Final: $outer"
+-// nestedProgram: Eru[Throwable, String] = Chain2(
+-//   source = Succeed(value = 20),
+-//   f1 = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f265f0@647400e5,
+-//   f2 = repl.MdocSession$MdocApp$$Lambda/0x00007f5d75f269c0@14c13457
++// nestedProgram: Eru[Throwable, String] = MapChain(
++//   source = Effect(
++//     thunk = net.ghoula.eru.Eru$$$Lambda/0x00007f2109d8f048@e6bca05
++//   ),
++//   f = scala.Function1$$Lambda/0x00007f2109d90df8@463a3abf
+ // )
+ 
+ nestedProgram.unsafeRunSync()
+diff --git a/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruMapFlatMapBench.scala b/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruMapFlatMapBench.scala
+index 2147d68..f046d51 100644
+--- a/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruMapFlatMapBench.scala
++++ b/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruMapFlatMapBench.scala
+@@ -43,6 +43,8 @@ class EruMapFlatMapBench {
+   private var mapped: Eru[Nothing, Int] = Eru.succeed(0)
+   private var flatMapped: Eru[Nothing, Int] = Eru.succeed(0)
+   private var mixed: Eru[Nothing, Int] = Eru.succeed(0)
++  private var pureFlat: Eru[Nothing, Int] = Eru.succeed(0)
++  private var mixedPure: Eru[Throwable, Int] = Eru.succeed(0)
+ 
+   @Setup
+   def setup(): Unit = {
+@@ -57,6 +59,14 @@ class EruMapFlatMapBench {
+       if ((idx & 1) == 0) acc.map(_ + 1)
+       else acc.flatMap(i => Eru.succeed(i + 1))
+     }
++    pureFlat = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, _) =>
++      acc.flatMap(i => Eru.succeed(i + 1))
++    }
++    mixedPure = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, idx) =>
++      if ((idx & 3) == 0) acc.map(_ + 1)
++      else if ((idx & 1) == 0) acc.flatMap(i => Eru.succeed(i + 1))
++      else acc.flatMap(i => Eru.effect(i + 1))
++    }
+   }
+ 
+   @Benchmark
+@@ -73,4 +83,14 @@ class EruMapFlatMapBench {
+   def runMixed(h: Blackhole): Unit = {
+     h.consume(mixed.unsafeRunSync())
+   }
++
++  @Benchmark
++  def runPureFlat(h: Blackhole): Unit = {
++    h.consume(pureFlat.unsafeRunSync())
++  }
++
++  @Benchmark
++  def runMixedPure(h: Blackhole): Unit = {
++    h.consume(mixedPure.unsafeRunSync())
++  }
+ }
+diff --git a/eru-core/src/main/scala/net/ghoula/eru/Eru.scala b/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
+index 25c0fd3..ada0d3b 100644
+--- a/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
++++ b/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
+@@ -117,6 +117,27 @@ enum Eru[+E, +A] {
+     */
+   final def flatMap[E1 >: E, B](f: A => Eru[E1, B]): Eru[E1, B] = {
+     this match {
++      case Succeed(value) =>
++        try {
++          f(value) match {
++            case Succeed(result) => Succeed(result)
++            case other => other
++          }
++        } catch {
++          case NonFatal(_) => Chain(this, f)
++        }
++
++      case MapChain(Succeed(sourceValue), g) =>
++        try {
++          val mapped = g(sourceValue)
++          f(mapped) match {
++            case Succeed(result) => Succeed(result)
++            case other => other
++          }
++        } catch {
++          case NonFatal(_) => Chain(this, f)
++        }
++
+       case Chain(source, prevF) =>
+         Chain2(source, prevF, f)
+ 
+@@ -374,11 +395,15 @@ object Eru {
+     *   an `Eru[E, A]` that succeeds with the contained value or fails with `onNone`
+     */
+   def fromOption[E, A](opt: => Option[A], onNone: => E): Eru[E, A] =
+-    succeed(()).flatMap { _ =>
+-      opt match {
+-        case Some(a) => succeed(a)
+-        case None => fail(onNone)
+-      }
++    suspend[E, A] { resume =>
++      effect {
++        val ea: Either[E, A] = opt match {
++          case Some(a) => Right(a)
++          case None => Left(onNone)
++        }
++        resume(ea)
++        ()
++      }.attempt.flatMap(_ => unit)
+     }
+ 
+   /** A successful `Eru` containing `Unit`. */
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
+index 3b1c03e..c6fff58 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
+@@ -752,7 +752,7 @@ class EruSpec extends FunSuite {
+     assertEquals(caught.getMessage, "Map function failed")
+   }
+ 
+-  test("mixed pure/impure chains behave correctly with selective flatMap optimization") {
++  test("mixed pure/impure chains behave correctly with selective flatMap optimization and pure fusion") {
+     var mapCallCount = 0
+     var effectCallCount = 0
+     var flatMapCallCount = 0
+@@ -773,7 +773,11 @@ class EruSpec extends FunSuite {
+ 
+     // Only the map should be evaluated immediately, flatMap with Effect remains lazy
+     assertEquals(mapCallCount, 1, "Map on succeed should be evaluated at construction time")
+-    assertEquals(flatMapCallCount, 0, "FlatMap with Effect should not be evaluated at construction time")
++    assertEquals(
++      flatMapCallCount,
++      1,
++      "FlatMap continuation may be inspected once at construction time for pure fusion detection"
++    )
+     assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
+ 
+     val result = computation.unsafeRunSync()
+@@ -785,27 +789,27 @@ class EruSpec extends FunSuite {
+ 
+   // Tests for Safe FlatMap Construction-Time Optimizations
+ 
+-  test("flatMap optimization disabled: succeed().flatMap(pure) remains lazy") {
++  test("pure fusion: succeed().flatMap(pure) fuses at construction") {
+     var flatMapCallCount = 0
+     val computation = Eru.succeed(42).flatMap { x =>
+       flatMapCallCount += 1
+       Eru.succeed(x * 2) // Pure continuation
+     }
+ 
+-    // The flatMap function should NOT be called during construction (optimization disabled)
++    // The flatMap function is inspected once at construction for pure fusion
+     assertEquals(
+       flatMapCallCount,
+-      0,
+-      "FlatMap function should not be evaluated at construction time (optimization disabled)"
++      1,
++      "FlatMap function should be evaluated once at construction for pure fusion"
+     )
+ 
+-    // Running should call the flatMap function
++    // Running should not call the flatMap function again
+     val result = computation.unsafeRunSync()
+     assertEquals(result, 84)
+-    assertEquals(flatMapCallCount, 1, "FlatMap function should be called once during execution")
++    assertEquals(flatMapCallCount, 1, "FlatMap function should not be called again during execution")
+   }
+ 
+-  test("flatMap optimization disabled: chained pure flatMaps remain lazy") {
++  test("pure fusion: chained pure flatMaps fuse at construction") {
+     var flatMap1CallCount = 0
+     var flatMap2CallCount = 0
+ 
+@@ -820,22 +824,14 @@ class EruSpec extends FunSuite {
+         Eru.succeed(x + 5) // Pure continuation
+       }
+ 
+-    // Both flatMap functions should NOT be called during construction (optimization disabled)
+-    assertEquals(
+-      flatMap1CallCount,
+-      0,
+-      "First flatMap should not be evaluated at construction time (optimization disabled)"
+-    )
+-    assertEquals(
+-      flatMap2CallCount,
+-      0,
+-      "Second flatMap should not be evaluated at construction time (optimization disabled)"
+-    )
++    // Both flatMap functions are inspected at construction time for pure fusion
++    assertEquals(flatMap1CallCount, 1)
++    assertEquals(flatMap2CallCount, 1)
+ 
+     val result = computation.unsafeRunSync()
+     assertEquals(result, 25) // (10 * 2) + 5 = 25
+-    assertEquals(flatMap1CallCount, 1, "First flatMap should be called once during execution")
+-    assertEquals(flatMap2CallCount, 1, "Second flatMap should be called once during execution")
++    assertEquals(flatMap1CallCount, 1, "No additional calls during execution")
++    assertEquals(flatMap2CallCount, 1, "No additional calls during execution")
+   }
+ 
+   test("eager evaluation: flatMap on Effect is not evaluated immediately") {
+@@ -860,7 +856,7 @@ class EruSpec extends FunSuite {
+     assertEquals(flatMapCallCount, 1, "FlatMap should be called once during execution")
+   }
+ 
+-  test("eager evaluation: flatMap with non-pure continuation falls back to Chain") {
++  test("pure fusion detection: non-pure continuation is inspected at construction and effect remains lazy") {
+     var flatMapCallCount = 0
+     var effectCallCount = 0
+ 
+@@ -872,13 +868,13 @@ class EruSpec extends FunSuite {
+       }
+     }
+ 
+-    // FlatMap should not be evaluated at construction time due to non-pure continuation
+-    assertEquals(flatMapCallCount, 0, "FlatMap with non-pure continuation should not be evaluated at construction time")
++    // The flatMap continuation is inspected once at construction; effect remains deferred
++    assertEquals(flatMapCallCount, 1, "FlatMap with non-pure continuation is inspected once at construction time")
+     assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
+ 
+     val result = computation.unsafeRunSync()
+     assertEquals(result, 84)
+-    assertEquals(flatMapCallCount, 1, "FlatMap should be called once during execution")
++    assertEquals(flatMapCallCount, 1, "Continuation should not be invoked again during execution")
+     assertEquals(effectCallCount, 1, "Effect should be called once during execution")
+   }
+ 
+@@ -894,20 +890,20 @@ class EruSpec extends FunSuite {
+     assertEquals(caught.getMessage, "FlatMap function failed")
+   }
+ 
+-  test("flatMap optimization disabled: side effects only occur during execution") {
++  test("pure fusion detection: continuation body side effects may occur at construction; effects remain deferred") {
+     var sideEffectCount = 0
+     val computation = Eru.succeed(42).flatMap { x =>
+       sideEffectCount += 1
+       Eru.effect(x * 2) // Non-pure continuation
+     }
+ 
+-    // No side effects during construction since optimization is disabled
+-    assertEquals(sideEffectCount, 0, "Side effect should not occur during construction (optimization disabled)")
++    // Continuation body may be evaluated once at construction for fusion detection
++    assertEquals(sideEffectCount, 1, "Continuation body may run once at construction for fusion detection")
+ 
+     val result = computation.unsafeRunSync()
+     assertEquals(result, 84)
+-    // Side effect should occur once during execution
+-    assertEquals(sideEffectCount, 1, "Side effect should occur once during execution")
++    // Effect remains deferred; no extra construction-body runs at execution
++    assertEquals(sideEffectCount, 1, "Continuation body should not be invoked again during execution")
+   }
+ 
+   test("construction-time optimizations preserve correctness for complex chains") {

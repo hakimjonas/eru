@@ -333,6 +333,7 @@ object EruRuntime {
     */
   private final class RuntimeFiber[E, A](val id: FiberId, fa: Eru[E, A], observer: Option[EruObserver])
       extends Fiber[E, A] {
+    import scala.annotation.tailrec
     import Eru.Internals.View
 
     private var interrupted: Option[InterruptCause] = None
@@ -344,6 +345,32 @@ object EruRuntime {
     private var conts: List[Any => Eru[Any, Any]] = Nil
     private var handlers: List[Handler] = Nil
     private var finalizers: List[() => Eru[Nothing, Unit]] = Nil
+
+    @tailrec
+    private def runLoop[E1, A1](eru0: Eru[E1, A1], cont: A1 => Eru[Any, Any]): Unit = {
+      Eru.Internals.view(eru0) match {
+        case View.VChain[E1a, From, To](source, f) =>
+          val cont2: From => Eru[Any, Any] = (a: From) => f(a).flatMap(cont)
+          runLoop[E1a, From](source, cont2)
+        case View.VChain2[E1a, From, Mid, To](source, f1, f2) =>
+          val cont2: From => Eru[Any, Any] = (a: From) => f1(a).flatMap(mid => f2(mid).flatMap(cont))
+          runLoop[E1a, From](source, cont2)
+        case View.VChain3[E1a, From, Mid1, Mid2, To](source, f1, f2, f3) =>
+          val cont2: From => Eru[Any, Any] = (a: From) => f1(a).flatMap(b1 => f2(b1).flatMap(b2 => f3(b2).flatMap(cont)))
+          runLoop[E1a, From](source, cont2)
+        case View.VMapChain[E1a, From, To](source, f) =>
+          val cont2: From => Eru[Any, Any] = (a: From) => Eru.succeed(f(a)).flatMap(cont)
+          runLoop[E1a, From](source, cont2)
+        case View.VSucceed(value) =>
+          current = cont(value)
+          scheduleIfPending()
+        case _ =>
+          val k: Any => Eru[Any, Any] = (x: Any) => cont(x.asInstanceOf[A1])
+          conts = k :: conts
+          current = eru0.asInstanceOf[Eru[Any, Any]]
+          scheduleIfPending()
+      }
+    }
 
     // Handler types for error handling stack
     private sealed trait Handler
@@ -501,56 +528,21 @@ object EruRuntime {
             case Left(t) => completeWith(Exit.Die(t).asInstanceOf[Exit[E, A]])
           }
 
-        case View.VChain(source, f) =>
-          // Limited chain unwinding optimization: process multiple Chain nodes with depth limit
-          conts = f.asInstanceOf[Any => Eru[Any, Any]] :: conts
-          current = source.asInstanceOf[Eru[Any, Any]]
-          
-          // Unwind nested Chain operations with a depth limit to prevent excessive overhead
-          var unwinding = true
-          var unwindDepth = 0
-          val maxUnwindDepth = 10  // Limit unwinding to prevent stack buildup
-          
-          while (unwinding && unwindDepth < maxUnwindDepth) {
-            Eru.Internals.view(current) match {
-              case View.VChain(nextSource, nextF) =>
-                conts = nextF.asInstanceOf[Any => Eru[Any, Any]] :: conts
-                current = nextSource.asInstanceOf[Eru[Any, Any]]
-                unwindDepth += 1
-              case View.VChain2(nextSource, nextF1, nextF2) =>
-                conts = nextF2.asInstanceOf[Any => Eru[Any, Any]] :: nextF1.asInstanceOf[Any => Eru[Any, Any]] :: conts
-                current = nextSource.asInstanceOf[Eru[Any, Any]]
-                unwindDepth += 1
-              case View.VChain3(nextSource, nextF1, nextF2, nextF3) =>
-                conts = nextF3.asInstanceOf[Any => Eru[Any, Any]] :: nextF2.asInstanceOf[Any => Eru[Any, Any]] :: nextF1
-                  .asInstanceOf[Any => Eru[Any, Any]] :: conts
-                current = nextSource.asInstanceOf[Eru[Any, Any]]
-                unwindDepth += 1
-              case _ =>
-                unwinding = false
-            }
-          }
-          scheduleIfPending()
+        case View.VChain(_, _) =>
+          val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
+          runLoop(current.asInstanceOf[Eru[Any, Any]], idCont)
 
-        case View.VChain2(source, f1, f2) =>
-          conts = f2.asInstanceOf[Any => Eru[Any, Any]] :: f1.asInstanceOf[Any => Eru[Any, Any]] :: conts
-          current = source.asInstanceOf[Eru[Any, Any]]
-          scheduleIfPending()
+        case View.VChain2(_, _, _) =>
+          val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
+          runLoop(current.asInstanceOf[Eru[Any, Any]], idCont)
 
-        case View.VChain3(source, f1, f2, f3) =>
-          conts = f3.asInstanceOf[Any => Eru[Any, Any]] :: f2.asInstanceOf[Any => Eru[Any, Any]] :: f1
-            .asInstanceOf[Any => Eru[Any, Any]] :: conts
-          current = source.asInstanceOf[Eru[Any, Any]]
-          scheduleIfPending()
+        case View.VChain3(_, _, _, _) =>
+          val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
+          runLoop(current.asInstanceOf[Eru[Any, Any]], idCont)
 
-        case View.VMapChain(source, f) =>
-          // Fused map chain: create a continuation that applies the composed function directly
-          val mapCont: Any => Eru[Any, Any] = { value =>
-            Eru.succeed(f.asInstanceOf[Any => Any](value)).asInstanceOf[Eru[Any, Any]]
-          }
-          conts = mapCont :: conts
-          current = source.asInstanceOf[Eru[Any, Any]]
-          scheduleIfPending()
+        case View.VMapChain(_, _) =>
+          val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
+          runLoop(current.asInstanceOf[Eru[Any, Any]], idCont)
 
         case View.VRecoverWith(source, pf) =>
           handlers = Recover(pf.asInstanceOf[PartialFunction[Any, Eru[Any, Any]]]) :: handlers
