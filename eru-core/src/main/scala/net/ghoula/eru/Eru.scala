@@ -395,14 +395,12 @@ object Eru {
     *   an `Eru[E, A]` that succeeds with the contained value or fails with `onNone`
     */
   def fromOption[E, A](opt: => Option[A], onNone: => E): Eru[E, A] =
-    effect {
+    suspend[E, A] { cb =>
       opt match {
-        case Some(a) => a
-        case None => throw EruException(onNone)
+        case Some(a) => cb(Right(a))
+        case None => cb(Left(onNone))
       }
-    }.mapError {
-      case ex: EruException[?] => ex.error.asInstanceOf[E]
-      case t => throw t
+      Eru.unit
     }
 
   /** A successful `Eru` containing `Unit`. */

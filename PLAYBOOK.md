@@ -154,16 +154,6 @@ These are the top items to start now for 0.1.0.
 
 ## Acceptance Criteria (Global)
 
-### Performance Optimization Acceptance Criteria
-
-An optimization is "done" when:
-- AST inspection tests verify expected structure transformations
-- Correctness comparison tests pass (optimized = unoptimized results)
-- Exception safety tests demonstrate proper error handling
-- Benchmark validation shows expected performance characteristics
-- Allocation profiling confirms memory optimization goals
-- Cross-platform validation passes on multiple JVMs
-
 A feature is “done” when:
 - It is implemented with Scala 3 idioms as per the guidelines.
 - It has comprehensive unit tests; where applicable, property‑based tests.

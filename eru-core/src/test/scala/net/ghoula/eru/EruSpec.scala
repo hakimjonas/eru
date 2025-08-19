@@ -615,11 +615,11 @@ class EruSpec extends FunSuite {
     var optEvaluated = 0
     var onNoneEvaluated = 0
 
-    def mkSome(): Option[Int] = { optEvaluated += 1; Some(1) }
-    def mkNone(): Option[Int] = { optEvaluated += 1; None }
-    def err(): String = { onNoneEvaluated += 1; "none" }
+    def mkSome: Option[Int] = { optEvaluated += 1; Some(1) }
+    def mkNone: Option[Int] = { optEvaluated += 1; None }
+    def err: String = { onNoneEvaluated += 1; "none" }
 
-    val success = Eru.fromOption(mkSome(), err())
+    val success = Eru.fromOption(mkSome, err)
     assertEquals(optEvaluated, 0)
     assertEquals(onNoneEvaluated, 0)
     assertEquals(success.unsafeRunSync(), 1)
@@ -628,7 +628,7 @@ class EruSpec extends FunSuite {
 
     optEvaluated = 0
     onNoneEvaluated = 0
-    val failure = Eru.fromOption(mkNone(), err())
+    val failure = Eru.fromOption(mkNone, err)
     assertEquals(optEvaluated, 0)
     assertEquals(onNoneEvaluated, 0)
     val ex = intercept[EruException[String]] { failure.unsafeRunSync() }
@@ -924,4 +924,3 @@ class EruSpec extends FunSuite {
     assertEquals(mixedChain.unsafeRunSync(), 26)
   }
 }
-

@@ -16,7 +16,8 @@ class EruFusionValidationSpec extends FunSuite {
   }
 
   test("mixed pure/impure chains produce expected AST structure") {
-    val prog = Eru.succeed(0)
+    val prog = Eru
+      .succeed(0)
       .flatMap(i => Eru.succeed(i + 1))
       .flatMap(i => Eru.effect(i + 1))
 
