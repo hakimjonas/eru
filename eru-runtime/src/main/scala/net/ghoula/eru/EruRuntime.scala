@@ -348,6 +348,21 @@ object EruRuntime {
 
     @tailrec
     private def runLoop[E1, A1](eru0: Eru[E1, A1], cont: A1 => Eru[Any, Any]): Unit = {
+      // Pure fast path: evaluate fully pure chains without yielding to scheduler
+      try {
+        Eru.Internals.tryEvalPure(eru0) match {
+          case Some(v) =>
+            current = cont(v)
+            scheduleIfPending()
+            return
+          case None => ()
+        }
+      } catch {
+        case t: Throwable =>
+          completeWith(Exit.Die(t).asInstanceOf[Exit[E, A]])
+          return
+      }
+
       Eru.Internals.view(eru0) match {
         case View.VChain[E1a, From, To](source, f) =>
           val cont2: From => Eru[Any, Any] = (a: From) => f(a).flatMap(cont)

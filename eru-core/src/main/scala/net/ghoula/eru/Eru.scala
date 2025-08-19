@@ -1,7 +1,7 @@
 package net.ghoula.eru
 
 import scala.util.control.NonFatal
-import scala.util.control.TailCalls.{done, tailcall, TailRec}
+import scala.util.control.TailCalls.{TailRec, done, tailcall}
 
 import net.ghoula.eru.EruObserver.*
 
@@ -787,6 +787,47 @@ object Eru {
       case Debug(source, label) => VDebug(source, label)
       case Ensure(source, finalizer) => VEnsure(source, finalizer)
       case Suspend(register) => VSuspend(register)
+    }
+
+    def tryEvalPure[E, A](e: Eru[E, A]): Option[A] = {
+      var cur: Eru[Any, Any] = e.asInstanceOf[Eru[Any, Any]]
+      var stack: List[Any => Eru[Nothing, Any]] = Nil
+      var pure = true
+      var done = false
+      var out: Any = null
+
+      while (!done && pure) {
+        cur match {
+          case PureSucceed(v) =>
+            if (stack.isEmpty) {
+              out = v
+              done = true
+            } else {
+              val k = stack.head
+              stack = stack.tail
+              cur = k(v).asInstanceOf[Eru[Any, Any]]
+            }
+
+          case Succeed(v) =>
+            if (stack.isEmpty) {
+              out = v
+              done = true
+            } else {
+              val k = stack.head
+              stack = stack.tail
+              cur = k(v).asInstanceOf[Eru[Any, Any]]
+            }
+
+          case PureChain(src, f) =>
+            stack = f.asInstanceOf[Any => Eru[Nothing, Any]] :: stack
+            cur = src.asInstanceOf[Eru[Any, Any]]
+
+          case _ =>
+            pure = false
+        }
+      }
+
+      if (done && pure) Some(out.asInstanceOf[A]) else None
     }
   }
 }
