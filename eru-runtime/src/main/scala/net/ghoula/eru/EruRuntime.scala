@@ -343,7 +343,7 @@ object EruRuntime {
     // Simplified step-wise interpreter state using List-based stacks
     private var current: Eru[Any, Any] = fa
     private var conts: List[Any => Eru[Any, Any]] = Nil
-    private var handlers: List[Handler] = Nil
+    private var handlers: List[HandlerG] = Nil
     private var finalizers: List[() => Eru[Nothing, Unit]] = Nil
 
     @tailrec
@@ -370,11 +370,14 @@ object EruRuntime {
       }
     }
 
-    // Handler types for error handling stack
-    private sealed trait Handler
-    private case class Recover(pf: PartialFunction[Any, Eru[Any, Any]]) extends Handler
-    private case class MapErr(f: Any => Any) extends Handler
-    private case object AttemptH extends Handler
+    // Handler GADT for typed error handling stack
+    private sealed trait HandlerG
+    private object HandlerG {
+      final case class Recover(pf: PartialFunction[Any, Eru[Any, Any]]) extends HandlerG
+      final case class MapErr(f: Any => Any) extends HandlerG
+      case object AttemptH extends HandlerG
+    }
+    import HandlerG.*
 
     private def exitFromResult(result: Result[E, A]): Exit[E, A] =
       result match {
@@ -462,7 +465,9 @@ object EruRuntime {
       }
 
       if (!handled) {
-        completeWith(Exit.Failure(e.asInstanceOf[E]))
+        e match {
+          case ee: E @unchecked => completeWith(Exit.Failure(ee))
+        }
       } else {
         scheduleIfPending()
       }
@@ -481,7 +486,9 @@ object EruRuntime {
               if (conts.nonEmpty) {
                 handleSuccess(nextValue)  // Tail-recursive call for chained simple operations
               } else {
-                completeWith(Exit.Success(nextValue.asInstanceOf[A]))
+                nextValue match {
+                  case a: A @unchecked => completeWith(Exit.Success(a))
+                }
               }
             case other =>
               // Complex case: schedule normally
@@ -495,7 +502,9 @@ object EruRuntime {
             scheduleIfPending()
         }
       } else {
-        completeWith(Exit.Success(value.asInstanceOf[A]))
+        value match {
+          case a: A @unchecked => completeWith(Exit.Success(a))
+        }
       }
     }
 
@@ -542,13 +551,18 @@ object EruRuntime {
           val idCont: Any => Eru[Any, Any] = (t: Any) => Eru.succeed(t)
           runLoop(current, idCont)
 
-        case View.VRecoverWith(source, pf) =>
-          handlers = Recover(pf.asInstanceOf[PartialFunction[Any, Eru[Any, Any]]]) :: handlers
+        case View.VRecoverWith[E0, A0, E2, A1](source, pf) =>
+          val pfAny: PartialFunction[Any, Eru[Any, Any]] = { case e0: E0 => pf(e0) }
+          handlers = Recover(pfAny) :: handlers
           current = source
           scheduleIfPending()
 
-        case View.VMapError(source, f) =>
-          handlers = MapErr(f.asInstanceOf[Any => Any]) :: handlers
+        case View.VMapError[E0, A0, E2](source, f) =>
+          val fAny: Any => Any = {
+            case e0: E0 => f(e0)
+            case other => other
+          }
+          handlers = MapErr(fAny) :: handlers
           current = source
           scheduleIfPending()
 
