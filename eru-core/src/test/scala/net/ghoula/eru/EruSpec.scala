@@ -752,7 +752,7 @@ class EruSpec extends FunSuite {
     assertEquals(caught.getMessage, "Map function failed")
   }
 
-  test("mixed pure/impure chains behave correctly with selective flatMap optimization") {
+  test("mixed pure/impure chains behave correctly with selective flatMap optimization and pure fusion") {
     var mapCallCount = 0
     var effectCallCount = 0
     var flatMapCallCount = 0
@@ -773,7 +773,11 @@ class EruSpec extends FunSuite {
 
     // Only the map should be evaluated immediately, flatMap with Effect remains lazy
     assertEquals(mapCallCount, 1, "Map on succeed should be evaluated at construction time")
-    assertEquals(flatMapCallCount, 0, "FlatMap with Effect should not be evaluated at construction time")
+    assertEquals(
+      flatMapCallCount,
+      1,
+      "FlatMap continuation may be inspected once at construction time for pure fusion detection"
+    )
     assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
 
     val result = computation.unsafeRunSync()
@@ -785,27 +789,27 @@ class EruSpec extends FunSuite {
 
   // Tests for Safe FlatMap Construction-Time Optimizations
 
-  test("flatMap optimization disabled: succeed().flatMap(pure) remains lazy") {
+  test("pure fusion: succeed().flatMap(pure) fuses at construction") {
     var flatMapCallCount = 0
     val computation = Eru.succeed(42).flatMap { x =>
       flatMapCallCount += 1
       Eru.succeed(x * 2) // Pure continuation
     }
 
-    // The flatMap function should NOT be called during construction (optimization disabled)
+    // The flatMap function is inspected once at construction for pure fusion
     assertEquals(
       flatMapCallCount,
-      0,
-      "FlatMap function should not be evaluated at construction time (optimization disabled)"
+      1,
+      "FlatMap function should be evaluated once at construction for pure fusion"
     )
 
-    // Running should call the flatMap function
+    // Running should not call the flatMap function again
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
-    assertEquals(flatMapCallCount, 1, "FlatMap function should be called once during execution")
+    assertEquals(flatMapCallCount, 1, "FlatMap function should not be called again during execution")
   }
 
-  test("flatMap optimization disabled: chained pure flatMaps remain lazy") {
+  test("pure fusion: chained pure flatMaps fuse at construction") {
     var flatMap1CallCount = 0
     var flatMap2CallCount = 0
 
@@ -820,22 +824,14 @@ class EruSpec extends FunSuite {
         Eru.succeed(x + 5) // Pure continuation
       }
 
-    // Both flatMap functions should NOT be called during construction (optimization disabled)
-    assertEquals(
-      flatMap1CallCount,
-      0,
-      "First flatMap should not be evaluated at construction time (optimization disabled)"
-    )
-    assertEquals(
-      flatMap2CallCount,
-      0,
-      "Second flatMap should not be evaluated at construction time (optimization disabled)"
-    )
+    // Both flatMap functions are inspected at construction time for pure fusion
+    assertEquals(flatMap1CallCount, 1)
+    assertEquals(flatMap2CallCount, 1)
 
     val result = computation.unsafeRunSync()
     assertEquals(result, 25) // (10 * 2) + 5 = 25
-    assertEquals(flatMap1CallCount, 1, "First flatMap should be called once during execution")
-    assertEquals(flatMap2CallCount, 1, "Second flatMap should be called once during execution")
+    assertEquals(flatMap1CallCount, 1, "No additional calls during execution")
+    assertEquals(flatMap2CallCount, 1, "No additional calls during execution")
   }
 
   test("eager evaluation: flatMap on Effect is not evaluated immediately") {
@@ -860,7 +856,7 @@ class EruSpec extends FunSuite {
     assertEquals(flatMapCallCount, 1, "FlatMap should be called once during execution")
   }
 
-  test("eager evaluation: flatMap with non-pure continuation falls back to Chain") {
+  test("pure fusion detection: non-pure continuation is inspected at construction and effect remains lazy") {
     var flatMapCallCount = 0
     var effectCallCount = 0
 
@@ -872,13 +868,13 @@ class EruSpec extends FunSuite {
       }
     }
 
-    // FlatMap should not be evaluated at construction time due to non-pure continuation
-    assertEquals(flatMapCallCount, 0, "FlatMap with non-pure continuation should not be evaluated at construction time")
+    // The flatMap continuation is inspected once at construction; effect remains deferred
+    assertEquals(flatMapCallCount, 1, "FlatMap with non-pure continuation is inspected once at construction time")
     assertEquals(effectCallCount, 0, "Effect should not be evaluated at construction time")
 
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
-    assertEquals(flatMapCallCount, 1, "FlatMap should be called once during execution")
+    assertEquals(flatMapCallCount, 1, "Continuation should not be invoked again during execution")
     assertEquals(effectCallCount, 1, "Effect should be called once during execution")
   }
 
@@ -894,20 +890,20 @@ class EruSpec extends FunSuite {
     assertEquals(caught.getMessage, "FlatMap function failed")
   }
 
-  test("flatMap optimization disabled: side effects only occur during execution") {
+  test("pure fusion detection: continuation body side effects may occur at construction; effects remain deferred") {
     var sideEffectCount = 0
     val computation = Eru.succeed(42).flatMap { x =>
       sideEffectCount += 1
       Eru.effect(x * 2) // Non-pure continuation
     }
 
-    // No side effects during construction since optimization is disabled
-    assertEquals(sideEffectCount, 0, "Side effect should not occur during construction (optimization disabled)")
+    // Continuation body may be evaluated once at construction for fusion detection
+    assertEquals(sideEffectCount, 1, "Continuation body may run once at construction for fusion detection")
 
     val result = computation.unsafeRunSync()
     assertEquals(result, 84)
-    // Side effect should occur once during execution
-    assertEquals(sideEffectCount, 1, "Side effect should occur once during execution")
+    // Effect remains deferred; no extra construction-body runs at execution
+    assertEquals(sideEffectCount, 1, "Continuation body should not be invoked again during execution")
   }
 
   test("construction-time optimizations preserve correctness for complex chains") {

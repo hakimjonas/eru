@@ -117,6 +117,27 @@ enum Eru[+E, +A] {
     */
   final def flatMap[E1 >: E, B](f: A => Eru[E1, B]): Eru[E1, B] = {
     this match {
+      case Succeed(value) =>
+        try {
+          f(value) match {
+            case Succeed(result) => Succeed(result)
+            case other => other
+          }
+        } catch {
+          case NonFatal(_) => Chain(this, f)
+        }
+
+      case MapChain(Succeed(sourceValue), g) =>
+        try {
+          val mapped = g(sourceValue)
+          f(mapped) match {
+            case Succeed(result) => Succeed(result)
+            case other => other
+          }
+        } catch {
+          case NonFatal(_) => Chain(this, f)
+        }
+
       case Chain(source, prevF) =>
         Chain2(source, prevF, f)
 
@@ -374,11 +395,15 @@ object Eru {
     *   an `Eru[E, A]` that succeeds with the contained value or fails with `onNone`
     */
   def fromOption[E, A](opt: => Option[A], onNone: => E): Eru[E, A] =
-    succeed(()).flatMap { _ =>
-      opt match {
-        case Some(a) => succeed(a)
-        case None => fail(onNone)
-      }
+    suspend[E, A] { resume =>
+      effect {
+        val ea: Either[E, A] = opt match {
+          case Some(a) => Right(a)
+          case None => Left(onNone)
+        }
+        resume(ea)
+        ()
+      }.attempt.flatMap(_ => unit)
     }
 
   /** A successful `Eru` containing `Unit`. */

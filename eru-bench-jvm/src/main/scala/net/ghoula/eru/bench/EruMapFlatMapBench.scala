@@ -43,6 +43,8 @@ class EruMapFlatMapBench {
   private var mapped: Eru[Nothing, Int] = Eru.succeed(0)
   private var flatMapped: Eru[Nothing, Int] = Eru.succeed(0)
   private var mixed: Eru[Nothing, Int] = Eru.succeed(0)
+  private var pureFlat: Eru[Nothing, Int] = Eru.succeed(0)
+  private var mixedPure: Eru[Throwable, Int] = Eru.succeed(0)
 
   @Setup
   def setup(): Unit = {
@@ -56,6 +58,14 @@ class EruMapFlatMapBench {
     mixed = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, idx) =>
       if ((idx & 1) == 0) acc.map(_ + 1)
       else acc.flatMap(i => Eru.succeed(i + 1))
+    }
+    pureFlat = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, _) =>
+      acc.flatMap(i => Eru.succeed(i + 1))
+    }
+    mixedPure = (0 until depth).foldLeft(Eru.succeed(0)) { (acc, idx) =>
+      if ((idx & 3) == 0) acc.map(_ + 1)
+      else if ((idx & 1) == 0) acc.flatMap(i => Eru.succeed(i + 1))
+      else acc.flatMap(i => Eru.effect(i + 1))
     }
   }
 
@@ -72,5 +82,15 @@ class EruMapFlatMapBench {
   @Benchmark
   def runMixed(h: Blackhole): Unit = {
     h.consume(mixed.unsafeRunSync())
+  }
+
+  @Benchmark
+  def runPureFlat(h: Blackhole): Unit = {
+    h.consume(pureFlat.unsafeRunSync())
+  }
+
+  @Benchmark
+  def runMixedPure(h: Blackhole): Unit = {
+    h.consume(mixedPure.unsafeRunSync())
   }
 }
