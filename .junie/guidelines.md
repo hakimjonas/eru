@@ -29,7 +29,7 @@ Before implementing any feature or making any change, evaluate your approach aga
 - **Action:** Design APIs that are fluent, discoverable, and feel like a natural extension of the Scala language. When
   adding features, consider how they can be presented to the user in the simplest, most elegant way possible.
 
-### Pillar III: A "Pit of Success"
+### Pillar III:  Guided Correctness
 
 - **Priority:** The easiest, most obvious way to use `Eru` must also be the most correct, performant, and resource-safe
   way.

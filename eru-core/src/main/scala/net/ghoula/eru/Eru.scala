@@ -795,10 +795,10 @@ extension [E, A](eru: Eru[E, A]) {
 
 /** Extension methods providing enhanced resource safety patterns for `Eru[E, A]`.
   *
-  * These methods follow the principle of making resource safety the "pit of success" by providing
-  * ergonomic, discoverable patterns that guide developers toward correct resource management. They
-  * build upon the foundational `ensure` and `bracket` methods to provide common resource management
-  * scenarios as natural extensions.
+  * These methods follow the principle of making resource safety the "guided correctness" by
+  * providing ergonomic, discoverable patterns that guide developers toward correct resource
+  * management. They build upon the foundational `ensure` and `bracket` methods to provide common
+  * resource management scenarios as natural extensions.
   */
 extension [E, A](eru: Eru[E, A]) {
 

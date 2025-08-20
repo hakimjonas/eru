@@ -1,6 +1,6 @@
 # Eru Roadmap
 
-**Mission**: Build a definitive effect system for the discerning Scala 3 developer, grounded in the pillars of Correctness, Radical Ergonomics, a Pit of Success, and Exceptional Observability.
+**Mission**: Build a definitive effect system for the discerning Scala 3 developer, grounded in the pillars of Correctness, Radical Ergonomics, a Guided Correctness, and Exceptional Observability.
 
 **Last updated**: 2025-08-20
 
@@ -46,7 +46,7 @@ The Eru project has successfully completed its initial major development phases,
 
 This milestone represents the culmination of the core vision for Eru, delivering the full synthesis of correctness and performance. All original goals for 0.1.0, 0.2.0, and 0.3.0 have been met or exceeded.
 
-**Pillars Achieved**: Correctness, Radical Ergonomics, Pit of Success, Exceptional Observability.
+**Pillars Achieved**: Correctness, Radical Ergonomics, Guided Correctness, Exceptional Observability.
 
 **Key Deliverables**:
 
