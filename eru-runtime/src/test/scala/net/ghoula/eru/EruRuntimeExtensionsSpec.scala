@@ -15,7 +15,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("timeout extension fails with TimeoutException when effect takes too long") {
     val slowEffect = EruRuntime.sleep(Duration.ofMillis(100)).map(_ => 42)
     val timedEffect = slowEffect.timeout(Duration.ofMillis(10))
-    
+
     intercept[java.util.concurrent.TimeoutException] {
       timedEffect.unsafeRunSync()
     }
@@ -24,7 +24,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("timeoutTo returns fallback value on timeout") {
     val slowEffect = EruRuntime.sleep(Duration.ofMillis(100)).map(_ => 42)
     val timedEffect = slowEffect.timeoutTo(Duration.ofMillis(10), 99)
-    
+
     val result = timedEffect.unsafeRunSync()
     assertEquals(result, 99) // Fallback value
   }
@@ -32,7 +32,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("timeoutTo preserves original value when no timeout") {
     val fastEffect = Eru.succeed(42)
     val timedEffect = fastEffect.timeoutTo(Duration.ofSeconds(1), 99)
-    
+
     val result = timedEffect.unsafeRunSync()
     assertEquals(result, 42) // Original value
   }
@@ -72,11 +72,11 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("retryWithBackoff applies exponential backoff") {
     var attempts = 0
     val startTime = System.nanoTime()
-    
+
     val flakyEffect = Eru.effect {
       attempts += 1
       if (attempts < 3) "retry"
-      else "success"  
+      else "success"
     }.flatMap {
       case "success" => Eru.succeed("done")
       case _ => Eru.fail("try again")
@@ -85,7 +85,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     val result = flakyEffect.retryWithBackoff(Duration.ofMillis(10), 3).unsafeRunSync()
     val endTime = System.nanoTime()
     val elapsedMs = (endTime - startTime) / 1_000_000
-    
+
     assertEquals(result, "done")
     assertEquals(attempts, 3)
     // Should have some delay due to backoff (at least 10ms + 20ms = 30ms)
@@ -108,12 +108,12 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("zipPar extension runs effects in parallel and combines results") {
     val left = Eru.succeed(10).map(x => { Thread.sleep(10); x + 5 })
     val right = Eru.succeed(20).map(x => { Thread.sleep(10); x * 2 })
-    
+
     val startTime = System.nanoTime()
     val result = left.zipPar(right).unsafeRunSync()
     val endTime = System.nanoTime()
     val elapsedMs = (endTime - startTime) / 1_000_000
-    
+
     assertEquals(result, (15, 40))
     // Should be faster than sequential (< 25ms vs 20ms sequential)
     assert(elapsedMs < 25)
@@ -122,7 +122,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("zipPar propagates failure and interrupts partner") {
     val success = EruRuntime.sleep(Duration.ofMillis(100)).map(_ => 42)
     val failure = EruRuntime.sleep(Duration.ofMillis(10)).flatMap(_ => Eru.fail("boom"))
-    
+
     val ex = intercept[EruException[String]] {
       success.zipPar(failure).unsafeRunSync()
     }
@@ -132,7 +132,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("race extension returns first completion result") {
     val slow = EruRuntime.sleep(Duration.ofMillis(100)).map(_ => "slow")
     val fast = EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "fast")
-    
+
     val result = slow.race(fast).unsafeRunSync()
     result match {
       case Right(value) => assertEquals(value, "fast")
@@ -143,7 +143,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("race returns failure when first completion is failure") {
     val success = EruRuntime.sleep(Duration.ofMillis(100)).map(_ => "success")
     val fastFailure = EruRuntime.sleep(Duration.ofMillis(10)).flatMap(_ => Eru.fail("fast failure"))
-    
+
     val ex = intercept[EruException[String]] {
       success.race(fastFailure).unsafeRunSync()
     }
@@ -153,7 +153,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("fork extension creates a fiber that can be awaited") {
     val effect = Eru.succeed(42).map(_ * 2)
     val fiber = effect.fork.unsafeRunSync()
-    
+
     val exit = fiber.await.unsafeRunSync()
     exit match {
       case Exit.Success(value) => assertEquals(value, 84)
@@ -164,7 +164,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("fork with failing effect returns Exit.Failure") {
     val failingEffect = Eru.fail("boom")
     val fiber = failingEffect.fork.unsafeRunSync()
-    
+
     val exit = fiber.await.unsafeRunSync()
     exit match {
       case Exit.Failure(error) => assertEquals(error, "boom")
@@ -175,12 +175,13 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("fork with defective effect returns Exit.Die") {
     val defectiveEffect = Eru.effect[Int](throw new RuntimeException("kaboom"))
     val fiber = defectiveEffect.fork.unsafeRunSync()
-    
+
     val exit = fiber.await.unsafeRunSync()
     exit match {
-      case Exit.Die(throwable) => 
+      case Exit.Die(throwable: RuntimeException) =>
         assertEquals(throwable.getMessage, "kaboom")
-        assert(throwable.isgit InstanceOf[RuntimeException])
+      case Exit.Die(throwable) =>
+        fail(s"Expected RuntimeException, got ${throwable.getClass.getSimpleName}")
       case other => fail(s"Expected Die, got $other")
     }
   }
@@ -194,15 +195,15 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     val observer = new TestObserver
     val effect = Eru.succeed("observed")
     val fiber = effect.forkWithObserver(observer).unsafeRunSync()
-    
+
     // Wait for completion
     val exit = fiber.await.unsafeRunSync()
-    
+
     exit match {
       case Exit.Success(value) => assertEquals(value, "observed")
       case other => fail(s"Expected Success, got $other")
     }
-    
+
     val eventTypes = observer.events.map(_.getClass.getSimpleName).toList
     assert(eventTypes.contains("FiberStarted"))
     assert(eventTypes.contains("FiberCompleted"))
@@ -211,10 +212,10 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   test("fiber interrupt works correctly") {
     val longRunning = EruRuntime.sleep(Duration.ofSeconds(1)).map(_ => "completed")
     val fiber = longRunning.fork.unsafeRunSync()
-    
+
     // Interrupt the fiber
     fiber.interrupt(InterruptCause.Cancelled(Some("test cancellation"))).unsafeRunSync()
-    
+
     val exit = fiber.await.unsafeRunSync()
     exit match {
       case Exit.Interrupt(fid, cause) =>
@@ -225,14 +226,18 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   }
 
   test("complex concurrent scenario with multiple extension methods") {
-    val computation1 = Eru.succeed(10).map(_ * 2)
+    val computation1 = Eru
+      .succeed(10)
+      .map(_ * 2)
       .retry(EruRuntime.Policy.Recurs(2))
       .timeout(Duration.ofSeconds(1))
-    
-    val computation2 = Eru.succeed(5).map(_ + 15)
+
+    val computation2 = Eru
+      .succeed(5)
+      .map(_ + 15)
       .cached
       .timeout(Duration.ofSeconds(1))
-    
+
     val result = computation1.zipPar(computation2).unsafeRunSync()
     assertEquals(result, (20, 20))
   }
@@ -245,7 +250,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
       if (attempts < 2) throw new RuntimeException("retry me")
       else s"success attempt $attempts"
     }.attempt.flatMap {
-      case Result.Success(value) => Eru.succeed(value)  
+      case Result.Success(value) => Eru.succeed(value)
       case Result.Failure(_) => Eru.fail("retry")
     }
 
@@ -254,7 +259,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
       .retry(EruRuntime.Policy.Recurs(2))
       .timeout(Duration.ofMillis(200))
       .unsafeRunSync()
-      
+
     assertEquals(result, "success attempt 2")
   }
 }

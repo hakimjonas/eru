@@ -1,17 +1,14 @@
 # Eru Quickstart — Synchronous Core
 
-Status: 0.1.0 internal waypoint — core synchronous kernel complete (not yet released)
+This guide shows how to model and run effectful programs with Eru's synchronous core using pure, composable building blocks.
 
-This guide shows how to model and run effectful programs with Eru’s synchronous core using pure, composable building blocks.
+## Key Ideas
 
-Key ideas:
-- Eru[E, A] is a pure description of a program that may fail with a typed error E or succeed with A.
-- Construction is pure. Evaluation happens only when you call an unsafe interpreter at the edge (here: unsafeRunSync).
-- Composition is via map, flatMap, zip, recover, recoverWith, and mapError.
+- `Eru[E, A]` is a pure description of a program that may fail with a typed error E or succeed with A.
 
-Recommendation: Prefer .attempt to interpret safely into Result without throwing; use unsafeRunSync only at the outer edge (e.g., main or tests).
+- Construction is pure and lazy. Evaluation happens only when you call an unsafe interpreter (e.g., `unsafeRunSync`).
 
----
+- Composition is via `map`, `flatMap`, `zip`, and error handling methods.
 
 ## Hello, Eru
 
@@ -21,127 +18,48 @@ import net.ghoula.eru.Eru
 val program: Eru[Nothing, String] =
   Eru.succeed("hello, eru")
 
-val result: String = program.unsafeRunSync() // edge
+val result: String = program.unsafeRunSync()
 ```
 
 ## Laziness and Effects
 
-Use effect to suspend side-effects and exceptions. The function is evaluated only when the program is run.
+Use `effect` to suspend side-effects. The provided thunk is evaluated only when the program is run.
 
 ```scala
-import net.ghoula.eru.Eru
-
 var counter = 0
 val prog: Eru[Throwable, Int] = Eru.effect {
   counter += 1
-  40 + 2
+  42
 }
 
-// counter is still 0 here
-val value = prog.unsafeRunSync() // 42
+// counter is still 0
+val value = prog.unsafeRunSync()
 // counter is now 1
 ```
 
 ## Sequencing with map and flatMap
 
-```scala
-import net.ghoula.eru.Eru
+`flatMap` and `map` are used to chain operations. For chains of pure computations using `Eru.succeed`, Eru applies construction-time optimizations to reduce overhead, making pure functional composition highly efficient.
 
-val prog: Eru[Nothing, Int] =
+```scala
+val pureComputation: Eru[Nothing, Int] =
   Eru.succeed(10)
-    .map(_ * 2)            // 20
-    .flatMap(x => Eru.succeed(x + 5)) // 25
+    .flatMap(x => Eru.succeed(x * 2)) // This chain is fused at construction
+    .map(_ + 2)
 
-val out = prog.unsafeRunSync() // 25
+val result = pureComputation.unsafeRunSync() // 22
 ```
 
-## Typed errors, recovery, and shaping
+## Error Handling
 
-- fail constructs a typed failure.
-- recover and recoverWith allow selective recovery.
-- mapError transforms the error type/value.
+Use methods like `recover` and `attempt` to handle potential failures in a composable way.
 
 ```scala
-import net.ghoula.eru.Eru
+val failed = Eru.fail("boom")
 
-val failed: Eru[String, Nothing] = Eru.fail("not found")
+val recovered = failed.recover {
+  case "boom" => "recovered!"
+}
 
-val recovered: Eru[String, String] =
-  failed.recover {
-    case "not found" => "default"
-  }
-
-val ok = recovered.unsafeRunSync() // "default"
-
-val shaped: Eru[Int, Int] =
-  Eru.fail("abc").mapError(_.length)
-
-// shaped.unsafeRunSync() would throw EruException(3) at the edge
+recovered.unsafeRunSync() // "recovered!"
 ```
-
-recoverWith can replace an error with an alternative computation:
-
-```scala
-import net.ghoula.eru.Eru
-
-val prog: Eru[String | Int, String] =
-  Eru.fail("oops").recoverWith {
-    case "oops" => Eru.fail(404) // change error type to Int
-  }
-```
-
-## Combining independent computations with zip
-
-zip evaluates left first, then right, and short-circuits on the first failure.
-
-```scala
-import net.ghoula.eru.Eru
-
-val left  = Eru.succeed(1)
-val right = Eru.succeed("a")
-
-val both: Eru[Nothing, (Int, String)] = left.zip(right)
-val tuple = both.unsafeRunSync() // (1, "a")
-```
-
-## Interop: Either and Try
-
-```scala
-import net.ghoula.eru.Eru
-
-val e1: Either[String, Int] = Right(42)
-val fromEither: Eru[String, Int] = Eru.fromEither(e1)
-
-import scala.util.{Try, Success, Failure}
-val t: Try[Int] = Success(42)
-val fromTry: Eru[Throwable, Int] = Eru.fromTry(t)
-```
-
-## Safe interpretation with attempt
-
-```scala
-import net.ghoula.eru.{Eru, Result}
-
-val program: Eru[String, Int] =
-  Eru.succeed(21).map(_ * 2)
-
-val asResult: Eru[Nothing, Result[String, Int]] =
-  program.attempt
-
-val message: String =
-  asResult.map(_.fold(e => s"error: $e", a => s"ok: $a")).unsafeRunSync()
-// "ok: 42"
-```
-
-## Edge semantics
-
-- unsafeRunSync is the synchronous interpreter and may throw at the edge.
-- If a computation fails with a Throwable, that Throwable is rethrown as-is (e.g., from Eru.effect or Eru.fail(t: Throwable)).
-- If a computation fails with a non-Throwable typed error E, an EruException(E) is thrown.
-- Eru.effect catches scala.util.control.NonFatal exceptions into the error channel; fatal errors escape.
-
-## Suggested usage pattern
-
-- Build programs as Eru values throughout your application and libraries.
-- Use unsafeRunSync only at the outermost boundary (e.g., main), or in tests.
-- Once attempt ships, prefer .attempt and handle results in a pure style within your domain logic.
