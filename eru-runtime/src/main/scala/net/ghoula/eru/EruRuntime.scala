@@ -446,11 +446,62 @@ object EruRuntime {
               break
               
             case View.VEffect(thunk) =>
-              thunk() match {
-                case Right(value) => currentEru = Eru.succeed(value)
-                case Left(t) => 
-                  completeWith(Exit.Die(t))
-                  return true
+              // FUSED EFFECT->CHAIN FAST PATH
+              // Fused fast path when next continuation is a Chain
+              if (fastConts.nonEmpty) fastConts.last match {
+                case Chain(f) =>
+                  // Pop first to avoid double-application if user code throws
+                  fastConts.remove(fastConts.length - 1)
+                  val r =
+                    try thunk()
+                    catch {
+                      case t: Throwable =>
+                        completeWith(Exit.Die(t))
+                        return true
+                    }
+                  r match {
+                    case Right(value) =>
+                      try {
+                        currentEru = f(value) // Directly continue; no intermediate Succeed
+                      } catch {
+                        case t: Throwable =>
+                          completeWith(Exit.Die(t))
+                          return true
+                      }
+                    case Left(t) =>
+                      completeWith(Exit.Die(t))
+                      return true
+                  }
+                case _ =>
+                  // Fallback: existing logic
+                  val r =
+                    try thunk()
+                    catch {
+                      case t: Throwable =>
+                        completeWith(Exit.Die(t))
+                        return true
+                    }
+                  r match {
+                    case Right(value) => currentEru = Eru.succeed(value)
+                    case Left(t) =>
+                      completeWith(Exit.Die(t))
+                      return true
+                  }
+              } else {
+                // No continuations
+                val r =
+                  try thunk()
+                  catch {
+                    case t: Throwable =>
+                      completeWith(Exit.Die(t))
+                      return true
+                  }
+                r match {
+                  case Right(value) => currentEru = Eru.succeed(value)
+                  case Left(t) =>
+                    completeWith(Exit.Die(t))
+                    return true
+                }
               }
               
             case View.VMapChain(source, f) =>
