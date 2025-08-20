@@ -346,6 +346,59 @@ object EruRuntime {
     private var handlers: List[HandlerG] = Nil
     private var finalizers: List[() => Eru[Nothing, Unit]] = Nil
 
+    // FastCont definitions for optimized continuation handling
+    private sealed trait FastCont
+    private object FastCont {
+      case object Identity extends FastCont
+      final case class Chain(var f: Any => Eru[Any, Any]) extends FastCont
+      final case class MapF(var f: Any => Any) extends FastCont
+    }
+
+    // FastCont object pools to eliminate allocations in fast path
+    // Separate pools for each type to avoid type casting
+    private val chainPool = scala.collection.mutable.ArrayBuffer.empty[FastCont.Chain]
+    private val mapFPool = scala.collection.mutable.ArrayBuffer.empty[FastCont.MapF]
+    private val POOL_CAPACITY = 128
+
+    @inline private def acquireChain(f: Any => Eru[Any, Any]): FastCont.Chain = {
+      if (chainPool.nonEmpty) {
+        val chain = chainPool.remove(chainPool.length - 1)
+        chain.f = f
+        chain
+      } else {
+        new FastCont.Chain(f)
+      }
+    }
+
+    @inline private def acquireMapF(f: Any => Any): FastCont.MapF = {
+      if (mapFPool.nonEmpty) {
+        val mapF = mapFPool.remove(mapFPool.length - 1)
+        mapF.f = f
+        mapF
+      } else {
+        new FastCont.MapF(f)
+      }
+    }
+
+    @inline private def releaseCont(cont: FastCont): Unit = {
+      cont match {
+        case chain: FastCont.Chain =>
+          if (chainPool.length < POOL_CAPACITY) {
+            chain.f = null // Clear function reference to prevent memory leaks
+            chainPool += chain
+          }
+          // If pool is at capacity, let the object be GC'd
+        case mapF: FastCont.MapF =>
+          if (mapFPool.length < POOL_CAPACITY) {
+            mapF.f = null // Clear function reference to prevent memory leaks
+            mapFPool += mapF
+          }
+          // If pool is at capacity, let the object be GC'd
+        case FastCont.Identity =>
+          // Identity is a singleton, no need to pool
+      }
+    }
+
     @tailrec
     private def runLoop[E1, A1](eru0: Eru[E1, A1], cont: A1 => Eru[Any, Any]): Unit = {
       Eru.Internals.view(eru0) match {
@@ -411,6 +464,7 @@ object EruRuntime {
                 cont match {
                   case Identity => 
                     // Continue with value as-is
+                    releaseCont(cont)
                     if (fastConts.isEmpty) {
                       // No more continuations, exit to general path for safe completion
                       current = Eru.succeed(value)
@@ -420,16 +474,20 @@ object EruRuntime {
                   case MapF(f) =>
                     try {
                       currentEru = Eru.succeed(f(value))
+                      releaseCont(cont)
                     } catch {
                       case t: Throwable => 
+                        releaseCont(cont)
                         completeWith(Exit.Die(t))
                         return true
                     }
                   case Chain(f) =>
                     try {
                       currentEru = f(value)
+                      releaseCont(cont)
                     } catch {
                       case t: Throwable =>
+                        releaseCont(cont)
                         completeWith(Exit.Die(t))
                         return true
                     }
@@ -449,13 +507,14 @@ object EruRuntime {
               // FUSED EFFECT->CHAIN FAST PATH
               // Fused fast path when next continuation is a Chain
               if (fastConts.nonEmpty) fastConts.last match {
-                case Chain(f) =>
+                case chainCont @ Chain(f) =>
                   // Pop first to avoid double-application if user code throws
                   fastConts.remove(fastConts.length - 1)
                   val r =
                     try thunk()
                     catch {
                       case t: Throwable =>
+                        releaseCont(chainCont)
                         completeWith(Exit.Die(t))
                         return true
                     }
@@ -463,12 +522,15 @@ object EruRuntime {
                     case Right(value) =>
                       try {
                         currentEru = f(value) // Directly continue; no intermediate Succeed
+                        releaseCont(chainCont)
                       } catch {
                         case t: Throwable =>
+                          releaseCont(chainCont)
                           completeWith(Exit.Die(t))
                           return true
                       }
                     case Left(t) =>
+                      releaseCont(chainCont)
                       completeWith(Exit.Die(t))
                       return true
                   }
@@ -505,24 +567,24 @@ object EruRuntime {
               }
               
             case View.VMapChain(source, f) =>
-              fastConts += MapF(f)
+              fastConts += acquireMapF(f)
               currentEru = source
               
             case View.VChain(source, f) =>
-              fastConts += Chain(f)
+              fastConts += acquireChain(f)
               currentEru = source
               
             case View.VChain2(source, f1, f2) =>
               // Push in reverse order so they execute in correct order
-              fastConts += Chain(f2)
-              fastConts += Chain(f1)
+              fastConts += acquireChain(f2)
+              fastConts += acquireChain(f1)
               currentEru = source
               
             case View.VChain3(source, f1, f2, f3) =>
               // Push in reverse order so they execute in correct order
-              fastConts += Chain(f3)
-              fastConts += Chain(f2)
-              fastConts += Chain(f1)
+              fastConts += acquireChain(f3)
+              fastConts += acquireChain(f2)
+              fastConts += acquireChain(f1)
               currentEru = source
               
             case _ =>
