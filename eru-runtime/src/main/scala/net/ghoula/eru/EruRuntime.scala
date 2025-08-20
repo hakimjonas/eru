@@ -443,7 +443,7 @@ object EruRuntime {
       var currentEru: Eru[Any, Any] = current
       var fastConts = scala.collection.mutable.ArrayBuffer.empty[FastCont]
       var iterCount = 0
-      val MAX_ITERS_BEFORE_INTERRUPT_CHECK = 1000
+      val MAX_ITERS_BEFORE_INTERRUPT_CHECK = 1024
       
       breakable {
         while (exit0.isEmpty) {

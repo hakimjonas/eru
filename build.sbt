@@ -141,5 +141,9 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
   .enablePlugins(JmhPlugin)
   .settings(
     name := "eru-bench-jvm",
-    publish / skip := true
+    publish / skip := true,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio" % "2.1.20",
+      "org.typelevel" %% "cats-effect" % "3.6.3"
+    )
   )
