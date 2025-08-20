@@ -370,6 +370,129 @@ object EruRuntime {
       }
     }
 
+    /** Fast path loop for synchronous effect chains.
+      * 
+      * This method uses tight iteration with mutable state to avoid allocations and trampolined
+      * scheduling for synchronous operations. It handles the common case of pure chains with
+      * minimal overhead.
+      * 
+      * Invariants:
+      * - Only handles synchronous operations (Succeed, Effect, Chain*, MapChain)
+      * - Falls back to general path for async operations (Suspend, complex error handling)
+      * - Maintains proper interruption checking via batch counter
+      * - Preserves stack semantics for continuations and finalizers
+      */
+    private def runFastLoop(): Boolean = {
+      import FastCont.*
+      import scala.util.control.Breaks.*
+      
+      // Mutable state for fast path execution
+      var currentEru: Eru[Any, Any] = current
+      var fastConts = scala.collection.mutable.ArrayBuffer.empty[FastCont]
+      var iterCount = 0
+      val MAX_ITERS_BEFORE_INTERRUPT_CHECK = 1000
+      
+      breakable {
+        while (exit0.isEmpty) {
+          // Batch interruption checking for performance
+          iterCount += 1
+          if (iterCount >= MAX_ITERS_BEFORE_INTERRUPT_CHECK) {
+            iterCount = 0
+            if (interruptible && interrupted.isDefined) {
+              completeWith(Exit.Interrupt(id, interrupted.get))
+              return true
+            }
+          }
+          
+          Eru.Internals.view(currentEru) match {
+            case View.VSucceed(value) =>
+              if (fastConts.nonEmpty) {
+                val cont = fastConts.remove(fastConts.length - 1) // pop from end
+                cont match {
+                  case Identity => 
+                    // Continue with value as-is
+                    if (fastConts.isEmpty) {
+                      // No more continuations, exit to general path for safe completion
+                      current = Eru.succeed(value)
+                      break
+                    }
+                    // Continue with remaining continuations - value remains current
+                  case MapF(f) =>
+                    try {
+                      currentEru = Eru.succeed(f(value))
+                    } catch {
+                      case t: Throwable => 
+                        completeWith(Exit.Die(t))
+                        return true
+                    }
+                  case Chain(f) =>
+                    try {
+                      currentEru = f(value)
+                    } catch {
+                      case t: Throwable =>
+                        completeWith(Exit.Die(t))
+                        return true
+                    }
+                }
+              } else {
+                // No continuations left - exit to general path for safe completion
+                current = Eru.succeed(value)
+                break
+              }
+              
+            case View.VFail(error) =>
+              // Exit fast path and let general path handle error recovery
+              current = currentEru
+              break
+              
+            case View.VEffect(thunk) =>
+              thunk() match {
+                case Right(value) => currentEru = Eru.succeed(value)
+                case Left(t) => 
+                  completeWith(Exit.Die(t))
+                  return true
+              }
+              
+            case View.VMapChain(source, f) =>
+              fastConts += MapF(f)
+              currentEru = source
+              
+            case View.VChain(source, f) =>
+              fastConts += Chain(f)
+              currentEru = source
+              
+            case View.VChain2(source, f1, f2) =>
+              // Push in reverse order so they execute in correct order
+              fastConts += Chain(f2)
+              fastConts += Chain(f1)
+              currentEru = source
+              
+            case View.VChain3(source, f1, f2, f3) =>
+              // Push in reverse order so they execute in correct order
+              fastConts += Chain(f3)
+              fastConts += Chain(f2)
+              fastConts += Chain(f1)
+              currentEru = source
+              
+            case _ =>
+              // Exit fast path for complex operations
+              current = currentEru
+              // Restore continuation stack to regular format
+              val regularConts = fastConts.reverseIterator.map {
+                case Chain(f) => f
+                case MapF(f) => (a: Any) => Eru.succeed(f(a))
+                case Identity => (a: Any) => Eru.succeed(a)
+              }.toList
+              conts = regularConts ++ conts
+              break
+          }
+        }
+      }
+      
+      false // Indicate we exited fast path and need general path
+    }
+
+
     // Handler GADT for typed error handling stack
     private sealed trait HandlerG
     private object HandlerG {
@@ -428,6 +551,20 @@ object EruRuntime {
     private def scheduleIfPending(): Unit = {
       if (exit0.isEmpty) {
         Scheduler.schedule(() => run())
+      }
+    }
+
+    /** Optimized version for direct execution without scheduling overhead */
+    private def runDirectOrSchedule(): Unit = {
+      if (exit0.isEmpty) {
+        // Try direct execution first to avoid lambda allocation and scheduler overhead
+        if (conts.isEmpty && handlers.isEmpty && finalizers.isEmpty) {
+          // Conditions are good for fast path - run directly
+          run()
+        } else {
+          // Complex state - use scheduler
+          Scheduler.schedule(() => run())
+        }
       }
     }
 
@@ -510,6 +647,15 @@ object EruRuntime {
 
     def run(): Unit = {
       if (exit0.nonEmpty) return
+
+      // Fast path: try optimized loop for synchronous operations when stacks are empty
+      if (conts.isEmpty && handlers.isEmpty && finalizers.isEmpty) {
+        // Try fast path first - it returns true if it completed the fiber
+        if (runFastLoop()) {
+          return
+        }
+        // If fast path returned false, continue with general interpreter below
+      }
 
       // Check for interruption before each step, but only if interruptible
       if (interruptible) {
