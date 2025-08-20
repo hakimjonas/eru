@@ -1,93 +1,81 @@
 # Eru Roadmap
 
-Mission: Build the definitive effect system for the discerning Scala 3 developer, grounded in the pillars of Correctness, Radical Ergonomics, a Pit of Success, and Exceptional Observability.
+**Mission**: Build a definitive effect system for the discerning Scala 3 developer, grounded in the pillars of Correctness, Radical Ergonomics, a Pit of Success, and Exceptional Observability.
 
-Last updated: 2025-08-15
+**Last updated**: 2025-08-20
 
----
+## Current Status Snapshot
 
-Current status snapshot
+The Eru project has successfully completed its initial major development phases, delivering a correct, performant, and ergonomic effect system for Scala 3.
 
-- Implemented
-  - Core data type: enum Eru[E, A] with Succeed/Fail/Effect.
-  - Core combinators: map, flatMap, mapError, recover/recoverWith, orElse, zip.
-  - Constructors and interop: succeed, fail, effect, fromEither, fromTry, fromOption, unit.
-  - Safe interpreter helper: attempt (lazy, non-throwing) returning Result[E, A].
-  - Synchronous interpreter: unsafeRunSync using a stack-safe TailRec interpreter; rethrows Throwable failures and wraps non-Throwable typed failures in EruException[E].
-  - Foundational data type: enum Result[E, A] with map/flatMap/fold and tests.
-  - Resource safety foundations: ensure/bracket with FILO finalizer ordering; finalizer error suppression; tests.
-  - Observability foundations: EruObserver primitives (ScopeId, Outcome, EruEvent), .debug, observer-aware interpreter emitting ProgramStart/ProgramEnd after finalizers.
-  - Documentation: quickstart (attempt-first guidance), resources and observer guides; async direction notes; edge semantics clarified (NonFatal policy; unsafeRunSync behavior).
-  - Tests: comprehensive unit tests for Eru, Resource, Observer; all green on JVM; Native parity planned.
-  - Property-based tests for Resource laws added (0.2.0 scope).
-- Not yet implemented
-  - Concurrency runtime (fibers/scheduler), blocking region, and concurrency primitives (Ref, Deferred, Semaphore).
-  - Diagnostics enhancements and structured reporting for suppressed finalizer errors.
-  - Integration: Valar (first integration target; major refactor deferred post 0.3.0); other modules (e.g., Future interop, fs2/http4s).
+## Implemented & Verified ✅
 
----
+- **Core Data Type & Combinators**: A complete synchronous kernel including Eru[E, A], all standard monad and bifunctor operations (map, flatMap, recover, zip, etc.), and rich constructors (effect, fromEither, etc.).
 
-Milestones and deliverables
+- **Zero-Casting Runtime**: A fully type-safe, fiber-based concurrent runtime that is free of asInstanceOf calls, a guarantee enforced by the build linter.
 
-0.1.0 — Core synchronous kernel (Target: 2025-09) — Completed (internal): 2025-08-15
+- **Construction-Time Fusion**: A key performance optimization that evaluates pure flatMap chains at construction time, making their execution overhead virtually zero.
 
-- Status-driven goals
-  - Finalize the minimal API surface for synchronous programs. [done]
-  - Ensure exhaustive Scaladoc for all public APIs (Eru, Result, EruException). [done]
-  - Strengthen unit tests to cover edge cases (nested recover, error mapping, left-biasing). [done]
-- Deliverables
-  - Eru: attempt (to capture errors in Result), fromOption, unit helpers; zip for sequential composition.
-  - Result: convenience constructors and syntax parity with Eru where appropriate.
-  - Documentation: README status update; quickstart examples using only synchronous APIs; edge semantics clarified (NonFatal policy; unsafeRunSync Throwable rethrow vs EruException). Links: docs-src/quickstart.md, docs-src/design/async.md.
-  - Quality gates: sbt check and eruCoreJVM/test pass on CI.
+- **Resource Safety**: Principled resource management with ensure and bracket, guaranteeing FILO finalizer ordering and correct execution on success, failure, or defect.
 
-0.2.0 — Resource safety and observability foundations (Target: 2025-12) — Foundations implemented (internal): 2025-08-15
+- **Concurrency Primitives**: A full suite of non-blocking, fiber-safe concurrency primitives including Ref, Deferred, and Semaphore.
 
-- Pillars: Correctness, Pit of Success, Exceptional Observability
-- Deliverables
-  - Eru.Resource with acquisition/use/release semantics; ensure and bracket patterns; opaque types for Scope/FiberId prepared.
-  - EruObserver interface and minimal event model; .debug combinator backed by observer.
-  - Typed error model guidance and structured diagnostics for interpreter failures.
-  - Property-based tests for Resource laws; documentation and guides in docs-src.
+- **Structured Concurrency**: High-level, safe concurrency combinators like zipPar and race.
 
-0.3.0 — Concurrency and interop beta (Target: 2026-03)
+- **Observability**: A built-in EruObserver model for consuming structured lifecycle and debug events.
 
-- Pillars: Pit of Success, Radical Ergonomics
-- Deliverables
-  - Minimal fiber scheduler and safe blocking region (Eru.blocking).
-  - Concurrency primitives: Ref, Deferred, Semaphore; parallel combinators (zipPar, race).
-  - Time and resilience: timeout, retry policies.
-  - Interop: Future <-> Eru conversions.
+- **Correctness Guarantees**: Adherence to Monad laws is verified through property-based testing.
 
-0.4.0 — Ecosystem integrations and DX (Target: 2026-05)
+- **Platform Support**: First-class, parallel support for both JVM and Scala Native.
 
-- Deliverables
-  - Modules: eru-fs2, eru-http4s and example apps.
-  - Valar: refactor validation runtime on Eru (post 0.3.0), migration docs, CI verification.
-  - Documentation site with guides, API docs, and deep-dive articles; Valar-based onboarding path.
-  - Benchmarks and performance regression checks.
+- **Comprehensive Tests**: Full test coverage for all features on both JVM and Native platforms.
 
-1.0.0 — Stability and stewardship (Target: 2026-08)
+- **Documentation**: Core guides for quickstart, resources, concurrency, and observer are complete.
 
-- Deliverables
-  - API stabilization policy and semantic versioning guarantees.
-  - Lawfulness suite published and automated; migration guides.
-  - Final docs and examples; long-term maintenance plan.
+## Future Direction
 
----
+- **Ecosystem Integrations**: Thoughtfully expand the ecosystem with a small number of high-quality, principled integrations.
 
-Development workflow (unbreakable)
+- **Interop**: Improve interoperability with standard library types and other effect systems.
 
-- Understand the task by referencing the Manifesto pillars.
-- Implement with modern Scala 3 features (enum ADTs, opaque types, extension methods, given/using) to uphold domain integrity and ergonomics.
-- Tests: every public API change must be covered with comprehensive unit and, where applicable, property-based tests.
-- Local checks before pushing
-  - sbt check
-  - sbt eruCoreJVM/test and sbt eruCoreNative/test
-  - sbt prepare
+- **Advanced Concurrency**: Investigate higher-level concurrency patterns and data structures based on community feedback.
 
-Notes on design directives
+## Milestones and Deliverables
 
-- Prefer enum for ADTs and opaque types for identities like FiberId and Scope.
-- Favor extension methods for fluent APIs on Eru[A].
-- Embrace intersection/union types to precisely encode requirements and outcomes.
+### 0.3.0 — The Synthesis Release — ✅ Completed
+
+This milestone represents the culmination of the core vision for Eru, delivering the full synthesis of correctness and performance. All original goals for 0.1.0, 0.2.0, and 0.3.0 have been met or exceeded.
+
+**Pillars Achieved**: Correctness, Radical Ergonomics, Pit of Success, Exceptional Observability.
+
+**Key Deliverables**:
+
+- [COMPLETED] Finalized synchronous and asynchronous API surface.
+- [COMPLETED] Implemented and verified the zero-casting runtime.
+- [COMPLETED] Implemented and benchmarked construction-time flatMap fusion.
+- [COMPLETED] Delivered the full suite of concurrency primitives (Ref, Deferred, Semaphore) and combinators (zipPar, race).
+- [COMPLETED] Implemented time and resilience features (timeout, retry).
+- [COMPLETED] Implemented Future <-> Eru conversions for JVM interop.
+- [COMPLETED] Wrote and verified property-based tests for Monad and Resource laws.
+- [COMPLETED] Ensured all tests pass on both JVM and Scala Native.
+
+### 0.4.0 — Ecosystem & Community
+
+This phase will focus on growing the Eru ecosystem and responding to the needs of early adopters.
+
+**Deliverables**:
+
+- **Modules**: eru-http (a minimal, non-blocking HTTP client/server), eru-json.
+- **Valar Integration**: Complete the refactoring of the Valar validation library to run on Eru, serving as a flagship example.
+- **Documentation**: Create a full documentation website with tutorials, deep-dive articles, and clear, honest performance analyses.
+- **Benchmarks**: Add a comparative benchmark suite to provide fair performance data against other major effect systems.
+
+### 1.0.0 — Stability and Stewardship
+
+This release will mark the long-term stabilization of the API and a commitment to stewardship of the project.
+
+**Deliverables**:
+
+- API stabilization policy and semantic versioning guarantees.
+- Published migration guides for any breaking changes from the 0.x series.
+- A long-term maintenance and community contribution plan.
