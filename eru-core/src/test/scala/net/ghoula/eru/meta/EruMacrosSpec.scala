@@ -3,7 +3,6 @@ package net.ghoula.eru.meta
 import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
-import net.ghoula.eru.Eru
 
 class EruMacrosSpec extends FunSuite {
 

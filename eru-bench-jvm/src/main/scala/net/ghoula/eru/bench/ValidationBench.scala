@@ -5,7 +5,7 @@ import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.TimeUnit
 
-import net.ghoula.eru.Eru
+import net.ghoula.eru.CorePrelude.*
 
 /** JMH validation benchmarks to test JVM optimization behavior.
   *
