@@ -1,0 +1,417 @@
+diff --git a/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/CompetitiveBench.scala b/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/CompetitiveBench.scala
+index c48f4e2..f3f56d3 100644
+--- a/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/CompetitiveBench.scala
++++ b/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/CompetitiveBench.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru.bench
+ 
+ import cats.effect.IO
+ import cats.effect.unsafe.implicits.global
+-import net.ghoula.eru.Eru
++import net.ghoula.eru.CorePrelude.*
+ import org.openjdk.jmh.annotations.*
+ import zio.{UIO, Unsafe, ZIO}
+ 
+diff --git a/eru-core/src/main/scala/net/ghoula/eru/internal/extensions.scala b/eru-core/src/main/scala/net/ghoula/eru/internal/extensions.scala
+index b136493..ff0df00 100644
+--- a/eru-core/src/main/scala/net/ghoula/eru/internal/extensions.scala
++++ b/eru-core/src/main/scala/net/ghoula/eru/internal/extensions.scala
+@@ -541,5 +541,32 @@ object extensions {
+         result
+       }
+     }
++
++    /** Performs sophisticated compile-time analysis to detect antipatterns and guide best
++      * practices.
++      *
++      * This provides the ergonomic `myEffect.validated` API, moving away from the verbose
++      * `EruMacros.validated(myEffect)` pattern. This extension method delegates to the macro
++      * implementation while providing a discoverable, fluent interface.
++      *
++      * @return
++      *   the original expression unchanged, with compile-time diagnostics reported
++      */
++    inline def validated: Eru[E, A] = {
++      net.ghoula.eru.meta.EruMacros.validated(eru)
++    }
++
++    /** Applies compile-time optimizations to improve performance without changing semantics.
++      *
++      * This provides the ergonomic `myEffect.optimize` API, moving away from the verbose
++      * `EruMacros.optimize(myEffect)` pattern. This extension method delegates to the macro
++      * implementation while providing a discoverable, fluent interface.
++      *
++      * @return
++      *   an optimized version of the effect with improved performance characteristics
++      */
++    inline def optimize: Eru[E, A] = {
++      net.ghoula.eru.meta.EruMacros.optimize(eru)
++    }
+   }
+ }
+diff --git a/eru-core/src/main/scala/net/ghoula/eru/prelude.scala b/eru-core/src/main/scala/net/ghoula/eru/prelude.scala
+deleted file mode 100644
+index b1d9827..0000000
+--- a/eru-core/src/main/scala/net/ghoula/eru/prelude.scala
++++ /dev/null
+@@ -1,86 +0,0 @@
+-package net.ghoula.eru
+-
+-/** The single entry point for the Eru effect system.
+-  *
+-  * This object provides the complete public API of the eru-core module through a single import:
+-  * `import net.ghoula.eru.prelude.*`
+-  *
+-  * The prelude embodies Eru's commitment to "Radical Ergonomics" by consolidating the entire
+-  * surface area of the library into one discoverable namespace. This design follows modern Scala 3
+-  * practices, using export clauses to curate a cohesive developer experience.
+-  *
+-  * Everything a developer needs for 99% of use cases is available through this single import:
+-  *   - Core types: Eru, Result
+-  *   - Domain types: AttemptCount, JitterFactor, FailureThreshold
+-  *   - Factory methods: succeed, fail, effect, blocking, etc.
+-  *   - All extension methods: caching, resource safety, error handling, tracing
+-  *   - Supporting types: EruException, EruObserver, Exit, ErrorHandling patterns, Trace types
+-  *
+-  * This approach makes the library feel like a natural extension of the Scala language while
+-  * maintaining the principle of "Guided Correctness" by making the safest, most powerful patterns
+-  * always available and discoverable.
+-  */
+-object prelude {
+-
+-  // ===== CORE TYPES =====
+-
+-  /** The core effect type representing a pure, lazy, composable computation. */
+-  type Eru[+E, +A] = net.ghoula.eru.Eru[E, A]
+-  val Eru = net.ghoula.eru.Eru
+-
+-  /** The foundational result type for fallible computations. */
+-  type Result[+E, +A] = net.ghoula.eru.Result[E, A]
+-  val Result = net.ghoula.eru.Result
+-
+-  // ===== CORE TYPE COMPANIONS AND FACTORY METHODS =====
+-
+-  /** Export all factory methods from the Eru companion object.
+-    *
+-    * This includes: succeed, fail, effect, blocking, suspend, fromEither, fromTry, fromOption, unit
+-    */
+-  export net.ghoula.eru.Eru.*
+-
+-  /** Export Result companion object factory methods with qualified names to avoid conflicts.
+-    *
+-    * This includes: Result.succeed, Result.fail
+-    */
+-  export net.ghoula.eru.Result.{fail as resultFail, succeed as resultSucceed}
+-
+-  // ===== DOMAIN TYPES =====
+-
+-  /** Export all domain types with compile-time safety constraints. */
+-  export net.ghoula.eru.DomainTypes.*
+-
+-  // ===== EXCEPTION TYPES =====
+-
+-  /** The exception type for failed computations. */
+-  type EruException[E] = net.ghoula.eru.EruException[E]
+-
+-  /** Export the EruException companion object. */
+-  export net.ghoula.eru.EruException.*
+-
+-  // ===== OBSERVABILITY =====
+-
+-  /** Export the EruObserver type and companion object, including EruEvent. */
+-  export net.ghoula.eru.EruObserver.*
+-
+-  // ===== EXIT AND TERMINATION =====
+-
+-  /** Export all Exit types and companion methods. */
+-  export net.ghoula.eru.Exit
+-
+-  // ===== ERROR HANDLING PATTERNS =====
+-
+-  /** Export all sophisticated error handling patterns and types. */
+-  export net.ghoula.eru.patterns.ErrorHandling.*
+-
+-  // ===== TRACING AND OBSERVABILITY =====
+-
+-  /** Export all tracing types and functionality. */
+-  export net.ghoula.eru.trace.EruTrace.*
+-
+-  // ===== EXTENSION METHODS =====
+-
+-  /** Export all extension methods from the internal extensions object. */
+-  export net.ghoula.eru.internal.extensions.*
+-}
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruCachingSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruCachingSpec.scala
+index d062519..c23222b 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruCachingSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruCachingSpec.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru
+ 
+ import munit.FunSuite
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class EruCachingSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruFusionValidationSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruFusionValidationSpec.scala
+index 7918d6d..eff114a 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruFusionValidationSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruFusionValidationSpec.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru
+ 
+ import munit.FunSuite
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class EruFusionValidationSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruMonadLawsSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruMonadLawsSpec.scala
+index ee45454..6b85eb7 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruMonadLawsSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruMonadLawsSpec.scala
+@@ -3,7 +3,7 @@ package net.ghoula.eru
+ import munit.ScalaCheckSuite
+ import org.scalacheck.Prop.forAll
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ final class EruMonadLawsSpec extends ScalaCheckSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruObserverSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruObserverSpec.scala
+index a8095b9..98ec4a2 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruObserverSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruObserverSpec.scala
+@@ -4,7 +4,7 @@ import munit.FunSuite
+ 
+ import scala.collection.mutable.ListBuffer
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class EruObserverSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruResourceLawsSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruResourceLawsSpec.scala
+index 9627295..819f847 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruResourceLawsSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruResourceLawsSpec.scala
+@@ -4,7 +4,7 @@ import munit.FunSuite
+ 
+ import scala.util.Random
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class EruResourceLawsSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruResourceSafetyExtensionsSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruResourceSafetyExtensionsSpec.scala
+index 5f2e320..87303d3 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruResourceSafetyExtensionsSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruResourceSafetyExtensionsSpec.scala
+@@ -4,7 +4,7 @@ import munit.FunSuite
+ 
+ import scala.collection.mutable.ListBuffer
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class EruResourceSafetyExtensionsSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruResourceSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruResourceSpec.scala
+index bc75d50..752af9b 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruResourceSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruResourceSpec.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru
+ 
+ import munit.FunSuite
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class EruResourceSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruSmartConstructorSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruSmartConstructorSpec.scala
+index 25a3b44..a7d2b1f 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruSmartConstructorSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruSmartConstructorSpec.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru
+ 
+ import munit.FunSuite
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ /** Tests for smart constructor optimizations in Eru effect construction. These tests verify that
+   * construction-time optimizations work correctly while maintaining identical semantics.
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
+index 7e81ef8..66f1d74 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/EruSpec.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru
+ 
+ import munit.FunSuite
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class EruSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/ExitSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/ExitSpec.scala
+index f8b6324..db9f622 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/ExitSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/ExitSpec.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru
+ 
+ import munit.FunSuite
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class ExitSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/FiberSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/FiberSpec.scala
+index 360490b..25b0f9c 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/FiberSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/FiberSpec.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru
+ 
+ import munit.FunSuite
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class FiberSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/ResultSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/ResultSpec.scala
+index f86e995..f6b6cdc 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/ResultSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/ResultSpec.scala
+@@ -2,7 +2,7 @@ package net.ghoula.eru
+ 
+ import munit.FunSuite
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class ResultSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/meta/EruMacrosSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/meta/EruMacrosSpec.scala
+index b9dfce4..97b3241 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/meta/EruMacrosSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/meta/EruMacrosSpec.scala
+@@ -2,18 +2,19 @@ package net.ghoula.eru.meta
+ 
+ import munit.FunSuite
+ 
++import net.ghoula.eru.CorePrelude.*
+ import net.ghoula.eru.Eru
+ 
+ class EruMacrosSpec extends FunSuite {
+ 
+   test("validated macro preserves effect behavior for simple success case") {
+-    val effect = EruMacros.validated(Eru.succeed(42))
++    val effect = Eru.succeed(42).validated
+     val result = effect.unsafeRunSync()
+     assertEquals(result, 42)
+   }
+ 
+   test("validated macro preserves effect behavior for failure case") {
+-    val effect = EruMacros.validated(Eru.fail("boom"))
++    val effect = Eru.fail("boom").validated
+     val exception = intercept[net.ghoula.eru.EruException[String]] {
+       effect.unsafeRunSync()
+     }
+@@ -67,7 +68,7 @@ class EruMacrosSpec extends FunSuite {
+   }
+ 
+   test("optimize macro preserves effect behavior") {
+-    val effect = EruMacros.optimize(Eru.succeed(100))
++    val effect = Eru.succeed(100).optimize
+     val result = effect.unsafeRunSync()
+     assertEquals(result, 100)
+   }
+@@ -109,7 +110,7 @@ class EruMacrosSpec extends FunSuite {
+   }
+ 
+   test("macros work with extension methods") {
+-    import net.ghoula.eru.prelude.*
++    import net.ghoula.eru.CorePrelude.*
+ 
+     val effect = EruMacros.validated {
+       Eru.succeed("resource").autoCleanup(_ => Eru.unit)
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/patterns/ErrorHandlingSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/patterns/ErrorHandlingSpec.scala
+index 5381bea..e4ee3a6 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/patterns/ErrorHandlingSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/patterns/ErrorHandlingSpec.scala
+@@ -4,7 +4,7 @@ import munit.FunSuite
+ 
+ import java.time.{Duration, Instant}
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ 
+ class ErrorHandlingSpec extends FunSuite {
+ 
+diff --git a/eru-core/src/test/scala/net/ghoula/eru/trace/EruTraceSpec.scala b/eru-core/src/test/scala/net/ghoula/eru/trace/EruTraceSpec.scala
+index 8cdbd73..1104b62 100644
+--- a/eru-core/src/test/scala/net/ghoula/eru/trace/EruTraceSpec.scala
++++ b/eru-core/src/test/scala/net/ghoula/eru/trace/EruTraceSpec.scala
+@@ -4,7 +4,7 @@ import munit.FunSuite
+ 
+ import scala.collection.mutable.ListBuffer
+ 
+-import net.ghoula.eru.prelude.*
++import net.ghoula.eru.CorePrelude.*
+ import net.ghoula.eru.trace.EruTrace.Span
+ 
+ class EruTraceSpec extends FunSuite {
+diff --git a/eru-runtime/src/test/scala/net/ghoula/eru/EruRuntimeSpec.scala b/eru-runtime/src/test/scala/net/ghoula/eru/EruRuntimeSpec.scala
+index 907956a..61d9934 100644
+--- a/eru-runtime/src/test/scala/net/ghoula/eru/EruRuntimeSpec.scala
++++ b/eru-runtime/src/test/scala/net/ghoula/eru/EruRuntimeSpec.scala
+@@ -7,7 +7,7 @@ import scala.collection.mutable.ListBuffer
+ class EruRuntimeSpec extends FunSuite {
+ 
+   test("fork/await returns Exit.Success on success") {
+-    val fiber = EruRuntime.fork(Eru.succeed(42)).unsafeRunSync()
++    val fiber = Eru.succeed(42).fork.unsafeRunSync()
+     val exit = fiber.await.unsafeRunSync()
+     exit match {
+       case Exit.Success(v) => assertEquals(v, 42)
+@@ -16,7 +16,7 @@ class EruRuntimeSpec extends FunSuite {
+   }
+ 
+   test("fork/await returns Exit.Failure on typed failure") {
+-    val fiber = EruRuntime.fork(Eru.fail("boom")).unsafeRunSync()
++    val fiber = Eru.fail("boom").fork.unsafeRunSync()
+     val exit = fiber.await.unsafeRunSync()
+     exit match {
+       case Exit.Failure(e) => assertEquals(e, "boom")
+@@ -26,7 +26,7 @@ class EruRuntimeSpec extends FunSuite {
+ 
+   test("fork/await returns Exit.Die on defect (Throwable)") {
+     val ex = new RuntimeException("kaboom")
+-    val fiber = EruRuntime.fork(Eru.effect[Int](throw ex)).unsafeRunSync()
++    val fiber = Eru.effect[Int](throw ex).fork.unsafeRunSync()
+     val exit = fiber.await.unsafeRunSync()
+     exit match {
+       case Exit.Die(t) => assertEquals(t, ex)
+@@ -35,7 +35,7 @@ class EruRuntimeSpec extends FunSuite {
+   }
+ 
+   test("interrupt records cause and await returns Exit.Interrupt") {
+-    val fiber = EruRuntime.fork(Eru.succeed(1)).unsafeRunSync()
++    val fiber = Eru.succeed(1).fork.unsafeRunSync()
+     fiber.interrupt(InterruptCause.Cancelled()).unsafeRunSync()
+     val exit = fiber.await.unsafeRunSync()
+     exit match {
+@@ -52,7 +52,7 @@ class EruRuntimeSpec extends FunSuite {
+       def onEvent(event: EruEvent): Unit = buf += event
+     }
+     val obs = new Obs
+-    val fiber = EruRuntime.forkWithObserver(Eru.succeed(5), obs).unsafeRunSync()
++    val fiber = Eru.succeed(5).forkWithObserver(obs).unsafeRunSync()
+     // Drive the scheduler by awaiting completion so events are emitted
+     fiber.await.unsafeRunSync()
+     val evs = obs.buf.toList

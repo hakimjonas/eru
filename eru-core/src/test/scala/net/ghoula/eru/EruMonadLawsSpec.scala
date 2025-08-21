@@ -3,7 +3,7 @@ package net.ghoula.eru
 import munit.ScalaCheckSuite
 import org.scalacheck.Prop.forAll
 
-import net.ghoula.eru.prelude.*
+import net.ghoula.eru.CorePrelude.*
 
 final class EruMonadLawsSpec extends ScalaCheckSuite {
 

@@ -2,18 +2,19 @@ package net.ghoula.eru.meta
 
 import munit.FunSuite
 
+import net.ghoula.eru.CorePrelude.*
 import net.ghoula.eru.Eru
 
 class EruMacrosSpec extends FunSuite {
 
   test("validated macro preserves effect behavior for simple success case") {
-    val effect = EruMacros.validated(Eru.succeed(42))
+    val effect = Eru.succeed(42).validated
     val result = effect.unsafeRunSync()
     assertEquals(result, 42)
   }
 
   test("validated macro preserves effect behavior for failure case") {
-    val effect = EruMacros.validated(Eru.fail("boom"))
+    val effect = Eru.fail("boom").validated
     val exception = intercept[net.ghoula.eru.EruException[String]] {
       effect.unsafeRunSync()
     }
@@ -67,7 +68,7 @@ class EruMacrosSpec extends FunSuite {
   }
 
   test("optimize macro preserves effect behavior") {
-    val effect = EruMacros.optimize(Eru.succeed(100))
+    val effect = Eru.succeed(100).optimize
     val result = effect.unsafeRunSync()
     assertEquals(result, 100)
   }
@@ -109,7 +110,7 @@ class EruMacrosSpec extends FunSuite {
   }
 
   test("macros work with extension methods") {
-    import net.ghoula.eru.prelude.*
+    import net.ghoula.eru.CorePrelude.*
 
     val effect = EruMacros.validated {
       Eru.succeed("resource").autoCleanup(_ => Eru.unit)

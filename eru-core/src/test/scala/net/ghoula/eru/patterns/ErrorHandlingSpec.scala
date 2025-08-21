@@ -4,7 +4,7 @@ import munit.FunSuite
 
 import java.time.{Duration, Instant}
 
-import net.ghoula.eru.prelude.*
+import net.ghoula.eru.CorePrelude.*
 
 class ErrorHandlingSpec extends FunSuite {
 

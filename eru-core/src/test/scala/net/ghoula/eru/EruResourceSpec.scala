@@ -2,7 +2,7 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
-import net.ghoula.eru.prelude.*
+import net.ghoula.eru.CorePrelude.*
 
 class EruResourceSpec extends FunSuite {
 

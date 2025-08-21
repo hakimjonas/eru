@@ -1,26 +1,21 @@
 package net.ghoula.eru
 
-/** The single entry point for the Eru effect system.
+/** The core prelude for the Eru effect system.
   *
-  * This object provides the complete public API of the eru-core module through a single import:
-  * `import net.ghoula.eru.prelude.*`
+  * This object provides the complete public API of the eru-core module. It serves as the base layer
+  * for the final unified prelude in the eru-runtime module.
   *
-  * The prelude embodies Eru's commitment to "Radical Ergonomics" by consolidating the entire
-  * surface area of the library into one discoverable namespace. This design follows modern Scala 3
-  * practices, using export clauses to curate a cohesive developer experience.
-  *
-  * Everything a developer needs for 99% of use cases is available through this single import:
+  * The core prelude exports all functionality contained within the eru-core module:
   *   - Core types: Eru, Result
   *   - Domain types: AttemptCount, JitterFactor, FailureThreshold
   *   - Factory methods: succeed, fail, effect, blocking, etc.
-  *   - All extension methods: caching, resource safety, error handling, tracing
+  *   - Extension methods: caching, resource safety, error handling, tracing, validated, optimize
   *   - Supporting types: EruException, EruObserver, Exit, ErrorHandling patterns, Trace types
   *
-  * This approach makes the library feel like a natural extension of the Scala language while
-  * maintaining the principle of "Guided Correctness" by making the safest, most powerful patterns
-  * always available and discoverable.
+  * This design respects modular boundaries while providing a clean foundation for the
+  * runtime-enhanced prelude that will add concurrent operations like fork.
   */
-object prelude {
+object CorePrelude {
 
   // ===== CORE TYPES =====
 

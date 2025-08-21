@@ -2,7 +2,7 @@ package net.ghoula.eru.bench
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import net.ghoula.eru.Eru
+import net.ghoula.eru.CorePrelude.*
 import org.openjdk.jmh.annotations.*
 import zio.{UIO, Unsafe, ZIO}
 

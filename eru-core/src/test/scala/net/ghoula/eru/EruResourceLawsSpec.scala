@@ -4,7 +4,7 @@ import munit.FunSuite
 
 import scala.util.Random
 
-import net.ghoula.eru.prelude.*
+import net.ghoula.eru.CorePrelude.*
 
 class EruResourceLawsSpec extends FunSuite {
 

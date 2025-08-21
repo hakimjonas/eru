@@ -7,7 +7,7 @@ import scala.collection.mutable.ListBuffer
 class EruRuntimeSpec extends FunSuite {
 
   test("fork/await returns Exit.Success on success") {
-    val fiber = EruRuntime.fork(Eru.succeed(42)).unsafeRunSync()
+    val fiber = Eru.succeed(42).fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
     exit match {
       case Exit.Success(v) => assertEquals(v, 42)
@@ -16,7 +16,7 @@ class EruRuntimeSpec extends FunSuite {
   }
 
   test("fork/await returns Exit.Failure on typed failure") {
-    val fiber = EruRuntime.fork(Eru.fail("boom")).unsafeRunSync()
+    val fiber = Eru.fail("boom").fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
     exit match {
       case Exit.Failure(e) => assertEquals(e, "boom")
@@ -26,7 +26,7 @@ class EruRuntimeSpec extends FunSuite {
 
   test("fork/await returns Exit.Die on defect (Throwable)") {
     val ex = new RuntimeException("kaboom")
-    val fiber = EruRuntime.fork(Eru.effect[Int](throw ex)).unsafeRunSync()
+    val fiber = Eru.effect[Int](throw ex).fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
     exit match {
       case Exit.Die(t) => assertEquals(t, ex)
@@ -35,7 +35,7 @@ class EruRuntimeSpec extends FunSuite {
   }
 
   test("interrupt records cause and await returns Exit.Interrupt") {
-    val fiber = EruRuntime.fork(Eru.succeed(1)).unsafeRunSync()
+    val fiber = Eru.succeed(1).fork.unsafeRunSync()
     fiber.interrupt(InterruptCause.Cancelled()).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
     exit match {
@@ -52,7 +52,7 @@ class EruRuntimeSpec extends FunSuite {
       def onEvent(event: EruEvent): Unit = buf += event
     }
     val obs = new Obs
-    val fiber = EruRuntime.forkWithObserver(Eru.succeed(5), obs).unsafeRunSync()
+    val fiber = Eru.succeed(5).forkWithObserver(obs).unsafeRunSync()
     // Drive the scheduler by awaiting completion so events are emitted
     fiber.await.unsafeRunSync()
     val evs = obs.buf.toList

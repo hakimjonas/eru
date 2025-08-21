@@ -541,5 +541,32 @@ object extensions {
         result
       }
     }
+
+    /** Performs sophisticated compile-time analysis to detect antipatterns and guide best
+      * practices.
+      *
+      * This provides the ergonomic `myEffect.validated` API, moving away from the verbose
+      * `EruMacros.validated(myEffect)` pattern. This extension method delegates to the macro
+      * implementation while providing a discoverable, fluent interface.
+      *
+      * @return
+      *   the original expression unchanged, with compile-time diagnostics reported
+      */
+    inline def validated: Eru[E, A] = {
+      net.ghoula.eru.meta.EruMacros.validated(eru)
+    }
+
+    /** Applies compile-time optimizations to improve performance without changing semantics.
+      *
+      * This provides the ergonomic `myEffect.optimize` API, moving away from the verbose
+      * `EruMacros.optimize(myEffect)` pattern. This extension method delegates to the macro
+      * implementation while providing a discoverable, fluent interface.
+      *
+      * @return
+      *   an optimized version of the effect with improved performance characteristics
+      */
+    inline def optimize: Eru[E, A] = {
+      net.ghoula.eru.meta.EruMacros.optimize(eru)
+    }
   }
 }
