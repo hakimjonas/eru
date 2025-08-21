@@ -3,6 +3,8 @@ package net.ghoula.eru
 import munit.ScalaCheckSuite
 import org.scalacheck.Prop.forAll
 
+import net.ghoula.eru.prelude.*
+
 final class EruMonadLawsSpec extends ScalaCheckSuite {
 
   property("Monad law - left identity: Eru.succeed(a).flatMap(f) == f(a)") {

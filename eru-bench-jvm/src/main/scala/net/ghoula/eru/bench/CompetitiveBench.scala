@@ -2,13 +2,12 @@ package net.ghoula.eru.bench
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import net.ghoula.eru.Eru
 import org.openjdk.jmh.annotations.*
 import zio.{UIO, Unsafe, ZIO}
 
 import java.util.concurrent.TimeUnit
 import scala.compiletime.uninitialized
-
-import net.ghoula.eru.Eru
 
 /** Competitive benchmarks comparing Eru's performance against ZIO and Cats Effect.
   *

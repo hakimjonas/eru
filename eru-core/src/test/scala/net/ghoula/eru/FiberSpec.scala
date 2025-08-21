@@ -2,6 +2,8 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+import net.ghoula.eru.prelude.*
+
 class FiberSpec extends FunSuite {
 
   private final class TestFiber[E, A](val id: FiberId, exit: Exit[E, A]) extends Fiber[E, A] {

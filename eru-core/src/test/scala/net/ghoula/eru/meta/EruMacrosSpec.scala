@@ -109,7 +109,7 @@ class EruMacrosSpec extends FunSuite {
   }
 
   test("macros work with extension methods") {
-    import net.ghoula.eru.*
+    import net.ghoula.eru.prelude.*
 
     val effect = EruMacros.validated {
       Eru.succeed("resource").autoCleanup(_ => Eru.unit)

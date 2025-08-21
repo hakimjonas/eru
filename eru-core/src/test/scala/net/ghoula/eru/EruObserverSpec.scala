@@ -4,6 +4,8 @@ import munit.FunSuite
 
 import scala.collection.mutable.ListBuffer
 
+import net.ghoula.eru.prelude.*
+
 class EruObserverSpec extends FunSuite {
 
   private class CollectingObserver extends EruObserver {

@@ -4,7 +4,7 @@ import munit.FunSuite
 
 import scala.collection.mutable.ListBuffer
 
-import net.ghoula.eru.*
+import net.ghoula.eru.prelude.*
 import net.ghoula.eru.trace.EruTrace.Span
 
 class EruTraceSpec extends FunSuite {

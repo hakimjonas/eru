@@ -2,6 +2,8 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+import net.ghoula.eru.prelude.*
+
 class EruCachingSpec extends FunSuite {
 
   test("cached executes effect only once and reuses result on success") {

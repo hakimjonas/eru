@@ -4,6 +4,8 @@ import munit.FunSuite
 
 import scala.collection.mutable.ListBuffer
 
+import net.ghoula.eru.prelude.*
+
 class EruResourceSafetyExtensionsSpec extends FunSuite {
 
   test("ensureAll runs multiple finalizers in FILO order") {

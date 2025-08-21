@@ -2,6 +2,8 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+import net.ghoula.eru.prelude.*
+
 class EruResourceSpec extends FunSuite {
 
   test("ensure runs finalizer on success") {

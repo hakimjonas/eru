@@ -2,6 +2,8 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+import net.ghoula.eru.prelude.*
+
 /** Tests for smart constructor optimizations in Eru effect construction. These tests verify that
   * construction-time optimizations work correctly while maintaining identical semantics.
   */

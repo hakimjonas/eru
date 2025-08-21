@@ -2,6 +2,8 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+import net.ghoula.eru.prelude.*
+
 class ExitSpec extends FunSuite {
 
   test("Exit.Success holds the value") {

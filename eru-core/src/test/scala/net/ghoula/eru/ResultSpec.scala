@@ -2,6 +2,8 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+import net.ghoula.eru.prelude.*
+
 class ResultSpec extends FunSuite {
 
   test("Result.succeed creates a Success with the given value") {
