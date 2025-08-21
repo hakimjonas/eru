@@ -4,7 +4,7 @@ package net.ghoula.eru
   *
   * Instances are created in the `eru-runtime` module, and all operations are described as `Eru`
   * programs. The current runtime is single-threaded; however, the public API is designed to remain
-  * compatible with a future multithreaded scheduler.
+  * compatible with a possible future multithreaded scheduler.
   */
 trait Ref[A] {
 

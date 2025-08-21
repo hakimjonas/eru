@@ -14,9 +14,9 @@ import net.ghoula.eru.*
   *
   * ==Core Capabilities==
   *
-  * '''Compile-Time Validation:''' Advanced static analysis of effect chains to detect
-  * antipatterns, resource leaks, and suboptimal compositions before runtime. The validation system
-  * provides actionable feedback that guides developers toward best practices.
+  * '''Compile-Time Validation:''' Advanced static analysis of effect chains to detect antipatterns,
+  * resource leaks, and suboptimal compositions before runtime. The validation system provides
+  * actionable feedback that guides developers toward best practices.
   *
   * '''Automatic Derivation:''' Intelligent generation of common effect patterns based on type
   * structure, reducing boilerplate while ensuring correctness. Derivations are optimized for the

@@ -61,7 +61,7 @@ class CompetitiveBench {
     * Values represent the number of flatMap operations chained together, testing performance
     * degradation as chain length increases.
     */
-  @Param(Array("8", "128"))
+  @Param(Array("8"))
   var depth: Int = uninitialized
 
   /** Pre-constructed Eru effect chain for benchmarking. */
