@@ -15,15 +15,15 @@ import net.ghoula.eru.*
   * ==Core Capabilities==
   *
   * '''Compile-Time Validation:''' Advanced static analysis of effect chains to detect
-  * anti-patterns, resource leaks, and suboptimal compositions before runtime. The validation system
+  * antipatterns, resource leaks, and suboptimal compositions before runtime. The validation system
   * provides actionable feedback that guides developers toward best practices.
   *
   * '''Automatic Derivation:''' Intelligent generation of common effect patterns based on type
-  * structure, eliminating boilerplate while ensuring correctness. Derivations are optimized for the
+  * structure, reducing boilerplate while ensuring correctness. Derivations are optimized for the
   * specific characteristics of each type.
   *
-  * '''Performance Optimization:''' Compile-time transformations that eliminate inefficiencies,
-  * optimize resource management, and improve effect composition patterns without changing
+  * '''Performance Optimization:''' Compile-time transformations that reduce inefficiencies,
+  * optimize resource management, and improve effect-composition patterns without changing
   * semantics.
   *
   * ==Design Principles==
@@ -62,7 +62,7 @@ import net.ghoula.eru.*
   */
 object EruMacros {
 
-  /** Performs sophisticated compile-time analysis to detect anti-patterns and guide best practices.
+  /** Performs sophisticated compile-time analysis to detect antipatterns and guide best practices.
     *
     * This advanced validation macro analyzes effect chains using static program analysis to
     * identify common issues before runtime. It provides actionable feedback that helps developers
@@ -359,15 +359,19 @@ object EruMacros {
     } else if (tpe <:< TypeRepr.of[AutoCloseable]) {
       '{
         new EruDerivations[T] {
+          private def closeInstance(instance: T): Unit = {
+            instance match {
+              case closeable: AutoCloseable => closeable.close()
+              case _ => ()
+            }
+          }
+
           override def asResource(instance: T): net.ghoula.eru.Eru[Nothing, T] = {
             net.ghoula.eru.Eru
               .succeed(instance)
               .ensure(
                 net.ghoula.eru.Eru.effect {
-                  instance match {
-                    case closeable: AutoCloseable => closeable.close()
-                    case _ => ()
-                  }
+                  closeInstance(instance)
                 }
               )
           }
@@ -377,10 +381,7 @@ object EruMacros {
           )(use: T => net.ghoula.eru.Eru[Throwable, B]): net.ghoula.eru.Eru[Throwable, B] = {
             use(instance).ensure(
               net.ghoula.eru.Eru.effect {
-                instance match {
-                  case closeable: AutoCloseable => closeable.close()
-                  case _ => ()
-                }
+                closeInstance(instance)
               }
             )
           }
@@ -395,7 +396,7 @@ object EruMacros {
 
   /** Performs intelligent compile-time optimizations to enhance performance and safety.
     *
-    * This advanced optimization macro applies sophisticated program transformations that eliminate
+    * This advanced optimization macro applies sophisticated program transformations that reduce
     * inefficiencies, improve resource management, and enhance the overall performance
     * characteristics of Eru effect chains. All optimizations preserve program semantics while
     * providing measurable performance improvements.
@@ -432,7 +433,7 @@ object EruMacros {
     *   1. '''Analysis Phase:''' Deep static analysis of the effect AST
     *   2. '''Pattern Recognition:''' Identification of optimization opportunities
     *   3. '''Safe Transformation:''' Semantics-preserving code transformations
-    *   4. '''Validation:''' Ensuring all optimizations maintain correctness
+    *   4. '''Validation:''' Ensuring that all optimizations maintain correctness
     *   5. '''Reporting:''' Detailed feedback on applied optimizations
     *
     * All optimizations are conservative and will never change program behavior. The macro provides
