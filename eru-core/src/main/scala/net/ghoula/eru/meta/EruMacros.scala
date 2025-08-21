@@ -1,5 +1,6 @@
 package net.ghoula.eru.meta
 
+import scala.annotation.tailrec
 import scala.quoted.*
 
 import net.ghoula.eru.*
@@ -239,14 +240,16 @@ object EruMacros {
     }
 
     def hasResourceAcquisition(term: Term): Boolean = {
-      term match {
+      @tailrec
+      def searchTerm(current: Term): Boolean = current match {
         case Apply(Select(_, methodName), _)
             if methodName.contains("acquire") || methodName.contains("open") || methodName.contains("connect") =>
           true
-        case Apply(fun, _) => hasResourceAcquisition(fun)
-        case Select(qualifier, _) => hasResourceAcquisition(qualifier)
+        case Apply(fun, _) => searchTerm(fun)
+        case Select(qualifier, _) => searchTerm(qualifier)
         case _ => false
       }
+      searchTerm(term)
     }
 
     analyzeExpr(expr.asTerm)
@@ -398,11 +401,7 @@ object EruMacros {
             if (predicate(value)) net.ghoula.eru.Eru.succeed(value)
             else net.ghoula.eru.Eru.fail(error)
 
-          override def nonNull(value: T): net.ghoula.eru.Eru[String, T] =
-            Option(value) match {
-              case Some(v) => net.ghoula.eru.Eru.succeed(v)
-              case None => net.ghoula.eru.Eru.fail("Value cannot be null")
-            }
+          // Note: nonNull method uses trait default implementation to avoid duplication
         }
       }
     }
@@ -501,6 +500,8 @@ object EruMacros {
     var optimizationsApplied = 0
 
     // Analyze and optimize the expression tree
+    // Note: Not tail-recursive due to mutual recursion with optimizeSubterms
+    // This is acceptable for macro compilation as recursion depth is typically shallow
     def optimizeExpr(term: Term): Term = {
       term match {
         // Optimize pure effect chains by detecting constant patterns
