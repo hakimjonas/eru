@@ -10,6 +10,7 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("RetryPolicy.conditional retries on matching errors") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val policy = RetryPolicy.conditional[String](
       shouldRetryError = _.startsWith("retry"),
@@ -19,14 +20,15 @@ class ErrorHandlingSpec extends FunSuite {
 
     val context = RetryContext(Instant.now(), 0)
 
-    assert(policy.shouldRetry("retry-error", 0, context))
-    assert(policy.shouldRetry("retry-again", 1, context))
-    assert(!policy.shouldRetry("fatal-error", 0, context))
-    assert(!policy.shouldRetry("retry-error", 3, context)) // Max attempts reached
+    assert(policy.shouldRetry("retry-error", AttemptCount(0), context))
+    assert(policy.shouldRetry("retry-again", AttemptCount(1), context))
+    assert(!policy.shouldRetry("fatal-error", AttemptCount(0), context))
+    assert(!policy.shouldRetry("retry-error", AttemptCount(3), context)) // Max attempts reached
   }
 
   test("RetryPolicy.conditional calculates exponential backoff") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val policy = RetryPolicy.conditional[String](
       _ => true,
@@ -35,18 +37,19 @@ class ErrorHandlingSpec extends FunSuite {
       maxDelay = Duration.ofSeconds(1)
     )
 
-    assertEquals(policy.delayFor(0), Duration.ofMillis(100))
-    assertEquals(policy.delayFor(1), Duration.ofMillis(200))
-    assertEquals(policy.delayFor(2), Duration.ofMillis(400))
-    assertEquals(policy.delayFor(3), Duration.ofMillis(800))
+    assertEquals(policy.delayFor(AttemptCount(0)), Duration.ofMillis(100))
+    assertEquals(policy.delayFor(AttemptCount(1)), Duration.ofMillis(200))
+    assertEquals(policy.delayFor(AttemptCount(2)), Duration.ofMillis(400))
+    assertEquals(policy.delayFor(AttemptCount(3)), Duration.ofMillis(800))
 
     // Should cap at maxDelay
-    val longDelay = policy.delayFor(10)
+    val longDelay = policy.delayFor(AttemptCount(10))
     assert(longDelay.toMillis <= 1000)
   }
 
   test("RetryPolicy.jitteredExponential adds jitter") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val policy = RetryPolicy.jitteredExponential(
       maxAttempts = 3,
@@ -54,8 +57,8 @@ class ErrorHandlingSpec extends FunSuite {
       jitterFactor = 0.1
     )
 
-    val delay1 = policy.delayFor(1)
-    val _ = policy.delayFor(1) // Second delay for jitter comparison
+    val delay1 = policy.delayFor(AttemptCount(1))
+    val _ = policy.delayFor(AttemptCount(1)) // Second delay for jitter comparison
 
     // With jitter, delays should vary slightly
     val baseExpected = 200L // 100 * 2^1
@@ -65,6 +68,7 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("RetryPolicy.timeBasedCircuitBreaker respects time limits") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val timeLimit = Duration.ofSeconds(1)
     val policy = RetryPolicy.timeBasedCircuitBreaker(timeLimit, Duration.ofMillis(100))
@@ -72,8 +76,8 @@ class ErrorHandlingSpec extends FunSuite {
     val recentContext = RetryContext(Instant.now().minusMillis(500), 10)
     val oldContext = RetryContext(Instant.now().minusSeconds(2), 10)
 
-    assert(policy.shouldRetry("error", 10, recentContext)) // Within time limit
-    assert(!policy.shouldRetry("error", 10, oldContext)) // Exceeded time limit
+    assert(policy.shouldRetry("error", AttemptCount(10), recentContext)) // Within time limit
+    assert(!policy.shouldRetry("error", AttemptCount(10), oldContext)) // Exceeded time limit
   }
 
   test("RetryContext tracks errors and elapsed time") {
@@ -97,9 +101,10 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("CircuitBreaker starts in Closed state") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val breaker = new CircuitBreaker(
-      failureThreshold = 3,
+      failureThreshold = FailureThreshold(3),
       recoveryTimeout = Duration.ofSeconds(1)
     )
 
@@ -108,9 +113,10 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("CircuitBreaker opens after threshold failures") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val breaker = new CircuitBreaker(
-      failureThreshold = 2,
+      failureThreshold = FailureThreshold(2),
       recoveryTimeout = Duration.ofSeconds(1)
     )
 
@@ -125,9 +131,10 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("CircuitBreaker fast-fails when open") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val breaker = new CircuitBreaker(
-      failureThreshold = 1,
+      failureThreshold = FailureThreshold(1),
       recoveryTimeout = Duration.ofSeconds(10) // Long timeout
     )
 
@@ -145,9 +152,10 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("CircuitBreaker resets on success in closed state") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val breaker = new CircuitBreaker(
-      failureThreshold = 3,
+      failureThreshold = FailureThreshold(3),
       recoveryTimeout = Duration.ofSeconds(1)
     )
 
@@ -170,13 +178,14 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("ErrorAccumulator accumulates errors") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val acc1 = ErrorAccumulator.empty[String]
     assert(acc1.errors.isEmpty)
     assert(!acc1.nonEmpty)
     assert(acc1.headOption.isEmpty)
 
-    val acc2 = acc1.add("error1").add("error2")
+    val acc2 = acc1.add("error1", AttemptCount(1)).add("error2", AttemptCount(2))
     assertEquals(acc2.errors.size, 2)
     assert(acc2.nonEmpty)
     assertEquals(acc2.headOption, Some("error1")) // First error added
@@ -187,9 +196,10 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("ErrorAccumulator combines with other accumulators") {
     import ErrorHandling.*
+    import DomainTypes.*
 
-    val acc1 = ErrorAccumulator.empty[String].add("error1").add("error2")
-    val acc2 = ErrorAccumulator.empty[String].add("error3").add("error4")
+    val acc1 = ErrorAccumulator.empty[String].add("error1", AttemptCount(1)).add("error2", AttemptCount(2))
+    val acc2 = ErrorAccumulator.empty[String].add("error3", AttemptCount(3)).add("error4", AttemptCount(4))
 
     val combined = acc1.combine(acc2)
     assertEquals(combined.errors.size, 4)
@@ -240,9 +250,10 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("withCircuitBreaker extension method works") {
     import ErrorHandling.*
+    import DomainTypes.*
 
     val breaker = new CircuitBreaker(
-      failureThreshold = 2,
+      failureThreshold = FailureThreshold(2),
       recoveryTimeout = Duration.ofSeconds(1)
     )
 
@@ -349,8 +360,9 @@ class ErrorHandlingSpec extends FunSuite {
 
   test("error handling extensions compose with other extensions") {
     import ErrorHandling.*
+    import DomainTypes.*
 
-    val breaker = new CircuitBreaker(2, Duration.ofSeconds(1))
+    val breaker = new CircuitBreaker(FailureThreshold(2), Duration.ofSeconds(1))
     val _ = RetryPolicy.conditional[String](_.startsWith("retry"), 3, Duration.ofMillis(1))
 
     val effect = Eru

@@ -1,9 +1,60 @@
 package net.ghoula.eru.patterns
 
 import java.time.{Duration, Instant}
-import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
+import java.util.concurrent.atomic.AtomicReference
 
 import net.ghoula.eru.*
+
+/** Opaque types for enhanced domain integrity and type safety. */
+object DomainTypes {
+
+  /** Represents a count of retry attempts with compile-time safety. */
+  opaque type AttemptCount = Int
+
+  object AttemptCount {
+    def apply(value: Int): AttemptCount = {
+      require(value >= 0, "AttemptCount must be non-negative")
+      value
+    }
+
+    extension (count: AttemptCount) {
+      def value: Int = count
+      def increment: AttemptCount = count + 1
+      def +(other: Int): AttemptCount = count + other
+      def <(other: AttemptCount): Boolean = count < other
+      def >=(other: AttemptCount): Boolean = count >= other
+    }
+  }
+
+  /** Represents a jitter factor with constrained range [0.0, 1.0]. */
+  opaque type JitterFactor = Double
+
+  object JitterFactor {
+    def apply(value: Double): JitterFactor = {
+      require(value >= 0.0 && value <= 1.0, s"JitterFactor must be between 0.0 and 1.0, got: $value")
+      value
+    }
+
+    extension (factor: JitterFactor) {
+      def value: Double = factor
+    }
+  }
+
+  /** Represents a failure threshold with compile-time safety. */
+  opaque type FailureThreshold = Int
+
+  object FailureThreshold {
+    def apply(value: Int): FailureThreshold = {
+      require(value > 0, "FailureThreshold must be positive")
+      value
+    }
+
+    extension (threshold: FailureThreshold) {
+      def value: Int = threshold
+      def <=(other: Long): Boolean = threshold <= other
+    }
+  }
+}
 
 /** Enhanced error handling patterns for more ergonomic recovery mechanisms.
   *
@@ -13,22 +64,70 @@ import net.ghoula.eru.*
   * scenarios simple and discoverable.
   */
 object ErrorHandling {
+  import DomainTypes.*
 
   /** Sophisticated retry policy with conditions and context awareness. */
-  sealed trait RetryPolicy {
+  enum RetryPolicy {
+
+    /** Retry based on error type predicate with exponential backoff. */
+    case Conditional(
+      shouldRetryError: Any => Boolean,
+      maxAttempts: AttemptCount,
+      baseDelay: Duration,
+      maxDelay: Duration
+    )
+
+    /** Retry with jittered exponential backoff to avoid thundering herd. */
+    case JitteredExponential(
+      maxAttempts: AttemptCount,
+      baseDelay: Duration,
+      jitterFactor: JitterFactor,
+      random: scala.util.Random
+    )
+
+    /** Retry based on elapsed time limit rather than attempt count. */
+    case TimeBasedCircuitBreaker(
+      timeLimit: Duration,
+      baseDelay: Duration
+    )
 
     /** Determines if a retry should be attempted for the given error and context. */
-    def shouldRetry[E](error: E, attempt: Int, context: RetryContext): Boolean
+    def shouldRetry[E](error: E, attempt: AttemptCount, context: RetryContext): Boolean = this match {
+      case Conditional(shouldRetryError, maxAttempts, _, _) =>
+        attempt < maxAttempts && shouldRetryError(error)
+
+      case JitteredExponential(maxAttempts, _, _, _) =>
+        attempt < maxAttempts
+
+      case TimeBasedCircuitBreaker(timeLimit, _) =>
+        context.elapsedTime.compareTo(timeLimit) < 0
+    }
 
     /** Calculates the delay before the next retry attempt. */
-    def delayFor(attempt: Int): Duration
+    def delayFor(attempt: AttemptCount): Duration = this match {
+      case Conditional(_, _, baseDelay, maxDelay) =>
+        val exponentialDelay = baseDelay.multipliedBy(exponentialMultiplier(attempt.value))
+        if (exponentialDelay.compareTo(maxDelay) > 0) maxDelay else exponentialDelay
+
+      case JitteredExponential(_, baseDelay, jitterFactor, random) =>
+        val exponentialDelay = baseDelay.multipliedBy(exponentialMultiplier(attempt.value))
+        val jitter = exponentialDelay.toMillis * jitterFactor.value * (random.nextDouble() - 0.5)
+        Duration.ofMillis((exponentialDelay.toMillis + jitter.toLong).max(0))
+
+      case TimeBasedCircuitBreaker(_, baseDelay) =>
+        baseDelay
+    }
+
+    /** Efficiently calculates exponential multiplier with overflow protection. */
+    private def exponentialMultiplier(attempt: Int): Long =
+      if (attempt >= 63) Long.MaxValue else 1L << attempt
   }
 
   /** Context information available during retry decisions. */
-  final case class RetryContext(
-    startTime: Instant,
-    totalAttempts: Int,
-    lastErrors: List[Any] = Nil
+  final class RetryContext(
+    val startTime: Instant,
+    val totalAttempts: Int,
+    val lastErrors: List[Any] = Nil
   ) {
 
     /** Total elapsed time since first attempt. */
@@ -36,7 +135,40 @@ object ErrorHandling {
 
     /** Adds an error to the context history. */
     def withError(error: Any): RetryContext =
-      copy(lastErrors = (error :: lastErrors).take(10))
+      RetryContext(startTime, totalAttempts, (error :: lastErrors).take(10))
+
+    /** Equality based on all fields. */
+    override def equals(obj: Any): Boolean = obj match {
+      case that: RetryContext =>
+        startTime == that.startTime &&
+        totalAttempts == that.totalAttempts &&
+        lastErrors == that.lastErrors
+      case _ => false
+    }
+
+    /** Hash code based on all fields. */
+    override def hashCode(): Int = {
+      val prime = 31
+      var result = 1
+      result = prime * result + startTime.hashCode()
+      result = prime * result + totalAttempts.hashCode()
+      result = prime * result + lastErrors.hashCode()
+      result
+    }
+
+    /** String representation for debugging. */
+    override def toString: String =
+      s"RetryContext($startTime, $totalAttempts, $lastErrors)"
+  }
+
+  object RetryContext {
+
+    /** Creates a new RetryContext. */
+    def apply(
+      startTime: Instant,
+      totalAttempts: Int,
+      lastErrors: List[Any] = Nil
+    ): RetryContext = new RetryContext(startTime, totalAttempts, lastErrors)
   }
 
   object RetryPolicy {
@@ -47,19 +179,17 @@ object ErrorHandling {
       maxAttempts: Int,
       baseDelay: Duration,
       maxDelay: Duration = Duration.ofMinutes(1)
-    ): RetryPolicy = new RetryPolicy {
+    ): RetryPolicy = {
+      require(maxAttempts > 0, "maxAttempts must be positive")
+      require(!baseDelay.isNegative, "baseDelay cannot be negative")
+      require(!maxDelay.isNegative, "maxDelay cannot be negative")
+      require(maxDelay.compareTo(baseDelay) >= 0, "maxDelay must be >= baseDelay")
 
-      def shouldRetry[E1](error: E1, attempt: Int, context: RetryContext): Boolean = {
-        attempt < maxAttempts && (error match {
-          case e: E @unchecked => shouldRetryError(e)
-          case _ => false
-        })
+      val anyErrorPredicate: Any => Boolean = {
+        case e: E @unchecked => shouldRetryError(e)
+        case _ => false
       }
-
-      def delayFor(attempt: Int): Duration = {
-        val exponentialDelay = baseDelay.multipliedBy(1L << attempt)
-        if (exponentialDelay.compareTo(maxDelay) > 0) maxDelay else exponentialDelay
-      }
+      RetryPolicy.Conditional(anyErrorPredicate, AttemptCount(maxAttempts), baseDelay, maxDelay)
     }
 
     /** Retry with jittered exponential backoff to avoid thundering herd. */
@@ -67,30 +197,47 @@ object ErrorHandling {
       maxAttempts: Int,
       baseDelay: Duration,
       jitterFactor: Double = 0.1
-    ): RetryPolicy = new RetryPolicy {
+    ): RetryPolicy = {
+      require(maxAttempts > 0, "maxAttempts must be positive")
+      require(!baseDelay.isNegative, "baseDelay cannot be negative")
+      require(
+        jitterFactor >= 0.0 && jitterFactor <= 1.0,
+        s"jitterFactor must be between 0.0 and 1.0, got: $jitterFactor"
+      )
 
-      private val random = new scala.util.Random()
-
-      def shouldRetry[E](error: E, attempt: Int, context: RetryContext): Boolean =
-        attempt < maxAttempts
-
-      def delayFor(attempt: Int): Duration = {
-        val exponentialDelay = baseDelay.multipliedBy(1L << attempt)
-        val jitter = exponentialDelay.toMillis * jitterFactor * (random.nextDouble() - 0.5)
-        Duration.ofMillis((exponentialDelay.toMillis + jitter.toLong).max(0))
-      }
+      RetryPolicy.JitteredExponential(
+        AttemptCount(maxAttempts),
+        baseDelay,
+        JitterFactor(jitterFactor),
+        new scala.util.Random()
+      )
     }
 
     /** Retry based on elapsed time limit rather than attempt count. */
     def timeBasedCircuitBreaker(
       timeLimit: Duration,
       baseDelay: Duration
-    ): RetryPolicy = new RetryPolicy {
+    ): RetryPolicy = {
+      require(!timeLimit.isNegative, "timeLimit cannot be negative")
+      require(!timeLimit.isZero, "timeLimit cannot be zero")
+      require(!baseDelay.isNegative, "baseDelay cannot be negative")
+      require(timeLimit.compareTo(baseDelay) > 0, "timeLimit must be greater than baseDelay")
 
-      def shouldRetry[E](error: E, attempt: Int, context: RetryContext): Boolean =
-        context.elapsedTime.compareTo(timeLimit) < 0
+      RetryPolicy.TimeBasedCircuitBreaker(timeLimit, baseDelay)
+    }
 
-      def delayFor(attempt: Int): Duration = baseDelay
+    /** Common retry patterns for ergonomic usage. */
+
+    /** Exponential backoff with sensible defaults. */
+    def exponential(maxAttempts: Int): RetryPolicy = {
+      require(maxAttempts > 0, "maxAttempts must be positive")
+      conditional(_ => true, maxAttempts, Duration.ofMillis(100), Duration.ofMinutes(1))
+    }
+
+    /** Immediate retry without delay. */
+    def immediate(maxAttempts: Int): RetryPolicy = {
+      require(maxAttempts > 0, "maxAttempts must be positive")
+      conditional(_ => true, maxAttempts, Duration.ZERO, Duration.ZERO)
     }
   }
 
@@ -101,26 +248,81 @@ object ErrorHandling {
     case HalfOpen
   }
 
+  /** Internal state representation for circuit breaker. */
+  private final class CircuitBreakerState(
+    val state: CircuitState,
+    val failures: Long,
+    val successes: Long,
+    val lastFailureTime: Option[Instant]
+  ) {
+
+    /** Creates a copy with modified fields. */
+    def copy(
+      state: CircuitState = this.state,
+      failures: Long = this.failures,
+      successes: Long = this.successes,
+      lastFailureTime: Option[Instant] = this.lastFailureTime
+    ): CircuitBreakerState =
+      CircuitBreakerState(state, failures, successes, lastFailureTime)
+
+    /** Equality based on all fields. */
+    override def equals(obj: Any): Boolean = obj match {
+      case that: CircuitBreakerState =>
+        state == that.state &&
+        failures == that.failures &&
+        successes == that.successes &&
+        lastFailureTime == that.lastFailureTime
+      case _ => false
+    }
+
+    /** Hash code based on all fields. */
+    override def hashCode(): Int = {
+      val prime = 31
+      var result = 1
+      result = prime * result + state.hashCode()
+      result = prime * result + failures.hashCode()
+      result = prime * result + successes.hashCode()
+      result = prime * result + lastFailureTime.hashCode()
+      result
+    }
+
+    /** String representation for debugging. */
+    override def toString: String =
+      s"CircuitBreakerState($state, $failures, $successes, $lastFailureTime)"
+  }
+
+  private object CircuitBreakerState {
+
+    /** Creates a new CircuitBreakerState. */
+    def apply(
+      state: CircuitState,
+      failures: Long,
+      successes: Long,
+      lastFailureTime: Option[Instant]
+    ): CircuitBreakerState =
+      new CircuitBreakerState(state, failures, successes, lastFailureTime)
+  }
+
   /** Circuit breaker for protecting downstream services. */
   final class CircuitBreaker(
-    failureThreshold: Int,
+    failureThreshold: FailureThreshold,
     recoveryTimeout: Duration,
     successThreshold: Int = 1
   ) {
 
-    private val state = new AtomicReference[CircuitState](CircuitState.Closed)
-    private val failures = new AtomicLong(0)
-    private val successes = new AtomicLong(0)
-    private val lastFailureTime = new AtomicReference[Option[Instant]](None)
+    private val atomicState = new AtomicReference[CircuitBreakerState](
+      CircuitBreakerState(CircuitState.Closed, 0L, 0L, None)
+    )
 
     /** Current state of the circuit breaker. */
-    def currentState: CircuitState = state.get()
+    def currentState: CircuitState = atomicState.get().state
 
     /** Executes an effect with circuit breaker protection. */
     def protect[E, A](effect: Eru[E, A]): Eru[E | CircuitBreakerOpen, A] = {
-      currentState match {
-        case CircuitState.Open if shouldAttemptRecovery =>
-          state.set(CircuitState.HalfOpen)
+      val currentStateValue = atomicState.get()
+      currentStateValue.state match {
+        case CircuitState.Open if shouldAttemptRecovery(currentStateValue) =>
+          atomicState.compareAndSet(currentStateValue, currentStateValue.copy(state = CircuitState.HalfOpen))
           executeWithCircuitBreaker(effect)
 
         case CircuitState.Open =>
@@ -131,8 +333,8 @@ object ErrorHandling {
       }
     }
 
-    private def shouldAttemptRecovery: Boolean = {
-      lastFailureTime.get() match {
+    private def shouldAttemptRecovery(state: CircuitBreakerState): Boolean = {
+      state.lastFailureTime match {
         case Some(lastFailure) =>
           Duration.between(lastFailure, Instant.now()).compareTo(recoveryTimeout) >= 0
         case None => true
@@ -152,58 +354,254 @@ object ErrorHandling {
     }
 
     private def onSuccess(): Unit = {
-      state.get() match {
+      var currentState = atomicState.get()
+      var newState = currentState.state match {
         case CircuitState.HalfOpen =>
-          val currentSuccesses = successes.incrementAndGet()
-          if (currentSuccesses >= successThreshold) {
-            state.set(CircuitState.Closed)
-            failures.set(0)
-            successes.set(0)
+          val newSuccesses = currentState.successes + 1
+          if (newSuccesses >= successThreshold) {
+            currentState.copy(state = CircuitState.Closed, failures = 0L, successes = 0L)
+          } else {
+            currentState.copy(successes = newSuccesses)
           }
         case CircuitState.Closed =>
-          failures.set(0)
+          currentState.copy(failures = 0L)
         case CircuitState.Open =>
-          failures.set(0)
+          currentState.copy(failures = 0L)
+      }
+
+      while (!atomicState.compareAndSet(currentState, newState)) {
+        currentState = atomicState.get()
+        newState = currentState.state match {
+          case CircuitState.HalfOpen =>
+            val newSuccesses = currentState.successes + 1
+            if (newSuccesses >= successThreshold) {
+              currentState.copy(state = CircuitState.Closed, failures = 0L, successes = 0L)
+            } else {
+              currentState.copy(successes = newSuccesses)
+            }
+          case CircuitState.Closed =>
+            currentState.copy(failures = 0L)
+          case CircuitState.Open =>
+            currentState.copy(failures = 0L)
+        }
       }
     }
 
     private def onFailure(): Unit = {
-      val currentFailures = failures.incrementAndGet()
-      lastFailureTime.set(Some(Instant.now()))
+      val now = Some(Instant.now())
+      var currentState = atomicState.get()
+      var newFailures = currentState.failures + 1
+      var newState = currentState.copy(
+        failures = newFailures,
+        lastFailureTime = now,
+        state = if (failureThreshold <= newFailures && currentState.state != CircuitState.Open) {
+          CircuitState.Open
+        } else {
+          currentState.state
+        },
+        successes = if (failureThreshold <= newFailures) 0L else currentState.successes
+      )
 
-      if (currentFailures >= failureThreshold && state.get() != CircuitState.Open) {
-        state.set(CircuitState.Open)
-        successes.set(0)
+      while (!atomicState.compareAndSet(currentState, newState)) {
+        currentState = atomicState.get()
+        newFailures = currentState.failures + 1
+        newState = currentState.copy(
+          failures = newFailures,
+          lastFailureTime = now,
+          state = if (failureThreshold <= newFailures && currentState.state != CircuitState.Open) {
+            CircuitState.Open
+          } else {
+            currentState.state
+          },
+          successes = if (failureThreshold <= newFailures) 0L else currentState.successes
+        )
       }
     }
   }
 
   /** Error indicating circuit breaker is open. */
-  final case class CircuitBreakerOpen(message: String)
+  final class CircuitBreakerOpen(val message: String) {
 
-  /** Error accumulator for collecting multiple errors. */
-  final case class ErrorAccumulator[E](errors: List[E]) {
+    /** Equality based on message. */
+    override def equals(obj: Any): Boolean = obj match {
+      case that: CircuitBreakerOpen => message == that.message
+      case _ => false
+    }
 
-    /** Adds an error to the accumulator. */
-    def add(error: E): ErrorAccumulator[E] =
-      ErrorAccumulator(error :: errors)
+    /** Hash code based on message. */
+    override def hashCode(): Int = message.hashCode()
+
+    /** String representation for debugging. */
+    override def toString: String = s"CircuitBreakerOpen($message)"
+  }
+
+  object CircuitBreakerOpen {
+
+    /** Creates a new CircuitBreakerOpen error. */
+    def apply(message: String): CircuitBreakerOpen = new CircuitBreakerOpen(message)
+
+    /** Extracts the message from a CircuitBreakerOpen for pattern matching. */
+    def unapply(error: CircuitBreakerOpen): Option[String] = Some(error.message)
+  }
+
+  /** Error context providing structured diagnostic information. */
+  final class ErrorWithContext[E](
+    val error: E,
+    val timestamp: Instant,
+    val attempt: AttemptCount,
+    val context: Map[String, Any] = Map.empty
+  ) {
+
+    /** Equality based on all fields. */
+    override def equals(obj: Any): Boolean = obj match {
+      case that: ErrorWithContext[_] =>
+        error == that.error &&
+        timestamp == that.timestamp &&
+        attempt == that.attempt &&
+        context == that.context
+      case _ => false
+    }
+
+    /** Hash code based on all fields. */
+    override def hashCode(): Int = {
+      val prime = 31
+      var result = 1
+      result = prime * result + error.hashCode()
+      result = prime * result + timestamp.hashCode()
+      result = prime * result + attempt.hashCode()
+      result = prime * result + context.hashCode()
+      result
+    }
+
+    /** String representation for debugging. */
+    override def toString: String =
+      s"ErrorWithContext($error, $timestamp, $attempt, $context)"
+  }
+
+  object ErrorWithContext {
+
+    /** Creates a new ErrorWithContext. */
+    def apply[E](
+      error: E,
+      timestamp: Instant,
+      attempt: AttemptCount,
+      context: Map[String, Any] = Map.empty
+    ): ErrorWithContext[E] =
+      new ErrorWithContext(error, timestamp, attempt, context)
+  }
+
+  /** Enhanced error accumulator for collecting multiple errors with context. */
+  final class ErrorAccumulator[E](val errors: List[ErrorWithContext[E]]) {
+
+    /** Adds an error to the accumulator with current timestamp and attempt information. */
+    def add(error: E, attempt: AttemptCount, context: Map[String, Any] = Map.empty): ErrorAccumulator[E] =
+      ErrorAccumulator(ErrorWithContext(error, Instant.now(), attempt, context) :: errors)
 
     /** Combines with another accumulator. */
     def combine(other: ErrorAccumulator[E]): ErrorAccumulator[E] =
       ErrorAccumulator(errors ++ other.errors)
 
-    /** Gets all errors in chronological order. */
-    def allErrors: List[E] = errors.reverse
+    /** Gets all error contexts in chronological order. */
+    def allErrorsWithContext: List[ErrorWithContext[E]] = errors.reverse
+
+    /** Gets all errors without context in chronological order. */
+    def allErrors: List[E] = errors.reverse.map(_.error)
 
     /** Checks if there are any errors. */
     def nonEmpty: Boolean = errors.nonEmpty
 
+    /** Gets the most recent error with context. */
+    def mostRecentWithContext: Option[ErrorWithContext[E]] = errors.headOption
+
+    /** Gets the most recent error. */
+    def mostRecent: Option[E] = errors.headOption.map(_.error)
+
+    /** Gets the first error with context. */
+    def firstWithContext: Option[ErrorWithContext[E]] = errors.lastOption
+
     /** Gets the first error, if any. */
-    def headOption: Option[E] = errors.lastOption
+    def headOption: Option[E] = errors.lastOption.map(_.error)
+
+    /** Gets error statistics for diagnostic purposes. */
+    def errorStats: Map[String, Any] = {
+      val errorsByType = errors.groupBy(_.error.getClass.getSimpleName)
+      Map(
+        "totalErrors" -> errors.size,
+        "errorTypes" -> errorsByType.view.mapValues(_.size).toMap,
+        "timeSpan" -> (for {
+          first <- errors.lastOption
+          last <- errors.headOption
+        } yield Duration.between(first.timestamp, last.timestamp).toString).getOrElse("N/A")
+      )
+    }
+
+    /** Equality based on errors list. */
+    override def equals(obj: Any): Boolean = obj match {
+      case that: ErrorAccumulator[_] => errors == that.errors
+      case _ => false
+    }
+
+    /** Hash code based on errors list. */
+    override def hashCode(): Int = errors.hashCode()
+
+    /** String representation for debugging. */
+    override def toString: String = s"ErrorAccumulator($errors)"
   }
 
   object ErrorAccumulator {
-    def empty[E]: ErrorAccumulator[E] = ErrorAccumulator(Nil)
+
+    /** Creates a new ErrorAccumulator. */
+    def apply[E](errors: List[ErrorWithContext[E]]): ErrorAccumulator[E] =
+      new ErrorAccumulator(errors)
+
+    /** Creates an empty error accumulator. */
+    def empty[E]: ErrorAccumulator[E] = ErrorAccumulator(List.empty)
+  }
+
+  /** Fluent builder for CircuitBreaker configuration. */
+  final class CircuitBreakerBuilder {
+    private var failureThreshold: FailureThreshold = FailureThreshold(5)
+    private var recoveryTimeout: Duration = Duration.ofSeconds(30)
+    private var successThreshold: Int = 1
+
+    /** Sets the failure threshold that triggers circuit breaker to open. */
+    def withFailureThreshold(threshold: Int): CircuitBreakerBuilder = {
+      require(threshold > 0, "Failure threshold must be positive")
+      this.failureThreshold = FailureThreshold(threshold)
+      this
+    }
+
+    /** Sets the recovery timeout before attempting to close the circuit. */
+    def withRecoveryTimeout(timeout: Duration): CircuitBreakerBuilder = {
+      require(!timeout.isNegative, "Recovery timeout cannot be negative")
+      this.recoveryTimeout = timeout
+      this
+    }
+
+    /** Sets the number of successful calls required to close the circuit from half-open state. */
+    def withSuccessThreshold(threshold: Int): CircuitBreakerBuilder = {
+      require(threshold > 0, "Success threshold must be positive")
+      this.successThreshold = threshold
+      this
+    }
+
+    /** Builds the configured CircuitBreaker instance. */
+    def build: CircuitBreaker =
+      new CircuitBreaker(failureThreshold, recoveryTimeout, successThreshold)
+  }
+
+  object CircuitBreaker {
+
+    /** Creates a new fluent builder for CircuitBreaker configuration. */
+    def builder: CircuitBreakerBuilder = new CircuitBreakerBuilder()
+
+    /** Creates a CircuitBreaker with default configuration. */
+    def default: CircuitBreaker =
+      new CircuitBreaker(FailureThreshold(5), Duration.ofSeconds(30), 1)
+
+    /** Creates a CircuitBreaker with fast recovery for testing environments. */
+    def fastRecovery: CircuitBreaker =
+      new CircuitBreaker(FailureThreshold(3), Duration.ofSeconds(5), 1)
   }
 }
 
@@ -211,10 +609,22 @@ object ErrorHandling {
 extension [E, A](eru: Eru[E, A]) {
 
   /** Retries this effect using a sophisticated retry policy with conditions. */
-  def retryWith(policy: ErrorHandling.RetryPolicy): Eru[E, A] = {
+  def retryWith(policy: ErrorHandling.RetryPolicy): Eru[E | Throwable, A] = {
     import ErrorHandling.*
+    import DomainTypes.*
 
-    def loop(attempt: Int, context: RetryContext): Eru[E, A] = {
+    /** Resource-safe delay implementation using blocking sleep. */
+    def sleep(duration: Duration): Eru[Throwable, Unit] = {
+      if (duration.isZero || duration.isNegative) {
+        Eru.succeed(())
+      } else {
+        Eru.effect {
+          Thread.sleep(duration.toMillis)
+        }.map(_ => ())
+      }
+    }
+
+    def loop(attempt: AttemptCount, context: RetryContext): Eru[E | Throwable, A] = {
       eru.attempt.flatMap {
         case Result.Success(value) =>
           Eru.succeed(value)
@@ -222,8 +632,8 @@ extension [E, A](eru: Eru[E, A]) {
         case Result.Failure(error) =>
           val updatedContext = context.withError(error)
           if (policy.shouldRetry(error, attempt, updatedContext)) {
-            val _ = policy.delayFor(attempt)
-            loop(attempt + 1, updatedContext)
+            val delay = policy.delayFor(attempt)
+            sleep(delay).flatMap(_ => loop(attempt.increment, updatedContext))
           } else {
             Eru.fail(error)
           }
@@ -231,7 +641,7 @@ extension [E, A](eru: Eru[E, A]) {
     }
 
     val initialContext = RetryContext(Instant.now(), 0)
-    loop(0, initialContext)
+    loop(AttemptCount(0), initialContext)
   }
 
   /** Protects this effect with a circuit breaker. */
@@ -242,6 +652,7 @@ extension [E, A](eru: Eru[E, A]) {
   /** Combines multiple effects, accumulating errors if they fail. */
   def accumulateErrors[E1 >: E](other: Eru[E1, A]): Eru[ErrorHandling.ErrorAccumulator[E1], (A, A)] = {
     import ErrorHandling.*
+    import DomainTypes.*
 
     for {
       firstResult <- eru.attempt
@@ -251,13 +662,17 @@ extension [E, A](eru: Eru[E, A]) {
           Eru.succeed((a, b))
 
         case (Result.Failure(e1), Result.Success(_)) =>
-          Eru.fail(ErrorAccumulator.empty[E1].add(e1))
+          Eru.fail(ErrorAccumulator.empty[E1].add(e1, AttemptCount(1)))
 
         case (Result.Success(_), Result.Failure(e2)) =>
-          Eru.fail(ErrorAccumulator.empty[E1].add(e2))
+          Eru.fail(ErrorAccumulator.empty[E1].add(e2, AttemptCount(1)))
 
         case (Result.Failure(e1), Result.Failure(e2)) =>
-          Eru.fail(ErrorAccumulator.empty[E1].add(e1).add(e2))
+          val accumulator = ErrorAccumulator
+            .empty[E1]
+            .add(e1, AttemptCount(1))
+            .add(e2, AttemptCount(2))
+          Eru.fail(accumulator)
       }
     } yield combined
   }
@@ -265,13 +680,15 @@ extension [E, A](eru: Eru[E, A]) {
   /** Validates this effect's result and accumulates validation errors. */
   def validate[V](validations: (A => Eru[V, Unit])*): Eru[E | ErrorHandling.ErrorAccumulator[V], A] = {
     import ErrorHandling.*
+    import DomainTypes.*
 
     eru.flatMap { value =>
       val validationResults = validations.map(validate => validate(value).attempt)
 
       def collectErrors(
         remaining: List[Eru[Nothing, Result[V, Unit]]],
-        accumulator: ErrorAccumulator[V]
+        accumulator: ErrorAccumulator[V],
+        validationIndex: Int
       ): Eru[ErrorAccumulator[V], A] = {
         remaining match {
           case Nil =>
@@ -281,14 +698,15 @@ extension [E, A](eru: Eru[E, A]) {
           case head :: tail =>
             head.flatMap {
               case Result.Success(_) =>
-                collectErrors(tail, accumulator)
+                collectErrors(tail, accumulator, validationIndex + 1)
               case Result.Failure(error) =>
-                collectErrors(tail, accumulator.add(error))
+                val updatedAccumulator = accumulator.add(error, AttemptCount(validationIndex + 1))
+                collectErrors(tail, updatedAccumulator, validationIndex + 1)
             }
         }
       }
 
-      collectErrors(validationResults.toList, ErrorAccumulator.empty[V])
+      collectErrors(validationResults.toList, ErrorAccumulator.empty[V], 0)
     }
   }
 

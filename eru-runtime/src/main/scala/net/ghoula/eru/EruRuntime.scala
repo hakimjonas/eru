@@ -685,7 +685,7 @@ object EruRuntime {
         *   - Power of 2 for efficient modulo operations if needed in future
         *   - Empirically tuned to balance performance with cooperative behavior
         */
-      val MAX_ITERS_BEFORE_INTERRUPT_CHECK = 1024
+      val MAX_ITERS_BEFORE_INTERRUPT_CHECK = 1600
 
       var currentEru: Eru[Any, Any] = current
       var fastConts = scala.collection.mutable.ArrayBuffer.empty[FastCont]
