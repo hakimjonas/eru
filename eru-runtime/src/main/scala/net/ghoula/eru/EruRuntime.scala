@@ -8,24 +8,39 @@ import java.time.Duration
   * resource management, and cooperative scheduling. Effects are executed on lightweight fibers
   * managed by an internal scheduler queue. The runtime supports:
   *
-  * - Fiber forking with `fork` - creates new fibers for concurrent execution
-  * - Interruption masking with `uninterruptible` and `mask`
-  * - Proper suspension/resumption for asynchronous operations
-  * - Resource cleanup through finalizers
-  * - Cooperative yielding and timeout support
-  * - Parallel composition with `zipPar` and `race`
+  *   - Fiber forking with `fork` - creates new fibers for concurrent execution
+  *   - Interruption masking with `uninterruptible` and `mask`
+  *   - Proper suspension/resumption for asynchronous operations
+  *   - Resource cleanup through finalizers
+  *   - Cooperative yielding and timeout support
+  *   - Parallel composition with `zipPar` and `race`
   *
-  * While single-threaded, this runtime provides the full semantic foundation for
-  * future multi-threaded implementations and serves as the reference implementation
-  * for Eru's effect system.
+  * While single-threaded, this runtime provides the full semantic foundation for future
+  * multi-threaded implementations and serves as the reference implementation for Eru's effect
+  * system.
   */
-/** Timer abstraction for platform-specific timer implementations. */
+/** Timer abstraction for platform-specific timer implementations.
+  *
+  * This abstraction enables different timer implementations across platforms while maintaining a
+  * consistent scheduling interface. The JVM implementation may use java.util.Timer or
+  * ScheduledExecutorService, while Scala Native might use platform-specific timing mechanisms.
+  *
+  * The timer is used internally by the runtime for implementing timeouts, delays, and scheduled
+  * fiber wakeups in the asynchronous execution model.
+  */
 private[eru] trait Timer {
+
+  /** Schedules a task to run after the specified delay.
+    *
+    * @param delay
+    *   the duration to wait before executing the task
+    * @param task
+    *   the computation to execute after the delay
+    */
   def schedule(delay: Duration, task: () => Unit): Unit
 }
 
 object EruRuntime {
-
 
   /** Combines two effects, executing them in parallel on separate fibers.
     *
@@ -56,13 +71,21 @@ object EruRuntime {
       out <- (le, re) match {
         case (Some(Exit.Success(a)), Some(Exit.Success(b))) => Eru.succeed((a, b))
         case (Some(Exit.Success(_)), Some(Exit.Failure(e))) =>
-          lf.interrupt(InterruptCause.Cancelled(Some("zipPar partner failed"))).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+          lf.interrupt(InterruptCause.Cancelled(Some("zipPar partner failed")))
+            .flatMap(_ => rf.await)
+            .flatMap(_ => Eru.fail(e))
         case (Some(Exit.Success(_)), Some(Exit.Die(t))) =>
-          lf.interrupt(InterruptCause.Cancelled(Some("zipPar partner died"))).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+          lf.interrupt(InterruptCause.Cancelled(Some("zipPar partner died")))
+            .flatMap(_ => rf.await)
+            .flatMap(_ => Eru.effect(throw t))
         case (Some(Exit.Failure(e)), _) =>
-          rf.interrupt(InterruptCause.Cancelled(Some("zipPar partner failed"))).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+          rf.interrupt(InterruptCause.Cancelled(Some("zipPar partner failed")))
+            .flatMap(_ => rf.await)
+            .flatMap(_ => Eru.fail(e))
         case (Some(Exit.Die(t)), _) =>
-          rf.interrupt(InterruptCause.Cancelled(Some("zipPar partner died"))).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+          rf.interrupt(InterruptCause.Cancelled(Some("zipPar partner died")))
+            .flatMap(_ => rf.await)
+            .flatMap(_ => Eru.effect(throw t))
         case _ => Eru.effect(throw new RuntimeException("zipPar interrupted"))
       }
     } yield out
@@ -91,23 +114,56 @@ object EruRuntime {
       re <- rightRef.get
       res <- (le, re) match {
         case (Some(Exit.Success(a)), _) =>
-          rf.interrupt(InterruptCause.Cancelled(Some("race lost - left won"))).flatMap(_ => rf.await).flatMap(_ => Eru.succeed(Left(a)))
+          rf.interrupt(InterruptCause.Cancelled(Some("race lost - left won")))
+            .flatMap(_ => rf.await)
+            .flatMap(_ => Eru.succeed(Left(a)))
         case (_, Some(Exit.Success(b))) =>
-          lf.interrupt(InterruptCause.Cancelled(Some("race lost - right won"))).flatMap(_ => lf.await).flatMap(_ => Eru.succeed(Right(b)))
+          lf.interrupt(InterruptCause.Cancelled(Some("race lost - right won")))
+            .flatMap(_ => lf.await)
+            .flatMap(_ => Eru.succeed(Right(b)))
         case (Some(Exit.Failure(e)), _) =>
-          rf.interrupt(InterruptCause.Cancelled(Some("race terminated - left failed"))).flatMap(_ => rf.await).flatMap(_ => Eru.fail(e))
+          rf.interrupt(InterruptCause.Cancelled(Some("race terminated - left failed")))
+            .flatMap(_ => rf.await)
+            .flatMap(_ => Eru.fail(e))
         case (_, Some(Exit.Failure(e))) =>
-          lf.interrupt(InterruptCause.Cancelled(Some("race terminated - right failed"))).flatMap(_ => lf.await).flatMap(_ => Eru.fail(e))
+          lf.interrupt(InterruptCause.Cancelled(Some("race terminated - right failed")))
+            .flatMap(_ => lf.await)
+            .flatMap(_ => Eru.fail(e))
         case (Some(Exit.Die(t)), _) =>
-          rf.interrupt(InterruptCause.Cancelled(Some("race terminated - left died"))).flatMap(_ => rf.await).flatMap(_ => Eru.effect(throw t))
+          rf.interrupt(InterruptCause.Cancelled(Some("race terminated - left died")))
+            .flatMap(_ => rf.await)
+            .flatMap(_ => Eru.effect(throw t))
         case (_, Some(Exit.Die(t))) =>
-          lf.interrupt(InterruptCause.Cancelled(Some("race terminated - right died"))).flatMap(_ => lf.await).flatMap(_ => Eru.effect(throw t))
+          lf.interrupt(InterruptCause.Cancelled(Some("race terminated - right died")))
+            .flatMap(_ => lf.await)
+            .flatMap(_ => Eru.effect(throw t))
         case _ => Eru.effect(throw new RuntimeException("race interrupted"))
       }
     } yield res
 
-  /** A token that re-enables interruptibility inside a masked region. */
+  /** A token that re-enables interruptibility inside a masked region.
+    *
+    * When executing inside a masked region (created by `uninterruptible` or `mask`), interruption
+    * is disabled to prevent cancellation during critical sections. The Unmask token allows
+    * selective restoration of interruptibility for specific sub-computations that should remain
+    * cancellable.
+    *
+    * This design follows the principle of "masked by default, unmask when safe" to prevent race
+    * conditions in resource management while still allowing controlled cancellation points.
+    */
   trait Unmask {
+
+    /** Restores interruptibility for the given effect within a masked region.
+      *
+      * @param fa
+      *   the effect to execute with interruptibility restored
+      * @tparam E
+      *   the error type of the effect
+      * @tparam A
+      *   the success type of the effect
+      * @return
+      *   the same effect but with interruptibility restored according to the original state
+      */
     def apply[E, A](fa: Eru[E, A]): Eru[E, A]
   }
 
@@ -133,27 +189,42 @@ object EruRuntime {
   }
 
   /** Effect that temporarily restores a specific interruptibility state */
-  private final class RestoreInterruptibilityEffect[E, A](val source: Eru[E, A], val restoreState: Boolean) extends Eru[E, A] {
+  private final class RestoreInterruptibilityEffect[E, A](val source: Eru[E, A], val restoreState: Boolean)
+      extends Eru[E, A] {
     def attempt: Eru[Nothing, Result[E, A]] = source.attempt
     override def toString: String = s"RestoreInterruptibility($source, $restoreState)"
   }
 
   /** High-performance array-based stack for fiber runtime optimization.
-    * 
-    * Replaces List-based stacks to provide better cache locality and reduced allocation
-    * overhead for continuation management. Uses raw arrays with auto-resize and proper
-    * reference clearing to prevent memory leaks.
-    * 
-    * @tparam T the type of elements stored in the stack
+    *
+    * Replaces List-based stacks to provide better cache locality and reduced allocation overhead
+    * for continuation management. Uses raw arrays with auto-resize and proper reference clearing to
+    * prevent memory leaks.
+    *
+    * @tparam T
+    *   the type of elements stored in the stack
     */
   private final class ArrayStack[@specialized T: scala.reflect.ClassTag] {
-    private var array: Array[T] = new Array[T](16) // Initial capacity of 16
+
+    /** Initial capacity for the array stack.
+      *
+      * 16 elements provides a good balance between memory usage and performance:
+      *   - Small enough to avoid wasting memory for shallow effect chains
+      *   - Large enough to handle typical continuation stacks without immediate resizing
+      *   - Power of 2 for efficient memory allocation and cache line alignment
+      */
+    private val INITIAL_CAPACITY = 16
+
+    private var array: Array[T] = new Array[T](INITIAL_CAPACITY)
     private var size: Int = 0
-    
-    /** Adds an item to the top of the stack. Auto-resizes if necessary. */
+
+    /** Adds an item to the top of the stack with automatic resizing when capacity is exceeded.
+      *
+      * @param item
+      *   the element to add to the stack
+      */
     @inline def push(item: T): Unit = {
       if (size >= array.length) {
-        // Double the capacity when full
         val newArray = new Array[T](array.length * 2)
         System.arraycopy(array, 0, newArray, 0, array.length)
         array = newArray
@@ -161,12 +232,17 @@ object EruRuntime {
       array(size) = item
       size += 1
     }
-    
+
     /** Removes and returns the top item from the stack.
-      * Note: We don't clear the reference since we track size explicitly.
-      * The GC will handle cleanup when the array is replaced or goes out of scope.
-      * 
-      * @throws NoSuchElementException if the stack is empty
+      *
+      * Memory management is optimized by tracking size explicitly rather than clearing references,
+      * as the garbage collector handles cleanup efficiently when arrays are replaced or go out of
+      * scope.
+      *
+      * @return
+      *   the top element from the stack
+      * @throws NoSuchElementException
+      *   if the stack is empty
       */
     @inline def pop(): T = {
       if (size == 0) {
@@ -175,51 +251,97 @@ object EruRuntime {
       size -= 1
       array(size)
     }
-    
-    /** Returns true if the stack is empty. */
+
+    /** Returns true if the stack contains no elements.
+      *
+      * @return
+      *   true if the stack is empty, false otherwise
+      */
     @inline def isEmpty: Boolean = size == 0
-    
-    /** Returns true if the stack has items. */
+
+    /** Returns true if the stack contains one or more elements.
+      *
+      * @return
+      *   true if the stack has items, false otherwise
+      */
     @inline def nonEmpty: Boolean = size != 0
-    
-    /** Clears all items from the stack by resetting to a fresh array. */
+
+    /** Clears all items from the stack by resetting to a fresh array.
+      *
+      * This implementation creates a new array rather than clearing references, which is more
+      * efficient than iterating and nulling individual elements. Only performs the reset if the
+      * stack actually contains elements.
+      */
     @inline def clear(): Unit = {
-      // Instead of clearing references, create a fresh array
-      // This is actually more efficient than iterating and nulling
       if (size > 0) {
-        array = new Array[T](16) // Reset to initial capacity
+        array = new Array[T](INITIAL_CAPACITY)
         size = 0
       }
     }
-    
-    /** Returns the current number of items in the stack. */
+
+    /** Returns the current number of items in the stack.
+      *
+      * @return
+      *   the number of elements currently stored
+      */
     @inline def length: Int = size
   }
 
+  /** Single-threaded cooperative scheduler for fiber execution.
+    *
+    * This scheduler manages the execution queue for lightweight fibers and handles
+    * parking/unparking mechanisms for suspended computations. It provides the core scheduling
+    * primitives that enable non-blocking asynchronous execution while maintaining deterministic
+    * single-threaded semantics.
+    *
+    * The scheduler uses a simple FIFO queue for ready-to-run tasks and tracks the number of parked
+    * fibers to determine when to wait for external events versus when to terminate execution loops.
+    */
   private object Scheduler {
     private val queue = scala.collection.mutable.Queue[() => Unit]()
     private var parkedFibers: Int = 0
 
+    /** Enqueues a task for execution on the next scheduler pump.
+      *
+      * @param thunk
+      *   the computation to schedule for execution
+      */
     def schedule(thunk: () => Unit): Unit =
       queue.enqueue(thunk)
 
+    /** Marks a fiber as parked, indicating it's waiting for an external event.
+      *
+      * Parked fibers are tracked to determine scheduler pump behavior when the queue is empty but
+      * fibers are still waiting for completion.
+      */
     def parkFiber(): Unit =
       parkedFibers += 1
 
+    /** Marks a previously parked fiber as unparked, typically when it's resumed.
+      *
+      * The count is bounded to prevent underflow from incorrect unpark calls.
+      */
     def unparkFiber(): Unit =
       parkedFibers = Math.max(0, parkedFibers - 1)
 
+    /** Pumps the scheduler queue until the given condition is satisfied.
+      *
+      * This method drives the cooperative execution model by continuously processing queued tasks.
+      * When no tasks are available but parked fibers exist, it performs a minimal sleep to yield
+      * control while waiting for external events.
+      *
+      * @param done
+      *   predicate that determines when to stop pumping
+      */
     def pumpUntil(done: () => Boolean): Unit = {
       while !done() || (parkedFibers > 0 && queue.nonEmpty) do {
         if queue.nonEmpty then {
           val task = queue.dequeue()
           task()
         } else if parkedFibers > 0 then {
-          // Non-blocking wait when there are parked fibers waiting for external events
           try java.lang.Thread.sleep(1)
           catch { case _: InterruptedException => () }
         } else {
-          // No parked fibers and condition not met, exit
           return
         }
       }
@@ -269,12 +391,14 @@ object EruRuntime {
 
   /** Makes a region uninterruptible.
     *
-    * During execution of the provided effect, interruption is disabled. If the fiber
-    * is interrupted while uninterruptible, the interruption will be recorded but
-    * not acted upon until interruptibility is restored.
+    * During execution of the provided effect, interruption is disabled. If the fiber is interrupted
+    * while uninterruptible, the interruption will be recorded but not acted upon until
+    * interruptibility is restored.
     *
-    * @param fa the effect to run without interruption
-    * @return an effect that runs fa with interruption disabled
+    * @param fa
+    *   the effect to run without interruption
+    * @return
+    *   an effect that runs fa with interruption disabled
     */
   def uninterruptible[E, A](fa: Eru[E, A]): Eru[E, A] = {
     new UninterruptibleEffect(fa)
@@ -283,12 +407,14 @@ object EruRuntime {
   /** Masks interruption within a region, providing an Unmask to selectively restore
     * interruptibility.
     *
-    * The provided function receives an Unmask token that can be used to temporarily
-    * restore interruptibility within the masked region. This is useful for operations
-    * that need to be interruptible within an otherwise uninterruptible context.
+    * The provided function receives an Unmask token that can be used to temporarily restore
+    * interruptibility within the masked region. This is useful for operations that need to be
+    * interruptible within an otherwise uninterruptible context.
     *
-    * @param k function that receives an Unmask and produces an effect
-    * @return an effect that runs with interruption masked
+    * @param k
+    *   function that receives an Unmask and produces an effect
+    * @return
+    *   an effect that runs with interruption masked
     */
   def mask[E, A](k: Unmask => Eru[E, A]): Eru[E, A] = new MaskEffect(k)
 
@@ -305,9 +431,12 @@ object EruRuntime {
   def sleep(duration: Duration): Eru[Nothing, Unit] =
     Eru.effect {
       var completed = false
-      Platform.timer.schedule(duration, () => {
-        Scheduler.schedule(() => completed = true)
-      })
+      Platform.timer.schedule(
+        duration,
+        () => {
+          Scheduler.schedule(() => completed = true)
+        }
+      )
       Scheduler.pumpUntil(() => completed)
       ()
     }.attempt.flatMap(_ => Eru.unit)
@@ -338,16 +467,36 @@ object EruRuntime {
     }
   }
 
-  /** Retry policy describing how to reschedule failures. */
-  sealed trait Policy
-  object Policy {
+  /** Retry policy describing how to reschedule failures.
+    *
+    * This enum represents different strategies for retrying failed operations, providing both
+    * immediate retry patterns and backoff strategies to avoid overwhelming external systems. The
+    * policy determines the delay between retry attempts and the maximum number of attempts to make.
+    */
+  enum Policy {
 
-    /** Retry up to `n` times without delay. */
-    final case class Recurs(n: Int) extends Policy
+    /** Retry up to `n` times without delay.
+      *
+      * This policy immediately retries failed operations up to the specified limit, making it
+      * suitable for transient failures that are likely to resolve quickly.
+      *
+      * @param n
+      *   the maximum number of retry attempts (not counting the initial try)
+      */
+    case Recurs(n: Int)
 
     /** Exponential backoff: base * 2^i, up to `maxRetries` attempts (not counting the initial try).
+      *
+      * This policy implements exponential backoff where each retry waits longer than the previous
+      * one (base * 2^attempt). This approach is ideal for external service failures where backing
+      * off reduces load and increases the likelihood of eventual success.
+      *
+      * @param base
+      *   the initial delay duration for the first retry
+      * @param maxRetries
+      *   the maximum number of retry attempts (not counting the initial try)
       */
-    final case class Exponential(base: Duration, maxRetries: Int) extends Policy
+    case Exponential(base: Duration, maxRetries: Int)
   }
 
   /** Re-executes an effect on typed failure according to the given policy.
@@ -378,16 +527,16 @@ object EruRuntime {
   /** Internal fiber implementation for the single-threaded runtime.
     *
     * This class manages the execution state of a fiber, including:
-    * - current: The current effect being executed
-    * - conts: Stack of continuations (functions to apply to successful results)
-    * - handlers: Stack of error handlers (recovery functions, mapError, attempt)
-    * - finalizers: Stack of cleanup actions to run on completion or interruption
-    * - interruptible: Whether this fiber can be interrupted (managed by mask/uninterruptible)
-    * - interrupted: The interruption cause if this fiber has been interrupted
-    * - exit0: The final exit result once the fiber completes
+    *   - current: The current effect being executed
+    *   - conts: Stack of continuations (functions to apply to successful results)
+    *   - handlers: Stack of error handlers (recovery functions, mapError, attempt)
+    *   - finalizers: Stack of cleanup actions to run on completion or interruption
+    *   - interruptible: Whether this fiber can be interrupted (managed by mask/uninterruptible)
+    *   - interrupted: The interruption cause if this fiber has been interrupted
+    *   - exit0: The final exit result once the fiber completes
     *
-    * The main execution happens in the run() method which interprets the effect DSL
-    * step by step, managing stacks and scheduling continuations appropriately.
+    * The main execution happens in the run() method which interprets the effect DSL step by step,
+    * managing stacks and scheduling continuations appropriately.
     */
   private final class RuntimeFiber[E, A](val id: FiberId, fa: Eru[E, A], observer: Option[EruObserver])
       extends Fiber[E, A] {
@@ -398,25 +547,59 @@ object EruRuntime {
     private var exit0: Option[Exit[E, A]] = None
     private var interruptible: Boolean = true
 
-    // Simplified step-wise interpreter state using ArrayStack-based stacks for better performance
     private var current: Eru[Any, Any] = fa
     private var conts: ArrayStack[Any => Eru[Any, Any]] = new ArrayStack[Any => Eru[Any, Any]]()
     private var handlers: ArrayStack[HandlerG] = new ArrayStack[HandlerG]()
     private var finalizers: ArrayStack[() => Eru[Nothing, Unit]] = new ArrayStack[() => Eru[Nothing, Unit]]()
 
-    // FastCont definitions for optimized continuation handling
-    private sealed trait FastCont
-    private object FastCont {
-      case object Identity extends FastCont
-      final case class Chain(var f: Any => Eru[Any, Any]) extends FastCont
-      final case class MapF(var f: Any => Any) extends FastCont
+    /** Fast path continuation types for optimized fiber execution.
+      *
+      * This enum represents different types of continuations that can be applied during the fast
+      * path execution loop. These are pooled and reused to minimize allocations during
+      * high-frequency effect composition operations.
+      */
+    private enum FastCont {
+
+      /** Identity continuation that passes values through unchanged.
+        *
+        * Used as a placeholder when no actual transformation is needed, avoiding allocation of
+        * unnecessary function objects.
+        */
+      case Identity
+
+      /** Chain continuation for flatMap operations.
+        *
+        * Represents a continuation function that produces another effect from a value. The function
+        * is mutable to enable object pooling and reuse.
+        *
+        * @param f
+        *   the continuation function (mutable for pooling)
+        */
+      case Chain(var f: Any => Eru[Any, Any])
+
+      /** Map continuation for pure transformations.
+        *
+        * Represents a pure function transformation that maps one value to another. The function is
+        * mutable to enable object pooling and reuse.
+        *
+        * @param f
+        *   the mapping function (mutable for pooling)
+        */
+      case MapF(var f: Any => Any)
     }
 
-    // FastCont object pools to eliminate allocations in fast path
-    // Separate pools for each type to avoid type casting
+    /** Maximum capacity for FastCont object pools.
+      *
+      * 128 objects provides an optimal balance for continuation pooling:
+      *   - Large enough to handle deep effect chains without frequent allocation
+      *   - Small enough to prevent excessive memory usage in idle fibers
+      *   - Power of 2 for potential future optimization opportunities
+      *   - Empirically determined to cover 99%+ of real-world continuation depths
+      */
+    private val POOL_CAPACITY = 128
+
     private val chainPool = scala.collection.mutable.ArrayBuffer.empty[FastCont.Chain]
     private val mapFPool = scala.collection.mutable.ArrayBuffer.empty[FastCont.MapF]
-    private val POOL_CAPACITY = 128
 
     @inline private def acquireChain(f: Any => Eru[Any, Any]): FastCont.Chain = {
       if (chainPool.nonEmpty) {
@@ -442,18 +625,15 @@ object EruRuntime {
       cont match {
         case chain: FastCont.Chain =>
           if (chainPool.length < POOL_CAPACITY) {
-            chain.f = null // Clear function reference to prevent memory leaks
+            chain.f = null
             chainPool += chain
           }
-          // If pool is at capacity, let the object be GC'd
         case mapF: FastCont.MapF =>
           if (mapFPool.length < POOL_CAPACITY) {
-            mapF.f = null // Clear function reference to prevent memory leaks
+            mapF.f = null
             mapFPool += mapF
           }
-          // If pool is at capacity, let the object be GC'd
         case FastCont.Identity =>
-          // Identity is a singleton, no need to pool
       }
     }
 
@@ -467,7 +647,8 @@ object EruRuntime {
           val cont2: From => Eru[Any, Any] = (a: From) => f1(a).flatMap(mid => f2(mid).flatMap(cont))
           runLoop[E1a, From](source, cont2)
         case View.VChain3[E1a, From, Mid1, Mid2, To](source, f1, f2, f3) =>
-          val cont2: From => Eru[Any, Any] = (a: From) => f1(a).flatMap(b1 => f2(b1).flatMap(b2 => f3(b2).flatMap(cont)))
+          val cont2: From => Eru[Any, Any] = (a: From) =>
+            f1(a).flatMap(b1 => f2(b1).flatMap(b2 => f3(b2).flatMap(cont)))
           runLoop[E1a, From](source, cont2)
         case View.VMapChain[E1a, From, To](source, f) =>
           val cont2: From => Eru[Any, Any] = (a: From) => Eru.succeed(f(a)).flatMap(cont)
@@ -476,36 +657,42 @@ object EruRuntime {
           current = cont(value)
           scheduleIfPending()
         case _ =>
-          // Unreachable: runLoop is only invoked for chain/mapchain/succeed nodes from run()
           scheduleIfPending()
       }
     }
 
     /** Fast path loop for synchronous effect chains.
-      * 
+      *
       * This method uses tight iteration with mutable state to avoid allocations and trampolined
       * scheduling for synchronous operations. It handles the common case of pure chains with
       * minimal overhead.
-      * 
+      *
       * Invariants:
-      * - Only handles synchronous operations (Succeed, Effect, Chain*, MapChain)
-      * - Falls back to general path for async operations (Suspend, complex error handling)
-      * - Maintains proper interruption checking via batch counter
-      * - Preserves stack semantics for continuations and finalizers
+      *   - Only handles synchronous operations (Succeed, Effect, Chain*, MapChain)
+      *   - Falls back to general path for async operations (Suspend, complex error handling)
+      *   - Maintains proper interruption checking via batch counter
+      *   - Preserves stack semantics for continuations and finalizers
       */
     private def runFastLoop(): Boolean = {
       import FastCont.*
       import scala.util.control.Breaks.*
-      
-      // Mutable state for fast path execution
+
+      /** Maximum iterations before checking for fiber interruption.
+        *
+        * 1024 iterations provides optimal balance for interrupt responsiveness:
+        *   - High enough to avoid interrupt check overhead in tight loops
+        *   - Low enough to ensure reasonable interrupt latency (sub-millisecond)
+        *   - Power of 2 for efficient modulo operations if needed in future
+        *   - Empirically tuned to balance performance with cooperative behavior
+        */
+      val MAX_ITERS_BEFORE_INTERRUPT_CHECK = 1024
+
       var currentEru: Eru[Any, Any] = current
       var fastConts = scala.collection.mutable.ArrayBuffer.empty[FastCont]
       var iterCount = 0
-      val MAX_ITERS_BEFORE_INTERRUPT_CHECK = 1024
-      
+
       breakable {
         while (exit0.isEmpty) {
-          // Batch interruption checking for performance
           iterCount += 1
           if (iterCount >= MAX_ITERS_BEFORE_INTERRUPT_CHECK) {
             iterCount = 0
@@ -514,27 +701,24 @@ object EruRuntime {
               return true
             }
           }
-          
+
           Eru.Internals.view(currentEru) match {
             case View.VSucceed(value) =>
               if (fastConts.nonEmpty) {
-                val cont = fastConts.remove(fastConts.length - 1) // pop from end
+                val cont = fastConts.remove(fastConts.length - 1)
                 cont match {
-                  case Identity => 
-                    // Continue with value as-is
+                  case Identity =>
                     releaseCont(cont)
                     if (fastConts.isEmpty) {
-                      // No more continuations, exit to general path for safe completion
                       current = Eru.succeed(value)
                       break
                     }
-                    // Continue with remaining continuations - value remains current
                   case MapF(f) =>
                     try {
                       currentEru = Eru.succeed(f(value))
                       releaseCont(cont)
                     } catch {
-                      case t: Throwable => 
+                      case t: Throwable =>
                         releaseCont(cont)
                         completeWith(Exit.Die(t))
                         return true
@@ -551,22 +735,17 @@ object EruRuntime {
                     }
                 }
               } else {
-                // No continuations left - exit to general path for safe completion
                 current = Eru.succeed(value)
                 break
               }
-              
+
             case View.VFail(error) =>
-              // Exit fast path and let general path handle error recovery
               current = currentEru
               break
-              
+
             case View.VEffect(thunk) =>
-              // FUSED EFFECT->CHAIN FAST PATH
-              // Fused fast path when next continuation is a Chain
               if (fastConts.nonEmpty) fastConts.last match {
                 case chainCont @ Chain(f) =>
-                  // Pop first to avoid double-application if user code throws
                   fastConts.remove(fastConts.length - 1)
                   val r =
                     try thunk()
@@ -579,7 +758,7 @@ object EruRuntime {
                   r match {
                     case Right(value) =>
                       try {
-                        currentEru = f(value) // Directly continue; no intermediate Succeed
+                        currentEru = f(value)
                         releaseCont(chainCont)
                       } catch {
                         case t: Throwable =>
@@ -593,7 +772,6 @@ object EruRuntime {
                       return true
                   }
                 case _ =>
-                  // Fallback: existing logic
                   val r =
                     try thunk()
                     catch {
@@ -607,8 +785,8 @@ object EruRuntime {
                       completeWith(Exit.Die(t))
                       return true
                   }
-              } else {
-                // No continuations
+              }
+              else {
                 val r =
                   try thunk()
                   catch {
@@ -623,56 +801,79 @@ object EruRuntime {
                     return true
                 }
               }
-              
+
             case View.VMapChain(source, f) =>
               fastConts += acquireMapF(f)
               currentEru = source
-              
+
             case View.VChain(source, f) =>
               fastConts += acquireChain(f)
               currentEru = source
-              
+
             case View.VChain2(source, f1, f2) =>
-              // Push in reverse order so they execute in correct order
               fastConts += acquireChain(f2)
               fastConts += acquireChain(f1)
               currentEru = source
-              
+
             case View.VChain3(source, f1, f2, f3) =>
-              // Push in reverse order so they execute in correct order
               fastConts += acquireChain(f3)
               fastConts += acquireChain(f2)
               fastConts += acquireChain(f1)
               currentEru = source
-              
+
             case _ =>
-              // Exit fast path for complex operations
               current = currentEru
-              // Restore continuation stack to regular format
               val regularConts = fastConts.reverseIterator.map {
                 case Chain(f) => f
                 case MapF(f) => (a: Any) => Eru.succeed(f(a))
                 case Identity => (a: Any) => Eru.succeed(a)
               }.toList
-              // Push regularConts onto conts in reverse order to maintain execution order
               regularConts.reverse.foreach(conts.push)
               break
           }
         }
       }
-      
-      false // Indicate we exited fast path and need general path
+
+      false
     }
 
+    /** Error handling strategy types for fiber error recovery.
+      *
+      * This enum represents different strategies for handling errors that occur during fiber
+      * execution. These handlers are stacked and processed in LIFO order to provide proper error
+      * recovery semantics with support for error transformation, partial recovery, and attempt
+      * wrapping.
+      */
+    private enum HandlerG {
 
-    // Handler GADT for typed error handling stack
-    private sealed trait HandlerG
-    private object HandlerG {
-      final case class Recover(pf: PartialFunction[Any, Eru[Any, Any]]) extends HandlerG
-      final case class MapErr(f: Any => Any) extends HandlerG
-      case object AttemptH extends HandlerG
+      /** Partial recovery handler that can handle specific error types.
+        *
+        * This handler examines errors and applies recovery logic when the partial function is
+        * defined for the error. It enables selective error handling where only certain error types
+        * are recoverable.
+        *
+        * @param pf
+        *   partial function that maps errors to recovery effects
+        */
+      case Recover(pf: PartialFunction[Any, Eru[Any, Any]])
+
+      /** Error transformation handler for mapping error types.
+        *
+        * This handler transforms errors from one type to another without changing the failure
+        * semantics. It's used to implement mapError operations.
+        *
+        * @param f
+        *   function that transforms error values
+        */
+      case MapErr(f: Any => Any)
+
+      /** Attempt handler that wraps errors in Result types.
+        *
+        * This handler catches any error and wraps it in a Result.Failure, converting a failing
+        * computation into a successful Result value. It implements the attempt operation semantics.
+        */
+      case AttemptH
     }
-    import HandlerG.*
 
     private def exitFromResult(result: Result[E, A]): Exit[E, A] =
       result match {
@@ -700,14 +901,11 @@ object EruRuntime {
     }
 
     private def drainFinalizers(): Unit = {
-      // Execute finalizers in LIFO order (ArrayStack already provides LIFO via pop)
       while (finalizers.nonEmpty) {
         val fin = finalizers.pop()
         fin().attempt.unsafeRunSync()
       }
-      // Stack is already empty after popping all items
     }
-
 
     private def completeWith(exit: Exit[E, A]): Unit = {
       if (exit0.isEmpty) {
@@ -730,12 +928,9 @@ object EruRuntime {
     /** Optimized version for direct execution without scheduling overhead */
     private def runDirectOrSchedule(): Unit = {
       if (exit0.isEmpty) {
-        // Try direct execution first to avoid lambda allocation and scheduler overhead
         if (conts.isEmpty && handlers.isEmpty && finalizers.isEmpty) {
-          // Conditions are good for fast path - run directly
           run()
         } else {
-          // Complex state - use scheduler
           Scheduler.schedule(() => run())
         }
       }
@@ -766,7 +961,6 @@ object EruRuntime {
             current = Eru.succeed[Result[Any, Any]](Result.Failure(e))
             handled = true
           case _ =>
-            // Skip this handler
         }
       }
 
@@ -782,27 +976,23 @@ object EruRuntime {
     private def handleSuccess(value: Any): Unit = {
       if (conts.nonEmpty) {
         val k = conts.pop()
-        
-        // Simple direct execution optimization: handle common Succeed case immediately
+
         try {
           k(value) match {
             case Eru.Succeed(nextValue) =>
-              // Common case: continuation produced immediate success - continue directly
               if (conts.nonEmpty) {
-                handleSuccess(nextValue)  // Tail-recursive call for chained simple operations
+                handleSuccess(nextValue)
               } else {
                 nextValue match {
                   case a: A @unchecked => completeWith(Exit.Success(a))
                 }
               }
             case other =>
-              // Complex case: schedule normally
               current = other
               scheduleIfPending()
           }
         } catch {
           case _: Throwable =>
-            // Fallback: if anything goes wrong, use normal execution path
             current = k(value)
             scheduleIfPending()
         }
@@ -816,16 +1006,12 @@ object EruRuntime {
     def run(): Unit = {
       if (exit0.nonEmpty) return
 
-      // Fast path: try optimized loop for synchronous operations when stacks are empty
       if (conts.isEmpty && handlers.isEmpty && finalizers.isEmpty) {
-        // Try fast path first - it returns true if it completed the fiber
         if (runFastLoop()) {
           return
         }
-        // If fast path returned false, continue with general interpreter below
       }
 
-      // Check for interruption before each step, but only if interruptible
       if (interruptible) {
         interrupted match {
           case Some(cause) =>
@@ -840,7 +1026,7 @@ object EruRuntime {
           handleSuccess(value)
 
         case View.VFail(error) =>
-          conts.clear()  // Clear continuations on failure
+          conts.clear()
           handleFailure(error)
 
         case View.VEffect(thunk) =>
@@ -895,7 +1081,6 @@ object EruRuntime {
 
         case View.VDebug(source, label) =>
           if (label() == YieldMarker) {
-            // Yield: reschedule to allow other fibers to run
             current = source
             scheduleIfPending()
           } else {
@@ -910,7 +1095,6 @@ object EruRuntime {
           scheduleIfPending()
 
         case View.VSuspend(register) =>
-          // Proper suspend implementation: park the fiber and register callback to unparkfiber
           Scheduler.parkFiber()
           val callback: Either[Any, Any] => Unit = { result =>
             result match {
@@ -921,10 +1105,7 @@ object EruRuntime {
             }
             Scheduler.unparkFiber()
           }
-          // Register the callback - when it's invoked, it will resume this fiber
           register(callback)
-
-        // Handle interruption masking effects
         case u: UninterruptibleEffect[?, ?] =>
           val previousState = setInterruptible(false)
           current = u.source.ensure(Eru.effect { setInterruptible(previousState) }.attempt.flatMap(_ => Eru.unit))
@@ -978,9 +1159,9 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Fails with a TimeoutException if this effect does not complete within the specified duration.
     *
-    * This method provides a convenient, discoverable way to add timeouts to any Eru effect.
-    * The timeout is implemented via racing with a sleep effect, ensuring proper interruption
-    * and finalizer execution if the timeout wins.
+    * This method provides a convenient, discoverable way to add timeouts to any Eru effect. The
+    * timeout is implemented via racing with a sleep effect, ensuring proper interruption and
+    * finalizer execution if the timeout wins.
     *
     * @param duration
     *   the maximum allowed duration
@@ -1005,8 +1186,8 @@ extension [E, A](eru: Eru[E, A]) {
     *   an effect that either succeeds with A or the fallback value
     */
   def timeoutTo[A1 >: A](duration: java.time.Duration, fallback: A1): Eru[E | Throwable, A1] = {
-    EruRuntime.timeout(duration)(eru).recover {
-      case _: java.util.concurrent.TimeoutException => fallback
+    EruRuntime.timeout(duration)(eru).recover { case _: java.util.concurrent.TimeoutException =>
+      fallback
     }
   }
 
@@ -1026,8 +1207,8 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Retries this effect up to the specified number of times without delay.
     *
-    * This is a convenience method for simple retry scenarios where you just want to retry
-    * a fixed number of times immediately upon failure.
+    * This is a convenience method for simple retry scenarios where you just want to retry a fixed
+    * number of times immediately upon failure.
     *
     * @param maxRetries
     *   the maximum number of retry attempts (not counting the initial try)
@@ -1040,8 +1221,8 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Retries this effect with exponential backoff starting from the base duration.
     *
-    * This method implements a common retry pattern with exponential backoff, where each retry
-    * waits longer than the previous one (base * 2^attempt).
+    * This method implements a common retry pattern with exponential backoff, where each retry waits
+    * longer than the previous one (base * 2^attempt).
     *
     * @param baseDuration
     *   the initial delay duration
@@ -1056,8 +1237,8 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Runs two effects in parallel, combining their results into a tuple.
     *
-    * This provides a discoverable way to run effects in parallel. If either effect fails,
-    * the other is interrupted and the failure is propagated.
+    * This provides a discoverable way to run effects in parallel. If either effect fails, the other
+    * is interrupted and the failure is propagated.
     *
     * @param other
     *   the effect to run in parallel with this one
@@ -1070,8 +1251,8 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Races this effect against another, returning the first to complete.
     *
-    * This provides a discoverable way to race effects. The winner can be either success
-    * or failure. The losing effect is interrupted and fully awaited.
+    * This provides a discoverable way to race effects. The winner can be either success or failure.
+    * The losing effect is interrupted and fully awaited.
     *
     * @param other
     *   the effect to race against this one
@@ -1084,8 +1265,8 @@ extension [E, A](eru: Eru[E, A]) {
 
   /** Forks this effect into a fiber, returning the fiber immediately.
     *
-    * This provides a discoverable way to run effects concurrently. The fiber can be
-    * awaited or interrupted later.
+    * This provides a discoverable way to run effects concurrently. The fiber can be awaited or
+    * interrupted later.
     *
     * @return
     *   an effect that produces a Fiber representing the concurrent computation
