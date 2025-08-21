@@ -334,13 +334,10 @@ object EruMacros {
     val tpe = TypeRepr.of[T]
     val tpeSym = tpe.typeSymbol
 
-    // Generate different derivations based on the type structure
     if (tpeSym.flags.is(Flags.Case)) {
-      // Case class - generate validation helpers using proper AST construction
       val caseFields = tpeSym.caseFields
 
       if (caseFields.nonEmpty) {
-        // For case classes, provide comprehensive validation
         '{
           new EruDerivations[T] {
             override def validateAll(instance: T): net.ghoula.eru.Eru[String, T] = {
@@ -352,7 +349,6 @@ object EruMacros {
           }
         }
       } else {
-        // Fallback for case classes without fields
         '{
           new EruDerivations[T] {
             override def validateAll(instance: T): net.ghoula.eru.Eru[String, T] =
@@ -391,18 +387,8 @@ object EruMacros {
         }
       }
     } else {
-      // Generic type - provide basic validation and utility methods
       '{
-        new EruDerivations[T] {
-          override def pure(value: T): net.ghoula.eru.Eru[Nothing, T] =
-            net.ghoula.eru.Eru.succeed(value)
-
-          override def validate(value: T)(predicate: T => Boolean, error: String): net.ghoula.eru.Eru[String, T] =
-            if (predicate(value)) net.ghoula.eru.Eru.succeed(value)
-            else net.ghoula.eru.Eru.fail(error)
-
-          // Note: nonNull method uses trait default implementation to avoid duplication
-        }
+        new EruDerivations[T] {}
       }
     }
   }
@@ -496,22 +482,16 @@ object EruMacros {
   )(using q: Quotes): Expr[net.ghoula.eru.Eru[E, A]] = {
     import q.reflect.*
 
-    // Track optimizations applied
     var optimizationsApplied = 0
 
-    // Analyze and optimize the expression tree
-    // Note: Not tail-recursive due to mutual recursion with optimizeSubterms
-    // This is acceptable for macro compilation as recursion depth is typically shallow
     def optimizeExpr(term: Term): Term = {
       term match {
-        // Optimize pure effect chains by detecting constant patterns
         case Apply(
               Select(Apply(TypeApply(Select(Ident("Eru"), "succeed"), _), List(literal)), "map"),
               List(Lambda(List(param), body))
             ) if literal.show.contains("Literal") =>
           body match {
             case Apply(fun, List(Ident(paramName))) if paramName == param.name =>
-              // Try to evaluate the function at compile time if it's a simple operation
               fun match {
                 case Select(Ident(_), "+") =>
                   report.info("Optimizing pure map chain with arithmetic operation", term.pos)
@@ -526,19 +506,16 @@ object EruMacros {
             case _ => optimizeSubterms(term)
           }
 
-        // Detect and optimize resource acquisition without proper cleanup
         case Apply(Select(_, methodName), args) if isResourceAcquisition(methodName) =>
           if (!hasEnsureInChain(term)) {
             report.warning(
               s"Resource acquisition '$methodName' detected without corresponding cleanup - consider using autoClose or ensure",
               term.pos
             )
-            // Suggest adding autoClose
             report.info("Consider: resource.autoClose instead of just resource", term.pos)
           }
           optimizeSubterms(term)
 
-        // Optimize nested flatMaps to avoid stack buildup
         case Apply(Select(Apply(Select(_, "flatMap"), List(_)), "flatMap"), List(_)) =>
           report.info(
             "Deep flatMap nesting detected - consider using for-comprehension for better performance",
@@ -547,7 +524,6 @@ object EruMacros {
           optimizationsApplied += 1
           optimizeSubterms(term)
 
-        // Detect inefficient error handling patterns
         case Apply(
               Select(Apply(Select(_, "attempt"), _), "flatMap"),
               List(Lambda(_, Apply(Select(_, "succeed"), _)))
@@ -559,13 +535,11 @@ object EruMacros {
           optimizationsApplied += 1
           optimizeSubterms(term)
 
-        // Optimize away identity operations
         case Apply(Select(receiver, "map"), List(Lambda(List(param), Ident(paramName)))) if paramName == param.name =>
           report.info("Identity map detected - removing unnecessary operation", term.pos)
           optimizationsApplied += 1
-          optimizeExpr(receiver) // Return the receiver without the identity map
+          optimizeExpr(receiver)
 
-        // Detect potential memory leaks from unclosed resources
         case Apply(TypeApply(Select(Ident("Eru"), "effect"), _), List(Lambda(_, body))) =>
           if (
             containsResourceAllocation(body) && !term.toString
@@ -575,12 +549,10 @@ object EruMacros {
           }
           optimizeSubterms(term)
 
-        // Default: recursively optimize sub-expressions
         case _ => optimizeSubterms(term)
       }
     }
 
-    // Helper to optimize sub-terms
     def optimizeSubterms(term: Term): Term = {
       term match {
         case Apply(fun, args) =>
@@ -591,14 +563,11 @@ object EruMacros {
       }
     }
 
-    // Helper to check if method name indicates resource acquisition
     def isResourceAcquisition(methodName: String): Boolean = {
       methodName.contains("open") || methodName.contains("connect") ||
       methodName.contains("acquire") || methodName.contains("create") ||
       methodName.contains("allocate")
     }
-
-    // Helper to check if term has ensure/cleanup in its chain using proper AST analysis
     def hasEnsureInChain(term: Term): Boolean = {
       def searchTerm(t: Term): Boolean = t match {
         case Apply(Select(_, name), _) if name == "ensure" || name == "autoClose" || name == "bracket" => true
@@ -609,7 +578,6 @@ object EruMacros {
       searchTerm(term)
     }
 
-    // Helper to check if lambda body contains resource allocation using proper AST analysis
     def containsResourceAllocation(body: Term): Boolean = {
       def searchForAllocation(t: Term): Boolean = t match {
         case Apply(Select(New(tpt), _), _) =>
@@ -625,7 +593,6 @@ object EruMacros {
       searchForAllocation(body)
     }
 
-    // Helper to identify resource types by their characteristics
     def isResourceType(typeName: String): Boolean = {
       val resourceIndicators = Set(
         "FileInputStream",
@@ -645,15 +612,12 @@ object EruMacros {
       typeName.contains("AutoCloseable") || typeName.contains("Closeable")
     }
 
-    // Perform optimization
     val optimizedTerm = optimizeExpr(expr.asTerm)
 
-    // Report optimization results
     if (optimizationsApplied > 0) {
       report.info(s"Applied $optimizationsApplied compile-time optimizations", expr.asTerm.pos)
     }
 
-    // Convert back to expression
     optimizedTerm.asExprOf[net.ghoula.eru.Eru[E, A]]
   }
 }
@@ -769,8 +733,6 @@ trait EruDerivations[T] {
       case None => net.ghoula.eru.Eru.fail("Value cannot be null")
     }
 
-  // Specialized methods generated for specific type categories:
-
   /** Performs comprehensive validation of all fields and constraints.
     *
     * This method is automatically generated for case classes and data types, providing field-level
@@ -783,7 +745,7 @@ trait EruDerivations[T] {
     *   an effect that succeeds if all validations pass, or accumulates all validation errors
     */
   def validateAll(instance: T): net.ghoula.eru.Eru[Any, T] =
-    net.ghoula.eru.Eru.succeed(instance) // Default implementation - enhanced for case classes
+    net.ghoula.eru.Eru.succeed(instance)
 
   /** Converts a resource instance to a resource-managed effect with automatic cleanup.
     *
@@ -796,7 +758,7 @@ trait EruDerivations[T] {
     *   an effect that manages the resource lifecycle automatically
     */
   def asResource(instance: T): net.ghoula.eru.Eru[Nothing, T] =
-    net.ghoula.eru.Eru.succeed(instance) // Default implementation - enhanced for AutoCloseable
+    net.ghoula.eru.Eru.succeed(instance)
 
   /** Uses a resource safely with guaranteed cleanup using bracket semantics.
     *
@@ -814,5 +776,5 @@ trait EruDerivations[T] {
     *   an effect that safely uses the resource and guarantees cleanup
     */
   def useResource[B](instance: T)(use: T => net.ghoula.eru.Eru[Throwable, B]): net.ghoula.eru.Eru[Throwable, B] =
-    use(instance) // Default implementation - enhanced for AutoCloseable with proper bracket semantics
+    use(instance)
 }
