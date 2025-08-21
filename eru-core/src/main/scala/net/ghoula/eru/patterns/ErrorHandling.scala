@@ -4,57 +4,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicReference
 
 import net.ghoula.eru.*
-
-/** Opaque types for enhanced domain integrity and type safety. */
-object DomainTypes {
-
-  /** Represents a count of retry attempts with compile-time safety. */
-  opaque type AttemptCount = Int
-
-  object AttemptCount {
-    def apply(value: Int): AttemptCount = {
-      require(value >= 0, "AttemptCount must be non-negative")
-      value
-    }
-
-    extension (count: AttemptCount) {
-      def value: Int = count
-      def increment: AttemptCount = count + 1
-      def +(other: Int): AttemptCount = count + other
-      def <(other: AttemptCount): Boolean = count < other
-      def >=(other: AttemptCount): Boolean = count >= other
-    }
-  }
-
-  /** Represents a jitter factor with constrained range [0.0, 1.0]. */
-  opaque type JitterFactor = Double
-
-  object JitterFactor {
-    def apply(value: Double): JitterFactor = {
-      require(value >= 0.0 && value <= 1.0, s"JitterFactor must be between 0.0 and 1.0, got: $value")
-      value
-    }
-
-    extension (factor: JitterFactor) {
-      def value: Double = factor
-    }
-  }
-
-  /** Represents a failure threshold with compile-time safety. */
-  opaque type FailureThreshold = Int
-
-  object FailureThreshold {
-    def apply(value: Int): FailureThreshold = {
-      require(value > 0, "FailureThreshold must be positive")
-      value
-    }
-
-    extension (threshold: FailureThreshold) {
-      def value: Int = threshold
-      def <=(other: Long): Boolean = threshold <= other
-    }
-  }
-}
+import net.ghoula.eru.{DataClassUtils, DomainTypes}
 
 /** Enhanced error handling patterns for more ergonomic recovery mechanisms.
   *
@@ -66,10 +16,43 @@ object DomainTypes {
 object ErrorHandling {
   import DomainTypes.*
 
-  /** Sophisticated retry policy with conditions and context awareness. */
+  /** Sophisticated retry policies providing flexible, context-aware retry strategies.
+    *
+    * RetryPolicy represents different retry strategies that can be applied to effects, each
+    * optimized for specific failure patterns and operational requirements. The policies follow
+    * Eru's "Radical Ergonomics" principle by providing intuitive configuration while maintaining
+    * correctness guarantees.
+    *
+    * All policies support:
+    *   - Context-aware retry decisions based on error type and attempt history
+    *   - Configurable delay calculations with overflow protection
+    *   - Integration with Eru's structured error handling
+    *
+    * @example
+    *   {{{ // Conditional retry for specific errors val policy =
+    *   RetryPolicy.conditional[NetworkError]( shouldRetryError = _.isTransient, maxAttempts = 3,
+    *   baseDelay = Duration.ofMillis(100) )
+    *
+    * // Jittered exponential backoff val jitteredPolicy = RetryPolicy.jitteredExponential(
+    * maxAttempts = 5, baseDelay = Duration.ofMillis(50), jitterFactor = 0.2 ) }}}
+    */
   enum RetryPolicy {
 
-    /** Retry based on error type predicate with exponential backoff. */
+    /** Conditional retry with exponential backoff based on error type predicate.
+      *
+      * This policy only retries errors that match the provided predicate, allowing fine-grained
+      * control over which errors should trigger retry attempts. Uses exponential backoff with
+      * configurable maximum delay to prevent excessive resource consumption.
+      *
+      * @param shouldRetryError
+      *   predicate to determine if an error should be retried
+      * @param maxAttempts
+      *   maximum number of retry attempts before giving up
+      * @param baseDelay
+      *   initial delay between attempts, doubled for each retry
+      * @param maxDelay
+      *   maximum delay cap to prevent unbounded exponential growth
+      */
     case Conditional(
       shouldRetryError: Any => Boolean,
       maxAttempts: AttemptCount,
@@ -77,7 +60,21 @@ object ErrorHandling {
       maxDelay: Duration
     )
 
-    /** Retry with jittered exponential backoff to avoid thundering herd. */
+    /** Exponential backoff with jitter to prevent thundering herd effects.
+      *
+      * This policy adds randomized jitter to exponential backoff delays, preventing multiple
+      * clients from retrying simultaneously after shared resource failures. The jitter factor
+      * controls the amount of randomization applied to delays.
+      *
+      * @param maxAttempts
+      *   maximum number of retry attempts before giving up
+      * @param baseDelay
+      *   initial delay between attempts, doubled for each retry
+      * @param jitterFactor
+      *   amount of randomization (0.0-1.0) applied to delays
+      * @param random
+      *   random number generator for jitter calculations
+      */
     case JitteredExponential(
       maxAttempts: AttemptCount,
       baseDelay: Duration,
@@ -85,7 +82,17 @@ object ErrorHandling {
       random: scala.util.Random
     )
 
-    /** Retry based on elapsed time limit rather than attempt count. */
+    /** Time-bounded retry policy based on elapsed duration rather than attempt count.
+      *
+      * This policy continues retrying as long as the total elapsed time remains within the
+      * specified limit. Useful for scenarios where timing matters more than attempt count, such as
+      * real-time processing or user-facing operations.
+      *
+      * @param timeLimit
+      *   maximum total time to spend retrying before giving up
+      * @param baseDelay
+      *   fixed delay between retry attempts
+      */
     case TimeBasedCircuitBreaker(
       timeLimit: Duration,
       baseDelay: Duration
@@ -130,7 +137,7 @@ object ErrorHandling {
     val lastErrors: List[Any] = Nil
   ) {
 
-    /** Total elapsed time since first attempt. */
+    /** Total elapsed time since the first attempt. */
     def elapsedTime: Duration = Duration.between(startTime, Instant.now())
 
     /** Adds an error to the context history. */
@@ -147,18 +154,12 @@ object ErrorHandling {
     }
 
     /** Hash code based on all fields. */
-    override def hashCode(): Int = {
-      val prime = 31
-      var result = 1
-      result = prime * result + startTime.hashCode()
-      result = prime * result + totalAttempts.hashCode()
-      result = prime * result + lastErrors.hashCode()
-      result
-    }
+    override def hashCode(): Int =
+      DataClassUtils.hashCodeFor(startTime, totalAttempts, lastErrors)
 
     /** String representation for debugging. */
     override def toString: String =
-      s"RetryContext($startTime, $totalAttempts, $lastErrors)"
+      DataClassUtils.toStringFor("RetryContext", startTime, totalAttempts, lastErrors)
   }
 
   object RetryContext {
@@ -276,19 +277,12 @@ object ErrorHandling {
     }
 
     /** Hash code based on all fields. */
-    override def hashCode(): Int = {
-      val prime = 31
-      var result = 1
-      result = prime * result + state.hashCode()
-      result = prime * result + failures.hashCode()
-      result = prime * result + successes.hashCode()
-      result = prime * result + lastFailureTime.hashCode()
-      result
-    }
+    override def hashCode(): Int =
+      DataClassUtils.hashCodeFor(state, failures, successes, lastFailureTime)
 
     /** String representation for debugging. */
     override def toString: String =
-      s"CircuitBreakerState($state, $failures, $successes, $lastFailureTime)"
+      DataClassUtils.toStringFor("CircuitBreakerState", state, failures, successes, lastFailureTime)
   }
 
   private object CircuitBreakerState {
@@ -353,25 +347,20 @@ object ErrorHandling {
       }
     }
 
-    private def onSuccess(): Unit = {
+    /** Helper method to atomically update circuit breaker state using compare-and-set. */
+    private def updateStateAtomically(stateUpdater: CircuitBreakerState => CircuitBreakerState): Unit = {
       var currentState = atomicState.get()
-      var newState = currentState.state match {
-        case CircuitState.HalfOpen =>
-          val newSuccesses = currentState.successes + 1
-          if (newSuccesses >= successThreshold) {
-            currentState.copy(state = CircuitState.Closed, failures = 0L, successes = 0L)
-          } else {
-            currentState.copy(successes = newSuccesses)
-          }
-        case CircuitState.Closed =>
-          currentState.copy(failures = 0L)
-        case CircuitState.Open =>
-          currentState.copy(failures = 0L)
-      }
+      var newState = stateUpdater(currentState)
 
       while (!atomicState.compareAndSet(currentState, newState)) {
         currentState = atomicState.get()
-        newState = currentState.state match {
+        newState = stateUpdater(currentState)
+      }
+    }
+
+    private def onSuccess(): Unit = {
+      updateStateAtomically { currentState =>
+        currentState.state match {
           case CircuitState.HalfOpen =>
             val newSuccesses = currentState.successes + 1
             if (newSuccesses >= successThreshold) {
@@ -389,23 +378,9 @@ object ErrorHandling {
 
     private def onFailure(): Unit = {
       val now = Some(Instant.now())
-      var currentState = atomicState.get()
-      var newFailures = currentState.failures + 1
-      var newState = currentState.copy(
-        failures = newFailures,
-        lastFailureTime = now,
-        state = if (failureThreshold <= newFailures && currentState.state != CircuitState.Open) {
-          CircuitState.Open
-        } else {
-          currentState.state
-        },
-        successes = if (failureThreshold <= newFailures) 0L else currentState.successes
-      )
-
-      while (!atomicState.compareAndSet(currentState, newState)) {
-        currentState = atomicState.get()
-        newFailures = currentState.failures + 1
-        newState = currentState.copy(
+      updateStateAtomically { currentState =>
+        val newFailures = currentState.failures + 1
+        currentState.copy(
           failures = newFailures,
           lastFailureTime = now,
           state = if (failureThreshold <= newFailures && currentState.state != CircuitState.Open) {
@@ -429,10 +404,10 @@ object ErrorHandling {
     }
 
     /** Hash code based on message. */
-    override def hashCode(): Int = message.hashCode()
+    override def hashCode(): Int = DataClassUtils.hashCodeFor(message)
 
     /** String representation for debugging. */
-    override def toString: String = s"CircuitBreakerOpen($message)"
+    override def toString: String = DataClassUtils.toStringFor("CircuitBreakerOpen", message)
   }
 
   object CircuitBreakerOpen {
@@ -463,22 +438,15 @@ object ErrorHandling {
     }
 
     /** Hash code based on all fields. */
-    override def hashCode(): Int = {
-      val prime = 31
-      var result = 1
-      result = prime * result + error.hashCode()
-      result = prime * result + timestamp.hashCode()
-      result = prime * result + attempt.hashCode()
-      result = prime * result + context.hashCode()
-      result
-    }
+    override def hashCode(): Int =
+      DataClassUtils.hashCodeFor(error, timestamp, attempt, context)
 
     /** String representation for debugging. */
     override def toString: String =
-      s"ErrorWithContext($error, $timestamp, $attempt, $context)"
+      DataClassUtils.toStringFor("ErrorWithContext", error, timestamp, attempt, context)
   }
 
-  object ErrorWithContext {
+  private object ErrorWithContext {
 
     /** Creates a new ErrorWithContext. */
     def apply[E](
@@ -493,7 +461,7 @@ object ErrorHandling {
   /** Enhanced error accumulator for collecting multiple errors with context. */
   final class ErrorAccumulator[E](val errors: List[ErrorWithContext[E]]) {
 
-    /** Adds an error to the accumulator with current timestamp and attempt information. */
+    /** Adds an error to the accumulator with the current timestamp and attempt information. */
     def add(error: E, attempt: AttemptCount, context: Map[String, Any] = Map.empty): ErrorAccumulator[E] =
       ErrorAccumulator(ErrorWithContext(error, Instant.now(), attempt, context) :: errors)
 
@@ -542,10 +510,10 @@ object ErrorHandling {
     }
 
     /** Hash code based on errors list. */
-    override def hashCode(): Int = errors.hashCode()
+    override def hashCode(): Int = DataClassUtils.hashCodeFor(errors)
 
     /** String representation for debugging. */
-    override def toString: String = s"ErrorAccumulator($errors)"
+    override def toString: String = DataClassUtils.toStringFor("ErrorAccumulator", errors)
   }
 
   object ErrorAccumulator {
