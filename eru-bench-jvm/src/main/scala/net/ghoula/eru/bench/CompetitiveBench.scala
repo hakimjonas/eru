@@ -61,7 +61,7 @@ class CompetitiveBench {
     * Values represent the number of flatMap operations chained together, testing performance
     * degradation as chain length increases.
     */
-  @Param(Array("8"))
+  @Param(Array("8", "16", "299", "300"))
   var depth: Int = uninitialized
 
   /** Pre-constructed Eru effect chain for benchmarking. */
@@ -197,5 +197,71 @@ class CompetitiveBench {
   @Benchmark
   def catsEffect(): Int = {
     catsProgram.unsafeRunSync()
+  }
+
+  /** Benchmarks Eru's error handling performance with failure paths.
+    *
+    * This benchmark measures Eru's error propagation and recovery performance by constructing
+    * effect chains that deliberately fail at various points and use recovery mechanisms. This
+    * tests the efficiency of Eru's error handling infrastructure under realistic failure
+    * scenarios.
+    *
+    * @return
+    *   the recovered integer result from the failed effect chain
+    */
+  @Benchmark
+  def eruFailurePath(): Int = {
+    val failureProgram = Eru.succeed(0)
+      .flatMap(_ => Eru.fail("deliberate failure"))
+      .recover { case "deliberate failure" => depth }
+      .flatMap(x => Eru.succeed(x + 1))
+    
+    failureProgram.unsafeRunSync()
+  }
+
+  /** Benchmarks ZIO's error handling performance with failure paths.
+    *
+    * This benchmark measures ZIO's error propagation and recovery performance using equivalent
+    * failure and recovery patterns to the Eru benchmark. Tests ZIO's error handling efficiency
+    * under the same failure scenarios.
+    *
+    * @return
+    *   the recovered integer result from the failed ZIO chain
+    */
+  @Benchmark
+  def zioFailurePath(): Int = {
+    val failureProgram = ZIO.succeed(0)
+      .flatMap(_ => ZIO.fail("deliberate failure"))
+      .catchAll {
+        case "deliberate failure" => ZIO.succeed(depth)
+        case other => ZIO.fail(other)
+      }
+      .flatMap(x => ZIO.succeed(x + 1))
+    
+    Unsafe.unsafe { implicit unsafe =>
+      _root_.zio.Runtime.default.unsafe.run(failureProgram).getOrThrowFiberFailure()
+    }
+  }
+
+  /** Benchmarks Cats Effect's error handling performance with failure paths.
+    *
+    * This benchmark measures Cats Effect's error propagation and recovery performance using
+    * equivalent failure and recovery patterns. Tests IO's error handling efficiency under
+    * realistic failure scenarios.
+    *
+    * @return
+    *   the recovered integer result from the failed IO chain
+    */
+  @Benchmark
+  def catsEffectFailurePath(): Int = {
+    val failureProgram = IO.pure(0)
+      .flatMap(_ => IO.raiseError(new RuntimeException("deliberate failure")))
+      .handleErrorWith {
+        case _: RuntimeException => IO.pure(depth)
+        case other => IO.raiseError(other)
+      }
+      .flatMap(x => IO.pure(x + 1))
+    
+    failureProgram.unsafeRunSync()
   }
 }

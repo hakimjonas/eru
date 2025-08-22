@@ -17,14 +17,11 @@ import net.ghoula.eru.CorePrelude.*
   */
 final class EruMonadLawsSpec extends FunSuite {
 
-  // Test values for law verification
   private val testValue = 42
   private val testError = "test error"
   private val f: Int => Eru[String, String] = x => Eru.succeed(s"f($x)")
   private val g: String => Eru[String, Int] = s => Eru.succeed(s.length)
   private val h: Int => Int = _ * 2
-
-  // ===== MONAD LAWS =====
 
   test("Left Identity: Eru.succeed(a).flatMap(f) == f(a)") {
     val left = Eru.succeed(testValue).flatMap(f).unsafeRunSync()
@@ -89,8 +86,6 @@ final class EruMonadLawsSpec extends FunSuite {
     assertEquals(leftNegative, rightNegative)
   }
 
-  // ===== FUNCTOR LAWS =====
-
   test("Functor Identity: eru.map(identity) == eru") {
     val originalEffect = Eru.succeed(testValue)
     val left = originalEffect.map(identity).unsafeRunSync()
@@ -123,8 +118,6 @@ final class EruMonadLawsSpec extends FunSuite {
       failingEffect.map(h).map(_ + 1).unsafeRunSync()
     }
   }
-
-  // ===== APPLICATIVE LAWS =====
 
   test("Applicative Identity: pure(identity) <*> v = v") {
     val effect = Eru.succeed(testValue)
@@ -159,8 +152,6 @@ final class EruMonadLawsSpec extends FunSuite {
     assertEquals(composed, sequential)
     assertEquals(composed, testValue.toString.length)
   }
-
-  // ===== ADDITIONAL ALGEBRAIC PROPERTIES =====
 
   test("map/flatMap coherence: eru.map(f) == eru.flatMap(f.andThen(Eru.succeed))") {
     val originalEffect = Eru.succeed(testValue)
@@ -200,8 +191,6 @@ final class EruMonadLawsSpec extends FunSuite {
 
     assertEquals(left, right)
   }
-
-  // ===== EDGE CASES AND STACK SAFETY =====
 
   test("stack safety for deep flatMap chains") {
     def deepChain(n: Int): Eru[Nothing, Int] = {

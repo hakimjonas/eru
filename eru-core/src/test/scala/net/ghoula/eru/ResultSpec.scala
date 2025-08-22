@@ -154,4 +154,89 @@ class ResultSpec extends FunSuite {
     assertEquals(unitSuccess, Result.Success(()))
     assertEquals(unitFailure, Result.Failure(()))
   }
+
+  test("Result.fold transforms Success to output type") {
+    val successResult = Result.Success(42)
+    val folded = Result.fold(successResult)(e => s"Error: $e", a => s"Success: $a")
+    assertEquals(folded, "Success: 42")
+  }
+
+  test("Result.fold transforms Failure to output type") {
+    val failureResult = Result.Failure("bad input")
+    val folded = Result.fold(failureResult)(e => s"Error: $e", a => s"Success: $a")
+    assertEquals(folded, "Error: bad input")
+  }
+
+  test("Result.fold handles different input and output types") {
+    val intResult: Result[String, Int] = Result.Success(100)
+    val stringResult: Result[String, Int] = Result.Failure("overflow")
+
+    val intFolded: Boolean = Result.fold(intResult)(_ => false, _ > 50)
+    val stringFolded: Boolean = Result.fold(stringResult)(_ => false, _ > 50)
+
+    assert(intFolded)
+    assert(!stringFolded)
+  }
+
+  test("Result.toEru converts Success to successful Eru") {
+    val result = Result.Success(42)
+    val eru = Result.toEru(result)
+    assertEquals(eru.unsafeRunSync(), 42)
+  }
+
+  test("Result.toEru converts Failure to failed Eru") {
+    val result = Result.Failure("error message")
+    val eru = Result.toEru(result)
+
+    interceptMessage[EruException[String]]("error message") {
+      eru.unsafeRunSync()
+    }
+  }
+
+  test("Result.toEru preserves error and success types") {
+    val stringError: Result[String, Int] = Result.Failure("string error")
+    val intSuccess: Result[String, Int] = Result.Success(123)
+
+    val eruFromError: Eru[String, Int] = Result.toEru(stringError)
+    val eruFromSuccess: Eru[String, Int] = Result.toEru(intSuccess)
+
+    assertEquals(eruFromSuccess.unsafeRunSync(), 123)
+    interceptMessage[EruException[String]]("string error") {
+      eruFromError.unsafeRunSync()
+    }
+  }
+
+  test("Result.toExit converts Success to Exit.Success") {
+    val result = Result.Success("value")
+    val exit = Result.toExit(result)
+    assertEquals(exit, Exit.Success("value"))
+  }
+
+  test("Result.toExit converts Throwable Failure to Exit.Die") {
+    val throwable = new RuntimeException("runtime error")
+    val result = Result.Failure(throwable)
+    val exit = Result.toExit(result)
+    assertEquals(exit, Exit.Die(throwable))
+  }
+
+  test("Result.toExit converts typed Failure to Exit.Failure") {
+    val result = Result.Failure("typed error")
+    val exit = Result.toExit(result)
+    assertEquals(exit, Exit.Failure("typed error"))
+  }
+
+  test("Result.toExit handles mixed error types correctly") {
+    val typedError: Result[String, Int] = Result.Failure("business error")
+    val exception = new IllegalArgumentException("invalid")
+    val throwableError: Result[Throwable, Int] = Result.Failure(exception)
+    val success: Result[String, Int] = Result.Success(42)
+
+    val typedExit = Result.toExit(typedError)
+    val throwableExit = Result.toExit(throwableError)
+    val successExit = Result.toExit(success)
+
+    assertEquals(typedExit, Exit.Failure("business error"))
+    assertEquals(throwableExit, Exit.Die(exception))
+    assertEquals(successExit, Exit.Success(42))
+  }
 }
