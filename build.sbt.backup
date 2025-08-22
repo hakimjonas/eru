@@ -44,7 +44,7 @@ ThisBuild / javacOptions ++= Seq("--release", "21")
 
 // ===== Project Definitions =====
 lazy val root = (project in file("."))
-  .aggregate(eruCoreJVM, eruCoreNative, eruRuntimeJVM, eruRuntimeNative, eruIntegrationTest)
+  .aggregate(eruCoreJVM, eruCoreNative, eruRuntimeJVM, eruRuntimeNative)
   .settings(
     name := "eru-root",
     publish / skip := true,
@@ -124,9 +124,6 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
       "org.scalameta" %%% "munit" % "1.1.1" % Test
     )
   )
-  .jvmSettings(
-    testFrameworks += new TestFramework("munit.Framework")
-  )
   .nativeSettings(
     testFrameworks += new TestFramework("munit.Framework"),
     nativeConfig ~= { c =>
@@ -148,16 +145,5 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % "2.1.20",
       "org.typelevel" %% "cats-effect" % "3.6.3"
-    )
-  )
-
-// ===== Integration Tests (JVM only) =====
-lazy val eruIntegrationTest = (project in file("eru-integration-test"))
-  .dependsOn(eruCoreJVM % "compile->compile;test->test", eruRuntimeJVM % "compile->compile;test->test")
-  .settings(
-    name := "eru-integration-test",
-    publish / skip := true,
-    libraryDependencies ++= Seq(
-      "org.scalameta" %% "munit" % "1.1.1" % Test
     )
   )

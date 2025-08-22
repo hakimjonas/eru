@@ -63,3 +63,10 @@ For technical details, see the design document: design/async.md
 - **Concurrency — Fibers and structured concurrency**: concurrency.md
 
 - **Observability — EruObserver and debugging**: observer.md
+
+## Public API Spec — Executable
+
+The full, end-to-end Public API Specification is part of the standard test suite and serves as executable documentation that demonstrates the unified API and its ergonomics.
+
+- Run all tests (includes the Public API spec): `sbt test`
+- Run just this suite by tag: `sbt testOnly -- -t integration`
