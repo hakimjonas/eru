@@ -1,6 +1,7 @@
 package net.ghoula.eru
 
 import munit.FunSuite
+
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive verification of monad laws for the Eru effect type.

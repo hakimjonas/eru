@@ -26,11 +26,7 @@ object extensions_runner {
       *   an Exit value representing the structured result of the execution
       */
     def runExit(): Exit[E, A] =
-      e.attempt.map {
-        case Result.Success(a) => Exit.Success(a)
-        case Result.Failure(err: Throwable) => Exit.Die(err)
-        case Result.Failure(err) => Exit.Failure(err.asInstanceOf[E])
-      }.unsafeRunSync()
+      e.attempt.map(Result.toExit).unsafeRunSync()
 
     /** Executes this effect with the provided observer for enhanced observability.
       *

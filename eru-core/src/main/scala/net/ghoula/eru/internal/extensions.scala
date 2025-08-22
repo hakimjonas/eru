@@ -84,10 +84,8 @@ object extensions {
       * @return
       *   the result of applying the appropriate function
       */
-    def fold[B](ifFailure: E => B, ifSuccess: A => B): B = result match {
-      case Result.Success(value) => ifSuccess(value)
-      case Result.Failure(error) => ifFailure(error)
-    }
+    def fold[B](ifFailure: E => B, ifSuccess: A => B): B =
+      Result.fold(result)(ifFailure, ifSuccess)
 
     /** Returns `true` if this `Result` is a `Success`, `false` otherwise.
       *
@@ -150,11 +148,7 @@ object extensions {
             result
         }
       }.attempt.flatMap {
-        case Result.Success(result) =>
-          result match {
-            case Result.Success(value) => Eru.succeed(value)
-            case Result.Failure(error) => Eru.fail(error)
-          }
+        case Result.Success(result) => Result.toEru(result)
         case Result.Failure(_) =>
           // Fallback in case of any issues - recompute
           eru
