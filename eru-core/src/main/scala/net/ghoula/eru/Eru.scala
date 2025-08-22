@@ -316,7 +316,7 @@ object Eru {
     * @return
     *   an effect that suspends until the callback is invoked
     */
-  def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E, A] =
+  private def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E, A] =
     Suspend(register)
 
   /** Creates an `Eru[Nothing, A]` that succeeds with the given pure value.
