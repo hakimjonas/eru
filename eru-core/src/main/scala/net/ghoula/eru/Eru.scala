@@ -541,14 +541,7 @@ object Eru {
         case Ensure(source, fin) =>
           tailcall(runWithStack(source, fins)).map { case (either, fs) => (either, fin :: fs) }
         case Suspend(register) =>
-          val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
-          val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
-          val (_, fsAfterReg) = runWithStack(register(cb), fins).result
-          while (cbBox.get.isEmpty) {
-            try java.lang.Thread.sleep(0)
-            catch { case _: InterruptedException => () }
-          }
-          done((cbBox.get.get, fsAfterReg))
+          handleSuspend(cb => runWithStack(register(cb), fins).result)
       }
 
     /** Executes all finalizers in FILO (First-In-Last-Out) order with proper nesting support.
@@ -585,6 +578,93 @@ object Eru {
           }
       }
 
+    /** Helper method to propagate left (error) results without modification */
+    private def propagateLeft[E, A](
+      errorResult: (Either[E, A], List[Finalizer])
+    ): TailRec[(Either[E, A], List[Finalizer])] =
+      done(errorResult)
+
+    /** Helper method for chaining a single continuation function */
+    private def chainSingle[E, A, B](
+      source: Eru[E, A],
+      continuation: A => Eru[E, B],
+      scope: ScopeId,
+      observer: EruObserver,
+      fins: List[Finalizer]
+    ): TailRec[(Either[E, B], List[Finalizer])] =
+      tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
+        case (Right(value), fs) => tailcall(runWithObsStack(continuation(value), scope, observer, fs))
+        case (Left(error), fs) => propagateLeft((Left(error), fs))
+      }
+
+    /** Helper method for chaining two continuation functions */
+    private def chainDouble[E, A, B, C](
+      source: Eru[E, A],
+      f1: A => Eru[E, B],
+      f2: B => Eru[E, C],
+      scope: ScopeId,
+      observer: EruObserver,
+      fins: List[Finalizer]
+    ): TailRec[(Either[E, C], List[Finalizer])] =
+      tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
+        case (Right(a), fs1) =>
+          tailcall(runWithObsStack(f1(a), scope, observer, fs1)).flatMap {
+            case (Right(b), fs2) => tailcall(runWithObsStack(f2(b), scope, observer, fs2))
+            case (Left(e), fs2) => propagateLeft((Left(e), fs2))
+          }
+        case (Left(e), fs1) => propagateLeft((Left(e), fs1))
+      }
+
+    /** Helper method for chaining three continuation functions */
+    private def chainTriple[E, A, B, C, D](
+      source: Eru[E, A],
+      f1: A => Eru[E, B],
+      f2: B => Eru[E, C],
+      f3: C => Eru[E, D],
+      scope: ScopeId,
+      observer: EruObserver,
+      fins: List[Finalizer]
+    ): TailRec[(Either[E, D], List[Finalizer])] =
+      tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
+        case (Right(a), fs1) =>
+          tailcall(runWithObsStack(f1(a), scope, observer, fs1)).flatMap {
+            case (Right(b), fs2) =>
+              tailcall(runWithObsStack(f2(b), scope, observer, fs2)).flatMap {
+                case (Right(c), fs3) => tailcall(runWithObsStack(f3(c), scope, observer, fs3))
+                case (Left(e2), fs3) => propagateLeft((Left(e2), fs3))
+              }
+            case (Left(e1), fs2) => propagateLeft((Left(e1), fs2))
+          }
+        case (Left(e0), fs1) => propagateLeft((Left(e0), fs1))
+      }
+
+    /** Helper method for handling Suspend case logic.
+      *
+      * This consolidates the common pattern of creating an AtomicReference callback box and waiting
+      * for async completion found in both runWithStack and runWithObsStack.
+      *
+      * @param executeRegister
+      *   function to execute the registration with appropriate context
+      * @tparam E
+      *   the error type
+      * @tparam A
+      *   the success type
+      * @return
+      *   TailRec computation with the suspended result
+      */
+    private def handleSuspend[E, A](
+      executeRegister: (Either[E, A] => Unit) => (Either[Any, Any], List[Finalizer])
+    ): TailRec[(Either[E, A], List[Finalizer])] = {
+      val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
+      val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
+      val (_, fsAfterReg) = executeRegister(cb)
+      while (cbBox.get.isEmpty) {
+        try java.lang.Thread.sleep(0)
+        catch { case _: InterruptedException => () }
+      }
+      done((cbBox.get.get, fsAfterReg))
+    }
+
     private def runWithObsStack[E, A](
       eru: Eru[E, A],
       scope: ScopeId,
@@ -599,34 +679,13 @@ object Eru {
         case Effect(thunk) =>
           done((thunk(), fins))
         case Chain(source, f) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
-            case (Right(value), fs) => tailcall(runWithObsStack(f(value), scope, observer, fs))
-            case (Left(error), fs) => done((Left(error), fs))
-          }
+          chainSingle(source, f, scope, observer, fins)
 
         case Chain2(source, f1, f2) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
-            case (Right(a), fs1) =>
-              tailcall(runWithObsStack(f1(a), scope, observer, fs1)).flatMap {
-                case (Right(b), fs2) => tailcall(runWithObsStack(f2(b), scope, observer, fs2))
-                case (Left(e), fs2) => done((Left(e), fs2))
-              }
-            case (Left(e), fs1) => done((Left(e), fs1))
-          }
+          chainDouble(source, f1, f2, scope, observer, fins)
 
         case Chain3(source, f1, f2, f3) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
-            case (Right(a), fs1) =>
-              tailcall(runWithObsStack(f1(a), scope, observer, fs1)).flatMap {
-                case (Right(b), fs2) =>
-                  tailcall(runWithObsStack(f2(b), scope, observer, fs2)).flatMap {
-                    case (Right(c), fs3) => tailcall(runWithObsStack(f3(c), scope, observer, fs3))
-                    case (Left(e2), fs3) => done((Left(e2), fs3))
-                  }
-                case (Left(e1), fs2) => done((Left(e1), fs2))
-              }
-            case (Left(e0), fs1) => done((Left(e0), fs1))
-          }
+          chainTriple(source, f1, f2, f3, scope, observer, fins)
 
         case MapChain(source, f) =>
           tailcall(runWithObsStack(source, scope, observer, fins)).map {
@@ -640,7 +699,7 @@ object Eru {
               if (pf.isDefinedAt(error)) {
                 tailcall(runWithObsStack(pf(error), scope, observer, fs))
               } else {
-                done((Left(error), fs))
+                propagateLeft((Left(error), fs))
               }
           }
         case MapError(source, f) =>
@@ -652,7 +711,7 @@ object Eru {
                 case (Right(b), fsR) => (Right((a, b)), fsR)
                 case (Left(e1), fsR) => (Left(e1), fsR)
               }
-            case (Left(e0), fsL) => done((Left(e0), fsL))
+            case (Left(e0), fsL) => propagateLeft((Left(e0), fsL))
           }
         case Attempt(source) =>
           tailcall(runWithObsStack(source, scope, observer, fins)).map {
@@ -665,14 +724,7 @@ object Eru {
         case Ensure(source, fin) =>
           tailcall(runWithObsStack(source, scope, observer, fin :: fins))
         case Suspend(register) =>
-          val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
-          val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
-          val (_, fsAfterReg) = runWithObsStack(register(cb), scope, observer, fins).result
-          while (cbBox.get.isEmpty) {
-            try java.lang.Thread.sleep(0)
-            catch { case _: InterruptedException => () }
-          }
-          done((cbBox.get.get, fsAfterReg))
+          handleSuspend(cb => runWithObsStack(register(cb), scope, observer, fins).result)
       }
 
     /** Observer-aware interpreter variant */
