@@ -202,20 +202,20 @@ class CompetitiveBench {
   /** Benchmarks Eru's error handling performance with failure paths.
     *
     * This benchmark measures Eru's error propagation and recovery performance by constructing
-    * effect chains that deliberately fail at various points and use recovery mechanisms. This
-    * tests the efficiency of Eru's error handling infrastructure under realistic failure
-    * scenarios.
+    * effect chains that deliberately fail at various points and use recovery mechanisms. This tests
+    * the efficiency of Eru's error handling infrastructure under realistic failure scenarios.
     *
     * @return
     *   the recovered integer result from the failed effect chain
     */
   @Benchmark
   def eruFailurePath(): Int = {
-    val failureProgram = Eru.succeed(0)
+    val failureProgram = Eru
+      .succeed(0)
       .flatMap(_ => Eru.fail("deliberate failure"))
       .recover { case "deliberate failure" => depth }
       .flatMap(x => Eru.succeed(x + 1))
-    
+
     failureProgram.unsafeRunSync()
   }
 
@@ -230,14 +230,15 @@ class CompetitiveBench {
     */
   @Benchmark
   def zioFailurePath(): Int = {
-    val failureProgram = ZIO.succeed(0)
+    val failureProgram = ZIO
+      .succeed(0)
       .flatMap(_ => ZIO.fail("deliberate failure"))
       .catchAll {
         case "deliberate failure" => ZIO.succeed(depth)
         case other => ZIO.fail(other)
       }
       .flatMap(x => ZIO.succeed(x + 1))
-    
+
     Unsafe.unsafe { implicit unsafe =>
       _root_.zio.Runtime.default.unsafe.run(failureProgram).getOrThrowFiberFailure()
     }
@@ -246,22 +247,222 @@ class CompetitiveBench {
   /** Benchmarks Cats Effect's error handling performance with failure paths.
     *
     * This benchmark measures Cats Effect's error propagation and recovery performance using
-    * equivalent failure and recovery patterns. Tests IO's error handling efficiency under
-    * realistic failure scenarios.
+    * equivalent failure and recovery patterns. Tests IO's error handling efficiency under realistic
+    * failure scenarios.
     *
     * @return
     *   the recovered integer result from the failed IO chain
     */
   @Benchmark
   def catsEffectFailurePath(): Int = {
-    val failureProgram = IO.pure(0)
+    val failureProgram = IO
+      .pure(0)
       .flatMap(_ => IO.raiseError(new RuntimeException("deliberate failure")))
       .handleErrorWith {
         case _: RuntimeException => IO.pure(depth)
         case other => IO.raiseError(other)
       }
       .flatMap(x => IO.pure(x + 1))
-    
+
     failureProgram.unsafeRunSync()
+  }
+
+  /** Benchmarks Eru's resource management performance with bracket patterns.
+    *
+    * This benchmark measures Eru's resource acquisition, usage, and cleanup performance using the
+    * bracket pattern. Tests the efficiency of Eru's ensure-based resource management under
+    * realistic scenarios with nested resource operations.
+    *
+    * @return
+    *   the result of resource operations with guaranteed cleanup
+    */
+  @Benchmark
+  def eruResourceManagement(): Int = {
+    def acquireResource(id: Int): Eru[Throwable, String] = Eru.effect(s"resource-$id")
+    def releaseResource(resource: String): Eru[Throwable, Unit] = { val _ = resource; Eru.effect(()) }
+    def useResource(resource: String): Eru[Throwable, Int] = Eru.effect(resource.length)
+
+    val program = (0 until depth / 10).foldLeft(Eru.succeed(0)) { (acc, i) =>
+      acc.flatMap { sum =>
+        acquireResource(i).bracket(releaseResource) { resource =>
+          useResource(resource).map(_ + sum)
+        }
+      }
+    }
+
+    program.unsafeRunSync()
+  }
+
+  /** Benchmarks ZIO's resource management performance with bracket patterns.
+    *
+    * This benchmark measures ZIO's resource acquisition, usage, and cleanup performance using ZIO's
+    * bracket semantics. Tests ZIO's resource management efficiency under equivalent scenarios to
+    * the Eru benchmark.
+    *
+    * @return
+    *   the result of resource operations with guaranteed cleanup
+    */
+  @Benchmark
+  def zioResourceManagement(): Int = {
+    def acquireResource(id: Int): UIO[String] = ZIO.succeed(s"resource-$id")
+    def releaseResource(resource: String): UIO[Unit] = { val _ = resource; ZIO.succeed(()) }
+    def useResource(resource: String): UIO[Int] = ZIO.succeed(resource.length)
+
+    val program = (0 until depth / 10).foldLeft(ZIO.succeed(0)) { (acc, i) =>
+      acc.flatMap { sum =>
+        ZIO.acquireReleaseWith(acquireResource(i))(releaseResource) { resource =>
+          useResource(resource).map(_ + sum)
+        }
+      }
+    }
+
+    Unsafe.unsafe { implicit unsafe =>
+      _root_.zio.Runtime.default.unsafe.run(program).getOrThrowFiberFailure()
+    }
+  }
+
+  /** Benchmarks Cats Effect's resource management performance with bracket patterns.
+    *
+    * This benchmark measures Cats Effect's resource acquisition, usage, and cleanup performance
+    * using IO's bracket semantics. Tests IO's resource management efficiency under equivalent
+    * scenarios to other effect systems.
+    *
+    * @return
+    *   the result of resource operations with guaranteed cleanup
+    */
+  @Benchmark
+  def catsEffectResourceManagement(): Int = {
+    def acquireResource(id: Int): IO[String] = IO.pure(s"resource-$id")
+    def releaseResource(resource: String): IO[Unit] = { val _ = resource; IO.pure(()) }
+    def useResource(resource: String): IO[Int] = IO.pure(resource.length)
+
+    val program = (0 until depth / 10).foldLeft(IO.pure(0)) { (acc, i) =>
+      acc.flatMap { sum =>
+        acquireResource(i).bracket(useResource(_).map(_ + sum))(releaseResource)
+      }
+    }
+
+    program.unsafeRunSync()
+  }
+
+  /** Benchmarks Eru's mixed workload performance with computation and I/O simulation.
+    *
+    * This benchmark measures Eru's performance under mixed workloads that combine CPU-intensive
+    * computations with I/O simulation (via effects). This tests Eru's efficiency in realistic
+    * application scenarios with varied operation types.
+    *
+    * @return
+    *   the result of mixed computation and I/O operations
+    */
+  @Benchmark
+  def eruMixedWorkload(): Int = {
+    def cpuIntensiveWork(n: Int): Int = {
+      var result = n
+      var i = 0
+      while (i < 100) {
+        result = (result * 31 + i) % 1000000
+        i += 1
+      }
+      result
+    }
+
+    val program = (0 until depth / 4).foldLeft(Eru.succeed(0)) { (acc, i) =>
+      acc.flatMap { sum =>
+        if (i % 3 == 0) {
+          // CPU intensive computation
+          Eru.effect(cpuIntensiveWork(i)).map(_ + sum)
+        } else {
+          // I/O simulation with potential failure and recovery
+          Eru
+            .effect(i * 2)
+            .flatMap(x => if (x % 7 == 0) Eru.fail("simulated I/O error") else Eru.succeed(x))
+            .recover { case _ => i }
+            .map(_ + sum)
+        }
+      }
+    }
+
+    program.unsafeRunSync()
+  }
+
+  /** Benchmarks ZIO's mixed workload performance with computation and I/O simulation.
+    *
+    * This benchmark measures ZIO's performance under equivalent mixed workloads combining
+    * CPU-intensive computations with I/O simulation. Tests ZIO's efficiency in realistic
+    * application scenarios with varied operation types.
+    *
+    * @return
+    *   the result of mixed computation and I/O operations
+    */
+  @Benchmark
+  def zioMixedWorkload(): Int = {
+    def cpuIntensiveWork(n: Int): Int = {
+      var result = n
+      var i = 0
+      while (i < 100) {
+        result = (result * 31 + i) % 1000000
+        i += 1
+      }
+      result
+    }
+
+    val program = (0 until depth / 4).foldLeft(ZIO.succeed(0)) { (acc, i) =>
+      acc.flatMap { sum =>
+        if (i % 3 == 0) {
+          // CPU intensive computation
+          ZIO.succeed(cpuIntensiveWork(i)).map(_ + sum)
+        } else {
+          // I/O simulation with potential failure and recovery
+          ZIO
+            .succeed(i * 2)
+            .flatMap(x => if (x % 7 == 0) ZIO.fail("simulated I/O error") else ZIO.succeed(x))
+            .catchAll(_ => ZIO.succeed(i))
+            .map(_ + sum)
+        }
+      }
+    }
+
+    Unsafe.unsafe { implicit unsafe =>
+      _root_.zio.Runtime.default.unsafe.run(program).getOrThrowFiberFailure()
+    }
+  }
+
+  /** Benchmarks Cats Effect's mixed workload performance with computation and I/O simulation.
+    *
+    * This benchmark measures Cats Effect's performance under equivalent mixed workloads combining
+    * CPU-intensive computations with I/O simulation. Tests IO's efficiency in realistic application
+    * scenarios with varied operation types.
+    *
+    * @return
+    *   the result of mixed computation and I/O operations
+    */
+  @Benchmark
+  def catsEffectMixedWorkload(): Int = {
+    def cpuIntensiveWork(n: Int): Int = {
+      var result = n
+      var i = 0
+      while (i < 100) {
+        result = (result * 31 + i) % 1000000
+        i += 1
+      }
+      result
+    }
+
+    val program = (0 until depth / 4).foldLeft(IO.pure(0)) { (acc, i) =>
+      acc.flatMap { sum =>
+        if (i % 3 == 0) {
+          // CPU intensive computation
+          IO(cpuIntensiveWork(i)).map(_ + sum)
+        } else {
+          // I/O simulation with potential failure and recovery
+          IO.pure(i * 2)
+            .flatMap(x => if (x % 7 == 0) IO.raiseError(new RuntimeException("simulated I/O error")) else IO.pure(x))
+            .handleError(_ => i)
+            .map(_ + sum)
+        }
+      }
+    }
+
+    program.unsafeRunSync()
   }
 }
