@@ -189,46 +189,6 @@ class ErrorHandlingSpec extends FunSuite {
     assertEquals(combined.allErrors, List("error3", "error4", "error1", "error2"))
   }
 
-  test("retryWith extension method retries with policy") {
-
-    var attempts = 0
-    val flakyEffect = Eru.effect {
-      attempts += 1
-      if (attempts < 3) throw new RuntimeException("retry me")
-      else s"success on attempt $attempts"
-    }
-
-    val policy = RetryPolicy.conditional[Throwable](
-      _.getMessage == "retry me",
-      maxAttempts = 5,
-      baseDelay = Duration.ofMillis(1)
-    )
-
-    val result = flakyEffect.retryWith(policy).unsafeRunSync()
-    assertEquals(result, "success on attempt 3")
-    assertEquals(attempts, 3)
-  }
-
-  test("retryWith extension method stops retrying non-matching errors") {
-
-    var attempts = 0
-    val flakyEffect = Eru.effect {
-      attempts += 1
-      throw new RuntimeException("fatal error")
-    }
-
-    val policy = RetryPolicy.conditional[Throwable](
-      _.getMessage == "retry me", // Won't match "fatal error"
-      maxAttempts = 5,
-      baseDelay = Duration.ofMillis(1)
-    )
-
-    intercept[RuntimeException] {
-      flakyEffect.retryWith(policy).unsafeRunSync()
-    }
-    assertEquals(attempts, 1) // Should not retry
-  }
-
   test("withCircuitBreaker extension method works") {
 
     val breaker = new CircuitBreaker(

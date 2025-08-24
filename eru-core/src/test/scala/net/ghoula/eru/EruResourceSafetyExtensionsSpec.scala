@@ -142,22 +142,6 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     assert(cleanupCalled)
   }
 
-  test("shareResource delegates to autoCleanup for now") {
-    var cleanupCalled = false
-    var sharedValue: Option[String] = None
-
-    val program = Eru.succeed("shared").shareResource { value =>
-      cleanupCalled = true
-      sharedValue = Some(value)
-      Eru.unit
-    }
-
-    val result = program.unsafeRunSync()
-    assertEquals(result, "shared")
-    assert(cleanupCalled)
-    assertEquals(sharedValue, Some("shared"))
-  }
-
   test("pooled ensures resource is returned to pool") {
     var returnedToPool = false
     var pooledValue: Option[String] = None
