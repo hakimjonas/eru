@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-28 15:25 (local)
+Last updated: 2025-08-28 23:31 (local)
 Target version: 1.0.0
 
 ---
@@ -21,10 +21,10 @@ Reference: docs-src/WORKING_PLAN.md (execution detail) and MANIFESTO.md (vision)
 
 ## Acceptance Criteria (Go/No-Go)
 
-- [ ] AC1: Canonical prelude works across modules; no `internal` in public surface.
+- [x] AC1: Canonical prelude works across modules; no `internal` in public surface.
 - [ ] AC2: `sbt check` green (mdoc, scalafix, scalafmt).
-- [ ] AC3: Core and Runtime tests green on JVM and Native (where configured).
-- [ ] AC4: Integration tests pass using only `net.ghoula.eru.prelude.*`.
+- [x] AC3: Core and Runtime tests green on JVM and Native (where configured).
+- [x] AC4: Integration tests pass using only `net.ghoula.eru.prelude.*`.
 - [ ] AC5: Full Scaladoc coverage for public APIs; guides compile via mdoc.
 - [ ] AC6: Lawfulness verified via ScalaCheck where applicable.
 - [ ] AC7: Observability documented and validated from userland.
@@ -48,7 +48,7 @@ Phase 0 — Boundary Hardening and Prelude Correctness
 
 Phase 1 — Documentation and Scaladoc Completeness
 - [ ] P1.1 Scaladoc on every public symbol (purpose, params, returns, examples).
-- [ ] P1.2 mdoc guides: Quickstart, Concurrency & Coordination, Resource Discipline, Reliability, Observability.
+- [x] P1.2 mdoc guides: Quickstart, Concurrency & Coordination, Resource Discipline, Reliability, Observability.
 - [ ] P1.3 `sbt check` green for docs.
 - [x] P1.4 Aggregated Scaladoc generation wired (sbt-unidoc via alias `genApiDocs`).
 
@@ -100,6 +100,22 @@ Phase 5 — CI and Release Hygiene (Final)
   - Began executing Phase 0 tasks. NA-1 marked In Progress: preparing to remove unmanaged source root injections in build.sbt to eliminate duplicate compilation (no code change applied in this step).
   - Added this update and will continue to log after each incremental, green build step.
 
+- 2025-08-28 23:15 — Phase 0 Complete; Public Surface Verified
+  - Unified `object prelude` in shared; removed duplicate definitions across source sets (P0.2, P0.3).
+  - RuntimeExtensions consolidated and exposed via the public surface; runner conveniences available without internal leakage (P0.1, P0.5).
+  - Negative compile-time guard validated by integration test `PublicSurfaceSpec` (P0.4).
+  - Build sanity green (P0.6).
+
+- 2025-08-28 23:22 — Phase 1 Kickoff; Docs Progress
+  - Updated guides to import only the unified prelude.
+  - Drafted Reliability guide (retries, backoff, timeouts) and updated Quickstart, Concurrency, Resources, and Observability docs (P1.2).
+  - Verified integration scenarios pass: zipPar, race, Deferred/Ref coordination (ConcurrencySpec).
+
+- 2025-08-28 23:31 — Momentum: Phase 1 Continues
+  - Keeping cadence: updating plan and prioritizing D1 (Scaladoc coverage for Prelude, RuntimeExtensions, EruObserver, Exit).
+  - Guides kept aligned with canonical prelude import; no API surface changes planned in this increment (D2).
+  - Next immediate action: begin adding missing Scaladoc headers to public symbols in RuntimeExtensions and Prelude (tracked under D1).
+
 ---
 
 ## Known Issues / Blockers (to be triaged and resolved in Phase 0)
@@ -120,15 +136,23 @@ Phase 5 — CI and Release Hygiene (Final)
 5) Sealed Eru extension errors and missing type params in runtime fast-path
 - Symptoms observed during the misconfigured build; expected to resolve once duplicate sources and mismatched views are eliminated.
 
+Status: These were addressed during Phase 0 and are no longer blocking; kept here for traceability.
+
 ---
 
 ## Next Actions (Short-Term)
 
-- [*] NA-1: Remove unmanaged source root injections from eruRuntime in build.sbt to prevent duplicate compilation (P0.6). Owner: maintainers. ETA: ASAP. Status: In Progress.
-- [ ] NA-2: Keep only one `prelude` (prefer shared) and one `RuntimeExtensions` in a consistent location; delete duplicates (P0.2, P0.3).
-- [ ] NA-3: Ensure CorePrelude exports via `api.PreludeApi` and Runtime exports via `api.RuntimePreludeApi` (P0.1, P0.5).
-- [ ] NA-4: Move `testkit` code that imports `munit` to test scope or a dedicated testkit module (P0.6 hygiene).
-- [ ] NA-5: Rebuild incrementally and update this plan after each green step (ideal workflow: build and tests pass after every step).
+- [x] NA-1: Remove unmanaged source root injections from eruRuntime in build.sbt to prevent duplicate compilation (P0.6). Owner: maintainers. ETA: ASAP. Status: Done.
+- [x] NA-2: Keep only one `prelude` (prefer shared) and one `RuntimeExtensions` in a consistent location; delete duplicates (P0.2, P0.3).
+- [x] NA-3: Ensure CorePrelude exports via `api.PreludeApi` and Runtime exports via `api.RuntimePreludeApi` (P0.1, P0.5).
+- [x] NA-4: Move `testkit` code that imports `munit` to test scope or a dedicated testkit module (P0.6 hygiene).
+- [*] NA-5: Rebuild incrementally and update this plan after each green step (ongoing cadence).
+
+New Phase 1 Actions:
+- [ ] D1: Complete Scaladoc coverage for all public APIs (P1.1). Prioritize Prelude, RuntimeExtensions, EruObserver, Exit.
+- [ ] D2: Refine and finalize guides content; keep mdoc disabled for now (P1.2 maintenance, P1.3 pending).
+- [ ] D3: Prepare to re-enable mdoc/unidoc in Phase 5 once content stabilizes; keep aliases clean.
+- [ ] D4: Start drafting property tests scaffolding for Phase 2 (Result/Eru laws; finalizers; retry schedule).
 
 ---
 
