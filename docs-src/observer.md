@@ -14,7 +14,7 @@ Eru includes a minimal observability footprint for program execution. You can at
 To use an observer, pass it to the unsafeRunSyncWith interpreter.
 
 ```scala
-import net.ghoula.eru.*
+import net.ghoula.eru.prelude.*
 
 class PrintingObserver extends EruObserver {
   def onEvent(e: EruEvent): Unit = println(e)

@@ -25,3 +25,9 @@ addSbtPlugin("ch.epfl.scala" % "sbt-tasty-mima" % "1.3.0")
 
 // Benchmarking
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.7")
+
+// Aggregated Scaladoc
+
+// Site + GitHub Pages publishing
+addSbtPlugin("com.github.sbt" % "sbt-site" % "1.6.0")
+addSbtPlugin("com.github.sbt" % "sbt-ghpages" % "0.8.0")

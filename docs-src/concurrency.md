@@ -9,7 +9,7 @@ The foundation of Eru is the ability to compose pure effects that describe compu
 For chains of pure computations (using Eru.succeed), Eru employs a construction-time optimization to fuse operations and reduce overhead.
 
 ```scala
-import net.ghoula.eru.*
+import net.ghoula.eru.prelude.*
 
 // Compose pure effects using for-comprehension
 val program = for {
@@ -34,7 +34,7 @@ Eru's concurrency primitives are designed to be non-blocking to align with the l
 Eru provides a non-blocking Semaphore. All acquisition methods like tryAcquire are effects that complete immediately with a boolean indicating success. A blocking acquire can be trivially built on top of tryAcquire if needed, but is not provided by default to encourage non-blocking design.
 
 ```scala
-import net.ghoula.eru.*
+import net.ghoula.eru.prelude.*
 import scala.concurrent.duration.*
 
 val program = for {

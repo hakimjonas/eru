@@ -1,5 +1,9 @@
 # Documentation Website Strategy for Eru
 
+Status: Deferred (pending further research)
+
+We will not implement website generation or Scaladoc site integration in the build at this time. The following document remains a plan and set of recommendations to be revisited after we complete a brief research spike (tooling selection, integration approaches, hosting). This deferral avoids churn and ensures we make an informed choice.
+
 ## Executive Summary
 
 Based on analysis of Eru's existing infrastructure and modern documentation trends, this document provides comprehensive recommendations for establishing a professional documentation website that showcases Eru's exceptional technical quality and competitive advantages.

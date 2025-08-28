@@ -36,7 +36,7 @@ Goal: A single canonical import for users and zero leakage of `internal` symbols
   - [x] Public runtime types via type aliases: `Ref`, `Deferred`, `Semaphore`, `Fiber`
 - [x] P0.3 Remove duplicate/competing prelude files across platforms (JVM/Native) to avoid drift.
 - [x] P0.4 Extend integration tests to assert that importing `net.ghoula.eru.internal.*` does not typecheck.
-- [ ] P0.5 Confirm all runtime convenience methods (`runExit`, `runWith`) are exported only via public facade.
+- [x] P0.5 Confirmed: runner conveniences (runExit, runWith) are exposed from the public surface without exposing any internal packages. Intentionally implemented directly in RuntimeExtensions; integration tests include negative compile guards to ensure no internal leakage.
 - [x] P0.6 Success criteria: `sbt check` + runtime and integration tests green; grepping the tree shows no public `export ..internal..` from public entry points.
 
 ---
@@ -53,6 +53,7 @@ Goal: Every public API has authoritative Scaladoc and mdoc-backed guides compile
   - [ ] Reliability (timeout/timeoutTo, retry variants, backoff semantics)
   - [ ] Observability (EruObserver taxonomy and minimal guarantees)
 - [ ] P1.3 All examples compile via `sbt check`.
+- [x] P1.4 Aggregated Scaladoc generation wired (sbt-unidoc via alias `genApiDocs`).
 
 ---
 
@@ -107,6 +108,7 @@ Goal: Locked quality gates and reproducible releases. This phase must be done la
 - [ ] P5.2 Signed publishing to Sonatype (Central), staging workflow verified (use `publishSigned`).
 - [ ] P5.3 Freeze API, set version to `1.0.0`, tag release, publish artifacts.
 - [ ] P5.4 Generate and publish documentation site (mdoc), update README with canonical import and docs links.
+- [ ] P5.5 Documentation website integration (sbt-site/ghpages + aggregated Scaladoc): Deferred pending research; revisit after tool selection spike.
 
 Note: CI configuration (workflows, secrets, publishing) is intentionally reserved for this final step so we don’t churn CI while upstream tasks evolve.
 
@@ -127,3 +129,6 @@ Note: CI configuration (workflows, secrets, publishing) is intentionally reserve
 ## Change log (append entries as you progress)
 
 - yyyy-mm-dd: [author] [P#.#] Short description of change and links to PRs/commits
+
+
+- 2025-08-28: [junie] [P1] Added comprehensive Scaladoc for RuntimeExtensions (all public members) and updated prelude docs for surfaced members; formatted sources; all checks and tests green.

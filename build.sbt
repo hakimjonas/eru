@@ -4,7 +4,6 @@ enablePlugins(SbtPgp)
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 import scalanativecrossproject.ScalaNativeCrossPlugin.autoImport.*
 import scala.scalanative.build.*
-import _root_.mdoc.MdocPlugin
 
 // ===== Build‑wide Settings =====
 ThisBuild / organization := "net.ghoula"
@@ -65,10 +64,10 @@ lazy val root = (project in file("."))
     addCommandAlias("benchValidationSuite", "benchBaseline; benchValidation; benchCore"),
 
     // Build and documentation aliases
-    addCommandAlias("prepare", "scalafixAll; scalafmtAll; scalafmtSbt; compile; test; eruCoreJVM/mdoc"),
+    addCommandAlias("prepare", "scalafixAll; scalafmtAll; scalafmtSbt; compile; test"),
     addCommandAlias(
       "check",
-      "eruCoreJVM/mdoc --check; scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
+      "scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
     )
   )
 
@@ -90,12 +89,6 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
       "org.scalameta" %%% "munit-scalacheck" % "1.1.0" % Test
     )
   )
-  .jvmSettings(
-    // --- MDoc Configuration ---
-    mdocIn := file("docs-src"),
-    mdocOut := file(".")
-  )
-  .jvmConfigure(_.enablePlugins(MdocPlugin))
   .nativeSettings(
     testFrameworks += new TestFramework("munit.Framework"),
     nativeConfig ~= { c =>

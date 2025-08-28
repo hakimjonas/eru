@@ -13,7 +13,7 @@ This guide shows how to model and run effectful programs with Eru's synchronous 
 ## Hello, Eru
 
 ```scala
-import net.ghoula.eru.Eru
+import net.ghoula.eru.prelude.*
 
 val program: Eru[Nothing, String] =
   Eru.succeed("hello, eru")
