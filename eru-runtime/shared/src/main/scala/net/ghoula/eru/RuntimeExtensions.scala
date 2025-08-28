@@ -2,8 +2,8 @@ package net.ghoula.eru
 
 /** Runtime extensions and constructors available from the unified prelude.
   *
-  * These enrich the Eru public API with concurrency, timeouts, retries,
-  * runner conveniences, and constructors for runtime data types.
+  * These enrich the Eru public API with concurrency, timeouts, retries, runner conveniences, and
+  * constructors for runtime data types.
   */
 object RuntimeExtensions {
 

@@ -57,7 +57,7 @@ object Semaphore {
     Eru.succeed(new RuntimeSemaphore(if (n < 0) 0L else n))
 
   private final class RuntimeSemaphore(init: Long) extends Semaphore {
-    private final val permits = new java.util.concurrent.atomic.AtomicLong(init)
+    private val permits = new java.util.concurrent.atomic.AtomicLong(init)
 
     def permitsAvailable: Eru[Nothing, Long] = Eru.succeed(permits.get())
 

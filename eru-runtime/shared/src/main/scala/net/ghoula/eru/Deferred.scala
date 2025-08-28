@@ -42,7 +42,7 @@ object Deferred {
     }
 
   private final class RuntimeDeferred[A] extends Deferred[A] {
-    private final val state = new java.util.concurrent.atomic.AtomicReference[Option[A]](None)
+    private val state = new java.util.concurrent.atomic.AtomicReference[Option[A]](None)
 
     def complete(a: A): Eru[Nothing, Boolean] =
       Eru.effect {

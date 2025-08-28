@@ -59,7 +59,7 @@ object Ref {
     Eru.succeed(new RuntimeRef[A](initial))
 
   private final class RuntimeRef[A](init: A) extends Ref[A] {
-    private final val state = new java.util.concurrent.atomic.AtomicReference(init)
+    private val state = new java.util.concurrent.atomic.AtomicReference(init)
 
     def get: Eru[Nothing, A] = Eru.effect(state.get()).attempt.map {
       case Result.Success(v) => v
