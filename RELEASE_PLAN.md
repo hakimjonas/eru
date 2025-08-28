@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-28 23:38 (local)
+Last updated: 2025-08-28 23:51 (local)
 Target version: 1.0.0
 
 ---
@@ -128,9 +128,17 @@ Phase 5 — CI and Release Hygiene (Final)
   - Updated api.PreludeApi Scaladoc with canonical import, extension families, and an example block aligned with unified prelude usage.
   - Revalidated build/tests matrix; no behavior changes.
 
- ---
+- 2025-08-28 23:51 — Phase 1 D1 Continues; Plan Update
+  - Timestamp updated; continuing Scaladoc coverage with focus on EruObserver and Exit next.
+  - Next actions: begin scaffolding for property-law tests planning (D4), keep mdoc disabled until Phase 5, and verify green after each incremental change.
 
-## Known Issues / Blockers (to be triaged and resolved in Phase 0)
+- 2025-08-28 23:51 — Phase 2 Scaffolding Started
+  - Marked D4 as In Progress. Will introduce ScalaCheck skeleton suites in Phase 2: ResultLawsSpec, EruLawsSpec, FinalizersLawSpec, RetryPolicySpec (planning only, no code added yet).
+  - Re-validated integration and observer specs green.
+
+ ---
+ 
+ ## Known Issues / Blockers (to be triaged and resolved in Phase 0)
 
 1) Duplicate source roots and files in eru-runtime
 - unmanagedSourceDirectories in build.sbt for eruRuntime (JVM/Native) includes `src/main/scala`, mixing with `shared/src/main/scala` and causing duplicate symbol definitions.
@@ -164,7 +172,7 @@ New Phase 1 Actions:
 - [ ] D1: Complete Scaladoc coverage for all public APIs (P1.1). Prioritize Prelude, RuntimeExtensions, EruObserver, Exit.
 - [ ] D2: Refine and finalize guides content; keep mdoc disabled for now (P1.2 maintenance, P1.3 pending).
 - [ ] D3: Prepare to re-enable mdoc/unidoc in Phase 5 once content stabilizes; keep aliases clean.
-- [ ] D4: Start drafting property tests scaffolding for Phase 2 (Result/Eru laws; finalizers; retry schedule).
+- [*] D4: Start drafting property tests scaffolding for Phase 2 (Result/Eru laws; finalizers; retry schedule).
 
 ---
 

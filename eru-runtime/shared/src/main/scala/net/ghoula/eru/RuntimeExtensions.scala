@@ -6,7 +6,7 @@ package net.ghoula.eru
   * constructors for runtime data types.
   *
   * @example
-  * {{{ import net.ghoula.eru.prelude.* import java.time.Duration
+  *   {{{ import net.ghoula.eru.prelude.* import java.time.Duration
   *
   * val a = Eru.succeed(1) val b = Eru.succeed(2)
   *

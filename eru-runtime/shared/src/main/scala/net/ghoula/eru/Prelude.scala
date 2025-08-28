@@ -8,7 +8,7 @@ package net.ghoula.eru
   * users get a single, canonical import with no exposure of internal packages.
   *
   * @example
-  * {{{ import net.ghoula.eru.prelude.* import java.time.Duration
+  *   {{{ import net.ghoula.eru.prelude.* import java.time.Duration
   *
   * // Core usage val hello: Eru[Nothing, String] = Eru.succeed("hello") val value: String =
   * hello.unsafeRunSync()
