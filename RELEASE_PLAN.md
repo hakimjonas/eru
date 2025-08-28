@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-28 23:31 (local)
+Last updated: 2025-08-28 23:38 (local)
 Target version: 1.0.0
 
 ---
@@ -116,7 +116,19 @@ Phase 5 — CI and Release Hygiene (Final)
   - Guides kept aligned with canonical prelude import; no API surface changes planned in this increment (D2).
   - Next immediate action: begin adding missing Scaladoc headers to public symbols in RuntimeExtensions and Prelude (tracked under D1).
 
----
+- 2025-08-28 23:35 — Phase 1 D1 Progress: RuntimeExtensions Scaladoc Enriched
+  - Added comprehensive example block to RuntimeExtensions header covering zipPar, race, timeout/timeoutTo, retryN, runExit, runWith.
+  - No behavior changes; public API unchanged. Prepping to verify build/tests green.
+
+- 2025-08-28 23:36 — Verification: Build and Tests Green
+  - Ran full build and a representative test matrix (core: EruSpec, ResultSpec, ExitSpec, ObserverSpec; runtime/integration: PublicSurfaceSpec, ConcurrencySpec). All passed.
+  - Proceeding with D1: Prelude examples added and verified; next incremental step is optional polish on EruObserver/Exit docs if gaps are found.
+
+- 2025-08-28 23:38 — Phase 1 D1 Progress: PreludeApi documentation polished
+  - Updated api.PreludeApi Scaladoc with canonical import, extension families, and an example block aligned with unified prelude usage.
+  - Revalidated build/tests matrix; no behavior changes.
+
+ ---
 
 ## Known Issues / Blockers (to be triaged and resolved in Phase 0)
 
