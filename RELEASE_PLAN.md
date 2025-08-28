@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-28 23:51 (local)
+Last updated: 2025-08-29 00:05 (local)
 Target version: 1.0.0
 
 ---
@@ -135,6 +135,20 @@ Phase 5 — CI and Release Hygiene (Final)
 - 2025-08-28 23:51 — Phase 2 Scaffolding Started
   - Marked D4 as In Progress. Will introduce ScalaCheck skeleton suites in Phase 2: ResultLawsSpec, EruLawsSpec, FinalizersLawSpec, RetryPolicySpec (planning only, no code added yet).
   - Re-validated integration and observer specs green.
+
+- 2025-08-29 00:00 — Phase 1 D1 Review Update
+  - Reviewed Scaladoc coverage for EruObserver and Exit; current content is sufficiently comprehensive for Phase 1 with minor polish items deferred.
+  - Phase 1 continues with small Scaladoc refinements while keeping builds green; D4 (property-law scaffolding) remains In Progress (planning only).
+  - Next: maintain docs alignment with the unified prelude, and prepare concrete test skeletons to land in Phase 2 without affecting current green state.
+
+- 2025-08-29 00:00 — Verification: Core and Integration Test Matrix Green
+  - Core suites passed: EruSpec (85), ResultSpec (32), ExitSpec (4), EruObserverSpec (5).
+  - Integration passed: PublicSurfaceSpec (2), ConcurrencySpec (3).
+  - No behavior changes; repository remains green.
+
+- 2025-08-29 00:05 — Momentum Continues
+  - Timestamp bump; Phase 1 remains active; next immediate focus: minor Scaladoc polish for Prelude/RuntimeExtensions and keeping docs aligned with unified prelude.
+  - mdoc/unidoc remain disabled per Temporary Build Note; repository stays green.
 
  ---
  
