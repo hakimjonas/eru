@@ -29,15 +29,15 @@ Last updated: TODO(maintainers)
 
 Goal: A single canonical import for users and zero leakage of `internal` symbols through the public surface.
 
-- [ ] P0.1 Replace any `export net.ghoula.eru.internal.*` from public objects with public facades (e.g., `api.PreludeApi`, `api.RuntimePreludeApi`).
-- [ ] P0.2 Ensure a single authoritative `object prelude` at `eru-runtime/shared` that re-exports:
-  - [ ] Core prelude (`CorePrelude.*`)
-  - [ ] Runtime extensions and runner conveniences (`RuntimeExtensions.*` which itself exports via public facade)
-  - [ ] Public runtime types via type aliases: `Ref`, `Deferred`, `Semaphore`, `Fiber`
-- [ ] P0.3 Remove duplicate/competing prelude files across platforms (JVM/Native) to avoid drift.
-- [ ] P0.4 Extend integration tests to assert that importing `net.ghoula.eru.internal.*` does not typecheck.
+- [x] P0.1 Replace any `export net.ghoula.eru.internal.*` from public objects with public facades (e.g., `api.PreludeApi`, `api.RuntimePreludeApi`).
+- [x] P0.2 Ensure a single authoritative `object prelude` at `eru-runtime/shared` that re-exports:
+  - [x] Core prelude (`CorePrelude.*`)
+  - [x] Runtime extensions and runner conveniences (`RuntimeExtensions.*` which itself exports via public facade)
+  - [x] Public runtime types via type aliases: `Ref`, `Deferred`, `Semaphore`, `Fiber`
+- [x] P0.3 Remove duplicate/competing prelude files across platforms (JVM/Native) to avoid drift.
+- [x] P0.4 Extend integration tests to assert that importing `net.ghoula.eru.internal.*` does not typecheck.
 - [ ] P0.5 Confirm all runtime convenience methods (`runExit`, `runWith`) are exported only via public facade.
-- [ ] P0.6 Success criteria: `sbt check` + runtime and integration tests green; grepping the tree shows no public `export ..internal..` from public entry points.
+- [x] P0.6 Success criteria: `sbt check` + runtime and integration tests green; grepping the tree shows no public `export ..internal..` from public entry points.
 
 ---
 
@@ -86,6 +86,11 @@ Goal: Establish a baseline and monitor for regressions in critical scenarios.
 - [ ] P4.2 Record baseline results (commit artifact or store in repo as text with date and environment).
 - [ ] P4.3 Define acceptable variance thresholds (document in PERFORMANCE.md or this plan).
 - [ ] P4.4 Optional: publish JMH results as CI artifacts.
+- [ ] P4.5 Comparative plan (Eru vs Cats Effect vs ZIO):
+  - [ ] P4.5.a Audit existing ~350 tests/benches to avoid duplication and identify gaps.
+  - [ ] P4.5.b Define fairness rules, shared scenario matrix, and uniform JMH settings.
+  - [ ] P4.5.c Create dev/BENCHMARKS_COMPARISON.md with methodology and matrix.
+  - [ ] P4.5.d Execute comparative benches only after Phases 0–3 are green; store results in complete_benchmark_results.txt with environment and SHAs.
 
 ---
 

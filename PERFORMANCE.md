@@ -88,3 +88,53 @@ value of Eru lies in its adherence to the principles of the Manifesto.
 We believe that this combination of correctness, ergonomics, and principled performance offers a compelling vision for
 modern functional programming in Scala 3. We present these findings for the community's review and hope that this work
 proves to be a useful contribution to the ongoing, collaborative effort to build better tools.
+## Comparative Benchmarks Plan (Eru vs Cats Effect vs ZIO)
+
+Goal: Provide a complete, fair, reproducible comparison across the most relevant dimensions for users: pure/effectful/mixed chains, memory pressure, concurrency, coordination, resource management, reliability (timeouts/retries), and observability overhead.
+
+Principles of fairness:
+- Same Scala version, JDK, JVM flags, hardware, and OS.
+- Warmups and iterations identical across suites (JMH configured uniformly).
+- Implement equivalent semantics, not identical code style (each library’s idioms, but same logical behavior and guarantees).
+- Avoid hidden advantages: no unsafe or non-portable shortcuts; keep default schedulers/executors unless explicitly noted.
+- Report and publish environment details (CPU, cores, RAM, JVM, OS), commit SHAs, and benchmark parameters.
+
+Required libraries:
+- Eru (current checkout)
+- Cats Effect 3.x (current stable)
+- ZIO 2.x (current stable)
+
+Scenario matrix:
+1) Computation chains
+   - Pure map/flatMap chains: small/medium/deep
+   - Effectful chains (Eru.effect / IO delay / ZIO effect)
+   - Mixed chains at varying densities (e.g., 10%, 50%, 90% effectful steps)
+   - Memory pressure variants (allocate small case classes vs. larger payloads)
+
+2) Concurrency primitives
+   - zipPar: pair and n-way composition
+   - race: deterministic winner/loser cases
+   - Fork/join throughput (spawn N small tasks; await all)
+   - Coordination: Ref get/set/update, Deferred complete/await, Semaphore withPermit/withPermits
+
+3) Resource management
+   - ensure/bracket costs (success/failure/defect paths)
+   - nested finalizers (FILO depth and overhead)
+
+4) Reliability
+   - timeout/timeoutTo semantics and overhead on success/failure/timeout cases
+   - retryN and exponential backoff (latency budget and CPU usage)
+
+5) Observability
+   - Overhead of simple observer hooks vs. baseline (where applicable)
+
+Output and reporting:
+- Use JMH median/mean + p95 + error margins.
+- For each scenario, record ops/ms (throughput) and/or ns/op (avg time) as appropriate.
+- Record GC profiler stats (-prof gc) and optionally stack profiler (-prof stack) for selected cases.
+- Store results in repo under complete_benchmark_results.txt with date, environment, and commit SHAs.
+
+Process and gating:
+- Do NOT implement until Phase 4 per RELEASE_PLAN/WORKING_PLAN.
+- Before adding new benches, audit existing ~350 tests/benches to avoid duplication and confirm coverage gaps.
+- Benchmarks must not change library internals (public API use only).

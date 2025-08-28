@@ -36,15 +36,15 @@ Reference: docs-src/WORKING_PLAN.md (execution detail) and MANIFESTO.md (vision)
 ## Phase Checklist
 
 Phase 0 — Boundary Hardening and Prelude Correctness
-- [ ] P0.1 Replace any public `export ..internal..` with public facades (e.g., api.PreludeApi, api.RuntimePreludeApi).
-- [ ] P0.2 Single authoritative `object prelude` export (prefer shared) with:
-  - [ ] CorePrelude.*
-  - [ ] RuntimeExtensions.* (runner conveniences re-exported via public facade)
-  - [ ] Public runtime type aliases: Ref, Deferred, Semaphore, Fiber
-- [ ] P0.3 Remove duplicate/competing prelude files across source sets (shared/jvm/native).
-- [ ] P0.4 Integration guard: attempts to import `net.ghoula.eru.internal.*` do not typecheck (tests/docs).
+- [x] P0.1 Replace any public `export ..internal..` with public facades (e.g., api.PreludeApi, api.RuntimePreludeApi).
+- [x] P0.2 Single authoritative `object prelude` export (prefer shared) with:
+  - [x] CorePrelude.*
+  - [x] RuntimeExtensions.* (runner conveniences re-exported via public facade)
+  - [x] Public runtime type aliases: Ref, Deferred, Semaphore, Fiber
+- [x] P0.3 Remove duplicate/competing prelude files across source sets (shared/jvm/native).
+- [x] P0.4 Integration guard: attempts to import `net.ghoula.eru.internal.*` do not typecheck (tests/docs).
 - [ ] P0.5 Runner conveniences (runExit, runWith) only via public facade; no internal leakage.
-- [ ] P0.6 Build sanity: sbt compile green after each structural step.
+- [x] P0.6 Build sanity: sbt compile green after each structural step.
 
 Phase 1 — Documentation and Scaladoc Completeness
 - [ ] P1.1 Scaladoc on every public symbol (purpose, params, returns, examples).
@@ -68,6 +68,8 @@ Phase 4 — Performance Guardrails
 - [ ] P4.2 Record baseline results in repo with environment info.
 - [ ] P4.3 Define variance thresholds.
 - [ ] P4.4 Optional: publish results as CI artifacts.
+- [ ] P4.5 Comparative suite plan: Eru vs Cats Effect vs ZIO — define fairness rules, common scenarios, uniform JMH settings.
+- [ ] P4.6 Execute comparative benches only after prior phases are green; store results in complete_benchmark_results.txt with full environment and SHAs.
 
 Phase 5 — CI and Release Hygiene (Final)
 - [ ] P5.1 CI matrix: `sbt check`, core/runtime Jvm+Native tests, integration tests, `sbt prepare`.

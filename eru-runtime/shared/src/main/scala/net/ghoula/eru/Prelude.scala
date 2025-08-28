@@ -1,6 +1,6 @@
 package net.ghoula.eru
 
-/** Unified public prelude for Eru on the JVM target.
+/** Unified public prelude for Eru.
   *
   * Usage: import net.ghoula.eru.prelude.*
   */
