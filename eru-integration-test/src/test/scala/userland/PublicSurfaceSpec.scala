@@ -14,4 +14,10 @@ final class PublicSurfaceSpec extends FunSuite {
     }
   }
 
+  test("internal names are not pulled in by the prelude import") {
+    assert(!scala.compiletime.testing.typeChecks("import net.ghoula.eru.prelude.*; val _: PreludeApi.type = ???"))
+    assert(
+      !scala.compiletime.testing.typeChecks("import net.ghoula.eru.prelude.*; val _: RuntimePreludeApi.type = ???")
+    )
+  }
 }

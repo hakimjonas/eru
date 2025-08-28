@@ -17,16 +17,13 @@ object EruRuntime {
       val id = FiberId.fresh()
       val exit: Exit[E, A] =
         fa.attempt.unsafeRunSync() match {
-          case Result.Success(a) => Exit.Success(a)
-          case Result.Failure(err) => err match {
-            case t: Throwable => Exit.Die(t)
-            case e            => Exit.Failure(e.asInstanceOf[E])
-          }
+          case Result.Success(a)  => Exit.Success(a)
+          case Result.Failure(err) => Exit.Failure(err)
         }
       new CompletedFiber[E, A](id, exit)
     }.attempt.map {
       case Result.Success(f) => f
-      case Result.Failure(t) => new CompletedFiber[FiberId, Nothing](FiberId.fresh(), Exit.Die(t)).asInstanceOf[Fiber[E, A]]
+      case Result.Failure(t) => new CompletedFiber[E, A](FiberId.fresh(), Exit.Die(t))
     }
 
   /** Runs two effects and combines their results. Implemented sequentially for portability. */
