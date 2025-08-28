@@ -77,5 +77,5 @@ object CorePrelude {
   // ===== EXTENSION METHODS =====
 
   /** Export all extension methods through the unified PreludeApi facade. */
-  export net.ghoula.eru.internal.PreludeApi.*
+  export net.ghoula.eru.api.PreludeApi.*
 }

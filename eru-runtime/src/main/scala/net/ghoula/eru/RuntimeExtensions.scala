@@ -3,7 +3,7 @@ package net.ghoula.eru
 object RuntimeExtensions {
   
   // Export runner conveniences
-  export net.ghoula.eru.internal.extensions_runner.*
+  export net.ghoula.eru.api.RuntimePreludeApi.*
   
   // Extension methods for Eru instances
   extension [E, A](eru: Eru[E, A]) {
