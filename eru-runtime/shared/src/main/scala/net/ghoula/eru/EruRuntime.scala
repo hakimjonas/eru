@@ -76,9 +76,36 @@ object EruRuntime {
     }
   }
 
-  /** Retry policy for simple recursive retries and exponential backoff. */
+  /** Retry policy for bounded retries with optional exponential backoff.
+    *
+    * Policies are deterministic and specify only the number of retries and, for backoff, the base
+    * delay used to compute per-attempt delays. Time computations are precise and derived from the
+    * attempt index `i` starting at 0 for the first retry.
+    *
+    * @example
+    *   {{@ import java.time.Duration // Retry up to 5 times with no delay between attempts val p1 =
+    *   Policy.Recurs(5)
+    *
+    * // Retry up to 3 times with exponential backoff starting at 10ms (10ms, 20ms, 40ms) val p2 =
+    * Policy.Exponential(Duration.ofMillis(10), 3)
+    * @}}
+    */
   enum Policy {
+
+    /** Retries at most `n` times with no delay between retries.
+      * @param n
+      *   maximum number of retries (not counting the initial attempt). Negative values are treated
+      *   as 0.
+      */
     case Recurs(n: Int)
+
+    /** Retries at most `maxRetries` times with exponential backoff delays `base * 2^i`.
+      * @param base
+      *   initial delay used for the first retry; subsequent retries double the delay
+      * @param maxRetries
+      *   maximum number of retries (not counting the initial attempt). Negative values are treated
+      *   as 0.
+      */
     case Exponential(base: Duration, maxRetries: Int)
   }
 

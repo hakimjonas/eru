@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-29 00:15 (local)
+Last updated: 2025-08-29 07:23 (local)
 Target version: 1.0.0
 
 ---
@@ -26,7 +26,7 @@ Reference: docs-src/WORKING_PLAN.md (execution detail) and MANIFESTO.md (vision)
 - [x] AC3: Core and Runtime tests green on JVM and Native (where configured).
 - [x] AC4: Integration tests pass using only `net.ghoula.eru.prelude.*`.
 - [ ] AC5: Full Scaladoc coverage for public APIs; guides compile via mdoc.
-- [ ] AC6: Lawfulness verified via ScalaCheck where applicable.
+- [x] AC6: Lawfulness verified via ScalaCheck where applicable.
 - [ ] AC7: Observability documented and validated from userland.
 - [ ] AC8: Performance baseline recorded; no significant regressions.
 - [ ] AC9: CI and signed publishing pipeline green; 1.0.0 tagged and published.
@@ -150,9 +150,25 @@ Phase 5 — CI and Release Hygiene (Final)
   - Timestamp bump; Phase 1 remains active; next immediate focus: minor Scaladoc polish for Prelude/RuntimeExtensions and keeping docs aligned with unified prelude.
   - mdoc/unidoc remain disabled per Temporary Build Note; repository stays green.
 
- ---
- 
- ## Known Issues / Blockers (to be triaged and resolved in Phase 0)
+- 2025-08-29 07:16 — Phase 2 Coverage Verified; Retry Guard Correction
+  - Property-based suites green: Result and Eru laws, finalizers exactly-once (incl. defect path), retry attempts/backoff and no-retry for defects (P2.1–P2.4 complete). P2.5 parity pending.
+  - Corrected retry implementation to avoid isInstanceOf; now uses pattern matching per scalafix and Manifesto. All tests re-run and green across core, runtime, and integration.
+
+- 2025-08-29 07:21 — Phase 1 D1 Polish: Retry Policy Scaladoc
+  - Enriched Scaladoc for EruRuntime.Policy (Recurs, Exponential) with parameter docs and examples.
+  - No behavior changes; preparing to verify build and a small test matrix.
+
+- 2025-08-29 07:23 — Phase 3 Minimal Observability Test
+  - Added ObservabilitySpec in integration tests asserting sequence ProgramStart -> Step -> ProgramEnd(Success) with debug.
+  - Confirms minimal event taxonomy and success path; further event scenarios and docs remain for P3.
+
+- 2025-08-29 07:25 — Phase 3 TypedFailure Observability Sequence
+  - Extended ObservabilitySpec to cover typed failure path (Outcome.TypedFailure); green.
+  - AC7 remains open; more sequences (defect, fork/join) and docs polish to follow.
+
+  ---
+  
+  ## Known Issues / Blockers (to be triaged and resolved in Phase 0)
 
 1) Duplicate source roots and files in eru-runtime
 - unmanagedSourceDirectories in build.sbt for eruRuntime (JVM/Native) includes `src/main/scala`, mixing with `shared/src/main/scala` and causing duplicate symbol definitions.
