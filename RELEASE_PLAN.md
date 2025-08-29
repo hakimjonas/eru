@@ -320,3 +320,10 @@ Action:
   - Implemented parity benches for fair scenarios: Composition, ErrorHandling, Resource, Retry (ZERO base), RunnerOverhead.
   - Executed JMH smoke run on .*ParityBench.*; raw output archived at benchmarks/raw/2025-08-29-121819-ParityBenches.txt.
   - Baseline updated with parity reference. Ready for idle-session full runs (bench, benchWithGC) under FAIRNESS.md.
+
+
+
+- 2025-08-29 13:42 — Phase 4 Scripted Smoke Trial
+  - Ran tools/run-benches.sh --mode=smoke to validate harness and artifact capture.
+  - Artifacts saved under benchmarks/raw with timestamp 2025-08-29-133359 (env + raw for EruMapFlatMapBench and ParityBenches).
+  - Next: schedule idle-session full runs via tools/run-benches.sh (default) and tools/run-benches.sh --gc; update Baseline-2025-08-29.md with tables and analysis after runs.

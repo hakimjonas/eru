@@ -1,0 +1,2359 @@
+[info] welcome to sbt 1.11.4 (Eclipse Adoptium Java 21.0.8)
+[info] loading global plugins from /home/hakim/.sbt/1.0/plugins
+[info] loading settings for project eru-build from plugins.sbt...
+[info] loading project definition from /home/hakim/personal/arda/eru/project
+[info] loading settings for project root from build.sbt...
+[info] set current project to eru-root (in build file:/home/hakim/personal/arda/eru/)
+[info] set current project to eru-bench-jvm (in build file:/home/hakim/personal/arda/eru/)
+[warn] sbt 0.13 shell syntax is deprecated; use slash syntax instead: Jmh / run
+[info] running (fork) org.openjdk.jmh.Main -wi 1 -i 1 -f1 -t1 .*ParityBench.*
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect
+[info] # Parameters: (depthStr = 8, path = success)
+[info] # Run progress: 0,00% complete, ETA 00:04:06
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 30,741 ops/ms
+[info] Iteration   1: 61,538 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect":
+[info]   61,538 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect
+[info] # Parameters: (depthStr = 8, path = shortCircuitAtHalf)
+[info] # Run progress: 0,81% complete, ETA 00:05:14
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 14,895 ops/ms
+[info] Iteration   1: 36,931 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect":
+[info]   36,931 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect
+[info] # Parameters: (depthStr = 32, path = success)
+[info] # Run progress: 1,63% complete, ETA 00:05:12
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 29,997 ops/ms
+[info] Iteration   1: 57,287 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect":
+[info]   57,287 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect
+[info] # Parameters: (depthStr = 32, path = shortCircuitAtHalf)
+[info] # Run progress: 2,44% complete, ETA 00:05:08
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 12,717 ops/ms
+[info] Iteration   1: 31,822 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect":
+[info]   31,822 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect
+[info] # Parameters: (depthStr = 64, path = success)
+[info] # Run progress: 3,25% complete, ETA 00:05:05
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 25,663 ops/ms
+[info] Iteration   1: 52,704 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect":
+[info]   52,704 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect
+[info] # Parameters: (depthStr = 64, path = shortCircuitAtHalf)
+[info] # Run progress: 4,07% complete, ETA 00:05:04
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 9,423 ops/ms
+[info] Iteration   1: 31,185 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect":
+[info]   31,185 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect
+[info] # Parameters: (depthStr = 128, path = success)
+[info] # Run progress: 4,88% complete, ETA 00:05:02
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 24,942 ops/ms
+[info] Iteration   1: 50,304 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect":
+[info]   50,304 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect
+[info] # Parameters: (depthStr = 128, path = shortCircuitAtHalf)
+[info] # Run progress: 5,69% complete, ETA 00:05:00
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 14,073 ops/ms
+[info] Iteration   1: 28,875 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.catsEffect":
+[info]   28,875 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.eru
+[info] # Parameters: (depthStr = 8, path = success)
+[info] # Run progress: 6,50% complete, ETA 00:04:57
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 27993,377 ops/ms
+[info] Iteration   1: 32696,262 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.eru":
+[info]   32696,262 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.eru
+[info] # Parameters: (depthStr = 8, path = shortCircuitAtHalf)
+[info] # Run progress: 7,32% complete, ETA 00:04:55
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 11084,922 ops/ms
+[info] Iteration   1: 12786,158 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.eru":
+[info]   12786,158 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.eru
+[info] # Parameters: (depthStr = 32, path = success)
+[info] # Run progress: 8,13% complete, ETA 00:04:53
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 26612,072 ops/ms
+[info] Iteration   1: 29861,054 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.eru":
+[info]   29861,054 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.eru
+[info] # Parameters: (depthStr = 32, path = shortCircuitAtHalf)
+[info] # Run progress: 8,94% complete, ETA 00:04:50
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 4310,191 ops/ms
+[info] Iteration   1: 4800,974 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.eru":
+[info]   4800,974 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.eru
+[info] # Parameters: (depthStr = 64, path = success)
+[info] # Run progress: 9,76% complete, ETA 00:04:48
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 25262,170 ops/ms
+[info] Iteration   1: 31522,991 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.eru":
+[info]   31522,991 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.eru
+[info] # Parameters: (depthStr = 64, path = shortCircuitAtHalf)
+[info] # Run progress: 10,57% complete, ETA 00:04:45
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2005,142 ops/ms
+[info] Iteration   1: 1893,802 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.eru":
+[info]   1893,802 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.eru
+[info] # Parameters: (depthStr = 128, path = success)
+[info] # Run progress: 11,38% complete, ETA 00:04:43
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 27751,738 ops/ms
+[info] Iteration   1: 32221,851 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.eru":
+[info]   32221,851 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.eru
+[info] # Parameters: (depthStr = 128, path = shortCircuitAtHalf)
+[info] # Run progress: 12,20% complete, ETA 00:04:40
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1053,765 ops/ms
+[info] Iteration   1: 690,501 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.eru":
+[info]   690,501 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.zio
+[info] # Parameters: (depthStr = 8, path = success)
+[info] # Run progress: 13,01% complete, ETA 00:04:38
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2488,746 ops/ms
+[info] Iteration   1: 4623,759 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.zio":
+[info]   4623,759 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.zio
+[info] # Parameters: (depthStr = 8, path = shortCircuitAtHalf)
+[info] # Run progress: 13,82% complete, ETA 00:04:36
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1841,020 ops/ms
+[info] Iteration   1: 2845,553 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.zio":
+[info]   2845,553 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.zio
+[info] # Parameters: (depthStr = 32, path = success)
+[info] # Run progress: 14,63% complete, ETA 00:04:34
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1073,796 ops/ms
+[info] Iteration   1: 1596,251 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.zio":
+[info]   1596,251 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.zio
+[info] # Parameters: (depthStr = 32, path = shortCircuitAtHalf)
+[info] # Run progress: 15,45% complete, ETA 00:04:31
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 765,057 ops/ms
+[info] Iteration   1: 1168,748 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.zio":
+[info]   1168,748 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.zio
+[info] # Parameters: (depthStr = 64, path = success)
+[info] # Run progress: 16,26% complete, ETA 00:04:28
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 578,219 ops/ms
+[info] Iteration   1: 864,256 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.zio":
+[info]   864,256 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.zio
+[info] # Parameters: (depthStr = 64, path = shortCircuitAtHalf)
+[info] # Run progress: 17,07% complete, ETA 00:04:25
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 383,606 ops/ms
+[info] Iteration   1: 578,063 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.zio":
+[info]   578,063 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.zio
+[info] # Parameters: (depthStr = 128, path = success)
+[info] # Run progress: 17,89% complete, ETA 00:04:23
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 287,612 ops/ms
+[info] Iteration   1: 414,075 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.zio":
+[info]   414,075 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.CompositionParityBench.zio
+[info] # Parameters: (depthStr = 128, path = shortCircuitAtHalf)
+[info] # Run progress: 18,70% complete, ETA 00:04:20
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 192,443 ops/ms
+[info] Iteration   1: 321,653 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.CompositionParityBench.zio":
+[info]   321,653 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ErrorHandlingParityBench.ceRecover
+[info] # Parameters: (path = success)
+[info] # Run progress: 19,51% complete, ETA 00:04:18
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 30,152 ops/ms
+[info] Iteration   1: 59,075 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ErrorHandlingParityBench.ceRecover":
+[info]   59,075 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ErrorHandlingParityBench.ceRecover
+[info] # Parameters: (path = failure)
+[info] # Run progress: 20,33% complete, ETA 00:04:15
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 27,489 ops/ms
+[info] Iteration   1: 57,498 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ErrorHandlingParityBench.ceRecover":
+[info]   57,498 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ErrorHandlingParityBench.eruRecover
+[info] # Parameters: (path = success)
+[info] # Run progress: 21,14% complete, ETA 00:04:12
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 21057,891 ops/ms
+[info] Iteration   1: 26250,890 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ErrorHandlingParityBench.eruRecover":
+[info]   26250,890 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ErrorHandlingParityBench.eruRecover
+[info] # Parameters: (path = failure)
+[info] # Run progress: 21,95% complete, ETA 00:04:10
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 15593,303 ops/ms
+[info] Iteration   1: 20878,707 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ErrorHandlingParityBench.eruRecover":
+[info]   20878,707 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ErrorHandlingParityBench.zioRecover
+[info] # Parameters: (path = success)
+[info] # Run progress: 22,76% complete, ETA 00:04:07
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 5915,384 ops/ms
+[info] Iteration   1: 8949,764 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ErrorHandlingParityBench.zioRecover":
+[info]   8949,764 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ErrorHandlingParityBench.zioRecover
+[info] # Parameters: (path = failure)
+[info] # Run progress: 23,58% complete, ETA 00:04:04
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 3181,288 ops/ms
+[info] Iteration   1: 5297,612 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ErrorHandlingParityBench.zioRecover":
+[info]   5297,612 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ResourceParityBench.catsEffect
+[info] # Parameters: (outcome = success)
+[info] # Run progress: 24,39% complete, ETA 00:04:02
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 21,281 ops/ms
+[info] Iteration   1: 57,786 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ResourceParityBench.catsEffect":
+[info]   57,786 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ResourceParityBench.catsEffect
+[info] # Parameters: (outcome = failure)
+[info] # Run progress: 25,20% complete, ETA 00:03:59
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 10,422 ops/ms
+[info] Iteration   1: 32,925 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ResourceParityBench.catsEffect":
+[info]   32,925 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ResourceParityBench.eru
+[info] # Parameters: (outcome = success)
+[info] # Run progress: 26,02% complete, ETA 00:03:57
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2632,060 ops/ms
+[info] Iteration   1: 3137,897 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ResourceParityBench.eru":
+[info]   3137,897 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ResourceParityBench.eru
+[info] # Parameters: (outcome = failure)
+[info] # Run progress: 26,83% complete, ETA 00:03:54
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2300,062 ops/ms
+[info] Iteration   1: 2923,868 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ResourceParityBench.eru":
+[info]   2923,868 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ResourceParityBench.zio
+[info] # Parameters: (outcome = success)
+[info] # Run progress: 27,64% complete, ETA 00:03:52
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1619,669 ops/ms
+[info] Iteration   1: 3489,540 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ResourceParityBench.zio":
+[info]   3489,540 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.ResourceParityBench.zio
+[info] # Parameters: (outcome = failure)
+[info] # Run progress: 28,46% complete, ETA 00:03:49
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1861,680 ops/ms
+[info] Iteration   1: 3003,542 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.ResourceParityBench.zio":
+[info]   3003,542 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 1)
+[info] # Run progress: 29,27% complete, ETA 00:03:47
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 34,766 ops/ms
+[info] Iteration   1: 48,270 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   48,270 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 2)
+[info] # Run progress: 30,08% complete, ETA 00:03:44
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 5,361 ops/ms
+[info] Iteration   1: 45,114 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   45,114 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 3)
+[info] # Run progress: 30,89% complete, ETA 00:03:42
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 22,358 ops/ms
+[info] Iteration   1: 46,477 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   46,477 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 6)
+[info] # Run progress: 31,71% complete, ETA 00:03:40
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 26,965 ops/ms
+[info] Iteration   1: 54,815 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   54,815 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 12)
+[info] # Run progress: 32,52% complete, ETA 00:03:38
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 26,841 ops/ms
+[info] Iteration   1: 55,722 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   55,722 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 1)
+[info] # Run progress: 33,33% complete, ETA 00:03:35
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 21,253 ops/ms
+[info] Iteration   1: 57,062 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   57,062 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 2)
+[info] # Run progress: 34,15% complete, ETA 00:03:32
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 28,380 ops/ms
+[info] Iteration   1: 53,654 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   53,654 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 3)
+[info] # Run progress: 34,96% complete, ETA 00:03:30
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 11,383 ops/ms
+[info] Iteration   1: 37,105 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   37,105 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 6)
+[info] # Run progress: 35,77% complete, ETA 00:03:27
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 13,714 ops/ms
+[info] Iteration   1: 25,884 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   25,884 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 12)
+[info] # Run progress: 36,59% complete, ETA 00:03:25
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 11,719 ops/ms
+[info] Iteration   1: 36,002 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   36,002 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 1)
+[info] # Run progress: 37,40% complete, ETA 00:03:22
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 26,448 ops/ms
+[info] Iteration   1: 58,019 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   58,019 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 2)
+[info] # Run progress: 38,21% complete, ETA 00:03:20
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 31,694 ops/ms
+[info] Iteration   1: 57,063 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   57,063 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 3)
+[info] # Run progress: 39,02% complete, ETA 00:03:17
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 15,166 ops/ms
+[info] Iteration   1: 38,092 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   38,092 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 6)
+[info] # Run progress: 39,84% complete, ETA 00:03:14
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 11,641 ops/ms
+[info] Iteration   1: 24,939 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   24,939 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 12)
+[info] # Run progress: 40,65% complete, ETA 00:03:12
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 11,255 ops/ms
+[info] Iteration   1: 25,322 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   25,322 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 1)
+[info] # Run progress: 41,46% complete, ETA 00:03:09
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 29,829 ops/ms
+[info] Iteration   1: 58,939 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   58,939 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 2)
+[info] # Run progress: 42,28% complete, ETA 00:03:06
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 31,646 ops/ms
+[info] Iteration   1: 60,077 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   60,077 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 3)
+[info] # Run progress: 43,09% complete, ETA 00:03:03
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 14,559 ops/ms
+[info] Iteration   1: 39,771 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   39,771 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 6)
+[info] # Run progress: 43,90% complete, ETA 00:03:01
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 9,034 ops/ms
+[info] Iteration   1: 20,706 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   20,706 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 12)
+[info] # Run progress: 44,72% complete, ETA 00:02:58
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 8,256 ops/ms
+[info] Iteration   1: 15,472 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   15,472 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 1)
+[info] # Run progress: 45,53% complete, ETA 00:02:55
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 26,915 ops/ms
+[info] Iteration   1: 51,164 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   51,164 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 2)
+[info] # Run progress: 46,34% complete, ETA 00:02:53
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 24,543 ops/ms
+[info] Iteration   1: 51,266 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   51,266 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 3)
+[info] # Run progress: 47,15% complete, ETA 00:02:50
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 12,362 ops/ms
+[info] Iteration   1: 34,548 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   34,548 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 6)
+[info] # Run progress: 47,97% complete, ETA 00:02:48
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6,087 ops/ms
+[info] Iteration   1: 13,204 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   13,204 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.catsEffect
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 12)
+[info] # Run progress: 48,78% complete, ETA 00:02:45
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2,218 ops/ms
+[info] Iteration   1: 7,709 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.catsEffect":
+[info]   7,709 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 1)
+[info] # Run progress: 49,59% complete, ETA 00:02:43
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 5938,838 ops/ms
+[info] Iteration   1: 8210,250 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8210,250 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 2)
+[info] # Run progress: 50,41% complete, ETA 00:02:40
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6213,549 ops/ms
+[info] Iteration   1: 7992,986 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7992,986 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 3)
+[info] # Run progress: 51,22% complete, ETA 00:02:38
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6097,459 ops/ms
+[info] Iteration   1: 8405,888 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8405,888 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 6)
+[info] # Run progress: 52,03% complete, ETA 00:02:35
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 5311,426 ops/ms
+[info] Iteration   1: 7231,512 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7231,512 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 12)
+[info] # Run progress: 52,85% complete, ETA 00:02:32
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6312,674 ops/ms
+[info] Iteration   1: 7747,324 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7747,324 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 1)
+[info] # Run progress: 53,66% complete, ETA 00:02:30
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6655,390 ops/ms
+[info] Iteration   1: 8381,861 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8381,861 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 2)
+[info] # Run progress: 54,47% complete, ETA 00:02:27
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6366,489 ops/ms
+[info] Iteration   1: 8100,469 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8100,469 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 3)
+[info] # Run progress: 55,28% complete, ETA 00:02:25
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 5518,749 ops/ms
+[info] Iteration   1: 7491,632 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7491,632 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 6)
+[info] # Run progress: 56,10% complete, ETA 00:02:22
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6446,204 ops/ms
+[info] Iteration   1: 5372,025 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   5372,025 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 12)
+[info] # Run progress: 56,91% complete, ETA 00:02:19
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6223,781 ops/ms
+[info] Iteration   1: 6667,782 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   6667,782 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 1)
+[info] # Run progress: 57,72% complete, ETA 00:02:17
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6414,424 ops/ms
+[info] Iteration   1: 6656,998 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   6656,998 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 2)
+[info] # Run progress: 58,54% complete, ETA 00:02:14
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6565,757 ops/ms
+[info] Iteration   1: 8013,092 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8013,092 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 3)
+[info] # Run progress: 59,35% complete, ETA 00:02:11
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6004,472 ops/ms
+[info] Iteration   1: 8263,123 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8263,123 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 6)
+[info] # Run progress: 60,16% complete, ETA 00:02:09
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6789,377 ops/ms
+[info] Iteration   1: 7990,181 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7990,181 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 12)
+[info] # Run progress: 60,98% complete, ETA 00:02:06
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6344,083 ops/ms
+[info] Iteration   1: 7535,645 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7535,645 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 1)
+[info] # Run progress: 61,79% complete, ETA 00:02:03
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6523,395 ops/ms
+[info] Iteration   1: 8410,997 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8410,997 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 2)
+[info] # Run progress: 62,60% complete, ETA 00:02:01
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6529,541 ops/ms
+[info] Iteration   1: 7993,384 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7993,384 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 3)
+[info] # Run progress: 63,41% complete, ETA 00:01:58
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6695,325 ops/ms
+[info] Iteration   1: 8025,185 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8025,185 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 6)
+[info] # Run progress: 64,23% complete, ETA 00:01:55
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6730,565 ops/ms
+[info] Iteration   1: 8254,095 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8254,095 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 12)
+[info] # Run progress: 65,04% complete, ETA 00:01:53
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6250,104 ops/ms
+[info] Iteration   1: 7496,935 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7496,935 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 1)
+[info] # Run progress: 65,85% complete, ETA 00:01:50
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6857,416 ops/ms
+[info] Iteration   1: 8267,598 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8267,598 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 2)
+[info] # Run progress: 66,67% complete, ETA 00:01:47
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 5966,427 ops/ms
+[info] Iteration   1: 7808,769 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7808,769 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 3)
+[info] # Run progress: 67,48% complete, ETA 00:01:45
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6217,722 ops/ms
+[info] Iteration   1: 8031,068 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8031,068 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 6)
+[info] # Run progress: 68,29% complete, ETA 00:01:42
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6042,103 ops/ms
+[info] Iteration   1: 8027,307 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   8027,307 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.eru
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 12)
+[info] # Run progress: 69,11% complete, ETA 00:01:39
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 6356,351 ops/ms
+[info] Iteration   1: 7917,351 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.eru":
+[info]   7917,351 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 1)
+[info] # Run progress: 69,92% complete, ETA 00:01:37
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 4970,221 ops/ms
+[info] Iteration   1: 6899,877 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   6899,877 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 2)
+[info] # Run progress: 70,73% complete, ETA 00:01:34
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2117,263 ops/ms
+[info] Iteration   1: 3521,784 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   3521,784 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 3)
+[info] # Run progress: 71,54% complete, ETA 00:01:32
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2065,101 ops/ms
+[info] Iteration   1: 3382,370 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   3382,370 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 6)
+[info] # Run progress: 72,36% complete, ETA 00:01:29
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2087,899 ops/ms
+[info] Iteration   1: 3338,190 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   3338,190 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 0, successIndexStr = 12)
+[info] # Run progress: 73,17% complete, ETA 00:01:26
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2012,424 ops/ms
+[info] Iteration   1: 3314,648 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   3314,648 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 1)
+[info] # Run progress: 73,98% complete, ETA 00:01:24
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 4930,981 ops/ms
+[info] Iteration   1: 7104,851 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   7104,851 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 2)
+[info] # Run progress: 74,80% complete, ETA 00:01:21
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2555,961 ops/ms
+[info] Iteration   1: 4235,945 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   4235,945 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 3)
+[info] # Run progress: 75,61% complete, ETA 00:01:18
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1650,701 ops/ms
+[info] Iteration   1: 2669,086 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   2669,086 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 6)
+[info] # Run progress: 76,42% complete, ETA 00:01:16
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1560,480 ops/ms
+[info] Iteration   1: 2703,178 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   2703,178 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 1, successIndexStr = 12)
+[info] # Run progress: 77,24% complete, ETA 00:01:13
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1682,571 ops/ms
+[info] Iteration   1: 2636,739 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   2636,739 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 1)
+[info] # Run progress: 78,05% complete, ETA 00:01:10
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 4487,546 ops/ms
+[info] Iteration   1: 7022,661 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   7022,661 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 2)
+[info] # Run progress: 78,86% complete, ETA 00:01:08
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1901,642 ops/ms
+[info] Iteration   1: 3981,533 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   3981,533 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 3)
+[info] # Run progress: 79,67% complete, ETA 00:01:05
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1558,135 ops/ms
+[info] Iteration   1: 2871,020 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   2871,020 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 6)
+[info] # Run progress: 80,49% complete, ETA 00:01:03
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1009,420 ops/ms
+[info] Iteration   1: 1750,622 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   1750,622 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 3, successIndexStr = 12)
+[info] # Run progress: 81,30% complete, ETA 00:01:00
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1038,450 ops/ms
+[info] Iteration   1: 1785,156 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   1785,156 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 1)
+[info] # Run progress: 82,11% complete, ETA 00:00:57
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 4712,617 ops/ms
+[info] Iteration   1: 6657,046 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   6657,046 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 2)
+[info] # Run progress: 82,93% complete, ETA 00:00:55
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1948,719 ops/ms
+[info] Iteration   1: 3859,102 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   3859,102 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 3)
+[info] # Run progress: 83,74% complete, ETA 00:00:52
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1801,863 ops/ms
+[info] Iteration   1: 2978,336 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   2978,336 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 6)
+[info] # Run progress: 84,55% complete, ETA 00:00:49
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 407,388 ops/ms
+[info] Iteration   1: 840,777 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   840,777 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 5, successIndexStr = 12)
+[info] # Run progress: 85,37% complete, ETA 00:00:47
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 778,578 ops/ms
+[info] Iteration   1: 1184,456 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   1184,456 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 1)
+[info] # Run progress: 86,18% complete, ETA 00:00:44
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 4198,272 ops/ms
+[info] Iteration   1: 5690,642 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   5690,642 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 2)
+[info] # Run progress: 86,99% complete, ETA 00:00:42
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2254,871 ops/ms
+[info] Iteration   1: 3807,845 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   3807,845 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 3)
+[info] # Run progress: 87,80% complete, ETA 00:00:39
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1398,998 ops/ms
+[info] Iteration   1: 2912,929 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   2912,929 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 6)
+[info] # Run progress: 88,62% complete, ETA 00:00:36
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 895,417 ops/ms
+[info] Iteration   1: 1368,101 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   1368,101 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RetryParityBench.zio
+[info] # Parameters: (maxRetriesStr = 10, successIndexStr = 12)
+[info] # Run progress: 89,43% complete, ETA 00:00:34
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 230,324 ops/ms
+[info] Iteration   1: 640,251 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RetryParityBench.zio":
+[info]   640,251 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.ceFallbackPath
+[info] # Parameters: (size = small)
+[info] # Run progress: 90,24% complete, ETA 00:00:31
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 23,875 ops/ms
+[info] Iteration   1: 54,064 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.ceFallbackPath":
+[info]   54,064 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.ceFallbackPath
+[info] # Parameters: (size = medium)
+[info] # Run progress: 91,06% complete, ETA 00:00:28
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 8,017 ops/ms
+[info] Iteration   1: 30,035 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.ceFallbackPath":
+[info]   30,035 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.ceUnsafe
+[info] # Parameters: (size = small)
+[info] # Run progress: 91,87% complete, ETA 00:00:26
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 23,903 ops/ms
+[info] Iteration   1: 52,775 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.ceUnsafe":
+[info]   52,775 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.ceUnsafe
+[info] # Parameters: (size = medium)
+[info] # Run progress: 92,68% complete, ETA 00:00:23
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 18,429 ops/ms
+[info] Iteration   1: 49,923 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.ceUnsafe":
+[info]   49,923 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.eruFallbackPath
+[info] # Parameters: (size = small)
+[info] # Run progress: 93,50% complete, ETA 00:00:21
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 19768,198 ops/ms
+[info] Iteration   1: 23666,161 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.eruFallbackPath":
+[info]   23666,161 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.eruFallbackPath
+[info] # Parameters: (size = medium)
+[info] # Run progress: 94,31% complete, ETA 00:00:18
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 18176,173 ops/ms
+[info] Iteration   1: 23940,815 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.eruFallbackPath":
+[info]   23940,815 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.eruUnsafe
+[info] # Parameters: (size = small)
+[info] # Run progress: 95,12% complete, ETA 00:00:15
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 82895,623 ops/ms
+[info] Iteration   1: 96727,355 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.eruUnsafe":
+[info]   96727,355 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.eruUnsafe
+[info] # Parameters: (size = medium)
+[info] # Run progress: 95,93% complete, ETA 00:00:13
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 77202,588 ops/ms
+[info] Iteration   1: 100271,208 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.eruUnsafe":
+[info]   100271,208 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.zioFallbackPath
+[info] # Parameters: (size = small)
+[info] # Run progress: 96,75% complete, ETA 00:00:10
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2786,429 ops/ms
+[info] Iteration   1: 5029,563 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.zioFallbackPath":
+[info]   5029,563 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.zioFallbackPath
+[info] # Parameters: (size = medium)
+[info] # Run progress: 97,56% complete, ETA 00:00:07
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2776,972 ops/ms
+[info] Iteration   1: 4933,301 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.zioFallbackPath":
+[info]   4933,301 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.zioUnsafe
+[info] # Parameters: (size = small)
+[info] # Run progress: 98,37% complete, ETA 00:00:05
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 5916,703 ops/ms
+[info] Iteration   1: 8448,964 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.zioUnsafe":
+[info]   8448,964 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 1 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.parity.RunnerOverheadParityBench.zioUnsafe
+[info] # Parameters: (size = medium)
+[info] # Run progress: 99,19% complete, ETA 00:00:02
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 530,759 ops/ms
+[info] Iteration   1: 750,264 ops/ms
+[info] Result "net.ghoula.eru.bench.parity.RunnerOverheadParityBench.zioUnsafe":
+[info]   750,264 ops/ms
+[info] # Run complete. Total time: 00:05:24
+[info] REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+[info] why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+[info] experiments, perform baseline and negative tests that provide experimental control, make sure
+[info] the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+[info] Do not assume the numbers tell you what you want them to tell.
+[info] NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+[info] extra caution when trusting the results, look into the generated code to check the benchmark still
+[info] works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+[info] different JVMs are already problematic, the performance difference caused by different Blackhole
+[info] modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+[info] Benchmark                                  (depthStr)  (maxRetriesStr)  (outcome)              (path)  (size)  (successIndexStr)   Mode  Cnt       Score   Error   Units
+[info] CompositionParityBench.catsEffect                   8              N/A        N/A             success     N/A                N/A  thrpt           61,538          ops/ms
+[info] CompositionParityBench.catsEffect                   8              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt           36,931          ops/ms
+[info] CompositionParityBench.catsEffect                  32              N/A        N/A             success     N/A                N/A  thrpt           57,287          ops/ms
+[info] CompositionParityBench.catsEffect                  32              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt           31,822          ops/ms
+[info] CompositionParityBench.catsEffect                  64              N/A        N/A             success     N/A                N/A  thrpt           52,704          ops/ms
+[info] CompositionParityBench.catsEffect                  64              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt           31,185          ops/ms
+[info] CompositionParityBench.catsEffect                 128              N/A        N/A             success     N/A                N/A  thrpt           50,304          ops/ms
+[info] CompositionParityBench.catsEffect                 128              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt           28,875          ops/ms
+[info] CompositionParityBench.eru                          8              N/A        N/A             success     N/A                N/A  thrpt        32696,262          ops/ms
+[info] CompositionParityBench.eru                          8              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt        12786,158          ops/ms
+[info] CompositionParityBench.eru                         32              N/A        N/A             success     N/A                N/A  thrpt        29861,054          ops/ms
+[info] CompositionParityBench.eru                         32              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt         4800,974          ops/ms
+[info] CompositionParityBench.eru                         64              N/A        N/A             success     N/A                N/A  thrpt        31522,991          ops/ms
+[info] CompositionParityBench.eru                         64              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt         1893,802          ops/ms
+[info] CompositionParityBench.eru                        128              N/A        N/A             success     N/A                N/A  thrpt        32221,851          ops/ms
+[info] CompositionParityBench.eru                        128              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt          690,501          ops/ms
+[info] CompositionParityBench.zio                          8              N/A        N/A             success     N/A                N/A  thrpt         4623,759          ops/ms
+[info] CompositionParityBench.zio                          8              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt         2845,553          ops/ms
+[info] CompositionParityBench.zio                         32              N/A        N/A             success     N/A                N/A  thrpt         1596,251          ops/ms
+[info] CompositionParityBench.zio                         32              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt         1168,748          ops/ms
+[info] CompositionParityBench.zio                         64              N/A        N/A             success     N/A                N/A  thrpt          864,256          ops/ms
+[info] CompositionParityBench.zio                         64              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt          578,063          ops/ms
+[info] CompositionParityBench.zio                        128              N/A        N/A             success     N/A                N/A  thrpt          414,075          ops/ms
+[info] CompositionParityBench.zio                        128              N/A        N/A  shortCircuitAtHalf     N/A                N/A  thrpt          321,653          ops/ms
+[info] ErrorHandlingParityBench.ceRecover                N/A              N/A        N/A             success     N/A                N/A  thrpt           59,075          ops/ms
+[info] ErrorHandlingParityBench.ceRecover                N/A              N/A        N/A             failure     N/A                N/A  thrpt           57,498          ops/ms
+[info] ErrorHandlingParityBench.eruRecover               N/A              N/A        N/A             success     N/A                N/A  thrpt        26250,890          ops/ms
+[info] ErrorHandlingParityBench.eruRecover               N/A              N/A        N/A             failure     N/A                N/A  thrpt        20878,707          ops/ms
+[info] ErrorHandlingParityBench.zioRecover               N/A              N/A        N/A             success     N/A                N/A  thrpt         8949,764          ops/ms
+[info] ErrorHandlingParityBench.zioRecover               N/A              N/A        N/A             failure     N/A                N/A  thrpt         5297,612          ops/ms
+[info] ResourceParityBench.catsEffect                    N/A              N/A    success                 N/A     N/A                N/A  thrpt           57,786          ops/ms
+[info] ResourceParityBench.catsEffect                    N/A              N/A    failure                 N/A     N/A                N/A  thrpt           32,925          ops/ms
+[info] ResourceParityBench.eru                           N/A              N/A    success                 N/A     N/A                N/A  thrpt         3137,897          ops/ms
+[info] ResourceParityBench.eru                           N/A              N/A    failure                 N/A     N/A                N/A  thrpt         2923,868          ops/ms
+[info] ResourceParityBench.zio                           N/A              N/A    success                 N/A     N/A                N/A  thrpt         3489,540          ops/ms
+[info] ResourceParityBench.zio                           N/A              N/A    failure                 N/A     N/A                N/A  thrpt         3003,542          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                0        N/A                 N/A     N/A                  1  thrpt           48,270          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                0        N/A                 N/A     N/A                  2  thrpt           45,114          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                0        N/A                 N/A     N/A                  3  thrpt           46,477          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                0        N/A                 N/A     N/A                  6  thrpt           54,815          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                0        N/A                 N/A     N/A                 12  thrpt           55,722          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                1        N/A                 N/A     N/A                  1  thrpt           57,062          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                1        N/A                 N/A     N/A                  2  thrpt           53,654          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                1        N/A                 N/A     N/A                  3  thrpt           37,105          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                1        N/A                 N/A     N/A                  6  thrpt           25,884          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                1        N/A                 N/A     N/A                 12  thrpt           36,002          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                3        N/A                 N/A     N/A                  1  thrpt           58,019          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                3        N/A                 N/A     N/A                  2  thrpt           57,063          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                3        N/A                 N/A     N/A                  3  thrpt           38,092          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                3        N/A                 N/A     N/A                  6  thrpt           24,939          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                3        N/A                 N/A     N/A                 12  thrpt           25,322          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                5        N/A                 N/A     N/A                  1  thrpt           58,939          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                5        N/A                 N/A     N/A                  2  thrpt           60,077          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                5        N/A                 N/A     N/A                  3  thrpt           39,771          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                5        N/A                 N/A     N/A                  6  thrpt           20,706          ops/ms
+[info] RetryParityBench.catsEffect                       N/A                5        N/A                 N/A     N/A                 12  thrpt           15,472          ops/ms
+[info] RetryParityBench.catsEffect                       N/A               10        N/A                 N/A     N/A                  1  thrpt           51,164          ops/ms
+[info] RetryParityBench.catsEffect                       N/A               10        N/A                 N/A     N/A                  2  thrpt           51,266          ops/ms
+[info] RetryParityBench.catsEffect                       N/A               10        N/A                 N/A     N/A                  3  thrpt           34,548          ops/ms
+[info] RetryParityBench.catsEffect                       N/A               10        N/A                 N/A     N/A                  6  thrpt           13,204          ops/ms
+[info] RetryParityBench.catsEffect                       N/A               10        N/A                 N/A     N/A                 12  thrpt            7,709          ops/ms
+[info] RetryParityBench.eru                              N/A                0        N/A                 N/A     N/A                  1  thrpt         8210,250          ops/ms
+[info] RetryParityBench.eru                              N/A                0        N/A                 N/A     N/A                  2  thrpt         7992,986          ops/ms
+[info] RetryParityBench.eru                              N/A                0        N/A                 N/A     N/A                  3  thrpt         8405,888          ops/ms
+[info] RetryParityBench.eru                              N/A                0        N/A                 N/A     N/A                  6  thrpt         7231,512          ops/ms
+[info] RetryParityBench.eru                              N/A                0        N/A                 N/A     N/A                 12  thrpt         7747,324          ops/ms
+[info] RetryParityBench.eru                              N/A                1        N/A                 N/A     N/A                  1  thrpt         8381,861          ops/ms
+[info] RetryParityBench.eru                              N/A                1        N/A                 N/A     N/A                  2  thrpt         8100,469          ops/ms
+[info] RetryParityBench.eru                              N/A                1        N/A                 N/A     N/A                  3  thrpt         7491,632          ops/ms
+[info] RetryParityBench.eru                              N/A                1        N/A                 N/A     N/A                  6  thrpt         5372,025          ops/ms
+[info] RetryParityBench.eru                              N/A                1        N/A                 N/A     N/A                 12  thrpt         6667,782          ops/ms
+[info] RetryParityBench.eru                              N/A                3        N/A                 N/A     N/A                  1  thrpt         6656,998          ops/ms
+[info] RetryParityBench.eru                              N/A                3        N/A                 N/A     N/A                  2  thrpt         8013,092          ops/ms
+[info] RetryParityBench.eru                              N/A                3        N/A                 N/A     N/A                  3  thrpt         8263,123          ops/ms
+[info] RetryParityBench.eru                              N/A                3        N/A                 N/A     N/A                  6  thrpt         7990,181          ops/ms
+[info] RetryParityBench.eru                              N/A                3        N/A                 N/A     N/A                 12  thrpt         7535,645          ops/ms
+[info] RetryParityBench.eru                              N/A                5        N/A                 N/A     N/A                  1  thrpt         8410,997          ops/ms
+[info] RetryParityBench.eru                              N/A                5        N/A                 N/A     N/A                  2  thrpt         7993,384          ops/ms
+[info] RetryParityBench.eru                              N/A                5        N/A                 N/A     N/A                  3  thrpt         8025,185          ops/ms
+[info] RetryParityBench.eru                              N/A                5        N/A                 N/A     N/A                  6  thrpt         8254,095          ops/ms
+[info] RetryParityBench.eru                              N/A                5        N/A                 N/A     N/A                 12  thrpt         7496,935          ops/ms
+[info] RetryParityBench.eru                              N/A               10        N/A                 N/A     N/A                  1  thrpt         8267,598          ops/ms
+[info] RetryParityBench.eru                              N/A               10        N/A                 N/A     N/A                  2  thrpt         7808,769          ops/ms
+[info] RetryParityBench.eru                              N/A               10        N/A                 N/A     N/A                  3  thrpt         8031,068          ops/ms
+[info] RetryParityBench.eru                              N/A               10        N/A                 N/A     N/A                  6  thrpt         8027,307          ops/ms
+[info] RetryParityBench.eru                              N/A               10        N/A                 N/A     N/A                 12  thrpt         7917,351          ops/ms
+[info] RetryParityBench.zio                              N/A                0        N/A                 N/A     N/A                  1  thrpt         6899,877          ops/ms
+[info] RetryParityBench.zio                              N/A                0        N/A                 N/A     N/A                  2  thrpt         3521,784          ops/ms
+[info] RetryParityBench.zio                              N/A                0        N/A                 N/A     N/A                  3  thrpt         3382,370          ops/ms
+[info] RetryParityBench.zio                              N/A                0        N/A                 N/A     N/A                  6  thrpt         3338,190          ops/ms
+[info] RetryParityBench.zio                              N/A                0        N/A                 N/A     N/A                 12  thrpt         3314,648          ops/ms
+[info] RetryParityBench.zio                              N/A                1        N/A                 N/A     N/A                  1  thrpt         7104,851          ops/ms
+[info] RetryParityBench.zio                              N/A                1        N/A                 N/A     N/A                  2  thrpt         4235,945          ops/ms
+[info] RetryParityBench.zio                              N/A                1        N/A                 N/A     N/A                  3  thrpt         2669,086          ops/ms
+[info] RetryParityBench.zio                              N/A                1        N/A                 N/A     N/A                  6  thrpt         2703,178          ops/ms
+[info] RetryParityBench.zio                              N/A                1        N/A                 N/A     N/A                 12  thrpt         2636,739          ops/ms
+[info] RetryParityBench.zio                              N/A                3        N/A                 N/A     N/A                  1  thrpt         7022,661          ops/ms
+[info] RetryParityBench.zio                              N/A                3        N/A                 N/A     N/A                  2  thrpt         3981,533          ops/ms
+[info] RetryParityBench.zio                              N/A                3        N/A                 N/A     N/A                  3  thrpt         2871,020          ops/ms
+[info] RetryParityBench.zio                              N/A                3        N/A                 N/A     N/A                  6  thrpt         1750,622          ops/ms
+[info] RetryParityBench.zio                              N/A                3        N/A                 N/A     N/A                 12  thrpt         1785,156          ops/ms
+[info] RetryParityBench.zio                              N/A                5        N/A                 N/A     N/A                  1  thrpt         6657,046          ops/ms
+[info] RetryParityBench.zio                              N/A                5        N/A                 N/A     N/A                  2  thrpt         3859,102          ops/ms
+[info] RetryParityBench.zio                              N/A                5        N/A                 N/A     N/A                  3  thrpt         2978,336          ops/ms
+[info] RetryParityBench.zio                              N/A                5        N/A                 N/A     N/A                  6  thrpt          840,777          ops/ms
+[info] RetryParityBench.zio                              N/A                5        N/A                 N/A     N/A                 12  thrpt         1184,456          ops/ms
+[info] RetryParityBench.zio                              N/A               10        N/A                 N/A     N/A                  1  thrpt         5690,642          ops/ms
+[info] RetryParityBench.zio                              N/A               10        N/A                 N/A     N/A                  2  thrpt         3807,845          ops/ms
+[info] RetryParityBench.zio                              N/A               10        N/A                 N/A     N/A                  3  thrpt         2912,929          ops/ms
+[info] RetryParityBench.zio                              N/A               10        N/A                 N/A     N/A                  6  thrpt         1368,101          ops/ms
+[info] RetryParityBench.zio                              N/A               10        N/A                 N/A     N/A                 12  thrpt          640,251          ops/ms
+[info] RunnerOverheadParityBench.ceFallbackPath          N/A              N/A        N/A                 N/A   small                N/A  thrpt           54,064          ops/ms
+[info] RunnerOverheadParityBench.ceFallbackPath          N/A              N/A        N/A                 N/A  medium                N/A  thrpt           30,035          ops/ms
+[info] RunnerOverheadParityBench.ceUnsafe                N/A              N/A        N/A                 N/A   small                N/A  thrpt           52,775          ops/ms
+[info] RunnerOverheadParityBench.ceUnsafe                N/A              N/A        N/A                 N/A  medium                N/A  thrpt           49,923          ops/ms
+[info] RunnerOverheadParityBench.eruFallbackPath         N/A              N/A        N/A                 N/A   small                N/A  thrpt        23666,161          ops/ms
+[info] RunnerOverheadParityBench.eruFallbackPath         N/A              N/A        N/A                 N/A  medium                N/A  thrpt        23940,815          ops/ms
+[info] RunnerOverheadParityBench.eruUnsafe               N/A              N/A        N/A                 N/A   small                N/A  thrpt        96727,355          ops/ms
+[info] RunnerOverheadParityBench.eruUnsafe               N/A              N/A        N/A                 N/A  medium                N/A  thrpt       100271,208          ops/ms
+[info] RunnerOverheadParityBench.zioFallbackPath         N/A              N/A        N/A                 N/A   small                N/A  thrpt         5029,563          ops/ms
+[info] RunnerOverheadParityBench.zioFallbackPath         N/A              N/A        N/A                 N/A  medium                N/A  thrpt         4933,301          ops/ms
+[info] RunnerOverheadParityBench.zioUnsafe               N/A              N/A        N/A                 N/A   small                N/A  thrpt         8448,964          ops/ms
+[info] RunnerOverheadParityBench.zioUnsafe               N/A              N/A        N/A                 N/A  medium                N/A  thrpt          750,264          ops/ms
+[success] Total time: 328 s (0:05:28.0), completed 29 Aug 2025, 13.42.17
