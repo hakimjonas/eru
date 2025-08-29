@@ -260,3 +260,51 @@ Action:
 
 - 2025-08-29 08:19 — Verification
   - sbt check green (scalafix/scalafmt), and full test matrix green (JVM + Native).
+
+
+- 2025-08-29 09:55 — Phase 4 Kickoff; FAIRNESS and Smoke Benchmarks
+  - Added benchmarks/FAIRNESS.md defining scope, rules, environment, and commands.
+  - Executed JMH smoke for EruMapFlatMapBench with `-wi 1 -i 1 -f1 -t1`; raw output saved to benchmarks/raw/2025-08-29-run1.txt.
+  - Created benchmarks/Baseline-2025-08-29.md summarizing environment and representative results.
+
+
+
+- 2025-08-29 11:04 — Phase 4 Suite Expansion (Retry Bench)
+  - Added EruRetryBench with parametrized Recurs/Exponential(base=ZERO) scenarios to measure bounded attempts deterministically.
+  - Kept FAIRNESS guidance (no wall-clock sleeps) and aligned params with integration properties.
+  - Next: add resource/runner/memory/stack/concurrency-lite benches and smoke-validate; schedule idle-session full runs.
+
+
+- 2025-08-29 11:16 — Phase 4 Suite Expansion (Resource/Runner/Error/Memory)
+  - Added EruResourceBench (ensure/bracket with K and success/typed-failure); smoke raw captured.
+  - Added EruRunnerOverheadBench (construction + run/attempt small/medium); smoke raw captured.
+  - Added EruErrorHandlingBench (recover/mapError/orElse) with success/failure paths; smoke raw captured.
+  - Added EruMemoryPressureBench (composition/resource/retryZero) designed for -prof gc; smoke raw captured.
+  - Baseline updated to reference raw outputs; FAIRNESS scope remains unchanged (no wall-clock sleeps; ZERO base retry in cross scenarios).
+
+
+- 2025-08-29 11:17 — Phase 4 Smoke Validation (additional)
+  - Executed smoke runs for new benches: EruRetryBench, EruResourceBench, EruRunnerOverheadBench, EruErrorHandlingBench, EruMemoryPressureBench.
+  - Saved raw outputs under benchmarks/raw; updated benchmarks/Baseline-2025-08-29.md with references and guidance (-prof gc for memory pressure).
+  - Next: implement EruStackSafetyBench and EruConcurrencyLiteBench; then add CE/ZIO parity for fair scenarios and schedule idle-session full runs.
+
+
+- 2025-08-29 11:18 — Phase 4 Next Targets
+  - Implement EruStackSafetyBench and EruConcurrencyLiteBench; then add Cats Effect / ZIO parity benches for fair scenarios (composition, error, resource, retry, runner).
+  - Schedule idle-session full runs (bench, benchWithGC) with environment capture and repo SHA; publish updated Baseline with tables and analysis.
+
+
+- 2025-08-29 11:20 — Phase 4 Bench Suite Progress
+  - New benches added and smoke-validated: EruRetryBench, EruResourceBench, EruRunnerOverheadBench, EruErrorHandlingBench, EruMemoryPressureBench.
+  - Next to implement: EruStackSafetyBench (deep chain with safe depth) and EruConcurrencyLiteBench (Eru-only: zipPar/race/fork/Ref/Deferred/Semaphore micros).
+  - Next run window (idle TTY): use `sbt benchCore` and `sbt benchWithGC`; capture env metadata (benchmarks/raw/env.txt) and repo SHA; then proceed with CE/ZIO parity benches for fair scenarios.
+
+
+- 2025-08-29 11:22 — Phase 4 Plan Sync
+  - Bench suite expanded (retry/resource/runner/error/memory) and smoke validated; Baseline updated with raw artifact references.
+  - Next actions: implement EruStackSafetyBench and EruConcurrencyLiteBench; then add CE/ZIO parity benches for fair scenarios and schedule idle-session full runs (bench, benchWithGC) with env metadata and SHA capture.
+
+
+- 2025-08-29 11:24 — Phase 4 Log Sync
+  - Bench suite expanded (retry/resource/runner/error/memory) and smoke validated; raw outputs referenced from Baseline-2025-08-29.md.
+  - Immediate next: implement EruStackSafetyBench and EruConcurrencyLiteBench; then CE/ZIO parity benches for fair scenarios; schedule idle-session full runs with -prof gc and environment capture.
