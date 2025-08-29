@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-29 00:05 (local)
+Last updated: 2025-08-29 00:15 (local)
 Target version: 1.0.0
 
 ---
@@ -53,10 +53,10 @@ Phase 1 — Documentation and Scaladoc Completeness
 - [x] P1.4 Aggregated Scaladoc generation wired (sbt-unidoc via alias `genApiDocs`).
 
 Phase 2 — Lawfulness and Property Testing
-- [ ] P2.1 Result: functor and monad laws.
-- [ ] P2.2 Eru: map/flatMap laws at observable boundary.
-- [ ] P2.3 Resource: bracket finalizers exactly-once across paths.
-- [ ] P2.4 Retry policies: attempt bounds and deterministic backoff.
+- [x] P2.1 Result: functor and monad laws.
+- [x] P2.2 Eru: map/flatMap laws at observable boundary.
+- [x] P2.3 Resource: bracket finalizers exactly-once across paths.
+- [x] P2.4 Retry policies: attempt bounds and deterministic backoff.
 - [ ] P2.5 Parity on JVM and Native.
 
 Phase 3 — Observability Polish

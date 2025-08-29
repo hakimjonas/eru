@@ -16,9 +16,11 @@ final class TimeoutRetrySpec extends FunSuite {
     }
   }
 
-  test("retryN re-executes failing effect until success") {
+  test("retryN re-executes typed failures until success") {
     var attempts = 0
-    val flaky = Eru.effect { attempts += 1; if (attempts < 3) throw new RuntimeException("boom") else 42 }
+    val flaky: Eru[Throwable | String, Int] =
+      Eru.effect { attempts += 1; attempts }
+        .flatMap(n => if (n < 3) Eru.fail("boom") else Eru.succeed(42))
     val retried = flaky.retryN(5)
     assertEquals(retried.runExit(), Exit.Success(42))
   }

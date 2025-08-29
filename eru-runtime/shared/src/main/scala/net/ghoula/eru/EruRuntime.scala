@@ -82,8 +82,9 @@ object EruRuntime {
     case Exponential(base: Duration, maxRetries: Int)
   }
 
-  /** Retries on typed failure according to the provided policy. Defects (Throwables) are
-    * propagated.
+  /** Retries on typed failure according to the provided policy. Defects (Throwables) are propagated
+    * without retrying. If the typed error channel E happens to include Throwable, failures that are
+    * instances of Throwable will not be retried.
     */
   def retry[E, A](policy: Policy)(fa: Eru[E, A]): Eru[E, A] = {
     import Policy.*
@@ -92,11 +93,13 @@ object EruRuntime {
       case Exponential(base, maxRet) => if (i < maxRet) Some(base.multipliedBy(1L << i)) else None
     }
     def loop(i: Int): Eru[E, A] =
-      fa.recoverWith { case e =>
-        delay(i) match {
-          case Some(d) => sleep(d).flatMap(_ => loop(i + 1))
-          case None => Eru.fail(e)
-        }
+      fa.recoverWith {
+        case t: Throwable => Eru.fail(t)
+        case e =>
+          delay(i) match {
+            case Some(d) => sleep(d).flatMap(_ => loop(i + 1))
+            case None => Eru.fail(e)
+          }
       }
     loop(0)
   }
