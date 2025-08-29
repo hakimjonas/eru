@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-29 07:23 (local)
+Last updated: 2025-08-29 07:57 (local)
 Target version: 1.0.0
 
 ---
@@ -57,7 +57,7 @@ Phase 2 — Lawfulness and Property Testing
 - [x] P2.2 Eru: map/flatMap laws at observable boundary.
 - [x] P2.3 Resource: bracket finalizers exactly-once across paths.
 - [x] P2.4 Retry policies: attempt bounds and deterministic backoff.
-- [ ] P2.5 Parity on JVM and Native.
+- [x] P2.5 Parity on JVM and Native.
 
 Phase 3 — Observability Polish
 - [ ] P3.1 Document event taxonomy and minimal guarantees.
@@ -233,3 +233,9 @@ Impact:
 
 Action:
 - Re-enable unidoc/mdoc in Phase 5 once the documentation stack is finalized and stable.
+
+
+- 2025-08-29 07:57 — Release Plan Synchronized; Full Parity Verified
+  - sbt check green (scalafix/scalafmt).
+  - Test parity verified on Native: eruCoreNative/test (340/340), eruRuntimeNative/test (3/3). JVM core/runtime and integration suites remain green.
+  - Marked P2.5 (Parity on JVM and Native) as completed; this plan now fully reflects current status.
