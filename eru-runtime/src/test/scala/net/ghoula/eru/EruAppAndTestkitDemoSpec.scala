@@ -30,7 +30,10 @@ final class EruAppAndTestkitDemoSpec extends EruSuite with EruAssertions {
     
     // Verify the app has the expected structure
     val app = SampleApp
-    assert(app.isInstanceOf[net.ghoula.eru.app.EruAppDefault])
+    app match {
+      case _: net.ghoula.eru.app.EruAppDefault => ()
+      case _ => fail("SampleApp should extend EruAppDefault")
+    }
     
     // The main method would call run.unsafeRunSync() automatically
     // We can't test main directly, but we can test the run method

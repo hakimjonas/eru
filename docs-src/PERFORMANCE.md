@@ -1,140 +1,123 @@
-# Eru Performance Analysis
+# Performance — Eru 1.0 Snapshot (2025‑08‑29)
 
-This document provides a factual analysis of the Eru effect system's performance characteristics. All data is derived
-from JMH microbenchmarks, and the goal is to present the results transparently, allowing developers to assess the
-trade-offs and capabilities of the library for themselves.
+This document summarizes what we measured, how we measured it, and what the numbers say about Eru’s performance today.
+It is intentionally conservative. The goal is not to boast, but to verify we are not being foolish and to document
+honest, reproducible results.
 
-**Methodology Note:** The following data comes from JMH microbenchmarks. While useful for measuring the performance of
-specific operations, these numbers may not be directly representative of all real-world application workloads.
+All data below comes from running the code in this repository. Raw outputs and environment metadata are checked in.
 
-## Key Findings
+- Non‑GC full baseline: benchmarks/raw/2025-08-29-143751-bench.txt
+- Environment: benchmarks/raw/env-2025-08-29-143751.txt
+- Parity smoke (Eru vs Cats Effect vs ZIO): benchmarks/raw/2025-08-29-121819-ParityBenches.txt
+- GC‑profiled baseline: pending (we aborted the first attempt early; see “What’s next”)
 
-Our development has been guided by the principles laid out in the Eru Manifesto. This has led to a dual focus on two
-primary, non-negotiable goals: achieving a provably correct, zero-casting runtime, and optimizing the performance of
-common functional patterns like flatMap.
+## Fairness and scope
+We compare only scenarios with equivalent semantics across libraries (per benchmarks/FAIRNESS.md):
+- Composition chains (map/flatMap) — success and short‑circuit failure
+- Error handling — recover/fallback on success/failure
+- Resource discipline — bracket acquire/use/release, success and typed‑failure
+- Retry — bounded attempts with ZERO backoff (no real sleeps)
+- Runner overhead — construction + boundary cost for small/medium programs
 
-### 1. Correctness: A Zero-Casting Runtime
+Deferred for cross‑library comparison: true parallel zip/race, structured interruption, and async I/O. We keep Eru‑only
+micros for those but do not compare across libraries yet.
 
-**Status:** Implemented & Verified.
+JMH settings for the non‑GC full baseline: -wi 5 -i 10 -f1 -t1. The environment (CPU/OS/JDK/Scala/SBT/SHAs) is recorded
+in the env file above.
 
-The first pillar of our Manifesto is Correctness as the Unseen Foundation. We have taken this principle to its logical
-conclusion. Through a series of disciplined refactoring steps, the EruRuntime has been made fully type-safe. The
-codebase is now free of `asInstanceOf` calls, a constraint that is enforced by the build linter.
+## Throughput summary tables (ops/ms)
+Numbers are taken from the cited raw outputs. For detailed variance and full listings, see the raw files.
 
-This is more than a stylistic choice. It provides a strong, compile-time guarantee against an entire class of potential
-runtime errors, making the system more robust and predictable by design.
+- Composition — success path (higher is better)
 
-### 2. Performance: Construction-Time flatMap Fusion
+| Depth | Eru | ZIO | Cats Effect |
+|------:|----:|----:|------------:|
+| 8     | 32,0k | 4,3k | 59 |
+| 32    | 32,6k | 1,5k | 59 |
+| 64    | 32,2k | 0,82k | 57 |
+| 128   | 32,1k | 0,40k | 51 |
 
-**Status:** Implemented & Verified.
+- Composition — short‑circuit at half depth (higher is better)
 
-The primary performance optimization in Eru is a construction-time fusion for pure flatMap chains. The flatMap
-implementation identifies chains of pure, non-effectful computations (e.g., `Succeed(...).flatMap(f)`) and evaluates
-them immediately upon construction, avoiding the creation of intermediate Chain objects.
+| Depth | Eru | ZIO | Cats Effect |
+|------:|----:|----:|------------:|
+| 8     | 12,3k | 2,73k | 37 |
+| 32    | 5,1k  | 1,13k | 33 |
+| 64    | 2,38k | 0,57k | 33 |
+| 128   | 1,53k | 0,32k | 29 |
 
-The effect of this optimization is best understood by comparing the runtime performance of pure flatMap chains to pure
-map chains, which represent a practical performance ceiling on the JVM.
+- Error handling — recover (higher is better)
 
-**Latest Benchmark Results (August 20, 2025):**
+| Path    | Eru   | ZIO   | Cats Effect |
+|---------|------:|------:|------------:|
+| success | 26,0k | 9,0k  | 63 |
+| failure | 20,7k | 5,6k  | 61 |
 
-| Benchmark   | Depth | Score (ops/ms) |
-|-------------|-------|----------------|
-| runPureFlat | 1000  | ~196,560       |
-| runMapped   | 1000  | ~196,429       |
+- Resource discipline — bracket (higher is better)
 
-**Analysis:** The benchmark data indicates that the overhead for flatMap in pure, left-associative chains is
-statistically negligible, with performance being equivalent to that of map. For effectual computations, the system
-correctly falls back to the standard, lazy evaluation model, ensuring that side effects are deferred until the program
-is executed.
+| Outcome | Eru   | ZIO   | Cats Effect |
+|---------|------:|------:|------------:|
+| success | 3,3k  | 3,4k  | 61 |
+| failure | 2,9k  | 2,8k  | 38 |
 
-## Performance Trade-offs and Usage Patterns
+Note: In the bracket success path, ZIO is sometimes faster than Eru in our runs (e.g., 5.1k vs 4.3k ops/ms in the
+non‑GC baseline). This does not change the overall picture: Eru and ZIO are broadly comparable on this scenario,
+while Cats Effect is far slower in these micros.
 
-Radical transparency is a core value of this project. Understanding a system's trade-offs is key to using it
-effectively. Our benchmark suite is designed to expose not just the strengths, but also the performance characteristics
-of different usage patterns.
+- Retry — bounded attempts, ZERO base (attempt‑bounded; higher is better)
 
-### The Cost of Mixing Pure and Effectful Code
+| (maxRetries, successIndex) | Eru  | ZIO  | Cats Effect |
+|----------------------------|-----:|-----:|------------:|
+| (0, 1)                     | 8,4k | 6,9k | 62 |
+| (1, 2)                     | 8,1k | 4,0k | 62 |
+| (3, 3)                     | 8,2k | 2,9k | 42 |
+| (5, 6)                     | 8,0k | 1,6k | 21 |
+| (10, 12)                   | 8,0k | 0,75k | 9 |
 
-The construction-time fusion is only active for purely successful computations. As soon as an `Eru.effect` is introduced
-into a chain, the optimization for that link is disabled, and evaluation is deferred to the runtime.
+- Runner overhead — construction + unsafe boundary (higher is better)
 
-The `runMixedPure` benchmark demonstrates this clearly: it interleaves pure flatMaps with `Eru.effect` calls.
+| Size   | Eru (unsafe) | ZIO (unsafe) | Cats Effect (unsafe) |
+|--------|-------------:|-------------:|---------------------:|
+| small  | 102,5k       | 8,9k         | 63 |
+| medium | 100,1k       | 0,78k        | 55 |
 
-| Benchmark    | Depth | Score (ops/ms) |
-|--------------|-------|----------------|
-| runMixedPure | 10    | ~4,208         |
-| runMixedPure | 100   | ~350           |
-| runMixedPure | 1000  | ~33            |
+Fallback path (recover/handleError): Eru ≈ 24.2–24.6k ops/ms; ZIO ≈ 5.1–5.7k; Cats Effect ≈ 43–59.
 
-**Analysis:** These numbers are expected and demonstrate the correctness of the fusion logic. The performance is still
-very good, but it is orders of magnitude different from a purely fused chain. This highlights a clear usage pattern: for
-performance-critical code, developers should strive to group pure, computational logic into distinct chains that can be
-fully optimized by the fusion engine.
+## Methodology details
+- Settings: JMH 1.37; -wi 5 -i 10 -f1 -t1. CPU governor and background load kept typical; see env file for hardware/OS.
+- Parity rules: equivalence of semantics only; scenarios have identical chain depths, failure positions, retry bounds,
+  and finalizer counts. No hidden tunings.
+- Determinism: retry/backoff uses ZERO base to avoid measuring sleeps; results are attempt‑bounded.
+- Reporting: we cite only data from raw files in this repository. When a competitor wins a scenario (e.g., ZIO bracket
+  success), we call it out explicitly.
 
-## Eru's Value Proposition: Beyond Performance
+## What this does and does not claim
+- These are microbenchmarks. They answer “how fast can a particular path be?” not “how will my app behave?”
+- The scope is restricted to equivalent semantics. We purposely avoid cross‑library comparisons for true parallelism or
+  async I/O until parity exists.
+- The results do not imply that any one library is “faster overall.” They show that, within a fair scope, Eru’s baseline
+  is excellent in composition, error handling, runner overhead, and retry; and competitive with ZIO on bracket, with ZIO
+  sometimes faster in bracket success.
 
-While the performance numbers are encouraging, they are a consequence of our primary goal, not the goal itself. The true
-value of Eru lies in its adherence to the principles of the Manifesto.
+## Environment and reproducibility
+- Environment metadata (hardware/OS/JDK/Scala/SBT/commit SHA): benchmarks/raw/env-2025-08-29-143751.txt
+- Command examples (from repo root):
+  - Full suite (non‑GC + GC): sh tools/run-benches.sh
+  - Parity only: sh tools/run-benches.sh --mode=parity
+  - With GC profile only: sh tools/run-benches.sh --gc
+- All raw outputs are stored under benchmarks/raw with timestamps. See also benchmarks/FAIRNESS.md for scope and rules.
 
-- **A Focus on Correctness:** The zero-casting runtime is a testament to our belief that a system should be correct by
-  construction, not just by test.
+## What’s next (GC and memory profile)
+- We will add GC‑profiled tables (bytes/op, GC time) from runs using -prof gc (parity‑only and full) and update this
+  document. The primary cross‑library signal will be bytes/op (gc.alloc.rate.norm). We expect:
+  - Pure success chains: flat, very low bytes/op; smooth scaling across depths.
+  - Mixed/effect boundaries: modest increases; no step‑cliffs.
+  - Resources/Retry: roughly linear with K/attempts; no unexpected promotion.
+- If GC profiles surface issues, we will address them and update this page with before/after data.
 
-- **Radical Ergonomics:** The fusion is automatic and transparent. Developers write simple, idiomatic functional code,
-  and the system provides the performance without requiring any special annotations or modes.
-
-- **A "Guided Correctness":** By providing a fast path for pure code and a safe path for effectual code, Eru guides
-  developers toward a style of programming that is both efficient and robust.
-
-We believe that this combination of correctness, ergonomics, and principled performance offers a compelling vision for
-modern functional programming in Scala 3. We present these findings for the community's review and hope that this work
-proves to be a useful contribution to the ongoing, collaborative effort to build better tools.
-## Comparative Benchmarks Plan (Eru vs Cats Effect vs ZIO)
-
-Goal: Provide a complete, fair, reproducible comparison across the most relevant dimensions for users: pure/effectful/mixed chains, memory pressure, concurrency, coordination, resource management, reliability (timeouts/retries), and observability overhead.
-
-Principles of fairness:
-- Same Scala version, JDK, JVM flags, hardware, and OS.
-- Warmups and iterations identical across suites (JMH configured uniformly).
-- Implement equivalent semantics, not identical code style (each library’s idioms, but same logical behavior and guarantees).
-- Avoid hidden advantages: no unsafe or non-portable shortcuts; keep default schedulers/executors unless explicitly noted.
-- Report and publish environment details (CPU, cores, RAM, JVM, OS), commit SHAs, and benchmark parameters.
-
-Required libraries:
-- Eru (current checkout)
-- Cats Effect 3.x (current stable)
-- ZIO 2.x (current stable)
-
-Scenario matrix:
-1) Computation chains
-   - Pure map/flatMap chains: small/medium/deep
-   - Effectful chains (Eru.effect / IO delay / ZIO effect)
-   - Mixed chains at varying densities (e.g., 10%, 50%, 90% effectful steps)
-   - Memory pressure variants (allocate small case classes vs. larger payloads)
-
-2) Concurrency primitives
-   - zipPar: pair and n-way composition
-   - race: deterministic winner/loser cases
-   - Fork/join throughput (spawn N small tasks; await all)
-   - Coordination: Ref get/set/update, Deferred complete/await, Semaphore withPermit/withPermits
-
-3) Resource management
-   - ensure/bracket costs (success/failure/defect paths)
-   - nested finalizers (FILO depth and overhead)
-
-4) Reliability
-   - timeout/timeoutTo semantics and overhead on success/failure/timeout cases
-   - retryN and exponential backoff (latency budget and CPU usage)
-
-5) Observability
-   - Overhead of simple observer hooks vs. baseline (where applicable)
-
-Output and reporting:
-- Use JMH median/mean + p95 + error margins.
-- For each scenario, record ops/ms (throughput) and/or ns/op (avg time) as appropriate.
-- Record GC profiler stats (-prof gc) and optionally stack profiler (-prof stack) for selected cases.
-- Store results in repo under complete_benchmark_results.txt with date, environment, and commit SHAs.
-
-Process and gating:
-- Do NOT implement until Phase 4 per RELEASE_PLAN/WORKING_PLAN.
-- Before adding new benches, audit existing ~350 tests/benches to avoid duplication and confirm coverage gaps.
-- Benchmarks must not change library internals (public API use only).
+## Bottom line
+- Eru delivers excellent throughput on fused composition, very fast error paths, efficient bounded retries, and extremely
+  low boundary overhead; it is competitive with ZIO on bracket, while Cats Effect is consistently slower in these
+  micro‑scenarios.
+- We explicitly acknowledge scenarios where ZIO leads (bracket success). We will continue to publish raw outputs,
+  environment metadata, and GC profiles to keep the picture honest and complete.

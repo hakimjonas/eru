@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-29 08:19 (local)
+Last updated: 2025-08-29 19:12 (local)
 Target version: 1.0.0
 
 ---
@@ -327,3 +327,11 @@ Action:
   - Ran tools/run-benches.sh --mode=smoke to validate harness and artifact capture.
   - Artifacts saved under benchmarks/raw with timestamp 2025-08-29-133359 (env + raw for EruMapFlatMapBench and ParityBenches).
   - Next: schedule idle-session full runs via tools/run-benches.sh (default) and tools/run-benches.sh --gc; update Baseline-2025-08-29.md with tables and analysis after runs.
+
+
+
+- 2025-08-29 19:12 — Phase 4 Depth Standardization for Benchmarks
+  - Standardized depth parameters to 8, 16, 32, 64, 128, 256, 512 in CompetitiveBench (removed 299/300); parity benches already conformed to powers-of-two.
+  - scaladoc in CompetitiveBench updated to reflect neutral, powers-of-two sweep; removed language that could be interpreted as targeting a competitor’s threshold.
+  - sbt check is green; repository ready for overnight full runs.
+  - Next actions: run non-GC and GC profiles in an idle TTY using tools/run-benches.sh and tools/run-benches.sh --gc; then promote results into Baseline doc with tables and environment metadata.
