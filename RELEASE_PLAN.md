@@ -315,3 +315,8 @@ Action:
   - Added EruStackSafetyBench (deep map/flatMap chains at 256/512/1024) and EruConcurrencyLiteBench (Eru-only: zipPar/race/fork/Ref/Deferred.poll/Semaphore) to eru-bench-jvm.
   - Executed smoke run; raw output archived at benchmarks/raw/2025-08-29-114414-EruNewBenches.txt and referenced from Baseline-2025-08-29.md.
   - Next: schedule idle-session full runs with bench/benchWithGC and update baseline tables + analysis; then proceed to CE/ZIO parity for fair scenarios.
+
+- 2025-08-29 12:18 — Phase 4 Parity Benches Smoke (CE/ZIO vs Eru)
+  - Implemented parity benches for fair scenarios: Composition, ErrorHandling, Resource, Retry (ZERO base), RunnerOverhead.
+  - Executed JMH smoke run on .*ParityBench.*; raw output archived at benchmarks/raw/2025-08-29-121819-ParityBenches.txt.
+  - Baseline updated with parity reference. Ready for idle-session full runs (bench, benchWithGC) under FAIRNESS.md.
