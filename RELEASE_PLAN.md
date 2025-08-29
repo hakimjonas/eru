@@ -2,7 +2,7 @@
 
 Mission: Deliver a pristine, principled 1.0 of Eru that exemplifies the Four Pillars — Correctness, Radical Ergonomics, Guided Correctness, and Exceptional Observability — with a joyful developer experience and an uncompromising public API.
 
-Last updated: 2025-08-29 07:57 (local)
+Last updated: 2025-08-29 08:19 (local)
 Target version: 1.0.0
 
 ---
@@ -27,7 +27,7 @@ Reference: docs-src/WORKING_PLAN.md (execution detail) and MANIFESTO.md (vision)
 - [x] AC4: Integration tests pass using only `net.ghoula.eru.prelude.*`.
 - [ ] AC5: Full Scaladoc coverage for public APIs; guides compile via mdoc.
 - [x] AC6: Lawfulness verified via ScalaCheck where applicable.
-- [ ] AC7: Observability documented and validated from userland.
+- [x] AC7: Observability documented and validated from userland.
 - [ ] AC8: Performance baseline recorded; no significant regressions.
 - [ ] AC9: CI and signed publishing pipeline green; 1.0.0 tagged and published.
 
@@ -60,9 +60,9 @@ Phase 2 — Lawfulness and Property Testing
 - [x] P2.5 Parity on JVM and Native.
 
 Phase 3 — Observability Polish
-- [ ] P3.1 Document event taxonomy and minimal guarantees.
-- [ ] P3.2 Integration tests to assert expected event sequences.
-- [ ] P3.3 Observer helpers (`noop`, `console`) surfaced and documented.
+- [x] P3.1 Document event taxonomy and minimal guarantees.
+- [x] P3.2 Integration tests to assert expected event sequences.
+- [x] P3.3 Observer helpers (`noop`, `console`) surfaced and documented.
 
 Phase 4 — Performance Guardrails
 - [ ] P4.1 Curate JMH scenarios; establish baseline.
@@ -239,3 +239,24 @@ Action:
   - sbt check green (scalafix/scalafmt).
   - Test parity verified on Native: eruCoreNative/test (340/340), eruRuntimeNative/test (3/3). JVM core/runtime and integration suites remain green.
   - Marked P2.5 (Parity on JVM and Native) as completed; this plan now fully reflects current status.
+
+
+- 2025-08-29 08:02 — Phase 1 D1 Next Slice Planned; Phase 3 Prep
+  - Focus next: P1.1 Scaladoc coverage for public APIs (Prelude, RuntimeExtensions, EruObserver, Exit) in small, green increments.
+  - Phase 3 preparation: extend ObservabilitySpec with defect and simple fork/join sequences; document minimal guarantees.
+  - mdoc/unidoc remain disabled until Phase 5; examples continue to import only `net.ghoula.eru.prelude.*`.
+
+
+- 2025-08-29 08:05 — Verification: Full test suite green
+  - sbt test passed across core/runtime/integration; Native matrix remains green.
+  - Proceeding with Phase 1 D1 (Scaladoc coverage for Prelude, RuntimeExtensions, EruObserver, Exit) and Phase 3 prep (extend ObservabilitySpec: defect and simple fork/join sequences; document minimal guarantees).
+
+
+- 2025-08-29 08:18 — Phase 3 Completed; Observability Polish
+  - Added EruObserver helpers: noop and console, surfaced via unified prelude.
+  - Extended ObservabilitySpec to assert sequences: Success (with Step), TypedFailure, Defect, and fork/join via forkWithObserver (FiberStarted -> FiberCompleted), matching minimal guarantees.
+  - Updated observer guide with event taxonomy, minimal guarantees, and helper usage examples.
+  - Marked AC7 complete and P3.1–P3.3 done. No API breaking changes.
+
+- 2025-08-29 08:19 — Verification
+  - sbt check green (scalafix/scalafmt), and full test matrix green (JVM + Native).

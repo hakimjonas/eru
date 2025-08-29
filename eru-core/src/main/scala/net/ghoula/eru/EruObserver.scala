@@ -51,6 +51,30 @@ package net.ghoula.eru
   */
 object EruObserver {
 
+  /** A no-op observer that discards all events.
+    *
+    * This is useful when an observer is required by an API but the caller does not wish to record
+    * or emit any events. It has near-zero overhead.
+    *
+    * @return
+    *   an observer that ignores all events
+    */
+  def noop: EruObserver = new EruObserver { def onEvent(event: EruEvent): Unit = () }
+
+  /** A console observer that prints events to standard output.
+    *
+    * This helper is intended for quick diagnostics and examples. For production use, prefer a
+    * structured observer that forwards to logging/metrics/tracing backends.
+    *
+    * @return
+    *   an observer that prints human-readable events to standard output
+    */
+  def console: EruObserver = new EruObserver {
+    def onEvent(event: EruEvent): Unit = {
+      System.out.println(event.toString)
+    }
+  }
+
   /** A stable identifier for a single program execution scope.
     *
     * ScopeId provides a unique identifier that tracks the execution boundary of Eru programs. In
