@@ -1,22 +1,23 @@
 package net.ghoula.eru.internal
 
 import java.time.Duration
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.{CountDownLatch, Executors, ScheduledExecutorService, TimeUnit}
 import java.util.concurrent.atomic.AtomicReference
 
 import net.ghoula.eru.*
 
-/** JVM-only Virtual Threads backend (H9.2 fork/await only).
+/** JVM-only Virtual Threads backend (H9.2 fork/await; H9.3 timers non-blocking).
   *
-  * zipPar, race, sleep, and timeout delegate to the sequential backend for now.
+  * zipPar and race still delegate to the sequential backend for now.
   */
 private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
   private val delegate: ConcurrencyBackend = DefaultBackends.sequential
+  private val scheduler: ScheduledExecutorService = Executors.newScheduledThreadPool(1, r => Thread.ofVirtual().name("eru-scheduler").unstarted(r))
 
   val capabilities: BackendCapabilities = BackendCapabilities(
     virtualThreads = true,
     structuredScopes = false,
-    timersNonBlocking = false
+    timersNonBlocking = true
   )
 
   private def computeExit[E, A](fa: Eru[E, A]): Exit[E, A] =
@@ -67,10 +68,20 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
     delegate.race(fa, fb)
 
   def sleep(duration: Duration): Eru[Nothing, Unit] =
-    delegate.sleep(duration)
+    Eru.effectAsync[Nothing, Unit] { cb =>
+      val delay = Math.max(0L, duration.toMillis)
+      scheduler.schedule(new Runnable { def run(): Unit = cb(Right(())) }, delay, TimeUnit.MILLISECONDS)
+    }
 
-  def timeout[E, A](duration: Duration)(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
-    delegate.timeout(duration)(fa)
+  def timeout[E, A](duration: Duration)(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] = {
+    import java.util.concurrent.TimeoutException
+    // Race fa against a timer; if timer wins, fail with TimeoutException
+    val timer = sleep(duration)
+    delegate.race(fa, timer).flatMap {
+      case Left(a)  => Eru.succeed(a)
+      case Right(_) => Eru.effect(throw new TimeoutException(s"Operation timed out after $duration"))
+    }
+  }
 
   def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A] =
     delegate.retry(policy)(fa)
