@@ -419,7 +419,7 @@ object Eru {
     /** The entry point for executing an Eru program.
       */
     def runSync[E, A](start: Eru[E, A]): A = {
-      val (either, fins) = runWithStack(start, Nil).result
+      val (either, fins) = runLoop(start, Nil, Hooks.Noop).result
       drainFinalizers(fins).result
       either match {
         case Left(error) =>
@@ -432,6 +432,16 @@ object Eru {
     }
 
     private type Finalizer = () => Eru[Nothing, Unit]
+
+    private trait Hooks {
+      def onStep(label: => String): Unit
+    }
+    private object Hooks {
+      val Noop: Hooks = new Hooks { def onStep(label: => String): Unit = () }
+      final case class ObserverHooks(scope: ScopeId, observer: EruObserver) extends Hooks {
+        def onStep(label: => String): Unit = observer.onEvent(EruEvent.Step(scope, label))
+      }
+    }
 
     /** Core synchronous interpreter that executes Eru effects step-by-step.
       *
@@ -458,7 +468,11 @@ object Eru {
       * @return
       *   TailRec computation yielding (result, accumulated finalizers)
       */
-    private def runWithStack[E, A](eru: Eru[E, A], fins: List[Finalizer]): TailRec[(Either[E, A], List[Finalizer])] =
+    private def runLoop[E, A](
+      eru: Eru[E, A],
+      fins: List[Finalizer],
+      hooks: Hooks
+    ): TailRec[(Either[E, A], List[Finalizer])] =
       eru match {
         case Succeed(value) =>
           done((Right(value), fins))
@@ -470,28 +484,28 @@ object Eru {
           done((thunk(), fins))
 
         case Chain(source, f) =>
-          tailcall(runWithStack(source, fins)).flatMap {
-            case (Right(value), fs) => tailcall(runWithStack(f(value), fs))
+          tailcall(runLoop(source, fins, hooks)).flatMap {
+            case (Right(value), fs) => tailcall(runLoop(f(value), fs, hooks))
             case (Left(error), fs) => done((Left(error), fs))
           }
 
         case Chain2(source, f1, f2) =>
-          tailcall(runWithStack(source, fins)).flatMap {
+          tailcall(runLoop(source, fins, hooks)).flatMap {
             case (Right(a), fs1) =>
-              tailcall(runWithStack(f1(a), fs1)).flatMap {
-                case (Right(b), fs2) => tailcall(runWithStack(f2(b), fs2))
+              tailcall(runLoop(f1(a), fs1, hooks)).flatMap {
+                case (Right(b), fs2) => tailcall(runLoop(f2(b), fs2, hooks))
                 case (Left(e), fs2) => done((Left(e), fs2))
               }
             case (Left(e), fs1) => done((Left(e), fs1))
           }
 
         case Chain3(source, f1, f2, f3) =>
-          tailcall(runWithStack(source, fins)).flatMap {
+          tailcall(runLoop(source, fins, hooks)).flatMap {
             case (Right(a), fs1) =>
-              tailcall(runWithStack(f1(a), fs1)).flatMap {
+              tailcall(runLoop(f1(a), fs1, hooks)).flatMap {
                 case (Right(b), fs2) =>
-                  tailcall(runWithStack(f2(b), fs2)).flatMap {
-                    case (Right(c), fs3) => tailcall(runWithStack(f3(c), fs3))
+                  tailcall(runLoop(f2(b), fs2, hooks)).flatMap {
+                    case (Right(c), fs3) => tailcall(runLoop(f3(c), fs3, hooks))
                     case (Left(e2), fs3) => done((Left(e2), fs3))
                   }
                 case (Left(e1), fs2) => done((Left(e1), fs2))
@@ -500,29 +514,29 @@ object Eru {
           }
 
         case MapChain(source, f) =>
-          tailcall(runWithStack(source, fins)).map {
+          tailcall(runLoop(source, fins, hooks)).map {
             case (Right(value), fs) => (Right(f(value)), fs)
             case (Left(error), fs) => (Left(error), fs)
           }
 
         case RecoverWith(source, pf) =>
-          tailcall(runWithStack(source, fins)).flatMap {
+          tailcall(runLoop(source, fins, hooks)).flatMap {
             case (Right(value), fs) => done((Right(value), fs))
             case (Left(error), fs) =>
               if (pf.isDefinedAt(error)) {
-                tailcall(runWithStack(pf(error), fs))
+                tailcall(runLoop(pf(error), fs, hooks))
               } else {
                 done((Left(error), fs))
               }
           }
 
         case MapError(source, f) =>
-          tailcall(runWithStack(source, fins)).map { case (either, fs) => (either.left.map(f), fs) }
+          tailcall(runLoop(source, fins, hooks)).map { case (either, fs) => (either.left.map(f), fs) }
 
         case Zip(left, right) =>
-          tailcall(runWithStack(left, fins)).flatMap {
+          tailcall(runLoop(left, fins, hooks)).flatMap {
             case (Right(a), fsL) =>
-              tailcall(runWithStack(right, fsL)).map {
+              tailcall(runLoop(right, fsL, hooks)).map {
                 case (Right(b), fsR) => (Right((a, b)), fsR)
                 case (Left(e1), fsR) => (Left(e1), fsR)
               }
@@ -530,18 +544,19 @@ object Eru {
           }
 
         case Attempt(source) =>
-          tailcall(runWithStack(source, fins)).map {
+          tailcall(runLoop(source, fins, hooks)).map {
             case (Left(e), fs) => (Right(Result.Failure(e)), fs)
             case (Right(a), fs) => (Right(Result.Success(a)), fs)
           }
 
-        case Debug(source, _) =>
-          tailcall(runWithStack(source, fins))
+        case Debug(source, label) =>
+          hooks.onStep(label())
+          tailcall(runLoop(source, fins, hooks))
 
         case Ensure(source, fin) =>
-          tailcall(runWithStack(source, fins)).map { case (either, fs) => (either, fin :: fs) }
+          tailcall(runLoop(source, fins, hooks)).map { case (either, fs) => (either, fin :: fs) }
         case Suspend(register) =>
-          handleSuspend(cb => runWithStack(register(cb), fins).result)
+          handleSuspend(cb => runLoop(register(cb), fins, hooks).result)
       }
 
     /** Executes all finalizers in FILO (First-In-Last-Out) order with proper nesting support.
@@ -573,69 +588,9 @@ object Eru {
       fins match {
         case Nil => done(())
         case fin :: rest =>
-          tailcall(runWithStack(fin(), Nil)).flatMap { case (_, inner) =>
+          tailcall(runLoop(fin(), Nil, Hooks.Noop)).flatMap { case (_, inner) =>
             tailcall(drainFinalizers(inner ++ rest))
           }
-      }
-
-    /** Helper method to propagate left (error) results without modification */
-    private def propagateLeft[E, A](
-      errorResult: (Either[E, A], List[Finalizer])
-    ): TailRec[(Either[E, A], List[Finalizer])] =
-      done(errorResult)
-
-    /** Helper method for chaining a single continuation function */
-    private def chainSingle[E, A, B](
-      source: Eru[E, A],
-      continuation: A => Eru[E, B],
-      scope: ScopeId,
-      observer: EruObserver,
-      fins: List[Finalizer]
-    ): TailRec[(Either[E, B], List[Finalizer])] =
-      tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
-        case (Right(value), fs) => tailcall(runWithObsStack(continuation(value), scope, observer, fs))
-        case (Left(error), fs) => propagateLeft((Left(error), fs))
-      }
-
-    /** Helper method for chaining two continuation functions */
-    private def chainDouble[E, A, B, C](
-      source: Eru[E, A],
-      f1: A => Eru[E, B],
-      f2: B => Eru[E, C],
-      scope: ScopeId,
-      observer: EruObserver,
-      fins: List[Finalizer]
-    ): TailRec[(Either[E, C], List[Finalizer])] =
-      tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
-        case (Right(a), fs1) =>
-          tailcall(runWithObsStack(f1(a), scope, observer, fs1)).flatMap {
-            case (Right(b), fs2) => tailcall(runWithObsStack(f2(b), scope, observer, fs2))
-            case (Left(e), fs2) => propagateLeft((Left(e), fs2))
-          }
-        case (Left(e), fs1) => propagateLeft((Left(e), fs1))
-      }
-
-    /** Helper method for chaining three continuation functions */
-    private def chainTriple[E, A, B, C, D](
-      source: Eru[E, A],
-      f1: A => Eru[E, B],
-      f2: B => Eru[E, C],
-      f3: C => Eru[E, D],
-      scope: ScopeId,
-      observer: EruObserver,
-      fins: List[Finalizer]
-    ): TailRec[(Either[E, D], List[Finalizer])] =
-      tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
-        case (Right(a), fs1) =>
-          tailcall(runWithObsStack(f1(a), scope, observer, fs1)).flatMap {
-            case (Right(b), fs2) =>
-              tailcall(runWithObsStack(f2(b), scope, observer, fs2)).flatMap {
-                case (Right(c), fs3) => tailcall(runWithObsStack(f3(c), scope, observer, fs3))
-                case (Left(e2), fs3) => propagateLeft((Left(e2), fs3))
-              }
-            case (Left(e1), fs2) => propagateLeft((Left(e1), fs2))
-          }
-        case (Left(e0), fs1) => propagateLeft((Left(e0), fs1))
       }
 
     /** Helper method for handling Suspend case logic.
@@ -675,61 +630,7 @@ object Eru {
       observer: EruObserver,
       fins: List[Finalizer]
     ): TailRec[(Either[E, A], List[Finalizer])] =
-      eru match {
-        case Succeed(value) =>
-          done((Right(value), fins))
-        case Fail(error) =>
-          done((Left(error), fins))
-        case Effect(thunk) =>
-          done((thunk(), fins))
-        case Chain(source, f) =>
-          chainSingle(source, f, scope, observer, fins)
-
-        case Chain2(source, f1, f2) =>
-          chainDouble(source, f1, f2, scope, observer, fins)
-
-        case Chain3(source, f1, f2, f3) =>
-          chainTriple(source, f1, f2, f3, scope, observer, fins)
-
-        case MapChain(source, f) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).map {
-            case (Right(value), fs) => (Right(f(value)), fs)
-            case (Left(error), fs) => (Left(error), fs)
-          }
-        case RecoverWith(source, pf) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).flatMap {
-            case (Right(value), fs) => done((Right(value), fs))
-            case (Left(error), fs) =>
-              if (pf.isDefinedAt(error)) {
-                tailcall(runWithObsStack(pf(error), scope, observer, fs))
-              } else {
-                propagateLeft((Left(error), fs))
-              }
-          }
-        case MapError(source, f) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).map { case (either, fs) => (either.left.map(f), fs) }
-        case Zip(left, right) =>
-          tailcall(runWithObsStack(left, scope, observer, fins)).flatMap {
-            case (Right(a), fsL) =>
-              tailcall(runWithObsStack(right, scope, observer, fsL)).map {
-                case (Right(b), fsR) => (Right((a, b)), fsR)
-                case (Left(e1), fsR) => (Left(e1), fsR)
-              }
-            case (Left(e0), fsL) => propagateLeft((Left(e0), fsL))
-          }
-        case Attempt(source) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).map {
-            case (Left(e), fs) => (Right(Result.Failure(e)), fs)
-            case (Right(a), fs) => (Right(Result.Success(a)), fs)
-          }
-        case Debug(source, label) =>
-          observer.onEvent(EruEvent.Step(scope, label()))
-          tailcall(runWithObsStack(source, scope, observer, fins))
-        case Ensure(source, fin) =>
-          tailcall(runWithObsStack(source, scope, observer, fins)).map { case (either, fs) => (either, fin :: fs) }
-        case Suspend(register) =>
-          handleSuspend(cb => runWithObsStack(register(cb), scope, observer, fins).result)
-      }
+      tailcall(runLoop(eru, fins, Hooks.ObserverHooks(scope, observer)))
 
     /** Observer-aware interpreter variant */
     def runSyncWithObserver[E, A](start: Eru[E, A], observer: EruObserver): A = {
