@@ -47,20 +47,11 @@ private[eru] object DataClassUtils {
   }
 }
 
-/** Domain types that enforce correctness through Scala 3's opaque type system.
+/** Opaque domain types with validation.
   *
-  * These opaque types provide compile-time safety and domain integrity by wrapping primitive types
-  * with meaningful constraints and semantics. They exemplify Eru's commitment to "Guided
-  * Correctness" by making invalid states unrepresentable at the type level.
-  *
-  * Each opaque type includes:
-  *   - Factory methods with runtime validation
-  *   - Safe extension methods for common operations
-  *   - Clear semantic meaning in the domain model
-  *
-  * The types defined here are fundamental building blocks used across multiple Eru modules,
-  * ensuring consistency in domain modeling and preventing common programming errors through
-  * type-level constraints.
+  *   - AttemptCount: non‑negative attempt counts
+  *   - JitterFactor: a double in [0.0, 1.0]
+  *   - FailureThreshold: a positive integer threshold
   */
 object DomainTypes {
 
@@ -85,7 +76,7 @@ object DomainTypes {
     /** Creates a new AttemptCount with validation.
       *
       * @param value
-      *   the attempt count value, must be non-negative
+      *   the attempt count value must be non-negative
       * @return
       *   a validated AttemptCount instance
       * @throws IllegalArgumentException
@@ -135,11 +126,11 @@ object DomainTypes {
     /** Creates a new JitterFactor with validation.
       *
       * @param value
-      *   the jitter factor, must be between 0.0 and 1.0 inclusive
+      *   the jitter factor must be between 0.0 and 1.0 inclusive
       * @return
       *   a validated JitterFactor instance
       * @throws IllegalArgumentException
-      *   if value is outside valid range
+      *   if value is outside the valid range
       */
     def apply(value: Double): JitterFactor = {
       require(value >= 0.0 && value <= 1.0, s"JitterFactor must be between 0.0 and 1.0, got: $value")
@@ -173,7 +164,7 @@ object DomainTypes {
     /** Creates a new FailureThreshold with validation.
       *
       * @param value
-      *   the failure threshold, must be positive
+      *   the failure threshold must be positive
       * @return
       *   a validated FailureThreshold instance
       * @throws IllegalArgumentException

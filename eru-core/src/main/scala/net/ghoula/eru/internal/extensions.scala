@@ -5,22 +5,17 @@ import java.time.{Duration, Instant}
 import net.ghoula.eru.EruObserver.EruEvent
 import net.ghoula.eru.{patterns, trace, DomainTypes, Eru, Result}
 
-/** Consolidated extension methods for the Eru effect system.
+/** Consolidated extension methods for Eru.
   *
-  * This file brings together all extension methods from across the Eru core module, providing a
-  * single location for the ergonomic surface area of the API. These extensions embody the principle
-  * of "Radical Ergonomics" by making powerful operations discoverable and fluent.
-  *
-  * The extensions are organized by the types they extend:
-  *   - Result[E, A]: Core result operations (map, flatMap, fold, etc.)
-  *   - Eru[E, A]: Caching, resource safety, error handling, and tracing operations
+  * Groups extensions by type:
+  *   - Result[E, A]: map, flatMap, fold, and basic queries
+  *   - Eru[E, A]: resource patterns, error handling, debugging, and supporting combinators
   */
 object extensions {
 
   /** Extension methods providing the core API for `Result[E, A]`.
     *
-    * These methods follow the principle of radical ergonomics, providing a fluent and discoverable
-    * API that feels like a natural extension of the Scala language.
+    * Provides a fluent, discoverable API for transforming and inspecting results.
     */
   extension [E, A](result: Result[E, A]) {
 
@@ -114,11 +109,10 @@ object extensions {
     }
   }
 
-  /** Extension methods providing built-in caching functionality for `Eru[E, A]`.
+  /** Extension methods providing built-in caching and resource helpers for `Eru[E, A]`.
     *
-    * These methods follow the principle of radical ergonomics, making caching operations
-    * discoverable as natural extensions of the Eru type itself. Timeout and retry functionality
-    * will be provided in the runtime module to avoid circular dependencies.
+    * Makes common operations discoverable as natural extensions of the Eru type. Timeout and retry
+    * functionality are available from the runtime module to avoid circular dependencies.
     */
   extension [E, A](eru: Eru[E, A]) {
 
@@ -150,7 +144,7 @@ object extensions {
       * @tparam F
       *   the error type of the cleanup operation
       * @return
-      *   an effect that will automatically cleanup the resource
+      *   an effect that will automatically clean up the resource
       */
     def autoCleanup[F](cleanup: A => Eru[F, Unit]): Eru[E, A] = {
       eru.flatMap(value => Eru.succeed(value).ensure(cleanup(value)))

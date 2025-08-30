@@ -1,19 +1,13 @@
 package net.ghoula.eru
 
-/** The core prelude for the Eru effect system.
+/** Core prelude for the Eru effect system.
   *
-  * This object provides the complete public API of the eru-core module. It serves as the base layer
-  * for the final unified prelude in the eru-runtime module.
-  *
-  * The core prelude exports all functionality contained within the eru-core module:
+  * Exports:
   *   - Core types: Eru, Result
   *   - Domain types: AttemptCount, JitterFactor, FailureThreshold
-  *   - Factory methods: succeed, fail, effect, blocking, etc.
-  *   - Extension methods: caching, resource safety, error handling, tracing, validated, optimize
-  *   - Supporting types: EruException, EruObserver, Exit, ErrorHandling patterns, Trace types
-  *
-  * This design respects modular boundaries while providing a clean foundation for the
-  * runtime-enhanced prelude that will add concurrent operations like fork.
+  *   - Factory methods: succeed, fail, effect, blocking, fromEither, fromTry, fromOption, unit
+  *   - Extension methods: resource safety, error handling, debugging, optimization
+  *   - Supporting types: EruException, EruObserver, Exit, tracing and error patterns
   */
 object CorePrelude {
 
@@ -66,7 +60,7 @@ object CorePrelude {
 
   // ===== ERROR HANDLING PATTERNS =====
 
-  /** Export all sophisticated error handling patterns and types. */
+  /** Export error handling patterns and types. */
   export net.ghoula.eru.patterns.ErrorHandling.*
 
   // ===== TRACING AND OBSERVABILITY =====

@@ -19,7 +19,7 @@ Eru provides principled resource safety in the synchronous kernel with two core 
 ### ensure runs on both success and failure:
 
 ```scala
-import net.ghoula.eru.Eru
+import net.ghoula.eru.prelude.*
 
 var cleaned = false
 val successfulProgram = Eru.succeed(42).ensure(Eru.effect { cleaned = true })

@@ -44,10 +44,10 @@ E. Reduce interpreter duplication (Correctness, Observability, Dev Ergonomics)
 
 F. Performance guardrails (Correctness, Confidence)
 - Intent: Ensure no regressions after A–E.
-- Actions: Re‑run bench smoke; keep scope honest (no cross‑library parallel claims yet).
+- Actions: Re‑run bench smoke; keep scope honest (no cross‑library parallel claims yet). ✓
 
 G. QA and workflow (Discipline)
-- sbt check green; full JVM/Native core+runtime tests; integration tests via public prelude only; prepare/bench scripts validated; release plan kept in sync.
+- sbt check green; full JVM/Native core+runtime tests; integration tests via public prelude only; prepare/bench scripts validated; release plan kept in sync. ✓
 
 ---
 

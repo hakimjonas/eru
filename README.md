@@ -35,24 +35,23 @@ For the point-by-point execution plan aligned with our Manifesto and guidelines,
 - **Eru Development Playbook — Point-by-Point Plan**: PLAYBOOK.md
 
 ## Concurrent Runtime
+Current state: sequential “concurrency‑lite.”
 
-The runtime is a complete fiber-based concurrency model with a structured programming interface.
+- On JVM today: zipPar is sequential and race is deterministic (left-biased) to preserve portability and simplicity of the synchronous core.
+- Next milestone: true concurrency on JVM via Java Virtual Threads (JDK 21+). When running on JDK 25 with `--enable-preview`, Eru may internally integrate Structured Concurrency (StructuredTaskScope) with automatic fallback to the VT backend.
+- Scala Native: supports the synchronous core and a sequential runtime for now (Native has multithreading but no Virtual Threads). True concurrency on Native is deferred and will be reassessed after the JVM runtime stabilizes.
 
-### Runtime Architecture
+### Architecture
 
-- **eru-core**: The pure, synchronous kernel.
+- **eru-core**: Pure, synchronous kernel (sealed ADT, zero casts, TailRec interpreter).
+- **eru-runtime**: Portability-first runtime with concurrency conveniences (fork facade, zipPar, race, timeouts, retries). A JVM concurrent backend on Virtual Threads is planned.
 
-- **eru-runtime**: The concurrent runtime with fibers, structured concurrency, and cooperative scheduling.
+### Notes
 
-### Key Features
+- Resource safety: patterns like `.ensure` and `bracket` are guaranteed today.
+- Observability: `EruObserver` provides ProgramStart/End and Step events; fiber events will be added with the concurrent runtime.
 
-- **Fiber Management**: Fork/await, interruption, and lifecycle management.
-
-- **Structured Concurrency**: race, zipPar, and principled resource cleanup.
-
-- **Resource Safety**: Automatic cleanup patterns like `.autoClose` and `.ensure`.
-
-For technical details, see the design document: design/async.md
+For status and roadmap, see IMMEDIATE_ACTION.md (sections D and H).
 
 ## Guides
 

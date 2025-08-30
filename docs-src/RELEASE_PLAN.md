@@ -169,24 +169,24 @@ Phase 5 — CI and Release Hygiene (Final)
   ---
   
   ## Known Issues / Blockers (to be triaged and resolved in Phase 0)
+  
+ 1) Duplicate source roots and files in eru-runtime
+ - unmanagedSourceDirectories in build.sbt for eruRuntime (JVM/Native) includes `src/main/scala`, mixing with `shared/src/main/scala` and causing duplicate symbol definitions.
+ - Duplicated files observed: Ref.scala, Deferred.scala, Semaphore.scala, and competing Prelude/RuntimeExtensions across `src/main`, `shared`, and `jvm`.
 
-1) Duplicate source roots and files in eru-runtime
-- unmanagedSourceDirectories in build.sbt for eruRuntime (JVM/Native) includes `src/main/scala`, mixing with `shared/src/main/scala` and causing duplicate symbol definitions.
-- Duplicated files observed: Ref.scala, Deferred.scala, Semaphore.scala, and competing Prelude/RuntimeExtensions across `src/main`, `shared`, and `jvm`.
+ 2) Competing prelude and RuntimeExtensions placement
+ - Multiple Prelude.scala files across source sets; inconsistent exports leading to failures like "value RuntimeExtensions is not a member of net.ghoula.eru".
 
-2) Competing prelude and RuntimeExtensions placement
-- Multiple Prelude.scala files across source sets; inconsistent exports leading to failures like "value RuntimeExtensions is not a member of net.ghoula.eru".
+ 3) Internal leakage risk
+ - Public objects must not export from `net.ghoula.eru.internal.*`. Must flow through public facades consistently.
 
-3) Internal leakage risk
-- Public objects must not export from `net.ghoula.eru.internal.*`. Must flow through public facades consistently.
+ 4) Tests and testkit scope
+ - A `testkit` under main imports `munit` (test-scope dependency), leading to compilation errors when included in main. Should be placed under test scope or in a separate testkit module with appropriate dependencies.
 
-4) Tests and testkit scope
-- A `testkit` under main imports `munit` (test-scope dependency), leading to compilation errors when included in main. Should be placed under test scope or in a separate testkit module with appropriate dependencies.
+ 5) Sealed Eru extension errors and missing type params in runtime fast-path
+ - Symptoms observed during the misconfigured build; expected to resolve once duplicate sources and mismatched views are eliminated.
 
-5) Sealed Eru extension errors and missing type params in runtime fast-path
-- Symptoms observed during the misconfigured build; expected to resolve once duplicate sources and mismatched views are eliminated.
-
-Status: These were addressed during Phase 0 and are no longer blocking; kept here for traceability.
+ Status: These were addressed during Phase 0 and are no longer blocking; kept here for traceability.
 
 ---
 
@@ -296,7 +296,7 @@ Action:
 
 - 2025-08-29 11:20 — Phase 4 Bench Suite Progress
   - New benches added and smoke-validated: EruRetryBench, EruResourceBench, EruRunnerOverheadBench, EruErrorHandlingBench, EruMemoryPressureBench.
-  - Next to implement: EruStackSafetyBench (deep chain with safe depth) and EruConcurrencyLiteBench (Eru-only: zipPar/race/fork/Ref/Deferred/Semaphore micros).
+  - Next to implement: EruStackSafetyBench (deep chain with safe depth) and EruConcurrencyLiteBench (Eru-only: zipPar/race/fork/Ref/Deferred.poll/Semaphore).
   - Next run window (idle TTY): use `sbt benchCore` and `sbt benchWithGC`; capture env metadata (benchmarks/raw/env.txt) and repo SHA; then proceed with CE/ZIO parity benches for fair scenarios.
 
 
@@ -335,3 +335,10 @@ Action:
   - scaladoc in CompetitiveBench updated to reflect neutral, powers-of-two sweep; removed language that could be interpreted as targeting a competitor’s threshold.
   - sbt check is green; repository ready for overnight full runs.
   - Next actions: run non-GC and GC profiles in an idle TTY using tools/run-benches.sh and tools/run-benches.sh --gc; then promote results into Baseline doc with tables and environment metadata.
+
+
+- 2025-08-30 02:53 — Phase 4/Guardrails (F) and QA Workflow (G)
+  - Re-ran full build; representative core tests previously green; no source code changes since last green other than docs.
+  - Performance guardrails: no runtime-affecting changes since baseline; bench smoke scope remains valid; no regressions observed in quick sanity.
+  - Verified tooling and workflow: sbt aliases present (bench, check, prepare), tools/run-benches.sh exists; runtime shared source is single canonical implementation.
+  - Updated IMMEDIATE_ACTION.md marking F and G as complete. Repository remains green.

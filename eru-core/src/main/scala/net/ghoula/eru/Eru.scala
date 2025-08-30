@@ -358,8 +358,8 @@ object Eru {
     * computation lazily and captures `NonFatal` exceptions into the `Throwable` error channel.
     * Fatal errors (e.g., `VirtualMachineError`) are not caught and will escape.
     *
-    * In the asynchronous runtime (0.3.x), the runtime may treat blocking regions specially to avoid
-    * starving the scheduler while maintaining correctness and resource-safety guarantees.
+    * In the asynchronous runtime (0.3.x), the runtime may treat blocking regions especially to
+    * avoid starving the scheduler while maintaining correctness and resource-safety guarantees.
     *
     * @param thunk
     *   the computation to suspend (by-name)
@@ -599,7 +599,7 @@ object Eru {
       * for async completion found in both runWithStack and runWithObsStack.
       *
       * @param executeRegister
-      *   function to execute the registration with appropriate context
+      *   function to execute the registration with the appropriate context
       * @tparam E
       *   the error type
       * @tparam A

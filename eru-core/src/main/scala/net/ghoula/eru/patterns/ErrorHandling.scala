@@ -6,22 +6,18 @@ import java.util.concurrent.atomic.AtomicReference
 import net.ghoula.eru.*
 import net.ghoula.eru.{DataClassUtils, DomainTypes}
 
-/** Enhanced error handling patterns for more ergonomic recovery mechanisms.
+/** Error handling patterns for recovery, retry, and validation.
   *
-  * This module provides sophisticated error handling patterns that go beyond simple retry logic,
-  * including circuit breakers, error accumulation, conditional recovery, and validation patterns.
-  * These patterns follow the "radical ergonomics" principle by making complex error handling
-  * scenarios simple and discoverable.
+  * Provides reusable patterns such as circuit breakers, error accumulation, conditional recovery,
+  * and validation. The focus is on clear behavior and predictable semantics.
   */
 object ErrorHandling {
   import DomainTypes.*
 
-  /** Sophisticated retry policies providing flexible, context-aware retry strategies.
+  /** Retry policies providing flexible, context-aware strategies.
     *
     * RetryPolicy represents different retry strategies that can be applied to effects, each
-    * optimized for specific failure patterns and operational requirements. The policies follow
-    * Eru's "Radical Ergonomics" principle by providing intuitive configuration while maintaining
-    * correctness guarantees.
+    * optimized for common failure patterns and operational requirements.
     *
     * All policies support:
     *   - Context-aware retry decisions based on error type and attempt history

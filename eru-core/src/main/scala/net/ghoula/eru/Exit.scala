@@ -1,63 +1,17 @@
 package net.ghoula.eru
 
-/** Structured outcome for effectful computations in Eru's asynchronous runtime.
+/** Structured outcome of running an effect.
   *
-  * Exit represents the comprehensive result of running an effect in a fiber, providing a principled
-  * approach to handling all possible termination scenarios. It distinguishes between successful
-  * completion, typed domain failures, unexpected system defects, and cooperative interruption,
-  * enabling robust error handling and resource management in concurrent programs.
-  *
-  * This structured approach aligns with Eru's core principles of correctness and observability by
-  * making all failure modes explicit and actionable. The separation of concerns between different
-  * failure types enables appropriate handling strategies for each scenario.
-  *
-  * ==Exit Categories==
-  *
-  * '''Success:''' Normal completion with a produced value, representing the happy path of effect
-  * execution where all operations completed successfully.
-  *
-  * '''Failure:''' Typed domain errors that are part of the expected business logic, handled through
-  * Eru's typed error channel for predictable error scenarios.
-  *
-  * '''Die:''' Unexpected system failures (Throwables) that represent programming errors or system
-  * issues, requiring immediate attention and typically indicating bugs.
-  *
-  * '''Interrupt:''' Cooperative cancellation scenarios where execution was halted due to external
-  * requests, timeouts, or structured concurrency requirements.
+  * Cases:
+  *   - Success(value): completed successfully
+  *   - Failure(error): completed with a typed error
+  *   - Die(throwable): failed due to an unexpected throwable
+  *   - Interrupt(fiberId, cause): interrupted cooperatively
   *
   * @tparam E
-  *   the type of the typed error (domain failure)
+  *   the typed error
   * @tparam A
-  *   the type of the success value
-  *
-  * @example
-  *   {{{
-  * // Pattern matching on exit outcomes
-  * def handleExit[E, A](exit: Exit[E, A]): Unit = exit match {
-  *   case Exit.Success(value) =>
-  *     logger.info(s"Operation completed successfully: $value")
-  *
-  *   case Exit.Failure(error) =>
-  *     logger.warn(s"Operation failed with domain error: $error")
-  *     // Handle expected business logic error
-  *
-  *   case Exit.Die(throwable) =>
-  *     logger.error("Unexpected system failure", throwable)
-  *     alerting.sendCriticalAlert("System defect detected", throwable)
-  *
-  *   case Exit.Interrupt(fiberId, cause) =>
-  *     logger.info(s"Operation interrupted for fiber $fiberId: $cause")
-  *     // Handle cancellation appropriately
-  * }
-  *
-  * // Converting Exit to standard error handling
-  * def exitToEither[E, A](exit: Exit[E, A]): Either[String, A] = exit match {
-  *   case Exit.Success(value) => Right(value)
-  *   case Exit.Failure(error) => Left(s"Domain error: $error")
-  *   case Exit.Die(throwable) => Left(s"System failure: ${throwable.getMessage}")
-  *   case Exit.Interrupt(_, cause) => Left(s"Interrupted: $cause")
-  * }
-  *   }}}
+  *   the success value
   */
 enum Exit[+E, +A] {
 
@@ -72,7 +26,7 @@ enum Exit[+E, +A] {
     */
   case Success(value: A)
 
-  /** Represents effect failure with a typed, domain-specific error.
+  /** Represents an effect failure with a typed, domain-specific error.
     *
     * This outcome indicates that the effect failed through Eru's typed error channel, representing
     * expected domain errors that are part of normal business logic. These errors are typically
@@ -86,7 +40,7 @@ enum Exit[+E, +A] {
   /** Represents unexpected effect failure due to a system defect.
     *
     * This outcome indicates that the effect failed due to an unexpected Throwable, representing a
-    * programming error, system failure, or other exceptional condition that was not anticipated.
+    * programming error, system failure, or other exceptional condition that was not expected.
     * Defects typically require immediate attention and often indicate bugs in the application
     * logic.
     *
@@ -197,7 +151,7 @@ object FiberId {
   *
   * ==Interruption Categories==
   *
-  * '''Cancelled:''' Explicit cancellation requests from users or the runtime system, typically
+  * '''Canceled:''' Explicit cancellation requests from users or the runtime system, typically
   * representing intentional termination of operations.
   *
   * '''Timeout:''' Time-based interruptions where operations exceed their allowed duration, crucial
@@ -254,7 +208,7 @@ object FiberId {
   */
 enum InterruptCause {
 
-  /** Interruption initiated by explicit cancellation request.
+  /** Interruption initiated by an explicit cancellation request.
     *
     * This cause represents intentional termination of fiber execution, typically initiated by user
     * action, application logic, or runtime management. Cancellation is the most common form of
@@ -276,7 +230,7 @@ enum InterruptCause {
     * @param duration
     *   the timeout duration that was exceeded, providing context about the time limit
     * @param operation
-    *   optional description of the specific operation that timed out, useful for diagnostics and
+    *   optional description of the specific operation which timed out, useful for diagnostics and
     *   performance analysis
     */
   case Timeout(duration: java.time.Duration, operation: Option[String] = None)
@@ -317,10 +271,10 @@ enum InterruptCause {
     *
     * This cause provides a type-safe way for applications to create custom interruption reasons
     * with rich diagnostic information. It enables domain-specific error handling while maintaining
-    * the structured approach to interruption management.
+    * a structured approach to interruption management.
     *
     * @param name
-    *   human-readable identifier for the interruption cause, should be consistent across similar
+    *   human-readable identifier for the interruption cause should be consistent across similar
     *   scenarios for effective monitoring and handling
     * @param context
     *   optional structured context information providing details about the specific situation that
@@ -351,7 +305,7 @@ enum InterruptCause {
   *
   * '''Cooperative Interruption:''' Interruption is cooperative rather than preemptive, allowing
   * fibers to complete critical sections and perform proper cleanup before termination. This ensures
-  * resource safety and prevents corrupted state.
+  * resource safety and prevents a corrupted state.
   *
   * '''Safe Resource Management:''' Fibers integrate with Eru's resource management system to ensure
   * that resources are properly cleaned up even when interruption occurs, preventing resource leaks
@@ -509,7 +463,7 @@ trait Fiber[+E, +A] {
     * execution state and interrupt masking.
     *
     * '''Cooperative Nature:''' Interruption respects critical sections and finalizers, ensuring
-    * that resource cleanup and important operations can complete safely.
+    * that resource cleanup and important operations can be completed safely.
     *
     * '''Idempotent Operation:''' Multiple interrupt calls on the same fiber are safe and idempotent -
     * the fiber will only be interrupted once with the first provided cause.
@@ -522,7 +476,7 @@ trait Fiber[+E, +A] {
     *   debugging, monitoring, and proper error handling
     * @return
     *   an effect that completes when the interruption request has been issued (not when the fiber
-    *   actually terminates)
+    *   terminates)
     *
     * @example
     *   {{{

@@ -1,53 +1,10 @@
 package net.ghoula.eru
 
-/** Observability primitives for Eru program execution implementing "Exceptional Observability."
+/** Observer API for receiving structured execution events during program runs.
   *
-  * This module provides the foundation for Eru's observability system, enabling structured,
-  * low-overhead monitoring of effect execution. The design follows Eru's principle of "Exceptional
-  * Observability" by making program execution transparent and introspectable while maintaining high
-  * performance through careful abstraction design.
-  *
-  * ==Core Design Principles==
-  *
-  * '''Structured Events:''' All observability events carry structured, type-safe information that
-  * enables rich analysis and correlation without losing semantic meaning.
-  *
-  * '''Low-Overhead Design:''' The observer interface is designed for minimal runtime impact,
-  * supporting both synchronous and asynchronous program execution models.
-  *
-  * '''Evolution-Ready Architecture:''' The types are designed to evolve naturally from the
-  * synchronous runtime (0.2.0) to the fiber-based asynchronous runtime (0.3.0+) without breaking
-  * changes to observer implementations.
-  *
-  * '''Integration-Friendly:''' The observer interface provides a stable integration surface for
-  * logging, metrics, and tracing backends, enabling ecosystem integration without tight coupling.
-  *
-  * @example
-  *   {{{
-  * // Custom observer for structured logging
-  * class LoggingObserver extends EruObserver {
-  *   def onEvent(event: EruEvent): Unit = event match {
-  *     case ProgramStart(scopeId) =>
-  *       logger.info(s"Program started with scope $scopeId")
-  *     case ProgramEnd(scopeId, outcome) =>
-  *       logger.info(s"Program $scopeId completed with $outcome")
-  *     case Step(scopeId, label) =>
-  *       logger.debug(s"Step '$label' in scope $scopeId")
-  *     case FiberStarted(fiberId) =>
-  *       logger.debug(s"Fiber $fiberId started")
-  *     case FiberCompleted(fiberId, exit) =>
-  *       logger.info(s"Fiber $fiberId completed: $exit")
-  *     case FiberInterrupted(fiberId, cause) =>
-  *       logger.warn(s"Fiber $fiberId interrupted: $cause")
-  *     case TraceSpan(span) =>
-  *       logger.trace(s"Trace span: ${span.operation}")
-  *   }
-  * }
-  *
-  * // Usage with Eru effects
-  * val observer = new LoggingObserver
-  * val result = myEffect.unsafeRunSyncWith(observer)
-  *   }}}
+  * Attach an observer via `unsafeRunSyncWith` to receive events such as `ProgramStart`,
+  * `ProgramEnd`, and `Step`. Fiber lifecycle events are also emitted when fiber operations are
+  * used.
   */
 object EruObserver {
 
