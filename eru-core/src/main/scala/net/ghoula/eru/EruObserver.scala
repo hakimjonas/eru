@@ -34,18 +34,17 @@ object EruObserver {
 
   /** A stable identifier for a single program execution scope.
     *
-    * ScopeId provides a unique identifier that tracks the execution boundary of Eru programs. In
-    * the current synchronous runtime (0.2.0), each ScopeId corresponds to a single
-    * `unsafeRunSyncWith` invocation. In the future asynchronous runtime (0.3.0+), each fiber will
-    * have its own ScopeId, enabling fine-grained tracking of concurrent execution.
+    * ScopeId provides a unique identifier that tracks the execution boundary of Eru programs. Each
+    * ScopeId typically corresponds to one program run and is used to correlate events during that
+    * run.
     *
     * ScopeIds are generated using a monotonic counter to ensure uniqueness within the process
     * lifetime. They provide a lightweight mechanism for correlating events across the execution of
-    * a program, essential for debugging and performance analysis.
+    * a program, useful for debugging and performance analysis.
     *
-    * '''Thread Safety Note:''' The current implementation uses an unsynchronized mutable counter.
-    * In concurrent environments, this may lead to race conditions. This will be addressed in the
-    * 0.3.0 runtime with proper synchronization mechanisms.
+    * Thread-safety note: The current implementation uses an unsynchronized mutable counter. In
+    * concurrent environments this may lead to race conditions and duplicate IDs; future runtime
+    * revisions will address this with proper atomic operations.
     *
     * @example
     *   {{{
@@ -235,21 +234,21 @@ object EruObserver {
       */
     case Step(scopeId: ScopeId, label: String)
 
-    /** Signals the creation and start of a new fiber (0.3.x runtime).
+    /** Signals the creation and start of a new fiber.
       *
-      * This event is emitted when a new fiber is created in the asynchronous runtime. It enables
-      * tracking of concurrent execution and fiber lifecycle management.
+      * This event is emitted when a new fiber is created. It enables tracking of concurrent
+      * execution and fiber lifecycle management.
       *
       * @param fiberId
       *   the unique identifier for the started fiber
       */
     case FiberStarted(fiberId: FiberId)
 
-    /** Signals the completion of a fiber with its exit outcome (0.3.x runtime).
+    /** Signals the completion of a fiber with its exit outcome.
       *
-      * This event is emitted when a fiber completes execution, providing detailed information about
-      * how the fiber terminated. The exit outcome includes success values, typed errors, defects,
-      * and interruption information.
+      * This event is emitted when a fiber completes execution, providing information about how the
+      * fiber terminated. The exit outcome includes success values, typed errors, defects, and
+      * interruption information.
       *
       * @param fiberId
       *   the unique identifier for the completed fiber
@@ -258,11 +257,11 @@ object EruObserver {
       */
     case FiberCompleted(fiberId: FiberId, exit: Exit[Any, Any])
 
-    /** Signals the interruption of a fiber with the interruption cause (0.3.x runtime).
+    /** Signals the interruption of a fiber with the interruption cause.
       *
-      * This event is emitted when a fiber is cooperatively interrupted, providing detailed
-      * information about why the interruption occurred. This enables proper handling of
-      * cancellation scenarios and resource cleanup.
+      * This event is emitted when a fiber is cooperatively interrupted, providing information about
+      * why the interruption occurred. This enables proper handling of cancellation scenarios and
+      * resource cleanup.
       *
       * @param fiberId
       *   the unique identifier for the interrupted fiber

@@ -429,8 +429,7 @@ object extensions {
       }
     }
 
-    /** Performs sophisticated compile-time analysis to detect antipatterns and guide best
-      * practices.
+    /** Performs compile-time analysis to detect antipatterns and guide best practices.
       *
       * This provides the ergonomic `myEffect.validated` API, moving away from the verbose
       * `EruMacros.validated(myEffect)` pattern. This extension method delegates to the macro

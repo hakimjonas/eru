@@ -113,7 +113,7 @@ object FiberId {
     * '''Thread Safety Note:''' The current implementation uses a volatile variable with
     * read-modify-write operations. While this provides visibility guarantees, it may produce
     * duplicate IDs under extreme concurrency. This limitation will be addressed in future versions
-    * with proper atomic operations or more sophisticated ID generation strategies.
+    * with proper atomic operations or alternative ID generation strategies.
     *
     * '''Performance:''' ID generation is designed to be very fast with minimal allocation, suitable
     * for high-throughput fiber creation scenarios.
@@ -142,8 +142,8 @@ object FiberId {
   *
   * InterruptCause provides a rich, type-safe classification of why a fiber was interrupted,
   * enabling precise handling of different cancellation scenarios. This structured approach supports
-  * Eru's principle of "Exceptional Observability" by capturing detailed context that aids in
-  * debugging, monitoring, and proper resource cleanup during fiber termination.
+  * by capturing detailed context that aids in debugging, monitoring, and proper resource cleanup
+  * during fiber termination.
   *
   * The cause system is designed to handle the full spectrum of interruption scenarios in concurrent
   * programs, from user-initiated cancellation to system-imposed limits and structured concurrency
@@ -311,9 +311,8 @@ enum InterruptCause {
   * that resources are properly cleaned up even when interruption occurs, preventing resource leaks
   * in concurrent programs.
   *
-  * '''Exceptional Observability:''' Fiber execution is fully observable through the EruObserver
-  * system, providing detailed insights into concurrent execution patterns and performance
-  * characteristics.
+  * '''Observability:''' Fiber execution can be observed through the EruObserver system to inspect
+  * execution patterns and performance characteristics.
   *
   * ==Fiber Lifecycle==
   *

@@ -354,12 +354,12 @@ object Eru {
 
   /** Executes a synchronous computation in a blocking region.
     *
-    * In the synchronous kernel (0.2.x), this is equivalent to [[effect]]: it suspends the
-    * computation lazily and captures `NonFatal` exceptions into the `Throwable` error channel.
-    * Fatal errors (e.g., `VirtualMachineError`) are not caught and will escape.
+    * In the synchronous kernel, this is equivalent to [[effect]]: it suspends the computation
+    * lazily and captures `NonFatal` exceptions into the `Throwable` error channel. Fatal errors
+    * (e.g., `VirtualMachineError`) are not caught and will escape.
     *
-    * In the asynchronous runtime (0.3.x), the runtime may treat blocking regions especially to
-    * avoid starving the scheduler while maintaining correctness and resource-safety guarantees.
+    * In concurrent runtimes, the scheduler may treat blocking regions specially to preserve
+    * responsiveness while maintaining correctness and resource-safety guarantees.
     *
     * @param thunk
     *   the computation to suspend (by-name)

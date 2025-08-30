@@ -6,18 +6,17 @@ import java.util.concurrent.atomic.AtomicLong
 import net.ghoula.eru.*
 import net.ghoula.eru.DataClassUtils
 
-/** Lightweight, built-in tracing system for Eru effects.
+/** Tracing support for Eru effects.
   *
-  * This tracing system provides structured observability without external dependencies, integrating
-  * seamlessly with the existing EruObserver pattern. It follows the principle of "exceptional
-  * observability" by making the runtime transparent while maintaining high performance through
-  * careful design.
+  * Provides structured tracing without external dependencies and integrates with the existing
+  * EruObserver event stream. Designed to be lightweight when disabled and useful for correlating
+  * spans, timing, and metadata when enabled.
   *
-  * Key features:
-  *   - Zero-allocation tracing for hot paths when tracing is disabled
-  *   - Structured trace context with span hierarchy
-  *   - Integration with existing EruObserver for unified observability
-  *   - Performance-aware collection with configurable sampling
+  * Features:
+  *   - Minimal overhead when tracing is disabled
+  *   - Trace context with span hierarchy
+  *   - Integration with EruObserver
+  *   - Optional sampling controls
   */
 object EruTrace {
 

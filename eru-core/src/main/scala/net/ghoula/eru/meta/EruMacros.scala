@@ -12,7 +12,7 @@ import net.ghoula.eru.*
   */
 object EruMacros {
 
-  /** Performs sophisticated compile-time analysis to detect antipatterns and guide best practices.
+  /** Performs compile-time analysis to detect antipatterns and guide best practices.
     *
     * This advanced validation macro analyzes effect chains using static program analysis to
     * identify common issues before runtime. It provides actionable feedback that helps developers
@@ -206,8 +206,7 @@ object EruMacros {
     expr
   }
 
-  /** Automatically derives sophisticated effect patterns based on type structure and
-    * characteristics.
+  /** Automatically derives effect patterns based on type structure and characteristics.
     *
     * This intelligent derivation macro analyzes the target type and generates optimized effect
     * patterns tailored to the specific characteristics of the type.
@@ -343,10 +342,10 @@ object EruMacros {
 
   /** Performs intelligent compile-time optimizations to enhance performance and safety.
     *
-    * This advanced optimization macro applies sophisticated program transformations that reduce
-    * inefficiencies, improve resource management, and enhance the overall performance
-    * characteristics of Eru effect chains. All optimizations preserve program semantics while
-    * providing measurable performance improvements.
+    * This optimization macro applies compile-time transformations that reduce inefficiencies,
+    * improve resource management, and enhance the overall performance characteristics of Eru effect
+    * chains. All optimizations preserve program semantics while providing measurable performance
+    * improvements.
     *
     * ==Optimization Categories==
     *
@@ -591,8 +590,8 @@ trait EruDerivations[T] {
   /** Creates a pure Eru effect containing the given value.
     *
     * This method provides the foundation for lifting pure values into the Eru effect system. It
-    * represents the most basic form of effect creation and serves as the building block for more
-    * sophisticated patterns.
+    * represents the most basic form of effect creation and serves as the building block for
+    * additional patterns.
     *
     * @param value
     *   the value to lift into an Eru effect

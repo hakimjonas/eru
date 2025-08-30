@@ -3,12 +3,8 @@ package net.ghoula.eru
 /** A data type representing the result of a computation that may either succeed with a value of
   * type `A` or fail with an error of type `E`.
   *
-  * `Result[E, A]` is the foundational data type of the Eru library, embodying the core principles
-  * of correctness, ergonomics, and composability. It provides a pure, immutable representation of
-  * fallible computations.
-  *
-  * The type parameters are covariant, allowing for flexible subtyping relationships that enhance
-  * composability and usability.
+  * `Result[E, A]` provides a pure, immutable representation of fallible computations. The type
+  * parameters are covariant to enable flexible subtyping relationships in common usage.
   *
   * @tparam E
   *   the type of the error value (covariant)
