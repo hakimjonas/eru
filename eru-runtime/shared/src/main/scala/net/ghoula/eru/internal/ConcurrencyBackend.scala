@@ -52,6 +52,27 @@ private[eru] trait ConcurrencyBackend {
 
   /** Retry typed failures according to the provided policy. */
   def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A]
+
+  /** Handles async boundary registration with backend-specific semantics.
+    *
+    * This method enables backends to provide either synchronous or asynchronous callback handling
+    * based on their capabilities. Synchronous backends (like sequential) must invoke the callback
+    * immediately during registration. Asynchronous backends (like VTOnlyBackend) can enqueue the
+    * callback for later execution on their executor.
+    *
+    * @param register
+    *   function that registers a callback with an async source, returning an Eru effect describing
+    *   the registration process
+    * @tparam E
+    *   the error type of the suspended computation
+    * @tparam A
+    *   the success type of the suspended computation
+    * @return
+    *   an effect that yields the suspended result
+    */
+  def handleSuspend[E, A](
+    register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
+  ): Eru[Nothing, Either[E | Throwable, A]]
 }
 
 /** Default backend implementations. */
@@ -131,5 +152,49 @@ private[eru] object DefaultBackends {
         }
       loop(0)
     }
+
+    /** Handles suspend operations with synchronous callback semantics.
+      *
+      * This implementation preserves the current synchronous kernel behavior: the register function
+      * must invoke the callback synchronously during execution. If the callback is not invoked
+      * immediately, an IllegalStateException is thrown to maintain backward compatibility.
+      *
+      * This approach ensures that the sequential backend remains predictable and deterministic
+      * while providing a clear error message for unsupported async operations.
+      *
+      * @param register
+      *   function to register callback with async source
+      * @return
+      *   effect yielding the suspended result
+      */
+    def handleSuspend[E, A](
+      register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
+    ): Eru[Nothing, Either[E | Throwable, A]] =
+      Eru.effect {
+        val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
+        val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
+
+        // Execute registration
+        val registrationExit = register(cb).attempt.unsafeRunSync()
+
+        // Check if callback was invoked synchronously
+        cbBox.get() match {
+          case Some(result) => result
+          case None =>
+            registrationExit match {
+              case Result.Success(_) =>
+                throw new IllegalStateException(
+                  "Eru.suspend: asynchronous registration is not supported in the synchronous kernel; the register function must invoke the callback synchronously."
+                )
+              case Result.Failure(t) =>
+                throw t
+            }
+        }
+      }.attempt.flatMap {
+        case Result.Success(result) => Eru.succeed(result)
+        case Result.Failure(t) =>
+          // If registration itself failed, return the error wrapped in Left
+          Eru.succeed(Left(t))
+      }
   }
 }

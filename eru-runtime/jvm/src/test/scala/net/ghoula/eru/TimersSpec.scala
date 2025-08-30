@@ -1,9 +1,13 @@
 package net.ghoula.eru
 
 import munit.FunSuite
-import net.ghoula.eru.prelude.*
-import java.time.Duration
 
+import java.time.Duration
+import scala.annotation.nowarn
+
+import net.ghoula.eru.prelude.*
+
+@nowarn("msg=.*")
 final class TimersSpec extends FunSuite {
 
   test("sleep completes after duration (non-blocking semantics)") {
