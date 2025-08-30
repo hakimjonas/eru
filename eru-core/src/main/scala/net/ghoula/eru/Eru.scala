@@ -658,11 +658,15 @@ object Eru {
       val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
       val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
       val (_, fsAfterReg) = executeRegister(cb)
-      while (cbBox.get.isEmpty) {
-        try java.lang.Thread.sleep(0)
-        catch { case _: InterruptedException => () }
+      cbBox.get match {
+        case Some(result) => done((result, fsAfterReg))
+        case None =>
+          val ex = new IllegalStateException(
+            "Eru.suspend: asynchronous registration is not supported in the synchronous kernel; the register function must invoke the callback synchronously."
+          )
+          drainFinalizers(fsAfterReg).result
+          throw ex
       }
-      done((cbBox.get.get, fsAfterReg))
     }
 
     private def runWithObsStack[E, A](
@@ -722,7 +726,7 @@ object Eru {
           observer.onEvent(EruEvent.Step(scope, label()))
           tailcall(runWithObsStack(source, scope, observer, fins))
         case Ensure(source, fin) =>
-          tailcall(runWithObsStack(source, scope, observer, fin :: fins))
+          tailcall(runWithObsStack(source, scope, observer, fins)).map { case (either, fs) => (either, fin :: fs) }
         case Suspend(register) =>
           handleSuspend(cb => runWithObsStack(register(cb), scope, observer, fins).result)
       }

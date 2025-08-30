@@ -8,15 +8,15 @@ This project is guided by a strong philosophical vision for what a modern effect
 
 ## Status
 
-**Current Development Status (August 2025)**: The core synchronous kernel and concurrent runtime are complete and have been validated against our primary goals from the Manifesto.
+**Current Development Status (August 2025)**: The core synchronous kernel is complete and validated against our primary goals from the Manifesto.
 
 - **Correctness Foundation**: 156/156 tests passing, with a zero-casting runtime implementation enforced by the build linter.
 
 - **Performance**: Includes construction-time fusion for pure flatMap chains, resulting in performance for pure computations that is competitive with hand-optimized map chains (~196k ops/ms, depth 1000).
 
-- **Concurrent Runtime**: A complete fiber-based asynchronous runtime with structured concurrency is implemented.
+- **Runtime Status**: Sequential “concurrency‑lite” today (zipPar sequential, race deterministic) to preserve a simple, portable core. True concurrency on JVM via Java Virtual Threads (JDK 21+) is the immediate next milestone; optional integration with JDK 25 Structured Concurrency is planned behind preview flags with automatic fallback.
 
-- **Platform Support**: Full support for JVM and Scala Native.
+- **Platform Support**: JVM fully supported. Scala Native supports the synchronous core and sequential runtime today; true concurrency on Native is deferred (Native has multithreading but no Virtual Threads).
 
 ## License
 

@@ -1,6 +1,6 @@
 # IMMEDIATE ACTION PLAN — Alpha Hardening and True Concurrency Roadmap
 
-Last updated: 2025-08-29 21:12 (local)
+Last updated: 2025-08-30 02:06 (local)
 
 Objective: Land a concise, high‑leverage plan that hardens the synchronous core for an alpha and defines a clear, staged path to implementing true concurrency. This plan maps to the Four Pillars (Correctness, Ergonomics, Guided Correctness, Observability) and is intended to be executed in small, always‑green increments.
 
@@ -33,7 +33,7 @@ C. Remove runtime duplication (Correctness, Ergonomics)
 
 D. Align README and guides with reality (Guided Correctness, Ergonomics)
 - Intent: Brand alpha as “synchronous core + concurrency‑lite.”
-- Change: Update README and guides (concurrency, runtime status, CompletedFiber semantics, deterministic race, sequential zipPar).
+- Change: Update README and guides (concurrency, runtime status, CompletedFiber semantics, deterministic race, sequential zipPar). Also add JVM‑first messaging (Virtual Threads now; Native concurrency deferred) and platform matrix.
 - Acceptance: No overclaims; clear user expectations.
 
 E. Reduce interpreter duplication (Correctness, Observability, Dev Ergonomics)
@@ -51,9 +51,9 @@ G. QA and workflow (Discipline)
 
 ---
 
-H. Implementing true concurrency (Scheduler, Fibers, Interruption, Observability)
+H. Implementing true concurrency (JVM 21/25 strategy, Scheduler/Fibers/Interruption/Observability)
 
-Intent: Deliver a real, portable, fiber‑based asynchronous runtime with cooperative scheduling and structured concurrency, while preserving the pure, cast‑free core. This will transition from the current sequential “concurrency‑lite” façade to genuine parallelism and asynchronous I/O.
+Intent: Deliver true concurrency on JVM immediately via Java Virtual Threads (JDK 21+), optionally integrating Structured Concurrency (JEP 505) on JDK 25 when preview is enabled — all behind a tiny internal backend abstraction. Keep Scala Native on the sequential “concurrency‑lite” runtime for now, with clear rationale and roadmap. Preserve the pure, cast‑free core.
 
 Scope and guiding principles
 - Correctness first: resource safety, finalizers FILO/once, lawfulness of bracket/ensure under concurrency.
@@ -61,81 +61,79 @@ Scope and guiding principles
 - Exceptional observability: fiber lifecycle and spans emitted without altering semantics.
 - Zero casts and stack safety preserved; core ADT remains sealed and pure.
 
-H1. Architecture and primitives
-- Scheduler model: work‑stealing pool with lightweight fibers; cooperative yielding at effect boundaries.
+H1. Backend abstraction and capabilities (preview‑free public API)
+- Introduce a private[eru] ConcurrencyBackend SPI used by EruRuntime to implement: fork/await/interrupt, zipPar, race, sleep, timeout, and capabilities reporting.
+- Default JVM backend: VTOnlyBackend (JDK 21+) using Virtual Threads and ScheduledExecutor timers; no preview dependency.
+- Optional JVM backend: STSBackend (JDK 25 with --enable-preview) that uses StructuredTaskScope.open(...) via reflection or an opt‑in module; automatic fallback to VTOnlyBackend if unavailable.
+- Capabilities flags: virtualThreads=true on JVM; structuredScopes=true only when STS is active; timersNonBlocking=true on JVM backends.
+
+H2. Architecture and primitives
+- Scheduler/execution model (JVM): per‑task VTs; cooperative cancellation via Thread.interrupt observed at effect boundaries; timers via ScheduledExecutor; no busy waits.
 - Execution representation: use Eru.Internals.view to step effects without exposing internal constructors.
 - Fiber state machine: Running/Suspended/Completed/Interrupted; exit stored once; await returns Exit.
-- Mailboxes/queues: lock‑free queues per worker where possible; fallback to synchronized structures on Native if needed.
-- Time: wheel or priority queue for timers; sleep/timeout integrate with scheduler, not Thread.sleep.
 
-H2. Suspend integration (async boundary)
-- Replace handleSuspend with scheduler registration:
-  - register installs callback that enqueues resumption onto a worker.
-  - Finalizers thread propagated; exactly‑once resume guaranteed.
-- Back‑pressure and fairness: bounded queues with cooperative polling; avoid starvation.
+H3. Suspend integration (async boundary)
+- Replace handleSuspend’s busy‑wait with non‑blocking resumption on the JVM backend (enqueue callback onto VT executor). Until backend lands, use B1/B2 policy in the sync kernel and document.
 
-H3. Interruption and structured concurrency
-- Cancellation tokens: per‑fiber interrupt flags with cause; mask regions for finalizers/critical sections.
-- Parent/child linkage: parent termination propagates InterruptCause.ParentTerminated to descendants.
-- Resource safety: finalizers always run; interruption observes ensure semantics.
+H4. Interruption and structured concurrency
+- Cooperative cancellation: VT interrupt; map to Exit.Interrupt at boundaries; ensure finalizers (FILO/once) run.
+- Parent/child linkage preserved at the Eru layer; when using STS, leverage scope cancellation semantics internally while keeping public semantics identical.
 
-H4. Concurrency operators
-- fork: create running fiber; emit FiberStarted; return handle.
-- zipPar: run both fibers; combine when both succeed; propagate first typed failure/defect; cancel loser on failure.
-- race: return first winner; safely interrupt the loser; handle all exit cases.
-- sleep/timeout: scheduler timers; timeout interrupts target with Timeout cause.
+H5. Concurrency operators (identical semantics across backends)
+- fork: launch on backend; emit FiberStarted/FiberCompleted/FiberInterrupted events.
+- zipPar: run both; on failure/defect, cancel the other and drain finalizers; combine results when both succeed.
+- race: return winner; cancel loser; document non‑determinism.
+- sleep/timeout: non‑blocking timers; timeout interrupts target with InterruptCause.Timeout.
 
-H5. Observability
-- Events: FiberStarted, FiberCompleted(exit), FiberInterrupted(cause), plus existing ProgramStart/End and Step.
-- Span hooks: optional time measurements around key operators (zipPar, race, sleep) via TraceSpan.
-
-H6. Portability strategy
-- Phase JVM first: implement scheduler using Java concurrency primitives (ForkJoinPool or custom work‑stealing on Virtual/Platform threads based on perf findings).
-- Phase Native: start with fixed thread pool and synchronized queues; iterate toward lock‑free when feasible.
-- Single public API across platforms; semantic parity tests enforced.
+H6. Portability strategy and platform position
+- JVM 21+: true concurrency via VTOnlyBackend by default; no preview flags required.
+- JVM 25+: optional integration with StructuredTaskScope when `--enable-preview` is enabled; automatic fallback otherwise.
+- Scala Native: keep sequential runtime for now (multithreading exists but no VTs); document rationale (low demand; complexity; roadmap after JVM stabilizes).
+- Single public API across platforms; semantic parity tests enforce identical behavior (except documented determinism differences).
 
 H7. Acceptance criteria
 - Correctness:
   - Finalizers run exactly once in FILO under success, typed failure, defect, and interruption.
   - zipPar/race semantics: correct short‑circuit and cancellation; no resource leaks.
-  - Suspend correctness: callback resumes exactly once; no deadlocks in standard patterns.
+  - Suspend correctness: callback resumes exactly once; no busy‑waits; no deadlocks in standard patterns.
 - Observability:
   - Fiber events emitted with correct ordering and stable IDs.
   - ProgramStart/End and Step unchanged except for added fiber events.
 - Performance (initial budgets to be refined):
   - zipPar speedup on CPU‑bound tasks vs sequential baseline for independent work.
   - sleep/timeout do not block threads; timers scale to thousands of scheduled tasks.
-- Determinism where documented (e.g., race is no longer forced‑left; document non‑determinism and provide raceFirst/raceLatest variants if needed in follow‑ups).
+- Determinism where documented (race is non‑deterministic on JVM backends).
 
 H8. Test plan
+- Capability‑gated tests: enable parallel/concurrency suites when capabilities.virtualThreads is true; add small STS smokes when structuredScopes is true.
 - Laws/Properties:
   - Finalizer laws under concurrency and interruption.
-  - Parity properties observed vs. non‑observed semantics (events add visibility only).
+  - Observed vs non‑observed parity (events only add visibility).
   - Interruption idempotence and masking guarantees.
 - Integration:
   - fork/await/join with many fibers; tree of parent/child interruption.
   - zipPar/race cancellation behavior; timeout correctness; sleep wakeup ordering.
-  - Suspend interop: Deferred/Ref/Semaphore built atop scheduler where applicable.
+  - Suspend interop: Deferred/Ref/Semaphore built atop backend where applicable.
 - Stress/Soak:
   - Thousands of fibers; timer storms; mixed successes/failures; randomized schedules.
 
 H9. Incremental delivery (milestones)
-- H9.1: Scheduler skeleton + fibers + await; fork runs effect to completion (no timers, no interruption). JVM only.
-- H9.2: zipPar/race with proper combination and cancellation; basic interruption (user cancellation). JVM.
-- H9.3: Timers: sleep/timeout over scheduler; remove Thread.sleep usage; integrate with interruption. JVM.
-- H9.4: Suspend integration: non‑blocking callback resumption; ensure finalizer safety. JVM.
-- H9.5: Observability events for fibers; spans optional. JVM.
-- H9.6: Native parity: bring features over with synchronized primitives; pass parity suites.
-- H9.7: Performance tuning: fairness, work‑stealing tweaks; baseline benches for parallel operators.
+- H9.1: JVM VT baseline — implement ConcurrencyBackend and VTOnlyBackend; wire EruRuntime to delegate (behavior identical to current semantics initially); keep tests green.
+- H9.2: fork/await on VT backend; CompletedFiber backed by promise/handle; emit fiber events.
+- H9.3: zipPar/race parallelization with safe cancellation and finalizer laws; timers via ScheduledExecutor; timeout interrupts.
+- H9.4: Suspend non‑blocking resumption; remove any latches from sync kernel on JVM path.
+- H9.5: Optional STSBackend for JDK 25 preview behind reflection/ServiceLoader with automatic fallback.
+- H9.6: Native remains sequential; parity guards and documentation.
+- H9.7: Performance tuning; baseline benches for parallel operators.
 
 H10. Documentation updates
-- README/Guides: update runtime status to “true concurrency (JVM), Native parity in progress” during milestones; finalize once parity achieved.
-- Scaladoc: Fiber, Exit, InterruptCause expanded with concurrent semantics and examples.
-- Observability guide: document fiber events and minimal guarantees.
+- README/Guides: add platform matrix — JVM 21+ true concurrency (VTs), optional JDK 25 STS integration with preview, Native sequential for now with rationale. Update “Status” and concurrency guide accordingly.
+- Scaladoc: Fiber, Exit, InterruptCause concurrent semantics and examples.
+- Observability guide: fiber events and minimal guarantees.
 
 ---
 
 Execution notes
-- Keep each step small and green; prefer internal feature flags if needed to land the scheduler incrementally.
+- Keep each step small and green; prefer internal feature flags if needed to land changes incrementally.
 - Maintain zero‑cast discipline and tail‑recursive safety in interpreter paths.
 - Update RELEASE_PLAN.md with timestamps and checkmarks as items land; reference this file for immediate priorities.
