@@ -6,7 +6,9 @@
 #   sh tools/run-benches.sh                   # full suite (aliases: bench, benchWithGC)
 #   sh tools/run-benches.sh --mode core       # Eru-only core focus (benchCore + benchWithGC)
 #   sh tools/run-benches.sh --mode parity     # CE/ZIO parity-only
-#   sh tools/run-benches.sh --mode smoke      # quick sanity (wi=1, i=1), parity + a few core
+#   sh tools/run-benches.sh --mode concurrency # H.9 concurrency benchmarks only
+#   sh tools/run-benches.sh --mode validation # validation and baseline benchmarks
+#   sh tools/run-benches.sh --mode smoke      # comprehensive quick sanity (wi=1, i=1), all categories
 #   sh tools/run-benches.sh --gc              # force GC-prof run only (skips non-GC full run)
 #   sh tools/run-benches.sh --no-gc           # skip GC-prof run (default runs both)
 #
@@ -17,7 +19,7 @@ set -eu
 # -----------------------------
 # Config & CLI parsing
 # -----------------------------
-MODE="full"           # full|core|parity|smoke
+MODE="full"           # full|core|parity|concurrency|validation|smoke
 DO_GC="both"          # both|gc-only|no-gc
 PROJECT_ROOT="$PWD"   # assume run from repo root
 RAW_DIR="benchmarks/raw"
@@ -28,7 +30,7 @@ COLOR=true
 for arg in "$@"; do
   case "$arg" in
     --mode)
-      echo "ERROR: --mode requires a value (full|core|parity|smoke)" >&2; exit 2;;
+      echo "ERROR: --mode requires a value (full|core|parity|concurrency|validation|smoke)" >&2; exit 2;;
     --mode=*) MODE="${arg#*=}" ;;
     --gc) DO_GC="gc-only" ;;
     --no-gc) DO_GC="no-gc" ;;
@@ -41,8 +43,8 @@ for arg in "$@"; do
 done
 
 case "$MODE" in
-  full|core|parity|smoke) ;;
-  *) echo "ERROR: unknown --mode=$MODE (allowed: full|core|parity|smoke)" >&2; exit 2 ;;
+  full|core|parity|concurrency|validation|smoke) ;;
+  *) echo "ERROR: unknown --mode=$MODE (allowed: full|core|parity|concurrency|validation|smoke)" >&2; exit 2 ;;
 esac
 
 # -----------------------------
@@ -160,12 +162,61 @@ run_parity_suite() {
   esac
 }
 
+run_concurrency_suite() {
+  # Focus on H.9 concurrency benchmarks - Virtual Threads, zipPar, race, suspend, timers
+  case "$DO_GC" in
+    gc-only)
+      run_capture "concurrencyWithGC" "project eruBenchJVM" "jmh:run -wi 5 -i 10 -f1 -t1 -prof gc .*EruConcurrencyH9Bench.*" ;;
+    no-gc)
+      run_capture "concurrency" "project eruBenchJVM" "jmh:run -wi 5 -i 10 -f1 -t1 .*EruConcurrencyH9Bench.*" ;;
+    both)
+      run_capture "concurrency" "project eruBenchJVM" "jmh:run -wi 5 -i 10 -f1 -t1 .*EruConcurrencyH9Bench.*"
+      run_capture "concurrencyWithGC" "project eruBenchJVM" "jmh:run -wi 5 -i 10 -f1 -t1 -prof gc .*EruConcurrencyH9Bench.*" ;;
+  esac
+}
+
+run_validation_suite() {
+  # Focus on validation and baseline benchmarks for performance regression detection
+  case "$DO_GC" in
+    gc-only)
+      run_capture "validationWithGC" "project eruBenchJVM" "jmh:run -wi 5 -i 10 -f1 -t1 -prof gc .*BaselineBench.* .*ValidationBench.*" ;;
+    no-gc)
+      run_capture "validation" "project eruBenchJVM" "jmh:run -wi 5 -i 10 -f1 -t1 .*BaselineBench.* .*ValidationBench.*" ;;
+    both)
+      run_capture "validation" "project eruBenchJVM" "jmh:run -wi 5 -i 10 -f1 -t1 .*BaselineBench.* .*ValidationBench.*"
+      run_capture "validationWithGC" "project eruBenchJVM" "jmh:run -wi 5 -i 10 -f1 -t1 -prof gc .*BaselineBench.* .*ValidationBench.*" ;;
+  esac
+}
+
 run_smoke_suite() {
-  # Lightweight sanity to validate harness quickly
-  run_capture "smoke-EruMapFlatMapBench" \
+  # Comprehensive quick sanity validation covering all major benchmark categories
+  # Core operations and composition
+  run_capture "smoke-CoreOperations" \
     "project eruBenchJVM" "jmh:run -wi 1 -i 1 -f1 -t1 .*EruMapFlatMapBench.*"
+  
+  # H.9 concurrency (Virtual Threads, zipPar, race, suspend, timers)
+  run_capture "smoke-ConcurrencyH9" \
+    "project eruBenchJVM" "jmh:run -wi 1 -i 1 -f1 -t1 .*EruConcurrencyH9Bench.*"
+  
+  # Error handling and recovery
+  run_capture "smoke-ErrorHandling" \
+    "project eruBenchJVM" "jmh:run -wi 1 -i 1 -f1 -t1 .*EruErrorHandlingBench.*"
+  
+  # Resource management and finalizers
+  run_capture "smoke-ResourceManagement" \
+    "project eruBenchJVM" "jmh:run -wi 1 -i 1 -f1 -t1 .*EruResourceBench.*"
+  
+  # Validation and baseline benchmarks
+  run_capture "smoke-Validation" \
+    "project eruBenchJVM" "jmh:run -wi 1 -i 1 -f1 -t1 .*BaselineBench.*"
+  
+  # Cross-library parity benchmarks
   run_capture "smoke-ParityBenches" \
     "project eruBenchJVM" "jmh:run -wi 1 -i 1 -f1 -t1 .*ParityBench.*"
+  
+  # Stack safety and memory pressure
+  run_capture "smoke-StackSafety" \
+    "project eruBenchJVM" "jmh:run -wi 1 -i 1 -f1 -t1 .*EruStackSafetyBench.*"
 }
 
 # -----------------------------
@@ -179,10 +230,12 @@ sbt -no-colors check >/dev/null && ok "sbt check passed"
 # -----------------------------
 banner "Starting benches (mode=$MODE, GC=$DO_GC)"
 case "$MODE" in
-  full)   run_full_suite   ;;
-  core)   run_core_suite   ;;
-  parity) run_parity_suite ;;
-  smoke)  run_smoke_suite  ;;
+  full)        run_full_suite        ;;
+  core)        run_core_suite        ;;
+  parity)      run_parity_suite      ;;
+  concurrency) run_concurrency_suite ;;
+  validation)  run_validation_suite  ;;
+  smoke)       run_smoke_suite       ;;
 esac
 
 # -----------------------------
