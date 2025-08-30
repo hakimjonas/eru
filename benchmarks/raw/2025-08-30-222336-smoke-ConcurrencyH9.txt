@@ -1,0 +1,172 @@
+[info] welcome to sbt 1.11.4 (Eclipse Adoptium Java 21.0.8)
+[info] loading global plugins from /home/hakim/.sbt/1.0/plugins
+[info] loading settings for project eru-build from plugins.sbt...
+[info] loading project definition from /home/hakim/personal/arda/eru/project
+[info] loading settings for project root from build.sbt...
+[info] set current project to eru-root (in build file:/home/hakim/personal/arda/eru/)
+[info] set current project to eru-bench-jvm (in build file:/home/hakim/personal/arda/eru/)
+[warn] sbt 0.13 shell syntax is deprecated; use slash syntax instead: Jmh / run
+[info] compiling 19 Scala sources to /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/classes ...
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:49:19 
+[error] 49 |    mediumEffect = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 100)
+[error]    |                   ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:50:17 
+[error] 50 |    slowEffect = EruRuntime.sleep(Duration.ofMillis(5)).map(_ => 200)
+[error]    |                 ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:55:15 
+[error] 55 |    val left = EruRuntime.sleep(Duration.ofMillis(2)).map(_ => 1)
+[error]    |               ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:56:16 
+[error] 56 |    val right = EruRuntime.sleep(Duration.ofMillis(2)).map(_ => 2)
+[error]    |                ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:57:14 
+[error] 57 |    h.consume(EruRuntime.zipPar(left, right).unsafeRunSync(): AnyRef)
+[error]    |              ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:62:15 
+[error] 62 |    val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast")
+[error]    |               ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:63:15 
+[error] 63 |    val slow = EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "slow")  
+[error]    |               ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:64:14 
+[error] 64 |    h.consume(EruRuntime.race(fast, slow).unsafeRunSync(): AnyRef)
+[error]    |              ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:69:16 
+[error] 69 |    val fiber = EruRuntime.fork(mediumEffect).unsafeRunSync()
+[error]    |                ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:81:17 
+[error] 81 |    val result = EruRuntime.suspend[Throwable, String] { callback =>
+[error]    |                 ^^^^^^^^^^
+[error]    |       Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]    |
+[error]    | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:102:16 
+[error] 102 |    val timer = EruRuntime.sleep(Duration.ofMillis(1))
+[error]     |                ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:113:15 
+[error] 113 |    val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "completed")
+[error]     |               ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:114:17 
+[error] 114 |    val result = EruRuntime.timeout(Duration.ofMillis(10))(fast).attempt.unsafeRunSync()
+[error]     |                 ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:126:6 
+[error] 126 |      EruRuntime.fork(Eru.succeed(i))
+[error]     |      ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E008] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:128:41 
+[error] 128 |    val results = fibers.map(_.flatMap(_.await)).toList.sequence.unsafeRunSync()
+[error]     |                                       ^^^^^^^
+[error]     |                                    value await is not a member of Any
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:139:17 
+[error] 139 |    val inner1 = EruRuntime.zipPar(quickEffect, quickEffect)
+[error]     |                 ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:140:17 
+[error] 140 |    val inner2 = EruRuntime.zipPar(quickEffect, quickEffect)  
+[error]     |                 ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:141:16 
+[error] 141 |    val outer = EruRuntime.zipPar(inner1, inner2)
+[error]     |                ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:154:40 
+[error] 154 |    val concurrent = (1 to 20).map(_ => EruRuntime.fork(resourceEffect))
+[error]     |                                        ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E008] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:155:45 
+[error] 155 |    val results = concurrent.map(_.flatMap(_.await)).toList.sequence.unsafeRunSync()
+[error]     |                                           ^^^^^^^
+[error]     |                                    value await is not a member of Any
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:167:22 
+[error] 167 |    val slowSuccess = EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "slow success")
+[error]     |                      ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:168:17 
+[error] 168 |    val result = EruRuntime.zipPar(fastFail, slowSuccess).attempt.unsafeRunSync()
+[error]     |                 ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:180:20 
+[error] 180 |    val asyncWork = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 42)  
+[error]     |                    ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- [E006] Not Found Error: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:181:19 
+[error] 181 |    val combined = EruRuntime.zipPar(syncWork, asyncWork)
+[error]     |                   ^^^^^^^^^^
+[error]     |     Not found: EruRuntime - did you mean Runtime? or perhaps runtime?
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[warn] -- Warning: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:42:47 
+[warn] 42 |  private var quickEffect: Eru[Nothing, Int] = _
+[warn]    |                                               ^
+[warn]    |`= _` has been deprecated; use `= uninitialized` instead.
+[warn]    |`uninitialized` can be imported with `scala.compiletime.uninitialized`.
+[warn]    |This construct can be rewritten automatically under -rewrite -source 3.4-migration.
+[warn] -- Warning: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:43:48 
+[warn] 43 |  private var mediumEffect: Eru[Nothing, Int] = _
+[warn]    |                                                ^
+[warn]    |`= _` has been deprecated; use `= uninitialized` instead.
+[warn]    |`uninitialized` can be imported with `scala.compiletime.uninitialized`.
+[warn]    |This construct can be rewritten automatically under -rewrite -source 3.4-migration.
+[warn] -- Warning: /home/hakim/personal/arda/eru/eru-bench-jvm/src/main/scala/net/ghoula/eru/bench/EruConcurrencyH9Bench.scala:44:46 
+[warn] 44 |  private var slowEffect: Eru[Nothing, Int] = _
+[warn]    |                                              ^
+[warn]    |`= _` has been deprecated; use `= uninitialized` instead.
+[warn]    |`uninitialized` can be imported with `scala.compiletime.uninitialized`.
+[warn]    |This construct can be rewritten automatically under -rewrite -source 3.4-migration.
+[error] No warnings can be incurred under -Werror (or -Xfatal-warnings)
+[warn] three warnings found
+[error] 25 errors found
+[error] (Compile / compileIncremental) Compilation failed
+[error] Total time: 5 s, completed 30 Aug 2025, 22.24.25

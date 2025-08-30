@@ -1,0 +1,223 @@
+[info] welcome to sbt 1.11.4 (Eclipse Adoptium Java 21.0.8)
+[info] loading global plugins from /home/hakim/.sbt/1.0/plugins
+[info] loading settings for project eru-build from plugins.sbt...
+[info] loading project definition from /home/hakim/personal/arda/eru/project
+[info] loading settings for project root from build.sbt...
+[info] set current project to eru-root (in build file:/home/hakim/personal/arda/eru/)
+[info] set current project to eru-bench-jvm (in build file:/home/hakim/personal/arda/eru/)
+[warn] sbt 0.13 shell syntax is deprecated; use slash syntax instead: Jmh / run
+[info] running (fork) org.openjdk.jmh.generators.bytecode.JmhBytecodeGenerator /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/classes /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/src_managed/jmh /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/resource_managed/jmh default
+[info] Processing 204 classes from /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/classes with "reflection" generator
+[info] Writing out Java source to /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/src_managed/jmh and resources to /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/resource_managed/jmh
+[info] running (fork) org.openjdk.jmh.Main -wi 1 -i 1 -f1 -t1 .*EruConcurrencyH9Bench.*
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.cancellationPerformance
+[info] # Run progress: 0,00% complete, ETA 00:00:44
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,173 ops/ms
+[info] Iteration   1: 0,114 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.cancellationPerformance":
+[info]   0,114 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.forkAwaitVirtualThread
+[info] # Run progress: 9,09% complete, ETA 00:00:42
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,850 ops/ms
+[info] Iteration   1: 0,892 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.forkAwaitVirtualThread":
+[info]   0,892 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.highConcurrencyFibers
+[info] # Run progress: 18,18% complete, ETA 00:00:38
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 1,740 ops/ms
+[info] Iteration   1: 1,896 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.highConcurrencyFibers":
+[info]   1,896 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.mixedSyncAsyncWorkload
+[info] # Run progress: 27,27% complete, ETA 00:00:34
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,847 ops/ms
+[info] Iteration   1: 0,888 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.mixedSyncAsyncWorkload":
+[info]   0,888 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.nestedZipParConcurrent
+[info] # Run progress: 36,36% complete, ETA 00:00:29
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 38,833 ops/ms
+[info] Iteration   1: 41,567 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.nestedZipParConcurrent":
+[info]   41,567 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.nonBlockingTimers
+[info] # Run progress: 45,45% complete, ETA 00:00:25
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,878 ops/ms
+[info] Iteration   1: 0,911 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.nonBlockingTimers":
+[info]   0,911 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.raceTrueConcurrent
+[info] # Run progress: 54,55% complete, ETA 00:00:21
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,857 ops/ms
+[info] Iteration   1: 0,893 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.raceTrueConcurrent":
+[info]   0,893 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.resourceCleanupConcurrent
+[info] # Run progress: 63,64% complete, ETA 00:00:17
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 4,066 ops/ms
+[info] Iteration   1: 4,452 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.resourceCleanupConcurrent":
+[info]   4,452 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.suspendAsyncBoundary
+[info] # Run progress: 72,73% complete, ETA 00:00:12
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 92,776 ops/ms
+[info] Iteration   1: 99,701 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.suspendAsyncBoundary":
+[info]   99,701 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.timeoutConcurrent
+[info] # Run progress: 81,82% complete, ETA 00:00:08
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,854 ops/ms
+[info] Iteration   1: 0,893 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.timeoutConcurrent":
+[info]   0,893 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions --enable-preview
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruConcurrencyH9Bench.zipParTrueConcurrent
+[info] # Run progress: 90,91% complete, ETA 00:00:04
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,446 ops/ms
+[info] Iteration   1: 0,465 ops/ms
+[info] Result "net.ghoula.eru.bench.EruConcurrencyH9Bench.zipParTrueConcurrent":
+[info]   0,465 ops/ms
+[info] # Run complete. Total time: 00:00:46
+[info] REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+[info] why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+[info] experiments, perform baseline and negative tests that provide experimental control, make sure
+[info] the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+[info] Do not assume the numbers tell you what you want them to tell.
+[info] NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+[info] extra caution when trusting the results, look into the generated code to check the benchmark still
+[info] works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+[info] different JVMs are already problematic, the performance difference caused by different Blackhole
+[info] modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+[info] Benchmark                                         Mode  Cnt   Score   Error   Units
+[info] EruConcurrencyH9Bench.cancellationPerformance    thrpt        0,114          ops/ms
+[info] EruConcurrencyH9Bench.forkAwaitVirtualThread     thrpt        0,892          ops/ms
+[info] EruConcurrencyH9Bench.highConcurrencyFibers      thrpt        1,896          ops/ms
+[info] EruConcurrencyH9Bench.mixedSyncAsyncWorkload     thrpt        0,888          ops/ms
+[info] EruConcurrencyH9Bench.nestedZipParConcurrent     thrpt       41,567          ops/ms
+[info] EruConcurrencyH9Bench.nonBlockingTimers          thrpt        0,911          ops/ms
+[info] EruConcurrencyH9Bench.raceTrueConcurrent         thrpt        0,893          ops/ms
+[info] EruConcurrencyH9Bench.resourceCleanupConcurrent  thrpt        4,452          ops/ms
+[info] EruConcurrencyH9Bench.suspendAsyncBoundary       thrpt       99,701          ops/ms
+[info] EruConcurrencyH9Bench.timeoutConcurrent          thrpt        0,893          ops/ms
+[info] EruConcurrencyH9Bench.zipParTrueConcurrent       thrpt        0,465          ops/ms
+[success] Total time: 49 s, completed 30 Aug 2025, 23.08.59

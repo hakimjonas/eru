@@ -1,0 +1,91 @@
+[info] welcome to sbt 1.11.4 (Eclipse Adoptium Java 21.0.8)
+[info] loading global plugins from /home/hakim/.sbt/1.0/plugins
+[info] loading settings for project eru-build from plugins.sbt...
+[info] loading project definition from /home/hakim/personal/arda/eru/project
+[info] loading settings for project root from build.sbt...
+[info] set current project to eru-root (in build file:/home/hakim/personal/arda/eru/)
+[info] set current project to eru-bench-jvm (in build file:/home/hakim/personal/arda/eru/)
+[warn] sbt 0.13 shell syntax is deprecated; use slash syntax instead: Jmh / run
+[info] running (fork) org.openjdk.jmh.Main -wi 1 -i 1 -f1 -t1 .*BaselineBench.*
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Average time, time/op
+[info] # Benchmark: net.ghoula.eru.bench.BaselineBench.absoluteBaseline
+[info] # Run progress: 0,00% complete, ETA 00:00:18
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,289 ns/op
+[info] Iteration   1: 0,286 ns/op
+[info] Result "net.ghoula.eru.bench.BaselineBench.absoluteBaseline":
+[info]   0,286 ns/op
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Average time, time/op
+[info] # Benchmark: net.ghoula.eru.bench.BaselineBench.allocationBaseline
+[info] # Run progress: 16,67% complete, ETA 00:00:16
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 20,157 ns/op
+[info] Iteration   1: 16,638 ns/op
+[info] Result "net.ghoula.eru.bench.BaselineBench.allocationBaseline":
+[info]   16,638 ns/op
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Average time, time/op
+[info] # Benchmark: net.ghoula.eru.bench.BaselineBench.eruMapChainBaseline
+[info] # Run progress: 33,33% complete, ETA 00:00:12
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 9,832 ns/op
+[info] Iteration   1: 8,043 ns/op
+[info] Result "net.ghoula.eru.bench.BaselineBench.eruMapChainBaseline":
+[info]   8,043 ns/op
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Average time, time/op
+[info] # Benchmark: net.ghoula.eru.bench.BaselineBench.rawComputation
+[info] # Run progress: 50,00% complete, ETA 00:00:09
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 0,278 ns/op
+[info] Iteration   1: 0,290 ns/op
+[info] Result "net.ghoula.eru.bench.BaselineBench.rawComputation":
+[info]   0,290 ns/op
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: <none>
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 1 s each
+[info] # Measurement: 1 iterations, 2 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Average time, time/op
+[info] # Benchmark: net.ghoula.eru.bench.BaselineBench.rawFunctionComposition
+[info] # Run progress: 66,67% complete, ETA 00:00:06
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 67,631 ns/op

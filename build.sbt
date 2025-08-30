@@ -48,7 +48,7 @@ lazy val root = (project in file("."))
     name := "eru-root",
     publish / skip := true,
     // Performance benchmarking aliases
-    addCommandAlias("bench", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1"),
+    addCommandAlias("bench", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 .*"),
     addCommandAlias("benchBaseline", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 .*BaselineBench.*"),
     addCommandAlias("benchValidation", "project eruBenchJVM; jmh:run -i 10 -wi 5 -f1 -t1 .*ValidationBench.*"),
     addCommandAlias(

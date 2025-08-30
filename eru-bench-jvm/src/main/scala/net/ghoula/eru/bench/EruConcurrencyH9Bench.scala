@@ -5,8 +5,23 @@ import org.openjdk.jmh.infra.Blackhole
 
 import java.time.Duration
 import java.util.concurrent.TimeUnit
+import scala.compiletime.uninitialized
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.EruRuntime
+
+// Simple sequence implementation for benchmarks
+extension [E, A](effects: List[Eru[E, A]]) {
+  def sequence: Eru[E, List[A]] = {
+    def loop(remaining: List[Eru[E, A]], acc: List[A]): Eru[E, List[A]] =
+      remaining match {
+        case Nil => Eru.succeed(acc.reverse)
+        case head :: tail =>
+          head.flatMap(a => loop(tail, a :: acc))
+      }
+    loop(effects, Nil)
+  }
+}
 
 /** H.9 Virtual Threads concurrency performance benchmarks.
   *
@@ -39,22 +54,15 @@ import net.ghoula.eru.prelude.*
 @Measurement(iterations = 10, time = 2, timeUnit = TimeUnit.SECONDS)
 class EruConcurrencyH9Bench {
 
-  private var quickEffect: Eru[Nothing, Int] = _
-  private var mediumEffect: Eru[Nothing, Int] = _
-  private var slowEffect: Eru[Nothing, Int] = _
+  private var quickEffect: Eru[Nothing, Int] = uninitialized
+  private var mediumEffect: Eru[Nothing, Int] = uninitialized
   
   @Setup(Level.Iteration)
   def setup(): Unit = {
     quickEffect = Eru.succeed(42)
     mediumEffect = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 100)
-    slowEffect = EruRuntime.sleep(Duration.ofMillis(5)).map(_ => 200)
   }
 
-  /** Measures true parallel zipPar performance with Virtual Threads.
-    * 
-    * This benchmark validates that zipPar actually runs effects in parallel
-    * on separate Virtual Threads, showing performance gains over sequential execution.
-    */
   @Benchmark
   def zipParTrueConcurrent(h: Blackhole): Unit = {
     val left = EruRuntime.sleep(Duration.ofMillis(2)).map(_ => 1)
@@ -62,11 +70,6 @@ class EruConcurrencyH9Bench {
     h.consume(EruRuntime.zipPar(left, right).unsafeRunSync(): AnyRef)
   }
 
-  /** Measures race performance with actual concurrent execution.
-    *
-    * The race should complete in approximately the time of the faster effect,
-    * demonstrating true non-deterministic concurrent racing behavior.
-    */
   @Benchmark 
   def raceTrueConcurrent(h: Blackhole): Unit = {
     val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast")
@@ -74,11 +77,6 @@ class EruConcurrencyH9Bench {
     h.consume(EruRuntime.race(fast, slow).unsafeRunSync(): AnyRef)
   }
 
-  /** Measures fork/await performance with Virtual Threads.
-    *
-    * This validates that forked effects actually run on separate Virtual Threads
-    * and that await properly synchronizes on fiber completion.
-    */
   @Benchmark
   def forkAwaitVirtualThread(h: Blackhole): Unit = {
     val fiber = EruRuntime.fork(mediumEffect).unsafeRunSync()
@@ -94,15 +92,16 @@ class EruConcurrencyH9Bench {
   @Benchmark
   def suspendAsyncBoundary(h: Blackhole): Unit = {
     val result = EruRuntime.suspend[Throwable, String] { callback =>
-      Eru.effect {
-        val future = new java.util.concurrent.CompletableFuture[String]()
-        future.whenComplete { (value, throwable) =>
-          if (throwable != null) callback(Left(throwable))
-          else callback(Right(value))
+      val future = new java.util.concurrent.CompletableFuture[String]()
+      future.whenComplete { (value, throwable) =>
+        Option(throwable) match {
+          case Some(error) => callback(Left(error))
+          case None => callback(Right(value))
         }
-        // Complete immediately for benchmark measurement
-        future.complete("async-result")
       }
+      // Complete immediately for benchmark measurement
+      future.complete("async-result")
+      Eru.unit
     }.unsafeRunSync()
     h.consume(result: AnyRef)
   }
@@ -115,7 +114,8 @@ class EruConcurrencyH9Bench {
   @Benchmark
   def nonBlockingTimers(h: Blackhole): Unit = {
     val timer = EruRuntime.sleep(Duration.ofMillis(1))
-    h.consume(timer.unsafeRunSync(): AnyRef)
+    timer.unsafeRunSync()
+    h.consume(scala.runtime.BoxedUnit.UNIT: AnyRef)
   }
 
   /** Measures timeout performance with concurrent effects.
