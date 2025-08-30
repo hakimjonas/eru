@@ -3,8 +3,6 @@ package net.ghoula.eru
 import java.time.Duration
 import scala.annotation.unused
 
-import net.ghoula.eru.internal.DefaultBackends
-
 /** Minimal, type-safe runtime functions for concurrency, racing, timeouts, and retries.
   *
   * This implementation avoids touching or subclassing the sealed Eru internals. It provides
@@ -12,8 +10,8 @@ import net.ghoula.eru.internal.DefaultBackends
   */
 object EruRuntime {
 
-  // Backend delegation layer (H9.1). Default: sequential, portability-first.
-  private val backend = DefaultBackends.sequential
+  // Backend delegation layer (H9.2). Select per-platform backend via ServiceLoader.
+  private val backend = PlatformBackend.backend
 
   /** Forks an effect and returns a completed fiber computed synchronously. This preserves the Fiber
     * API without requiring a scheduler.

@@ -6,9 +6,12 @@ import net.ghoula.eru.*
 
 /** Capabilities exposed by a concurrency backend.
   *
-  * @param virtualThreads whether the backend runs effects on Java Virtual Threads
-  * @param structuredScopes whether Structured Concurrency scopes are in use
-  * @param timersNonBlocking whether timers/sleeps are implemented without blocking threads
+  * @param virtualThreads
+  *   whether the backend runs effects on Java Virtual Threads
+  * @param structuredScopes
+  *   whether Structured Concurrency scopes are in use
+  * @param timersNonBlocking
+  *   whether timers/sleeps are implemented without blocking threads
   */
 private[eru] final case class BackendCapabilities(
   virtualThreads: Boolean,
@@ -18,17 +21,20 @@ private[eru] final case class BackendCapabilities(
 
 /** Internal SPI for providing concurrency semantics to EruRuntime.
   *
-  * A backend implements fork, parallel composition, race, sleep/timeout, and retry.
-  * Implementations must preserve Eru’s public semantics; differences in capabilities
-  * are surfaced via [[BackendCapabilities]].
+  * A backend implements fork, parallel composition, race, sleep/timeout, and retry. Implementations
+  * must preserve Eru’s public semantics; differences in capabilities are surfaced via
+  * [[BackendCapabilities]].
   */
 private[eru] trait ConcurrencyBackend {
   def capabilities: BackendCapabilities
 
   /** Launches the effect and returns a fiber handle.
-    * @param fa the effect to run
-    * @param observer optional observer to receive fiber lifecycle events
-    * @return an effect that yields a fiber handle
+    * @param fa
+    *   the effect to run
+    * @param observer
+    *   optional observer to receive fiber lifecycle events
+    * @return
+    *   an effect that yields a fiber handle
     */
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver] = None): Eru[Nothing, Fiber[E, A]]
 
