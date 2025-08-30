@@ -68,8 +68,22 @@ lazy val root = (project in file("."))
     addCommandAlias(
       "check",
       "scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
-    )
+    ),
+    addCommandAlias("cleanAll", "clean; cleanAllTargets")
   )
+
+lazy val cleanAllTargets = taskKey[Unit]("Remove all target directories including orphaned ones")
+cleanAllTargets := {
+  import scala.sys.process._
+  val log = streams.value.log
+  log.info("Removing all target directories...")
+  val result = Seq("find", ".", "-name", "target", "-type", "d", "-exec", "rm", "-rf", "{}", "+").!
+  if (result == 0) {
+    log.info("Successfully removed all target directories")
+  } else {
+    log.warn("Some target directories may not have been removed")
+  }
+}
 
 lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
   .crossType(CrossType.Pure)
