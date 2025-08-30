@@ -106,7 +106,7 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
   .nativeSettings(
     testFrameworks += new TestFramework("munit.Framework"),
     nativeConfig ~= { c =>
-      c.withLTO(LTO.thin).withMode(Mode.releaseFast).withGC(GC.immix)
+      c.withLTO(LTO.full).withMode(Mode.releaseFast).withGC(GC.immix)
     }
   )
 
@@ -138,7 +138,7 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
   .nativeSettings(
     testFrameworks += new TestFramework("munit.Framework"),
     nativeConfig ~= { c =>
-      c.withLTO(LTO.thin).withMode(Mode.releaseFast).withGC(GC.immix)
+      c.withLTO(LTO.full).withMode(Mode.releaseFast).withGC(GC.immix)
     }
   )
   .dependsOn(eruCore)

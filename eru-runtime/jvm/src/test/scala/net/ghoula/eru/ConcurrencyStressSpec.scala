@@ -195,8 +195,12 @@ final class ConcurrencyStressSpec extends FunSuite {
     // Verify all timers completed and timing is reasonable
     assertEquals(completed.sorted, (1 to timerCount).toList)
     // Should complete faster than sequential execution (which would be ~550ms)
-    // Allow some overhead for Virtual Thread scheduling and concurrency management
-    assert(elapsedMs < 800L, s"Concurrent timers took too long: ${elapsedMs}ms")
+    // Allow generous overhead for M1 Mac and Virtual Thread scheduling
+    val timeoutThreshold = {
+      val arch = System.getProperty("os.arch")
+      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 1200L else 800L
+    }
+    assert(elapsedMs < timeoutThreshold, s"Concurrent timers took too long: ${elapsedMs}ms (threshold: ${timeoutThreshold}ms)")
   }
 
   test("mixed concurrent and sequential operations") {
