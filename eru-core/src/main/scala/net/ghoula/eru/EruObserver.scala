@@ -56,26 +56,17 @@ object EruObserver {
   opaque type ScopeId = Long
 
   object ScopeId {
-    @volatile private var next: Long = 1L
+    private val next = new java.util.concurrent.atomic.AtomicLong(1L)
 
     /** Generates a fresh ScopeId for a new execution scope.
       *
       * This method creates a unique identifier for tracking program execution. Each call returns a
       * monotonically increasing value, ensuring uniqueness within the process lifetime.
       *
-      * '''Thread Safety:''' The current implementation uses a volatile variable with
-      * read-modify-write operations. While this provides visibility guarantees, it may produce
-      * duplicate IDs under high concurrency. This limitation will be addressed in future versions
-      * with proper atomic operations.
-      *
       * @return
       *   a new, unique ScopeId for program execution tracking
       */
-    def fresh(): ScopeId = {
-      val id = next
-      next = next + 1L
-      id
-    }
+    def fresh(): ScopeId = next.getAndIncrement()
   }
 
   /** Structured outcome representing the final result of program execution.

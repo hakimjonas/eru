@@ -102,18 +102,12 @@ opaque type FiberId = Long
   * extended with additional utilities for fiber management in future versions of the runtime.
   */
 object FiberId {
-  @volatile private var next: Long = 1L
+  private val next = new java.util.concurrent.atomic.AtomicLong(1L)
 
   /** Generates a fresh, unique FiberId for a new fiber.
     *
     * This method creates a unique identifier using a monotonic counter, ensuring that each fiber
-    * receives a distinct identifier within the process lifetime. The implementation is designed for
-    * high performance while maintaining uniqueness guarantees.
-    *
-    * '''Thread Safety Note:''' The current implementation uses a volatile variable with
-    * read-modify-write operations. While this provides visibility guarantees, it may produce
-    * duplicate IDs under extreme concurrency. This limitation will be addressed in future versions
-    * with proper atomic operations or alternative ID generation strategies.
+    * receives a distinct identifier within the process lifetime.
     *
     * '''Performance:''' ID generation is designed to be very fast with minimal allocation, suitable
     * for high-throughput fiber creation scenarios.
@@ -131,11 +125,7 @@ object FiberId {
     * assert(fiberIds.distinct.size == 1000) // All unique
     *   }}}
     */
-  def fresh(): FiberId = {
-    val id = next
-    next = next + 1L
-    id
-  }
+  def fresh(): FiberId = next.getAndIncrement()
 }
 
 /** Structured cause of fiber interruption with comprehensive diagnostic information.
