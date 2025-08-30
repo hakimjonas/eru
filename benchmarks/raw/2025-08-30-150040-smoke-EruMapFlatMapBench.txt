@@ -1,0 +1,489 @@
+[info] welcome to sbt 1.11.4 (Eclipse Adoptium Java 21.0.8)
+[info] loading global plugins from /home/hakim/.sbt/1.0/plugins
+[info] loading settings for project eru-build from plugins.sbt...
+[info] loading project definition from /home/hakim/personal/arda/eru/project
+[info] loading settings for project root from build.sbt...
+[info] set current project to eru-root (in build file:/home/hakim/personal/arda/eru/)
+[info] set current project to eru-bench-jvm (in build file:/home/hakim/personal/arda/eru/)
+[warn] sbt 0.13 shell syntax is deprecated; use slash syntax instead: Jmh / run
+[info] compiling 13 Scala sources to /home/hakim/personal/arda/eru/eru-core/.jvm/target/scala-3.7.2/classes ...
+[info] done compiling
+[info] compiling 10 Scala sources to /home/hakim/personal/arda/eru/eru-runtime/jvm/target/scala-3.7.2/classes ...
+[info] done compiling
+[info] compiling 18 Scala sources to /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/classes ...
+[info] done compiling
+[info] running (fork) org.openjdk.jmh.generators.bytecode.JmhBytecodeGenerator /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/classes /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/src_managed/jmh /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/resource_managed/jmh default
+[info] Processing 31 classes from /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/classes with "reflection" generator
+[info] Writing out Java source to /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/src_managed/jmh and resources to /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/resource_managed/jmh
+[info] compiling 155 Java sources to /home/hakim/personal/arda/eru/eru-bench-jvm/target/scala-3.7.2/classes ...
+[info] done compiling
+[info] running (fork) org.openjdk.jmh.Main -wi 1 -i 1 -f1 -t1 .*EruMapFlatMapBench.*
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyMixed
+[info] # Parameters: (depthStr = 10)
+[info] # Run progress: 0,00% complete, ETA 00:02:00
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 28784,296 ops/ms
+[info] Iteration   1: 30204,942 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyMixed":
+[info]   30204,942 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyMixed
+[info] # Parameters: (depthStr = 100)
+[info] # Run progress: 4,17% complete, ETA 00:02:01
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2218,039 ops/ms
+[info] Iteration   1: 2343,109 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyMixed":
+[info]   2343,109 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyMixed
+[info] # Parameters: (depthStr = 1000)
+[info] # Run progress: 8,33% complete, ETA 00:01:56
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 160,929 ops/ms
+[info] Iteration   1: 165,002 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyMixed":
+[info]   165,002 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyPureFlat
+[info] # Parameters: (depthStr = 10)
+[info] # Run progress: 12,50% complete, ETA 00:01:51
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 25379,856 ops/ms
+[info] Iteration   1: 26693,924 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyPureFlat":
+[info]   26693,924 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyPureFlat
+[info] # Parameters: (depthStr = 100)
+[info] # Run progress: 16,67% complete, ETA 00:01:45
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2665,264 ops/ms
+[info] Iteration   1: 2786,295 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyPureFlat":
+[info]   2786,295 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyPureFlat
+[info] # Parameters: (depthStr = 1000)
+[info] # Run progress: 20,83% complete, ETA 00:01:40
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 130,066 ops/ms
+[info] Iteration   1: 126,279 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionOnlyPureFlat":
+[info]   126,279 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionPlusRuntimePureFlat
+[info] # Parameters: (depthStr = 10)
+[info] # Run progress: 25,00% complete, ETA 00:01:34
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 25544,244 ops/ms
+[info] Iteration   1: 27089,515 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionPlusRuntimePureFlat":
+[info]   27089,515 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionPlusRuntimePureFlat
+[info] # Parameters: (depthStr = 100)
+[info] # Run progress: 29,17% complete, ETA 00:01:29
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 2992,276 ops/ms
+[info] Iteration   1: 3051,985 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionPlusRuntimePureFlat":
+[info]   3051,985 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.constructionPlusRuntimePureFlat
+[info] # Parameters: (depthStr = 1000)
+[info] # Run progress: 33,33% complete, ETA 00:01:24
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 157,575 ops/ms
+[info] Iteration   1: 165,535 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.constructionPlusRuntimePureFlat":
+[info]   165,535 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runFlatMapped
+[info] # Parameters: (depthStr = 10)
+[info] # Run progress: 37,50% complete, ETA 00:01:19
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 157378,592 ops/ms
+[info] Iteration   1: 157887,029 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runFlatMapped":
+[info]   157887,029 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runFlatMapped
+[info] # Parameters: (depthStr = 100)
+[info] # Run progress: 41,67% complete, ETA 00:01:13
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 158339,011 ops/ms
+[info] Iteration   1: 157779,832 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runFlatMapped":
+[info]   157779,832 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runFlatMapped
+[info] # Parameters: (depthStr = 1000)
+[info] # Run progress: 45,83% complete, ETA 00:01:08
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 159230,399 ops/ms
+[info] Iteration   1: 158341,793 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runFlatMapped":
+[info]   158341,793 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMapped
+[info] # Parameters: (depthStr = 10)
+[info] # Run progress: 50,00% complete, ETA 00:01:03
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 156562,181 ops/ms
+[info] Iteration   1: 157295,368 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMapped":
+[info]   157295,368 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMapped
+[info] # Parameters: (depthStr = 100)
+[info] # Run progress: 54,17% complete, ETA 00:00:57
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 157471,262 ops/ms
+[info] Iteration   1: 156040,170 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMapped":
+[info]   156040,170 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMapped
+[info] # Parameters: (depthStr = 1000)
+[info] # Run progress: 58,33% complete, ETA 00:00:52
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 156694,110 ops/ms
+[info] Iteration   1: 156195,848 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMapped":
+[info]   156195,848 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMixed
+[info] # Parameters: (depthStr = 10)
+[info] # Run progress: 62,50% complete, ETA 00:00:47
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 157895,401 ops/ms
+[info] Iteration   1: 157285,610 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMixed":
+[info]   157285,610 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMixed
+[info] # Parameters: (depthStr = 100)
+[info] # Run progress: 66,67% complete, ETA 00:00:42
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 156092,636 ops/ms
+[info] Iteration   1: 155218,885 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMixed":
+[info]   155218,885 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMixed
+[info] # Parameters: (depthStr = 1000)
+[info] # Run progress: 70,83% complete, ETA 00:00:36
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 157479,922 ops/ms
+[info] Iteration   1: 156970,134 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMixed":
+[info]   156970,134 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMixedPure
+[info] # Parameters: (depthStr = 10)
+[info] # Run progress: 75,00% complete, ETA 00:00:31
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 3431,851 ops/ms
+[info] Iteration   1: 3680,673 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMixedPure":
+[info]   3680,673 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMixedPure
+[info] # Parameters: (depthStr = 100)
+[info] # Run progress: 79,17% complete, ETA 00:00:26
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 287,700 ops/ms
+[info] Iteration   1: 313,342 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMixedPure":
+[info]   313,342 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runMixedPure
+[info] # Parameters: (depthStr = 1000)
+[info] # Run progress: 83,33% complete, ETA 00:00:21
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 27,866 ops/ms
+[info] Iteration   1: 29,725 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runMixedPure":
+[info]   29,725 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runPureFlat
+[info] # Parameters: (depthStr = 10)
+[info] # Run progress: 87,50% complete, ETA 00:00:15
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 156764,938 ops/ms
+[info] Iteration   1: 156479,950 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runPureFlat":
+[info]   156479,950 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runPureFlat
+[info] # Parameters: (depthStr = 100)
+[info] # Run progress: 91,67% complete, ETA 00:00:10
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 153117,006 ops/ms
+[info] Iteration   1: 151337,541 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runPureFlat":
+[info]   151337,541 ops/ms
+[info] # JMH version: 1.37
+[info] # VM version: JDK 21.0.8, OpenJDK 64-Bit Server VM, 21.0.8+9-LTS
+[info] # VM invoker: /home/hakim/.sdkman/candidates/java/21.0.8-tem/bin/java
+[info] # VM options: -server -Xms2G -Xmx2G -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions
+[info] # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+[info] # Warmup: 1 iterations, 2 s each
+[info] # Measurement: 1 iterations, 3 s each
+[info] # Timeout: 10 min per iteration
+[info] # Threads: 1 thread, will synchronize iterations
+[info] # Benchmark mode: Throughput, ops/time
+[info] # Benchmark: net.ghoula.eru.bench.EruMapFlatMapBench.runPureFlat
+[info] # Parameters: (depthStr = 1000)
+[info] # Run progress: 95,83% complete, ETA 00:00:05
+[info] # Fork: 1 of 1
+[info] # Warmup Iteration   1: 153492,928 ops/ms
+[info] Iteration   1: 154619,990 ops/ms
+[info] Result "net.ghoula.eru.bench.EruMapFlatMapBench.runPureFlat":
+[info]   154619,990 ops/ms
+[info] # Run complete. Total time: 00:02:06
+[info] REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+[info] why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+[info] experiments, perform baseline and negative tests that provide experimental control, make sure
+[info] the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+[info] Do not assume the numbers tell you what you want them to tell.
+[info] NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+[info] extra caution when trusting the results, look into the generated code to check the benchmark still
+[info] works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+[info] different JVMs are already problematic, the performance difference caused by different Blackhole
+[info] modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+[info] Benchmark                                           (depthStr)   Mode  Cnt       Score   Error   Units
+[info] EruMapFlatMapBench.constructionOnlyMixed                    10  thrpt        30204,942          ops/ms
+[info] EruMapFlatMapBench.constructionOnlyMixed                   100  thrpt         2343,109          ops/ms
+[info] EruMapFlatMapBench.constructionOnlyMixed                  1000  thrpt          165,002          ops/ms
+[info] EruMapFlatMapBench.constructionOnlyPureFlat                 10  thrpt        26693,924          ops/ms
+[info] EruMapFlatMapBench.constructionOnlyPureFlat                100  thrpt         2786,295          ops/ms
+[info] EruMapFlatMapBench.constructionOnlyPureFlat               1000  thrpt          126,279          ops/ms
+[info] EruMapFlatMapBench.constructionPlusRuntimePureFlat          10  thrpt        27089,515          ops/ms
+[info] EruMapFlatMapBench.constructionPlusRuntimePureFlat         100  thrpt         3051,985          ops/ms
+[info] EruMapFlatMapBench.constructionPlusRuntimePureFlat        1000  thrpt          165,535          ops/ms
+[info] EruMapFlatMapBench.runFlatMapped                            10  thrpt       157887,029          ops/ms
+[info] EruMapFlatMapBench.runFlatMapped                           100  thrpt       157779,832          ops/ms
+[info] EruMapFlatMapBench.runFlatMapped                          1000  thrpt       158341,793          ops/ms
+[info] EruMapFlatMapBench.runMapped                                10  thrpt       157295,368          ops/ms
+[info] EruMapFlatMapBench.runMapped                               100  thrpt       156040,170          ops/ms
+[info] EruMapFlatMapBench.runMapped                              1000  thrpt       156195,848          ops/ms
+[info] EruMapFlatMapBench.runMixed                                 10  thrpt       157285,610          ops/ms
+[info] EruMapFlatMapBench.runMixed                                100  thrpt       155218,885          ops/ms
+[info] EruMapFlatMapBench.runMixed                               1000  thrpt       156970,134          ops/ms
+[info] EruMapFlatMapBench.runMixedPure                             10  thrpt         3680,673          ops/ms
+[info] EruMapFlatMapBench.runMixedPure                            100  thrpt          313,342          ops/ms
+[info] EruMapFlatMapBench.runMixedPure                           1000  thrpt           29,725          ops/ms
+[info] EruMapFlatMapBench.runPureFlat                              10  thrpt       156479,950          ops/ms
+[info] EruMapFlatMapBench.runPureFlat                             100  thrpt       151337,541          ops/ms
+[info] EruMapFlatMapBench.runPureFlat                            1000  thrpt       154619,990          ops/ms
+[success] Total time: 145 s (0:02:25.0), completed 30 Aug 2025, 15.03.43

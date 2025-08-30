@@ -1,0 +1,91 @@
+=== ENVIRONMENT ===
+Repo: eru
+SHA: 2f908c855cc00551bda78dd3ded42fdb2d930103
+JAVA:
+openjdk version "21.0.8" 2025-07-15 LTS
+OpenJDK Runtime Environment Temurin-21.0.8+9 (build 21.0.8+9-LTS)
+OpenJDK 64-Bit Server VM Temurin-21.0.8+9 (build 21.0.8+9-LTS, mixed mode, sharing)
+UNAME:
+Linux hakim-laptop 6.15.6-321.current #1 SMP PREEMPT_DYNAMIC 2025-07-11 x86_64 GNU/Linux
+CPU (lscpu):
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  16
+On-line CPU(s) list:                     0-15
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD Ryzen 7 PRO 7840U w/ Radeon 780M Graphics
+CPU family:                              25
+Model:                                   116
+Thread(s) per core:                      2
+Core(s) per socket:                      8
+Socket(s):                               1
+Stepping:                                1
+Frequency boost:                         enabled
+CPU(s) scaling MHz:                      84%
+CPU max MHz:                             5134,8892
+CPU min MHz:                             419,1750
+BogoMIPS:                                6586,96
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid overflow_recov succor smca fsrm flush_l1d amd_lbr_pmc_freeze
+Virtualization:                          AMD-V
+L1d cache:                               256 KiB (8 instances)
+L1i cache:                               256 KiB (8 instances)
+L2 cache:                                8 MiB (8 instances)
+L3 cache:                                16 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-15
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Mitigation; Safe RET
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Mitigation; Clear CPU buffers
+Vulnerability Tsx async abort:           Not affected
+MEMORY (free -h):
+               total        used        free      shared  buff/cache   available
+Mem:            58Gi        26Gi        25Gi       353Mi       7,2Gi        32Gi
+Swap:           72Gi          0B        72Gi
+SCALA/SBT (from sbt):
+[info] welcome to sbt 1.11.4 (Eclipse Adoptium Java 21.0.8)
+[info] loading global plugins from /home/hakim/.sbt/1.0/plugins
+[info] loading settings for project eru-build from plugins.sbt...
+[info] loading project definition from /home/hakim/personal/arda/eru/project
+[info] loading settings for project root from build.sbt...
+[info] set current project to eru-root (in build file:/home/hakim/personal/arda/eru/)
+[info] eruCoreJVM / scalaVersion
+[info] 	3.7.2
+[info] eruIntegrationTest / scalaVersion
+[info] 	3.7.2
+[info] eruRuntimeNative / scalaVersion
+[info] 	3.7.2
+[info] eruCoreNative / scalaVersion
+[info] 	3.7.2
+[info] eruRuntimeJVM / scalaVersion
+[info] 	3.7.2
+[info] scalaVersion
+[info] 	3.7.2
+[info] eruCoreJVM / sbtVersion
+[info] 	1.11.4
+[info] eruIntegrationTest / sbtVersion
+[info] 	1.11.4
+[info] eruRuntimeNative / sbtVersion
+[info] 	1.11.4
+[info] eruCoreNative / sbtVersion
+[info] 	1.11.4
+[info] eruRuntimeJVM / sbtVersion
+[info] 	1.11.4
+[info] sbtVersion
+[info] 	1.11.4
+FAIRNESS: JMH defaults -wi 5 -i 10 -f1 -t1 (unless smoke)
+FAIRNESS: No one-off per-library tuning; identical scenarios across libs
