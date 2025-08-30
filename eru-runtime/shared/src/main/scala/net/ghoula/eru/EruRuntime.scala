@@ -10,43 +10,42 @@ import scala.annotation.unused
   */
 object EruRuntime {
 
+  private object Helpers {
+    private def computeExit[E, A](fa: Eru[E, A]): Exit[E, A] =
+      fa.attempt.unsafeRunSync() match {
+        case Result.Success(a) => Exit.Success(a)
+        case Result.Failure(err) => Exit.Failure(err)
+      }
+
+    private def completed[E, A](id: FiberId, exit: Exit[E, A], observerOpt: Option[EruObserver]): Fiber[E, A] = {
+      observerOpt.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+      new CompletedFiber[E, A](id, exit)
+    }
+
+    private[eru] def fork0[E, A](fa: Eru[E, A], observerOpt: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =
+      Eru.effect {
+        val id = FiberId.fresh()
+        observerOpt.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+        val exit = computeExit(fa)
+        completed(id, exit, observerOpt)
+      }.attempt.map {
+        case Result.Success(fiber) => fiber
+        case Result.Failure(t) =>
+          val id = FiberId.fresh()
+          val exit: Exit[E, A] = Exit.Die(t)
+          completed(id, exit, observerOpt)
+      }
+  }
+
   /** Forks an effect and returns a completed fiber computed synchronously. This preserves the Fiber
     * API without requiring a scheduler.
     */
   def fork[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] =
-    Eru.effect {
-      val id = FiberId.fresh()
-      val exit: Exit[E, A] =
-        fa.attempt.unsafeRunSync() match {
-          case Result.Success(a) => Exit.Success(a)
-          case Result.Failure(err) => Exit.Failure(err)
-        }
-      new CompletedFiber[E, A](id, exit)
-    }.attempt.map {
-      case Result.Success(f) => f
-      case Result.Failure(t) => new CompletedFiber[E, A](FiberId.fresh(), Exit.Die(t))
-    }
+    Helpers.fork0(fa, None)
 
   /** Forks with an observer, emitting lifecycle events around the synchronous run. */
   def forkWithObserver[E, A](fa: Eru[E, A], observer: EruObserver): Eru[Nothing, Fiber[E, A]] =
-    Eru.effect {
-      val id = FiberId.fresh()
-      observer.onEvent(EruObserver.EruEvent.FiberStarted(id))
-      val exit: Exit[E, A] =
-        fa.attempt.unsafeRunSync() match {
-          case Result.Success(a) => Exit.Success(a)
-          case Result.Failure(err) => Exit.Failure(err)
-        }
-      observer.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit))
-      new CompletedFiber[E, A](id, exit)
-    }.attempt.map {
-      case Result.Success(f) => f
-      case Result.Failure(t) =>
-        val id = FiberId.fresh()
-        val exit: Exit[E, A] = Exit.Die(t)
-        observer.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit))
-        new CompletedFiber[E, A](id, exit)
-    }
+    Helpers.fork0(fa, Some(observer))
 
   /** Runs two effects and combines their results. Implemented sequentially for portability. */
   def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, (A, B)] =
