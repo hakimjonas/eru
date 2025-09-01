@@ -200,7 +200,10 @@ final class ConcurrencyStressSpec extends FunSuite {
       val arch = System.getProperty("os.arch")
       if (arch.startsWith("aarch64") || arch.startsWith("arm")) 1200L else 800L
     }
-    assert(elapsedMs < timeoutThreshold, s"Concurrent timers took too long: ${elapsedMs}ms (threshold: ${timeoutThreshold}ms)")
+    assert(
+      elapsedMs < timeoutThreshold,
+      s"Concurrent timers took too long: ${elapsedMs}ms (threshold: ${timeoutThreshold}ms)"
+    )
   }
 
   test("mixed concurrent and sequential operations") {

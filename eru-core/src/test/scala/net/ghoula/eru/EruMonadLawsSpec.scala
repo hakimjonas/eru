@@ -198,7 +198,7 @@ final class EruMonadLawsSpec extends FunSuite {
       val arch = System.getProperty("os.arch")
       if (arch.startsWith("aarch64") || arch.startsWith("arm")) 5000 else 10000
     }
-    
+
     def deepChain(n: Int): Eru[Nothing, Int] = {
       if (n <= 0) Eru.succeed(0)
       else Eru.succeed(n).flatMap(_ => deepChain(n - 1))
@@ -215,7 +215,7 @@ final class EruMonadLawsSpec extends FunSuite {
       val arch = System.getProperty("os.arch")
       if (arch.startsWith("aarch64") || arch.startsWith("arm")) 5000 else 10000
     }
-    
+
     def deepMap(n: Int): Eru[Nothing, Int] = {
       if (n <= 0) Eru.succeed(0)
       else deepMap(n - 1).map(_ + 1)
