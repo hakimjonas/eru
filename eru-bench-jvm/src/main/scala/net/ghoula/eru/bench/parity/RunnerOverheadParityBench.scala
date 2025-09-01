@@ -6,6 +6,7 @@ import org.openjdk.jmh.annotations.*
 import zio.{UIO, Unsafe, ZIO}
 
 import java.util.concurrent.TimeUnit
+
 import net.ghoula.eru.CorePrelude.*
 
 @State(Scope.Thread)
@@ -16,7 +17,7 @@ import net.ghoula.eru.CorePrelude.*
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 class RunnerOverheadParityBench {
 
-  @Param(Array("small","medium"))
+  @Param(Array("small", "medium"))
   var size: String = "small"
 
   private var eruSuccess: Eru[Nothing, Int] = Eru.succeed(0)
@@ -33,11 +34,11 @@ class RunnerOverheadParityBench {
       case "small" =>
         eruSuccess = Eru.succeed(1).map(_ + 1)
         zioSuccess = ZIO.succeed(1).map(_ + 1)
-        ceSuccess  = IO.pure(1).map(_ + 1)
+        ceSuccess = IO.pure(1).map(_ + 1)
 
         eruFallback = Eru.fail("boom").recover { case _ => 1 }
         zioFallback = ZIO.fail("boom").catchAll(_ => ZIO.succeed(1))
-        ceFallback  = IO.raiseError(new RuntimeException("boom")).handleError(_ => 1)
+        ceFallback = IO.raiseError(new RuntimeException("boom")).handleError(_ => 1)
 
       case _ =>
         var e: Eru[Nothing, Int] = Eru.succeed(0)
@@ -49,19 +50,23 @@ class RunnerOverheadParityBench {
 
         eruSuccess = e
         zioSuccess = z
-        ceSuccess  = c
+        ceSuccess = c
 
         eruFallback = Eru.succeed(0).flatMap(_ => Eru.fail("x")).recover { case _ => 42 }
         zioFallback = ZIO.succeed(0).flatMap(_ => ZIO.fail("x")).catchAll(_ => ZIO.succeed(42))
-        ceFallback  = IO.pure(0).flatMap(_ => IO.raiseError(new RuntimeException("x"))).handleError(_ => 42)
+        ceFallback = IO.pure(0).flatMap(_ => IO.raiseError(new RuntimeException("x"))).handleError(_ => 42)
     }
   }
 
   @Benchmark def eruUnsafe(): Int = eruSuccess.unsafeRunSync()
-  @Benchmark def zioUnsafe(): Int = Unsafe.unsafe { implicit u => _root_.zio.Runtime.default.unsafe.run(zioSuccess).getOrThrowFiberFailure() }
+  @Benchmark def zioUnsafe(): Int = Unsafe.unsafe { implicit u =>
+    _root_.zio.Runtime.default.unsafe.run(zioSuccess).getOrThrowFiberFailure()
+  }
   @Benchmark def ceUnsafe(): Int = ceSuccess.unsafeRunSync()
 
   @Benchmark def eruFallbackPath(): Int = eruFallback.unsafeRunSync()
-  @Benchmark def zioFallbackPath(): Int = Unsafe.unsafe { implicit u => _root_.zio.Runtime.default.unsafe.run(zioFallback).getOrThrowFiberFailure() }
+  @Benchmark def zioFallbackPath(): Int = Unsafe.unsafe { implicit u =>
+    _root_.zio.Runtime.default.unsafe.run(zioFallback).getOrThrowFiberFailure()
+  }
   @Benchmark def ceFallbackPath(): Int = ceFallback.unsafeRunSync()
 }

@@ -7,8 +7,8 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 import scala.compiletime.uninitialized
 
-import net.ghoula.eru.prelude.*
 import net.ghoula.eru.EruRuntime
+import net.ghoula.eru.prelude.*
 
 // Simple sequence implementation for benchmarks
 extension [E, A](effects: List[Eru[E, A]]) {
@@ -25,16 +25,16 @@ extension [E, A](effects: List[Eru[E, A]]) {
 
 /** H.9 Virtual Threads concurrency performance benchmarks.
   *
-  * These benchmarks measure the true concurrent performance of Eru's H.9 implementation
-  * using the VTOnlyBackend with Virtual Threads. All operations demonstrate actual
-  * parallelism and non-blocking behavior where applicable.
+  * These benchmarks measure the true concurrent performance of Eru's H.9 implementation using the
+  * VTOnlyBackend with Virtual Threads. All operations demonstrate actual parallelism and
+  * non-blocking behavior where applicable.
   *
   * Benchmark Categories:
-  * - True Concurrent Operations: zipPar/race with actual parallel execution
-  * - Async Boundary Performance: suspend/resume with CompletableFuture integration  
-  * - Timer and Timeout Performance: non-blocking sleep/timeout operations
-  * - High Concurrency Load: many concurrent fibers and operations
-  * - Resource Safety Under Load: finalizer execution and cleanup guarantees
+  *   - True Concurrent Operations: zipPar/race with actual parallel execution
+  *   - Async Boundary Performance: suspend/resume with CompletableFuture integration
+  *   - Timer and Timeout Performance: non-blocking sleep/timeout operations
+  *   - High Concurrency Load: many concurrent fibers and operations
+  *   - Resource Safety Under Load: finalizer execution and cleanup guarantees
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
@@ -43,7 +43,7 @@ extension [E, A](effects: List[Eru[E, A]]) {
   value = 1,
   jvmArgs = Array(
     "-server",
-    "-Xms2G", 
+    "-Xms2G",
     "-Xmx2G",
     "-XX:+UseG1GC",
     "-XX:+UnlockExperimentalVMOptions",
@@ -56,7 +56,7 @@ class EruConcurrencyH9Bench {
 
   private var quickEffect: Eru[Nothing, Int] = uninitialized
   private var mediumEffect: Eru[Nothing, Int] = uninitialized
-  
+
   @Setup(Level.Iteration)
   def setup(): Unit = {
     quickEffect = Eru.succeed(42)
@@ -70,10 +70,10 @@ class EruConcurrencyH9Bench {
     h.consume(EruRuntime.zipPar(left, right).unsafeRunSync(): AnyRef)
   }
 
-  @Benchmark 
+  @Benchmark
   def raceTrueConcurrent(h: Blackhole): Unit = {
     val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast")
-    val slow = EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "slow")  
+    val slow = EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "slow")
     h.consume(EruRuntime.race(fast, slow).unsafeRunSync(): AnyRef)
   }
 
@@ -86,30 +86,32 @@ class EruConcurrencyH9Bench {
 
   /** Measures async boundary performance with CompletableFuture integration.
     *
-    * This benchmark validates H.9.4 suspend/resume functionality by measuring
-    * the overhead of integrating with Java's asynchronous CompletableFuture API.
+    * This benchmark validates H.9.4 suspend/resume functionality by measuring the overhead of
+    * integrating with Java's asynchronous CompletableFuture API.
     */
   @Benchmark
   def suspendAsyncBoundary(h: Blackhole): Unit = {
-    val result = EruRuntime.suspend[Throwable, String] { callback =>
-      val future = new java.util.concurrent.CompletableFuture[String]()
-      future.whenComplete { (value, throwable) =>
-        Option(throwable) match {
-          case Some(error) => callback(Left(error))
-          case None => callback(Right(value))
+    val result = EruRuntime
+      .suspend[Throwable, String] { callback =>
+        val future = new java.util.concurrent.CompletableFuture[String]()
+        future.whenComplete { (value, throwable) =>
+          Option(throwable) match {
+            case Some(error) => callback(Left(error))
+            case None => callback(Right(value))
+          }
         }
+        // Complete immediately for benchmark measurement
+        future.complete("async-result")
+        Eru.unit
       }
-      // Complete immediately for benchmark measurement
-      future.complete("async-result")
-      Eru.unit
-    }.unsafeRunSync()
+      .unsafeRunSync()
     h.consume(result: AnyRef)
   }
 
   /** Measures non-blocking timer performance.
     *
-    * This validates that sleep operations use non-blocking timers via
-    * ScheduledExecutorService rather than blocking Thread.sleep.
+    * This validates that sleep operations use non-blocking timers via ScheduledExecutorService
+    * rather than blocking Thread.sleep.
     */
   @Benchmark
   def nonBlockingTimers(h: Blackhole): Unit = {
@@ -120,10 +122,10 @@ class EruConcurrencyH9Bench {
 
   /** Measures timeout performance with concurrent effects.
     *
-    * This validates that timeout operations properly race against effects
-    * and cancel the losing side via Virtual Thread interruption.
+    * This validates that timeout operations properly race against effects and cancel the losing
+    * side via Virtual Thread interruption.
     */
-  @Benchmark  
+  @Benchmark
   def timeoutConcurrent(h: Blackhole): Unit = {
     val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "completed")
     val result = EruRuntime.timeout(Duration.ofMillis(10))(fast).attempt.unsafeRunSync()
@@ -132,8 +134,8 @@ class EruConcurrencyH9Bench {
 
   /** Measures high-concurrency fiber creation and completion.
     *
-    * This benchmark validates that the Virtual Threads backend can efficiently
-    * handle many concurrent fibers without significant overhead or blocking.
+    * This benchmark validates that the Virtual Threads backend can efficiently handle many
+    * concurrent fibers without significant overhead or blocking.
     */
   @Benchmark
   def highConcurrencyFibers(h: Blackhole): Unit = {
@@ -146,21 +148,21 @@ class EruConcurrencyH9Bench {
 
   /** Measures nested zipPar performance under concurrent load.
     *
-    * This validates that nested parallel operations work correctly and
-    * efficiently with the Virtual Threads backend implementation.
+    * This validates that nested parallel operations work correctly and efficiently with the Virtual
+    * Threads backend implementation.
     */
   @Benchmark
   def nestedZipParConcurrent(h: Blackhole): Unit = {
     val inner1 = EruRuntime.zipPar(quickEffect, quickEffect)
-    val inner2 = EruRuntime.zipPar(quickEffect, quickEffect)  
+    val inner2 = EruRuntime.zipPar(quickEffect, quickEffect)
     val outer = EruRuntime.zipPar(inner1, inner2)
     h.consume(outer.unsafeRunSync(): AnyRef)
   }
 
   /** Measures resource cleanup performance under concurrent execution.
     *
-    * This validates that finalizers execute properly in FILO order even
-    * under high concurrent load with Virtual Threads.
+    * This validates that finalizers execute properly in FILO order even under high concurrent load
+    * with Virtual Threads.
     */
   @Benchmark
   def resourceCleanupConcurrent(h: Blackhole): Unit = {
@@ -173,8 +175,8 @@ class EruConcurrencyH9Bench {
 
   /** Measures cancellation performance with Virtual Thread interruption.
     *
-    * This validates that effect cancellation via Thread.interrupt() works
-    * efficiently and properly cleans up resources under concurrent load.
+    * This validates that effect cancellation via Thread.interrupt() works efficiently and properly
+    * cleans up resources under concurrent load.
     */
   @Benchmark
   def cancellationPerformance(h: Blackhole): Unit = {
@@ -186,13 +188,13 @@ class EruConcurrencyH9Bench {
 
   /** Measures mixed sync/async workload performance.
     *
-    * This validates that the Virtual Threads backend handles mixed workloads
-    * of synchronous effects and asynchronous operations efficiently.
+    * This validates that the Virtual Threads backend handles mixed workloads of synchronous effects
+    * and asynchronous operations efficiently.
     */
   @Benchmark
   def mixedSyncAsyncWorkload(h: Blackhole): Unit = {
     val syncWork = Eru.succeed(1).map(_ * 2).map(_ + 3)
-    val asyncWork = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 42)  
+    val asyncWork = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 42)
     val combined = EruRuntime.zipPar(syncWork, asyncWork)
     h.consume(combined.unsafeRunSync(): AnyRef)
   }

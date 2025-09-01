@@ -10,10 +10,10 @@ import net.ghoula.eru.prelude.*
 /** Error-handling microbenchmarks for Eru.
   *
   * Scenarios:
-  *  - recoverMatch: failure recovered by pattern; success bypass
-  *  - recoverNoMatch: failure not matched -> remains failure (attempt boundary)
-  *  - mapErrorOnFailure: transforms error value
-  *  - orElseFallback: fallback only applied on failure
+  *   - recoverMatch: failure recovered by pattern; success bypass
+  *   - recoverNoMatch: failure not matched -> remains failure (attempt boundary)
+  *   - mapErrorOnFailure: transforms error value
+  *   - orElseFallback: fallback only applied on failure
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
@@ -41,7 +41,7 @@ class EruErrorHandlingBench {
   def setup(): Unit = {
     base = path match {
       case "success" => Eru.succeed(42)
-      case _          => Eru.fail("boom")
+      case _ => Eru.fail("boom")
     }
   }
 

@@ -6,16 +6,15 @@ import org.openjdk.jmh.infra.Blackhole
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
-import net.ghoula.eru.prelude.*
 import net.ghoula.eru.EruRuntime
+import net.ghoula.eru.prelude.*
 
 /** Memory pressure microbenchmarks for Eru.
   *
-  * Designed to be run with GC profiler: -prof gc
-  * Scenarios:
-  *  - composition: mixed pure/effect steps
-  *  - resource: ensure-heavy (K finalizers)
-  *  - retryZero: bounded attempts with base = ZERO
+  * Designed to be run with GC profiler: -prof gc Scenarios:
+  *   - composition: mixed pure/effect steps
+  *   - resource: ensure-heavy (K finalizers)
+  *   - retryZero: bounded attempts with base = ZERO
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))

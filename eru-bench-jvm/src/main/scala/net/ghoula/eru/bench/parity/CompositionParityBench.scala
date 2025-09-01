@@ -6,6 +6,7 @@ import org.openjdk.jmh.annotations.*
 import zio.{UIO, Unsafe, ZIO}
 
 import java.util.concurrent.TimeUnit
+
 import net.ghoula.eru.CorePrelude.*
 
 @State(Scope.Thread)
@@ -13,7 +14,7 @@ import net.ghoula.eru.CorePrelude.*
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(
   value = 1,
-  jvmArgs = Array("-server","-Xms2G","-Xmx2G","-XX:+UseG1GC","-XX:+UnlockExperimentalVMOptions")
+  jvmArgs = Array("-server", "-Xms2G", "-Xmx2G", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions")
 )
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
@@ -70,6 +71,8 @@ class CompositionParityBench {
   }
 
   @Benchmark def eru(): Int = eruProg.unsafeRunSync()
-  @Benchmark def zio(): Int = Unsafe.unsafe { implicit u => _root_.zio.Runtime.default.unsafe.run(zioProg).getOrThrowFiberFailure() }
+  @Benchmark def zio(): Int = Unsafe.unsafe { implicit u =>
+    _root_.zio.Runtime.default.unsafe.run(zioProg).getOrThrowFiberFailure()
+  }
   @Benchmark def catsEffect(): Int = ceProg.unsafeRunSync()
 }

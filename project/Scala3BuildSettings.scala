@@ -1,5 +1,5 @@
-import sbt._
-import Keys._
+import sbt.*
+import Keys.*
 
 /** Global Scala 3 build settings applied to all projects.
   *
@@ -9,7 +9,7 @@ import Keys._
 object Scala3BuildSettings extends AutoPlugin {
   override def trigger: PluginTrigger = allRequirements
 
-  override def buildSettings: Seq[Def.Setting[_]] = Seq(
+  override def buildSettings: Seq[Def.Setting[?]] = Seq(
     ThisBuild / usePipelining := false
   )
 }

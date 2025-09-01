@@ -26,8 +26,9 @@ import net.ghoula.eru.CorePrelude.*
   *
   * ==Depth Parameters==
   *
-  * Tests are conducted at depths of 8, 16, 32, 64, 128, 256, and 512 to provide a neutral, powers-of-two sweep.
-  * This avoids singling out any specific internal thresholds and offers a reproducible, conventional range:
+  * Tests are conducted at depths of 8, 16, 32, 64, 128, 256, and 512 to provide a neutral,
+  * powers-of-two sweep. This avoids singling out any specific internal thresholds and offers a
+  * reproducible, conventional range:
   *   - Shallow (8–16): fast-path optimizations and startup overhead
   *   - Medium (32–128): representative chain depth scaling
   *   - Deep (256–512): deeper chain behavior under identical semantics
@@ -37,13 +38,19 @@ import net.ghoula.eru.CorePrelude.*
   * This benchmark reveals fundamental differences in effect system design and identifies critical
   * performance thresholds:
   *
-  * '''Comparative perspective:''' Each library exhibits distinct scaling characteristics across depths. These benchmarks focus on equivalent semantics with neutral powers‑of‑two depths to provide a reproducible, fair comparison.
+  * '''Comparative perspective:''' Each library exhibits distinct scaling characteristics across
+  * depths. These benchmarks focus on equivalent semantics with neutral powers‑of‑two depths to
+  * provide a reproducible, fair comparison.
   *
-  * '''Eru:''' Maintains flat, high throughput for pure composition with smooth declines on short‑circuit paths, consistent with construction‑time fusion and a fast synchronous interpreter.
+  * '''Eru:''' Maintains flat, high throughput for pure composition with smooth declines on
+  * short‑circuit paths, consistent with construction‑time fusion and a fast synchronous
+  * interpreter.
   *
-  * '''ZIO:''' Strong shallow throughput with predictable declines as depth increases in these micro scenarios.
+  * '''ZIO:''' Strong shallow throughput with predictable declines as depth increases in these micro
+  * scenarios.
   *
-  * '''Cats Effect:''' Stable, lower absolute throughput in these micros, with consistent behavior across depths.
+  * '''Cats Effect:''' Stable, lower absolute throughput in these micros, with consistent behavior
+  * across depths.
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))

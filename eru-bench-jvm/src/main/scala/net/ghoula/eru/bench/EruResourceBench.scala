@@ -9,8 +9,7 @@ import net.ghoula.eru.prelude.*
 
 /** Resource-discipline microbenchmarks for Eru (ensure/bracket).
   *
-  * Parameters control number of finalizers (K) and use-phase outcome.
-  * We measure throughput under:
+  * Parameters control number of finalizers (K) and use-phase outcome. We measure throughput under:
   *   - ensureK: K finalizers in FILO order on success/typed-failure
   *   - bracketUse: acquire/use/release with success/typed-failure in use
   */
@@ -47,9 +46,9 @@ class EruResourceBench {
     k = math.max(1, kStr.toInt)
 
     val base: Eru[String, Int] = outcome match {
-      case "success"      => Eru.succeed(42)
+      case "success" => Eru.succeed(42)
       case "typedFailure" => Eru.fail("boom")
-      case _               => Eru.succeed(42)
+      case _ => Eru.succeed(42)
     }
 
     val finalizer: Eru[Any, Unit] = Eru.unit // small, non-failing finalizer
@@ -68,18 +67,18 @@ class EruResourceBench {
   @Benchmark
   def ensureK(h: Blackhole): Unit = {
     outcome match {
-      case "success"      => h.consume(ensuredProg.unsafeRunSync())
+      case "success" => h.consume(ensuredProg.unsafeRunSync())
       case "typedFailure" => h.consume(ensuredProg.attempt.unsafeRunSync())
-      case _               => h.consume(ensuredProg.unsafeRunSync())
+      case _ => h.consume(ensuredProg.unsafeRunSync())
     }
   }
 
   @Benchmark
   def bracketUse(h: Blackhole): Unit = {
     outcome match {
-      case "success"      => h.consume(bracketProg.unsafeRunSync())
+      case "success" => h.consume(bracketProg.unsafeRunSync())
       case "typedFailure" => h.consume(bracketProg.attempt.unsafeRunSync())
-      case _               => h.consume(bracketProg.unsafeRunSync())
+      case _ => h.consume(bracketProg.unsafeRunSync())
     }
   }
 }

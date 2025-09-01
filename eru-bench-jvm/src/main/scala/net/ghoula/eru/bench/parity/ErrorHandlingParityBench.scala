@@ -6,6 +6,7 @@ import org.openjdk.jmh.annotations.*
 import zio.{Unsafe, ZIO}
 
 import java.util.concurrent.TimeUnit
+
 import net.ghoula.eru.CorePrelude.*
 
 @State(Scope.Thread)
@@ -29,11 +30,11 @@ class ErrorHandlingParityBench {
       case "success" =>
         eruBase = Eru.succeed(42)
         zioBase = ZIO.succeed(42)
-        ceBase  = IO.pure(42)
+        ceBase = IO.pure(42)
       case _ =>
         eruBase = Eru.fail("boom")
         zioBase = ZIO.fail("boom")
-        ceBase  = IO.raiseError(new RuntimeException("boom"))
+        ceBase = IO.raiseError(new RuntimeException("boom"))
     }
   }
 
@@ -44,7 +45,7 @@ class ErrorHandlingParityBench {
     Unsafe.unsafe { implicit u =>
       val p = zioBase.catchAll {
         case "boom" => ZIO.succeed(1)
-        case other   => ZIO.fail(other)
+        case other => ZIO.fail(other)
       }
       _root_.zio.Runtime.default.unsafe.run(p).getOrThrowFiberFailure()
     }
@@ -52,6 +53,6 @@ class ErrorHandlingParityBench {
   @Benchmark def ceRecover(): Int =
     ceBase.handleErrorWith {
       case _: RuntimeException => IO.pure(1)
-      case other               => IO.raiseError(other)
+      case other => IO.raiseError(other)
     }.unsafeRunSync()
 }

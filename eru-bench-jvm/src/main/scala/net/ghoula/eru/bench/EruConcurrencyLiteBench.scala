@@ -10,9 +10,9 @@ import net.ghoula.eru.prelude.*
 /** Eru-only concurrency-adjacent microbenchmarks.
   *
   * Notes:
-  * - zipPar/race have sequential semantics in the current runtime and are
-  *   included for Eru internal regression tracking (not for cross-library comparison).
-  * - Includes small Ref/Deferred/Semaphore micros to gauge overhead.
+  *   - zipPar/race have sequential semantics in the current runtime and are included for Eru
+  *     internal regression tracking (not for cross-library comparison).
+  *   - Includes small Ref/Deferred/Semaphore micros to gauge overhead.
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))

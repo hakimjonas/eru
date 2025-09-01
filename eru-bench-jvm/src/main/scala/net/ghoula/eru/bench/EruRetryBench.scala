@@ -6,14 +6,14 @@ import org.openjdk.jmh.infra.Blackhole
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
-import net.ghoula.eru.prelude.*
 import net.ghoula.eru.EruRuntime
+import net.ghoula.eru.prelude.*
 
 /** Retry/backoff microbenchmarks for Eru.
   *
-  * These benches focus on the overhead and determinism of bounded retry policies.
-  * We avoid measuring wall-clock sleeps by using base = Duration.ZERO in backoff
-  * and count-bounded attempts via parameters.
+  * These benches focus on the overhead and determinism of bounded retry policies. We avoid
+  * measuring wall-clock sleeps by using base = Duration.ZERO in backoff and count-bounded attempts
+  * via parameters.
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))

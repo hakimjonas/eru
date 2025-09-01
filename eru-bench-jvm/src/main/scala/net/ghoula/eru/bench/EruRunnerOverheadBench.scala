@@ -9,8 +9,8 @@ import net.ghoula.eru.prelude.*
 
 /** Runner overhead microbenchmarks for Eru.
   *
-  * Measures the cost of constructing and executing small/medium programs
-  * at the observable boundary via unsafeRunSync and attempt.
+  * Measures the cost of constructing and executing small/medium programs at the observable boundary
+  * via unsafeRunSync and attempt.
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
@@ -40,11 +40,11 @@ class EruRunnerOverheadBench {
 
   @Setup(Level.Iteration)
   def setup(): Unit = {
-    smallProgSuccess =
-      Eru.succeed(1)
-        .map(_ + 1)
-        .flatMap(i => Eru.succeed(i + 1))
-        .map(_ * 2)
+    smallProgSuccess = Eru
+      .succeed(1)
+      .map(_ + 1)
+      .flatMap(i => Eru.succeed(i + 1))
+      .map(_ * 2)
 
     mediumProgSuccess = {
       var p: Eru[Nothing, Int] = Eru.succeed(0)
@@ -53,8 +53,7 @@ class EruRunnerOverheadBench {
       p
     }
 
-    smallProgTypedFail =
-      Eru.fail("boom").recover { case _ => 1 }.map(_ + 1)
+    smallProgTypedFail = Eru.fail("boom").recover { case _ => 1 }.map(_ + 1)
 
     mediumProgTypedFail = {
       // a few steps then a failure, then recover

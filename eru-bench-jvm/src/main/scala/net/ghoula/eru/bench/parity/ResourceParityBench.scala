@@ -6,6 +6,7 @@ import org.openjdk.jmh.annotations.*
 import zio.{UIO, Unsafe, ZIO}
 
 import java.util.concurrent.TimeUnit
+
 import net.ghoula.eru.CorePrelude.*
 
 @State(Scope.Thread)
@@ -40,11 +41,14 @@ class ResourceParityBench {
     // Cats Effect
     def cAcq: IO[String] = IO.pure("res")
     def cRel(r: String): IO[Unit] = { val _ = r; IO.pure(()) }
-    def cUse(r: String): IO[Int] = if (outcome == "success") IO.pure(r.length) else IO.raiseError(new RuntimeException("boom"))
+    def cUse(r: String): IO[Int] =
+      if (outcome == "success") IO.pure(r.length) else IO.raiseError(new RuntimeException("boom"))
     ceProg = cAcq.bracket(cUse)(cRel).attempt.map(_.fold(_ => -1, identity))
   }
 
   @Benchmark def eru(): Int = eruProg.unsafeRunSync()
-  @Benchmark def zio(): Int = Unsafe.unsafe { implicit u => _root_.zio.Runtime.default.unsafe.run(zioProg).getOrThrowFiberFailure() }
+  @Benchmark def zio(): Int = Unsafe.unsafe { implicit u =>
+    _root_.zio.Runtime.default.unsafe.run(zioProg).getOrThrowFiberFailure()
+  }
   @Benchmark def catsEffect(): Int = ceProg.unsafeRunSync()
 }

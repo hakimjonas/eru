@@ -9,9 +9,8 @@ import net.ghoula.eru.CorePrelude.*
 
 /** Stack-safety and deep-chain throughput microbenchmarks for Eru.
   *
-  * These benchmarks build deep flatMap/map chains and execute them to
-  * validate performance characteristics over depth while staying within
-  * safe recursion limits for the current runtime.
+  * These benchmarks build deep flatMap/map chains and execute them to validate performance
+  * characteristics over depth while staying within safe recursion limits for the current runtime.
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
