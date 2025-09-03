@@ -426,6 +426,79 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
   override def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
     parSequence(inputs.map(f))
 
+  /** Races multiple effects using Virtual Threads, returning the first to complete.
+    *
+    * This implementation creates one Virtual Thread per effect and uses atomic coordination to
+    * determine the winner. All losing effects are cancelled via thread interruption as soon as the
+    * first effect completes, ensuring optimal resource usage.
+    *
+    * @param effects
+    *   the list of effects to race
+    * @return
+    *   an effect yielding the winning result and its index in the original list
+    */
+  def raceAllVT[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)] =
+    effects match {
+      case Nil =>
+        Eru.effect(throw new IllegalArgumentException("raceAll: empty list of effects"))
+      case single :: Nil =>
+        single.map(a => (a, 0))
+      case _ =>
+        Eru.effect {
+          val size = effects.length
+          val resultRef = new AtomicReference[Option[() => Eru[E | Throwable, (A, Int)]]](None)
+          val latch = new CountDownLatch(1)
+          val threadRefs = new Array[AtomicReference[Option[Thread]]](size)
+
+          // Initialize thread references
+          (0 until size).foreach(i => threadRefs(i) = new AtomicReference[Option[Thread]](None))
+
+          def trySetWinner(index: Int, thunk: () => Eru[E | Throwable, (A, Int)]): Unit = {
+            if (resultRef.compareAndSet(None, Some(thunk))) {
+              // Cancel all other threads
+              threadRefs.zipWithIndex.foreach { case (ref, i) =>
+                if (i != index) ref.get().foreach(_.interrupt())
+              }
+              latch.countDown()
+            }
+          }
+
+          // Launch all effects concurrently
+          effects.zipWithIndex.foreach { case (effect, index) =>
+            val runnable: Runnable = () => {
+              threadRefs(index).set(Some(Thread.currentThread()))
+              val exit = computeExit(effect)
+              exit match {
+                case Exit.Success(value) =>
+                  trySetWinner(index, () => Eru.succeed((value, index)))
+                case Exit.Failure(error) =>
+                  trySetWinner(index, () => Eru.fail(error))
+                case Exit.Die(throwable) =>
+                  trySetWinner(index, () => Eru.effect(throw throwable))
+                case Exit.Interrupt(_, cause) =>
+                  trySetWinner(index, () => Eru.effect(throw new InterruptedException(s"Effect interrupted: $cause")))
+              }
+            }
+
+            java.lang.Thread.startVirtualThread(runnable)
+          }
+
+          try {
+            latch.await()
+            resultRef.get()
+          } catch {
+            case _: InterruptedException =>
+              // Cancel all threads if raceAll itself is interrupted
+              threadRefs.foreach(_.get().foreach(_.interrupt()))
+              throw new InterruptedException("raceAll interrupted")
+          }
+        }.attempt.flatMap {
+          case Result.Success(Some(thunk)) => thunk()
+          case Result.Success(None) => Eru.effect(throw new IllegalStateException("raceAll: no winner set"))
+          case Result.Failure(t) => Eru.effect(throw t)
+        }
+    }
+
   def handleSuspend[E, A](
     register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
   ): Eru[Nothing, Either[E | Throwable, A]] =

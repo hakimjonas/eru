@@ -71,6 +71,36 @@ private[eru] trait ConcurrencyBackend {
   def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
     parSequence(inputs.map(f))
 
+  /** Races multiple effects, returning the result of whichever completes first.
+    *
+    * All effects execute concurrently, and the first to complete (successfully or with failure)
+    * wins the race. All losing effects are cancelled immediately to prevent resource leaks. Returns
+    * the winning result along with its index in the original list.
+    *
+    * Default implementation falls back to nested binary races. Backends that support true
+    * concurrency should override this for better performance.
+    */
+  def raceAll[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)] =
+    effects match {
+      case Nil =>
+        Eru.effect(throw new IllegalArgumentException("raceAll: empty list of effects"))
+      case single :: Nil =>
+        single.map(a => (a, 0))
+      case _ :: _ =>
+        // Default implementation using binary race operations
+        def raceWithIndex(remaining: List[Eru[E, A]], currentIndex: Int): Eru[E | Throwable, (A, Int)] =
+          remaining match {
+            case Nil => Eru.effect(throw new IllegalStateException("raceAll: unexpected empty list"))
+            case single :: Nil => single.map(a => (a, currentIndex))
+            case current :: rest =>
+              race(current, raceWithIndex(rest, currentIndex + 1)).flatMap {
+                case Left(value) => Eru.succeed((value, currentIndex))
+                case Right((value, index)) => Eru.succeed((value, index))
+              }
+          }
+        raceWithIndex(effects, 0)
+    }
+
   /** Handles async boundary registration with backend-specific semantics.
     *
     * This method enables backends to provide either synchronous or asynchronous callback handling

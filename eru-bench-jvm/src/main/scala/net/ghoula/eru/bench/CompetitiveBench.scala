@@ -644,4 +644,93 @@ class CompetitiveBench {
     val slow = IO.sleep(FiniteDuration(20, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow")
     IO.race(fast, slow).unsafeRunSync()
   }
+
+  /** Benchmarks Eru's raceAll performance with multiple competing effects.
+    *
+    * This benchmark measures Eru's raceAll operation with multiple effects of varying durations,
+    * testing the efficiency of concurrent execution and cancellation behavior. The fastest effect
+    * (1ms) should win consistently, with all losing effects being cancelled properly.
+    *
+    * @return
+    *   a tuple containing the winning result and its index in the original list
+    */
+  @Benchmark
+  def eruRaceAll(): (String, Int) = {
+    import java.time.Duration
+    val effects = List(
+      EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "slow-1"), // index 0
+      EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast"), // index 1 - should win
+      EruRuntime.sleep(Duration.ofMillis(20)).map(_ => "slow-2"), // index 2
+      EruRuntime.sleep(Duration.ofMillis(15)).map(_ => "slow-3") // index 3
+    )
+    EruRuntime.raceAll(effects).unsafeRunSync()
+  }
+
+  /** Benchmarks ZIO's equivalent of raceAll using nested ZIO.raceEither operations.
+    *
+    * This benchmark simulates race-all functionality using nested raceEither operations since ZIO
+    * doesn't have a direct raceAll equivalent. This provides comparable timing behavior with
+    * multiple competing effects and proper cancellation.
+    *
+    * @return
+    *   the winning result as a String
+    */
+  @Benchmark
+  def zioRaceAll(): String = {
+    import _root_.zio.*
+    val effects = List(
+      ZIO.sleep(10.millis).as("slow-1"), // index 0
+      ZIO.sleep(1.millis).as("fast"), // index 1 - should win
+      ZIO.sleep(20.millis).as("slow-2"), // index 2
+      ZIO.sleep(15.millis).as("slow-3") // index 3
+    )
+
+    // Simulate raceAll with nested races since ZIO lacks native raceAll
+    def raceAll(effects: List[ZIO[Any, Nothing, String]]): ZIO[Any, Nothing, String] = effects match {
+      case Nil => ZIO.die(new IllegalArgumentException("empty list"))
+      case single :: Nil => single
+      case head :: tail =>
+        head.raceEither(raceAll(tail)).map {
+          case Left(winner) => winner
+          case Right(winner) => winner
+        }
+    }
+
+    val raced = raceAll(effects)
+    Unsafe.unsafe { implicit unsafe =>
+      _root_.zio.Runtime.default.unsafe.run(raced).getOrThrowFiberFailure()
+    }
+  }
+
+  /** Benchmarks Cats Effect's equivalent of raceAll using multiple IO.race operations.
+    *
+    * This benchmark simulates raceAll behavior using nested IO.race operations since Cats Effect
+    * doesn't have a native raceAll. This provides comparable semantics but may have different
+    * performance characteristics due to the nested structure.
+    *
+    * @return
+    *   the winning result as a String
+    */
+  @Benchmark
+  def catsEffectRaceAll(): String = {
+    val effects = List(
+      IO.sleep(FiniteDuration(10, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow-1"),
+      IO.sleep(FiniteDuration(1, java.util.concurrent.TimeUnit.MILLISECONDS)).as("fast"),
+      IO.sleep(FiniteDuration(20, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow-2"),
+      IO.sleep(FiniteDuration(15, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow-3")
+    )
+
+    // Simulate raceAll with nested races since Cats Effect lacks native raceAll
+    def raceAll(effects: List[IO[String]]): IO[String] = effects match {
+      case Nil => IO.raiseError(new IllegalArgumentException("empty list"))
+      case single :: Nil => single
+      case head :: tail =>
+        IO.race(head, raceAll(tail)).map {
+          case Left(winner) => winner
+          case Right(winner) => winner
+        }
+    }
+
+    raceAll(effects).unsafeRunSync()
+  }
 }

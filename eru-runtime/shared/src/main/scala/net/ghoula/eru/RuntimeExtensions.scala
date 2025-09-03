@@ -176,4 +176,48 @@ object RuntimeExtensions {
       */
     def semaphore(n: Long): Eru[Nothing, Semaphore] = Semaphore.make(n)
   }
+
+  /** Static utility methods from EruRuntime exposed for direct access. */
+
+  /** Suspends execution for the specified duration.
+    *
+    * @param duration
+    *   the duration to sleep
+    * @return
+    *   an effect that completes after the duration
+    */
+  def sleep(duration: java.time.Duration): Eru[Nothing, Unit] =
+    EruRuntime.sleep(duration)
+
+  /** Executes a collection of effects in parallel, returning results in order.
+    *
+    * @param effects
+    *   the effects to execute
+    * @return
+    *   an effect that yields all results in the same order as input
+    */
+  def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
+    EruRuntime.parSequence(effects)
+
+  /** Executes effects derived from inputs in parallel, returning results in order.
+    *
+    * @param inputs
+    *   the input values to process
+    * @param f
+    *   function to convert each input to an effect
+    * @return
+    *   an effect that yields all results in the same order as inputs
+    */
+  def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
+    EruRuntime.parTraverse(inputs)(f)
+
+  /** Races multiple effects, returning the result of whichever completes first.
+    *
+    * @param effects
+    *   the effects to race
+    * @return
+    *   an effect that yields the winning result and its index
+    */
+  def raceAll[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)] =
+    EruRuntime.raceAll(effects)
 }

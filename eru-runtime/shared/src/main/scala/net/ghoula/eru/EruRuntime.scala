@@ -477,6 +477,49 @@ object EruRuntime {
     */
   def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
     backend.parTraverse(inputs)(f)
+
+  /** Races multiple effects, returning the result of whichever completes first.
+    *
+    * All effects execute concurrently, and the first to complete (successfully or with failure)
+    * wins the race. All losing effects are cancelled immediately to prevent resource leaks. This is
+    * ideal for timeout patterns, competitive fetching, and resilience scenarios.
+    *
+    * '''Non-Deterministic Behavior:''' Race semantics are intentionally non-deterministic - any
+    * effect may win depending on execution timing, system load, and scheduling decisions.
+    *
+    * '''Cancellation:''' All losing effects are interrupted cooperatively, allowing finalizers to
+    * execute properly before termination. This maintains resource safety guarantees.
+    *
+    * '''Performance:''' On Virtual Threads backends, this operation spawns lightweight VTs for each
+    * effect and uses atomic coordination for optimal racing performance.
+    *
+    * @param effects
+    *   the list of effects to race (must be non-empty)
+    * @tparam E
+    *   the typed error that effects may produce
+    * @tparam A
+    *   the success type that effects produce
+    * @return
+    *   an effect yielding a tuple of (winning result, index of winning effect)
+    *
+    * @example
+    *   {{{
+    * import java.time.Duration
+    *
+    * // Race multiple service calls with different latencies
+    * val services = List(
+    *   EruRuntime.sleep(Duration.ofMillis(100)).as("service-1"),
+    *   EruRuntime.sleep(Duration.ofMillis(50)).as("service-2"),  // This will win
+    *   EruRuntime.sleep(Duration.ofMillis(200)).as("service-3")
+    * )
+    *
+    * EruRuntime.raceAll(services).flatMap { case (result, index) =>
+    *   Eru.effect(println(s"Winner: $result from index $index")) // Winner: service-2 from index 1
+    * }
+    *   }}}
+    */
+  def raceAll[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)] =
+    backend.raceAll(effects)
 }
 
 private final class CompletedFiber[E, A](val id: FiberId, exit0: Exit[E, A]) extends Fiber[E, A] {
