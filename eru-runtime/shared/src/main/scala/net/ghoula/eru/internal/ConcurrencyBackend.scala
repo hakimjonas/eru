@@ -53,6 +53,24 @@ private[eru] trait ConcurrencyBackend {
   /** Retry typed failures according to the provided policy. */
   def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A]
 
+  /** Executes a collection of effects in parallel, returning results in order.
+    *
+    * Default implementation falls back to sequential execution. Backends that support true
+    * concurrency should override this for better performance.
+    */
+  def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
+    effects.foldLeft(Eru.succeed(List.empty[A])) { (acc, effect) =>
+      acc.flatMap(list => effect.map(value => list :+ value))
+    }
+
+  /** Executes effects derived from inputs in parallel, returning results in order.
+    *
+    * Default implementation falls back to sequential execution. Backends that support true
+    * concurrency should override this for better performance.
+    */
+  def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
+    parSequence(inputs.map(f))
+
   /** Handles async boundary registration with backend-specific semantics.
     *
     * This method enables backends to provide either synchronous or asynchronous callback handling

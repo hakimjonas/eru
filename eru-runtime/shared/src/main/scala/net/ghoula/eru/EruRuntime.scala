@@ -395,6 +395,88 @@ object EruRuntime {
       case Right(value) => Eru.succeed(value)
       case Left(error) => Eru.fail(error)
     }
+
+  /** Executes a collection of effects in parallel and returns their results in order.
+    *
+    * This operation runs all effects concurrently and waits for all to complete before returning
+    * the results. If any effect fails, all other effects are cancelled immediately to ensure
+    * structured concurrency and prevent resource leaks.
+    *
+    * '''Backend Adaptation:''' Behavior adapts to the concurrency backend. Virtual Threads backends
+    * use lightweight VT spawning for optimal performance. Sequential backends fall back to
+    * sequential execution while maintaining the same API.
+    *
+    * '''Order Preservation:''' Results are returned in the same order as the input effects,
+    * regardless of completion order.
+    *
+    * @param effects
+    *   the collection of effects to execute in parallel
+    * @tparam E
+    *   the typed error that effects may produce
+    * @tparam A
+    *   the success type that effects produce
+    * @return
+    *   an effect yielding the list of results in input order, or the first error encountered
+    *
+    * @example
+    *   {{{
+    * import java.time.Duration
+    *
+    * // Run multiple independent effects in parallel
+    * val effects = List(
+    *   EruRuntime.sleep(Duration.ofMillis(100)).as("first"),
+    *   EruRuntime.sleep(Duration.ofMillis(50)).as("second"),
+    *   EruRuntime.sleep(Duration.ofMillis(150)).as("third")
+    * )
+    *
+    * EruRuntime.parSequence(effects).flatMap { results =>
+    *   Eru.effect(println(s"Results: $results")) // Results: ["first", "second", "third"]
+    * }
+    *   }}}
+    */
+  def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
+    backend.parSequence(effects)
+
+  /** Executes effects derived from a collection of inputs in parallel.
+    *
+    * This is the high-performance bulk operation that applies a function to each input to create an
+    * effect, then executes all effects in parallel. This is more efficient than manually mapping
+    * and then calling parSequence, as it can optimize the entire operation as a unit.
+    *
+    * '''Performance:''' On Virtual Threads backends, this operation is highly optimized for bulk
+    * parallel execution, avoiding individual fiber overhead and using efficient synchronization
+    * primitives.
+    *
+    * @param inputs
+    *   the collection of inputs to process
+    * @param f
+    *   function to transform each input into an effect
+    * @tparam A
+    *   the type of input elements
+    * @tparam E
+    *   the typed error that effects may produce
+    * @tparam B
+    *   the success type that effects produce
+    * @return
+    *   an effect yielding the list of results in input order
+    *
+    * @example
+    *   {{{
+    * import java.time.Duration
+    *
+    * // Process a list of URLs in parallel
+    * val urls = List("api/users", "api/posts", "api/comments")
+    *
+    * EruRuntime.parTraverse(urls) { url =>
+    *   EruRuntime.sleep(Duration.ofMillis(10))
+    *     .flatMap(_ => Eru.effect(s"Response from $url"))
+    * }.flatMap { responses =>
+    *   Eru.effect(println(s"All responses: $responses"))
+    * }
+    *   }}}
+    */
+  def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
+    backend.parTraverse(inputs)(f)
 }
 
 private final class CompletedFiber[E, A](val id: FiberId, exit0: Exit[E, A]) extends Fiber[E, A] {

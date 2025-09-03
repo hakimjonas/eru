@@ -2,13 +2,30 @@ package net.ghoula.eru.bench
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import cats.syntax.parallel.*
 import org.openjdk.jmh.annotations.*
 import zio.{UIO, Unsafe, ZIO}
 
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 import scala.compiletime.uninitialized
+import scala.concurrent.duration.FiniteDuration
 
-import net.ghoula.eru.CorePrelude.*
+import net.ghoula.eru.EruRuntime
+import net.ghoula.eru.prelude.*
+
+// Extension for sequential composition (to be used for parTraverse implementation in Eru)
+extension [E, A](effects: List[Eru[E, A]]) {
+  def sequenceEru: Eru[E, List[A]] = {
+    def loop(remaining: List[Eru[E, A]], acc: List[A]): Eru[E, List[A]] =
+      remaining match {
+        case Nil => Eru.succeed(acc.reverse)
+        case head :: tail =>
+          head.flatMap(a => loop(tail, a :: acc))
+      }
+    loop(effects, Nil)
+  }
+}
 
 /** Competitive benchmarks comparing Eru's performance against ZIO and Cats Effect.
   *
@@ -64,6 +81,14 @@ class CompetitiveBench {
     */
   @Param(Array("8", "16", "32", "64", "128", "256", "512"))
   var depth: Int = uninitialized
+
+  /** The concurrency width parameter for concurrent benchmarks.
+    *
+    * Values represent the number of concurrent operations to run in parallel for
+    * concurrency-focused benchmarks like parTraverse.
+    */
+  @Param(Array("8", "16", "32"))
+  var concurrency: Int = uninitialized
 
   /** Pre-constructed Eru effect chain for benchmarking. */
   var eruProgram: Eru[Throwable, Int] = uninitialized
@@ -465,5 +490,158 @@ class CompetitiveBench {
     }
 
     program.unsafeRunSync()
+  }
+
+  /** Benchmarks Eru's zipPar performance with concurrent execution.
+    *
+    * This benchmark measures Eru's parallel execution of two independent effects with small delays,
+    * testing the efficiency of the zipPar operation in the runtime system.
+    *
+    * @return
+    *   the tuple result from parallel execution
+    */
+  @Benchmark
+  def eruZipPar(): (Int, Int) = {
+    val left = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 1)
+    val right = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 2)
+    EruRuntime.zipPar(left, right).unsafeRunSync()
+  }
+
+  /** Benchmarks ZIO's zipPar performance with concurrent execution.
+    *
+    * This benchmark measures ZIO's parallel execution of two independent effects with small delays,
+    * providing equivalent semantics to the Eru zipPar benchmark.
+    *
+    * @return
+    *   the tuple result from parallel execution
+    */
+  @Benchmark
+  def zioZipPar(): (Int, Int) = {
+    val left = ZIO.sleep(java.time.Duration.ofMillis(1)).as(1)
+    val right = ZIO.sleep(java.time.Duration.ofMillis(1)).as(2)
+
+    Unsafe.unsafe { implicit unsafe =>
+      _root_.zio.Runtime.default.unsafe.run(left.zipPar(right)).getOrThrowFiberFailure()
+    }
+  }
+
+  /** Benchmarks Cats Effect's parTupled performance with concurrent execution.
+    *
+    * This benchmark measures Cats Effect's parallel execution of two independent effects with small
+    * delays, providing equivalent semantics to other libraries' zipPar operations.
+    *
+    * @return
+    *   the tuple result from parallel execution
+    */
+  @Benchmark
+  def catsEffectZipPar(): (Int, Int) = {
+    val left = IO.sleep(FiniteDuration(1, java.util.concurrent.TimeUnit.MILLISECONDS)).as(1)
+    val right = IO.sleep(FiniteDuration(1, java.util.concurrent.TimeUnit.MILLISECONDS)).as(2)
+    (left, right).parTupled.unsafeRunSync()
+  }
+
+  /** Benchmarks Eru's parTraverse performance with concurrent list processing.
+    *
+    * This benchmark measures Eru's parallel traversal by forking effects and awaiting their
+    * results. The number of items processed is determined by the concurrency parameter.
+    *
+    * @return
+    *   the list of processed results
+    */
+  @Benchmark
+  def eruParTraverse(): List[Int] = {
+    val items = (1 to concurrency).toList
+    def processItem(item: Int): Eru[Nothing, Int] =
+      EruRuntime.sleep(Duration.ofMillis(1)).map(_ => item * 2)
+
+    // Use the new native parTraverse implementation
+    EruRuntime.parTraverse(items)(processItem).unsafeRunSync()
+  }
+
+  /** Benchmarks ZIO's parTraverse performance with concurrent list processing.
+    *
+    * This benchmark measures ZIO's parallel traversal using ZIO's parTraverse operation. Provides
+    * equivalent semantics to the Eru parTraverse benchmark.
+    *
+    * @return
+    *   the list of processed results
+    */
+  @Benchmark
+  def zioParTraverse(): List[Int] = {
+    val items = (1 to concurrency).toList
+    def processItem(item: Int): UIO[Int] =
+      ZIO.sleep(java.time.Duration.ofMillis(1)).as(item * 2)
+
+    val program = ZIO.foreachPar(items)(processItem)
+
+    Unsafe.unsafe { implicit unsafe =>
+      _root_.zio.Runtime.default.unsafe.run(program).getOrThrowFiberFailure()
+    }
+  }
+
+  /** Benchmarks Cats Effect's parTraverse performance with concurrent list processing.
+    *
+    * This benchmark measures Cats Effect's parallel traversal using the parTraverse operation.
+    * Provides equivalent semantics to other libraries' parTraverse implementations.
+    *
+    * @return
+    *   the list of processed results
+    */
+  @Benchmark
+  def catsEffectParTraverse(): List[Int] = {
+    val items = (1 to concurrency).toList
+    def processItem(item: Int): IO[Int] =
+      IO.sleep(FiniteDuration(1, java.util.concurrent.TimeUnit.MILLISECONDS)).as(item * 2)
+
+    items.parTraverse(processItem).unsafeRunSync()
+  }
+
+  /** Benchmarks Eru's race performance with fast vs slow effects.
+    *
+    * This benchmark measures Eru's race operation with one fast effect (1ms) and one slow effect
+    * (20ms), testing cancellation efficiency and concurrent execution.
+    *
+    * @return
+    *   the result from the winning effect
+    */
+  @Benchmark
+  def eruRace(): Either[String, String] = {
+    val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast")
+    val slow = EruRuntime.sleep(Duration.ofMillis(20)).map(_ => "slow")
+    EruRuntime.race(fast, slow).unsafeRunSync()
+  }
+
+  /** Benchmarks ZIO's race performance with fast vs slow effects.
+    *
+    * This benchmark measures ZIO's race operation with equivalent fast and slow effects, providing
+    * comparable semantics to the Eru race benchmark.
+    *
+    * @return
+    *   the result from the winning effect
+    */
+  @Benchmark
+  def zioRace(): Either[String, String] = {
+    val fast = ZIO.sleep(java.time.Duration.ofMillis(1)).as("fast")
+    val slow = ZIO.sleep(java.time.Duration.ofMillis(20)).as("slow")
+
+    val raced = fast.raceEither(slow)
+    Unsafe.unsafe { implicit unsafe =>
+      _root_.zio.Runtime.default.unsafe.run(raced).getOrThrowFiberFailure()
+    }
+  }
+
+  /** Benchmarks Cats Effect's race performance with fast vs slow effects.
+    *
+    * This benchmark measures Cats Effect's race operation with equivalent fast and slow effects,
+    * providing comparable semantics to other libraries' race implementations.
+    *
+    * @return
+    *   the result from the winning effect
+    */
+  @Benchmark
+  def catsEffectRace(): Either[String, String] = {
+    val fast = IO.sleep(FiniteDuration(1, java.util.concurrent.TimeUnit.MILLISECONDS)).as("fast")
+    val slow = IO.sleep(FiniteDuration(20, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow")
+    IO.race(fast, slow).unsafeRunSync()
   }
 }

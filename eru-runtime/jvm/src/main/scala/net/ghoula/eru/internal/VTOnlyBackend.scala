@@ -334,22 +334,98 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
   def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A] =
     delegate.retry(policy)(fa)
 
-  /** Handles suspend operations with true async callback enqueueing.
+  /** Executes a collection of effects in parallel and returns their results in order.
     *
-    * This implementation provides non-blocking resumption for the JVM Virtual Threads backend.
-    * Instead of busy-waiting or failing on async registration, callbacks are enqueued onto the
-    * Virtual Thread executor for later execution. This enables true async boundary support while
-    * maintaining Eru's correctness guarantees.
+    * This implementation leverages Virtual Threads' lightweight nature by spawning one VT per
+    * effect and collecting results efficiently using a CountDownLatch. Failed effects cancel all
+    * remaining effects to ensure structured concurrency.
     *
-    * The implementation uses a CompletableFuture to park the Virtual Thread until the callback is
-    * invoked, allowing carrier threads to continue processing other Virtual Threads without
-    * blocking. Resource safety is maintained through proper exception handling.
-    *
-    * @param register
-    *   function to register callback with async source
+    * @param effects
+    *   the collection of effects to execute in parallel
     * @return
-    *   effect that yields the suspended result
+    *   an effect yielding the list of results in input order
     */
+  override def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
+    if (effects.isEmpty) {
+      Eru.succeed(Nil)
+    } else {
+      Eru.effect {
+        val size = effects.length
+        val results = new Array[Exit[E, A]](size)
+        val latch = new CountDownLatch(size)
+        val threadRefs = new Array[AtomicReference[Option[Thread]]](size)
+        val cancelled = new java.util.concurrent.atomic.AtomicBoolean(false)
+
+        // Initialize thread references
+        (0 until size).foreach(i => threadRefs(i) = new AtomicReference[Option[Thread]](None))
+
+        // Launch all effects concurrently
+        effects.zipWithIndex.foreach { case (effect, index) =>
+          val runnable: Runnable = () => {
+            threadRefs(index).set(Some(Thread.currentThread()))
+            val exit = computeExit(effect)
+            results(index) = exit
+
+            // Cancel all other threads on any non-success exit
+            exit match {
+              case Exit.Success(_) => // Continue normally
+              case _ =>
+                if (cancelled.compareAndSet(false, true)) {
+                  threadRefs.zipWithIndex.foreach { case (ref, i) =>
+                    if (i != index) ref.get().foreach(_.interrupt())
+                  }
+                }
+            }
+            latch.countDown()
+          }
+
+          java.lang.Thread.startVirtualThread(runnable)
+        }
+
+        try {
+          latch.await()
+          results.toList
+        } catch {
+          case _: InterruptedException =>
+            // Cancel all threads if parSequence itself is interrupted
+            if (cancelled.compareAndSet(false, true)) {
+              threadRefs.foreach(_.get().foreach(_.interrupt()))
+            }
+            throw new InterruptedException("parSequence interrupted")
+        }
+      }.attempt.flatMap {
+        case Result.Success(exits) =>
+          // Process exits in order, failing fast on first error
+          def processExits(remaining: List[Exit[E, A]], acc: List[A]): Eru[E | Throwable, List[A]] =
+            remaining match {
+              case Nil => Eru.succeed(acc.reverse)
+              case Exit.Success(value) :: tail => processExits(tail, value :: acc)
+              case Exit.Failure(error) :: _ => Eru.fail(error)
+              case Exit.Die(throwable) :: _ => Eru.effect(throw throwable)
+              case Exit.Interrupt(_, cause) :: _ =>
+                Eru.effect(throw new InterruptedException(s"Effect interrupted: $cause"))
+            }
+          processExits(exits, Nil)
+        case Result.Failure(t) => Eru.effect(throw t)
+      }
+    }
+
+  /** Executes effects derived from a collection of inputs in parallel.
+    *
+    * This is the key bulk operation that addresses parTraverse performance. It combines input
+    * mapping with parallel execution in a single efficient operation, avoiding the overhead of
+    * individual fiber management.
+    *
+    * @param inputs
+    *   the collection of inputs to process
+    * @param f
+    *   function to transform each input into an effect
+    * @return
+    *   an effect yielding the list of results in input order
+    */
+  override def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
+    parSequence(inputs.map(f))
+
   def handleSuspend[E, A](
     register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
   ): Eru[Nothing, Either[E | Throwable, A]] =
