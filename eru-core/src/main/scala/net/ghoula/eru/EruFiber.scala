@@ -1,10 +1,11 @@
 package net.ghoula.eru
 
-/** A pure, immutable handle to a running fiber computation.
+/** A pure, immutable handle to a completed fiber computation.
   *
-  * `EruFiber[E, A]` represents a handle to a computation that is running concurrently on a separate
-  * fiber. This is a description of a fiber reference, not the execution itself. It provides methods
-  * to await the fiber's completion or interrupt it, while maintaining the pure, referentially
+  * `EruFiber[E, A]` represents a handle to a computation that has been eagerly evaluated to
+  * completion on a logical fiber. In Phase 2, fibers are evaluated immediately using Strategy A
+  * (eager evaluation), storing their final result and accumulated finalizers directly in the fiber
+  * handle. This provides zero-cast implementation while maintaining the pure, referentially
   * transparent nature of the Eru effect system.
   *
   * Key characteristics:
@@ -18,8 +19,19 @@ package net.ghoula.eru
   * @tparam A
   *   the success type of the fiber's computation (covariant)
   *
+  * Phase 2 Implementation Notes:
+  *   - Fibers are eagerly evaluated using Strategy A: Fork operations execute child computations
+  *     immediately to completion and store results in the fiber handle
+  *   - Auto-join semantics prevent finalizer leakage from unawaited fibers
+  *   - Multiple await operations are safe and always return the same result
+  *   - Interruption is not yet implemented and returns Eru.unit as placeholder
+  *
   * @param id
   *   the unique identifier of this fiber
+  * @param exit
+  *   the pre-computed completion result of the fiber (Phase 2: eagerly evaluated)
+  * @param finalizers
+  *   the accumulated finalizers from fiber execution in FILO order (Phase 2: pre-accumulated)
   */
 final case class EruFiber[+E, +A](
   id: FiberId,
@@ -29,9 +41,10 @@ final case class EruFiber[+E, +A](
 
   /** Creates an Eru effect that awaits this fiber's completion.
     *
-    * The returned effect will suspend until this fiber completes, then produce an Exit value
-    * representing the fiber's final result. This operation is pure and referentially transparent -
-    * it describes the intent to wait for the fiber without actually performing the wait.
+    * In Phase 2, fibers are eagerly evaluated to completion, so this operation immediately returns
+    * the pre-computed Exit value without suspension. Multiple await operations on the same fiber
+    * are safe and referentially transparent - they always return the same result. This operation is
+    * pure and describes the intent to retrieve the fiber's result.
     *
     * @return
     *   an Eru effect that yields the fiber's exit result when executed

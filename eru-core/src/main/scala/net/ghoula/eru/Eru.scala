@@ -429,20 +429,23 @@ object Eru {
   /** A successful `Eru` containing `Unit`. */
   val unit: Eru[Nothing, Unit] = succeed(())
 
-  /** Forks a computation onto a separate fiber.
+  /** Forks a computation onto a separate logical fiber.
     *
-    * Creates a new fiber to execute the given computation concurrently. The returned effect
-    * immediately produces an EruFiber handle that can be used to await the computation's completion
-    * or interrupt it. The forked computation begins execution in the background while the calling
-    * fiber continues.
+    * Phase 2 Implementation: Uses Strategy A (eager evaluation) where the forked computation is
+    * immediately executed to completion and its result stored in the returned EruFiber handle. This
+    * provides zero-cast implementation while maintaining referential transparency.
+    *
+    * The returned effect produces an EruFiber handle containing the pre-computed result and
+    * accumulated finalizers. Auto-join semantics ensure that finalizers from unawaited fibers are
+    * automatically executed at program completion to prevent resource leaks.
     *
     * This operation is pure and referentially transparent - it describes the intent to fork without
-    * actually performing the fork until the returned effect is executed.
+    * actually performing the execution until the returned effect is evaluated.
     *
-    * Forked fibers follow structured concurrency principles:
-    *   - Child fibers are automatically interrupted when their parent completes
-    *   - Resource cleanup is guaranteed even during interruption
-    *   - All forked computations complete before the parent can finish
+    * Phase 2 fiber characteristics:
+    *   - Eager evaluation: computations complete immediately when Fork is executed
+    *   - Auto-join: unawaited fibers have their finalizers executed at program end
+    *   - Zero-cast: no unsafe type operations in the implementation
     *
     * @param computation
     *   the computation to execute on a separate fiber
@@ -458,12 +461,13 @@ object Eru {
 
   /** Creates an Eru that awaits the given fiber.
     *
-    * Produces an effect that, when executed, will suspend until the specified fiber completes and
-    * then yield the fiber's Exit outcome. This operation provides a safe way to join with
-    * concurrent computations without throwing exceptions.
+    * Phase 2 Implementation: Since fibers are eagerly evaluated and completed, this operation
+    * immediately accesses the pre-computed Exit outcome without suspension. This provides efficient
+    * zero-cast implementation.
     *
     * The await operation is pure and referentially transparent - multiple await calls on the same
-    * fiber will all receive the same Exit outcome.
+    * fiber will all receive the same Exit outcome. This is safe and encouraged in Phase 2 since the
+    * result is immutably stored in the fiber handle.
     *
     * @param fiber
     *   the fiber to await
