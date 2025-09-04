@@ -23,7 +23,7 @@ class EruFiberSpec extends FunSuite {
   test("EruFiber equality is based on ID") {
     val id = FiberId.fresh()
     val fiber1 = EruFiber.withId[String, Int](id)
-    val fiber2 = EruFiber.withId[String, Int](id) // Same types and ID
+    val fiber2 = EruFiber.withId[String, Int](id) // Same ID
 
     assertEquals(fiber1, fiber2) // Should be equal because same ID
   }

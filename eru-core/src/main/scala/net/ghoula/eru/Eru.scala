@@ -1,7 +1,7 @@
 package net.ghoula.eru
 
 import scala.util.control.NonFatal
-import scala.util.control.TailCalls.{done, tailcall, TailRec}
+import scala.util.control.TailCalls.{TailRec, done, tailcall}
 
 import net.ghoula.eru.EruObserver.*
 
@@ -284,6 +284,36 @@ enum Eru[+E, +A] {
     *   the result of executing this computation
     */
   final def unsafeRunSyncWith(observer: EruObserver): A = Eru.interpreter.runSyncWithObserver(this, observer)
+
+  /** Executes this computation synchronously with fiber support (Phase 2).
+    *
+    * This method uses the fiber-aware FiberStepper interpreter that can handle Fork and Await
+    * operations. Unlike the basic interpreter, this supports structured concurrency within
+    * the synchronous kernel.
+    *
+    * WARNING: Unsafe — may perform side effects and may throw at the edge with the same
+    * semantics as [[unsafeRunSync]].
+    *
+    * @return
+    *   the result of executing this computation with fiber support
+    */
+  final def unsafeRunSyncWithFibers(): A = Eru.interpreter.runSyncWithFibers(this)
+
+  /** Executes this computation synchronously with fiber support and observer.
+    *
+    * This method combines fiber-aware execution with observability, using the FiberStepper
+    * interpreter with enhanced fiber lifecycle event reporting.
+    *
+    * WARNING: Unsafe — may perform side effects and may throw at the edge with the same
+    * semantics as [[unsafeRunSync]].
+    *
+    * @param observer
+    *   the observer to receive events including fiber lifecycle events
+    * @return
+    *   the result of executing this computation with fiber support and observability
+    */
+  final def unsafeRunSyncWithFibersAndObserver(observer: EruObserver): A = 
+    Eru.interpreter.runSyncWithFibersAndObserver(this, observer)
 }
 
 object Eru {
@@ -637,6 +667,140 @@ object Eru {
       }
     }
 
+    /** Fiber-aware runLoop implementing Strategy A: Eager Fiber Evaluation.
+      *
+      * This method extends runLoop to handle Fork and Await operations using eager evaluation.
+      * Fork executes the child computation immediately to completion and stores the result
+      * and finalizers directly in the EruFiber. Await becomes pure structural access with
+      * no registry lookups required.
+      *
+      * Key features:
+      * - Zero type casts: All GADT constraints preserved through direct ADT pattern matching
+      * - Eager evaluation: Fork runs child immediately in synchronous kernel
+      * - FILO finalizer ordering: Child finalizers merge in front to maintain order
+      * - Stack-safe: Uses TailRec for all recursive calls
+      */
+    private def runFiberLoop[E, A](
+      eru: Eru[E, A],
+      fins: List[Finalizer],
+      hooks: Hooks,
+      currentFiberId: Option[FiberId] = None
+    ): TailRec[(Either[E, A], List[Finalizer])] =
+      eru match {
+        case Succeed(value) =>
+          done((Right(value), fins))
+
+        case Fail(error) =>
+          done((Left(error), fins))
+
+        case Effect(thunk) =>
+          done((thunk(), fins))
+
+        case Chain(source, cont) =>
+          tailcall(runFiberLoop(source, fins, hooks, currentFiberId)).flatMap {
+            case (Right(value), fs) => tailcall(runFiberContinuation(cont, value, fs, hooks, currentFiberId))
+            case (Left(error), fs) => done((Left(error), fs))
+          }
+
+        case MapChain(source, f) =>
+          tailcall(runFiberLoop(source, fins, hooks, currentFiberId)).map {
+            case (Right(value), fs) => (Right(f(value)), fs)
+            case (Left(error), fs) => (Left(error), fs)
+          }
+
+        case RecoverWith(source, pf) =>
+          tailcall(runFiberLoop(source, fins, hooks, currentFiberId)).flatMap {
+            case (Right(value), fs) => done((Right(value), fs))
+            case (Left(error), fs) =>
+              if (pf.isDefinedAt(error)) {
+                tailcall(runFiberLoop(pf(error), fs, hooks, currentFiberId))
+              } else {
+                done((Left(error), fs))
+              }
+          }
+
+        case MapError(source, f) =>
+          tailcall(runFiberLoop(source, fins, hooks, currentFiberId)).map { case (either, fs) => (either.left.map(f), fs) }
+
+        case Zip(left, right) =>
+          tailcall(runFiberLoop(left, fins, hooks, currentFiberId)).flatMap {
+            case (Right(a), fsL) =>
+              tailcall(runFiberLoop(right, fsL, hooks, currentFiberId)).map {
+                case (Right(b), fsR) => (Right((a, b)), fsR)
+                case (Left(e1), fsR) => (Left(e1), fsR)
+              }
+            case (Left(e0), fsL) => done((Left(e0), fsL))
+          }
+
+        case Attempt(source) =>
+          tailcall(runFiberLoop(source, fins, hooks, currentFiberId)).map {
+            case (Left(e), fs) => (Right(Result.Failure(e)), fs)
+            case (Right(a), fs) => (Right(Result.Success(a)), fs)
+          }
+
+        case Debug(source, label) =>
+          hooks.onStep(label())
+          tailcall(runFiberLoop(source, fins, hooks, currentFiberId))
+
+        case Ensure(source, fin) =>
+          tailcall(runFiberLoop(source, fins, hooks, currentFiberId)).map { case (either, fs) => (either, fin :: fs) }
+
+        case Suspend(register) =>
+          handleSuspend(cb => runFiberLoop(register(cb), fins, hooks, currentFiberId).result)
+
+        case Fork(computation) =>
+          // Strategy A: Eagerly evaluate the child computation
+          val childFiberId = FiberId.fresh()
+          
+          // Execute the child computation to completion
+          val (childResult, childFinalizers) = runFiberLoop(
+            computation, 
+            Nil, // Child starts with empty finalizers
+            hooks, 
+            Some(childFiberId)
+          ).result
+          
+          // Convert child result to Exit
+          val childExit = childResult match {
+            case Right(value) => Exit.Success(value)
+            case Left(error) => Exit.Failure(error)
+          }
+          
+          // Create completed EruFiber with result and finalizers
+          val completedFiber = EruFiber.withId(childFiberId, childExit, childFinalizers)
+          
+          // Return the fiber handle - type constraints preserved by GADT
+          done((Right(completedFiber), fins))
+
+        case Await(fiber) =>
+          // Strategy A: Pure structural access - fiber already contains result
+          
+          // Merge child finalizers in front to preserve FILO order
+          val mergedFinalizers = fiber.finalizers ++ fins
+          
+          // Return the stored exit result - type constraints preserved by GADT
+          done((Right(fiber.exit), mergedFinalizers))
+      }
+
+    /** Fiber-aware continuation execution to match runFiberLoop */
+    @inline private def runFiberContinuation[E, In, Out](
+      cont: Continuation[E, In, Out],
+      input: In,
+      fins: List[Finalizer],
+      hooks: Hooks,
+      currentFiberId: Option[FiberId]
+    ): TailRec[(Either[E, Out], List[Finalizer])] = {
+      cont match {
+        case Continuation.End() =>
+          done((Right(input), fins))
+        case Continuation.Step(f, next) =>
+          tailcall(runFiberLoop(f(input), fins, hooks, currentFiberId)).flatMap {
+            case (Right(intermediate), fs) => tailcall(runFiberContinuation(next, intermediate, fs, hooks, currentFiberId))
+            case (Left(error), fs) => done((Left(error), fs))
+          }
+      }
+    }
+
     /** Executes all finalizers in FILO (First-In-Last-Out) order with proper nesting support.
       *
       * This method processes the accumulated finalizer list by executing each finalizer and
@@ -716,6 +880,37 @@ object Eru {
       observer.onEvent(EruEvent.ProgramStart(scope))
       val (either, fins) = runWithObsStack(start, scope, observer, Nil).result
       drainFinalizers(fins).result
+      either match {
+        case Left(error) =>
+          error match {
+            case t: Throwable =>
+              observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.Defect(t)))
+            case e =>
+              observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.TypedFailure(e)))
+          }
+          handleRunResult(either)
+        case Right(value) =>
+          observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.Success))
+          value
+      }
+    }
+
+    /** Fiber-aware synchronous interpreter using eager evaluation */
+    def runSyncWithFibers[E, A](start: Eru[E, A]): A = {
+      val (either, fins) = runFiberLoop(start, Nil, Hooks.Noop).result
+      drainFinalizers(fins).result
+      handleRunResult(either)
+    }
+
+    /** Fiber-aware observer variant using runFiberLoop with eager evaluation */
+    def runSyncWithFibersAndObserver[E, A](start: Eru[E, A], observer: EruObserver): A = {
+      val scope = ScopeId.fresh()
+      val hooks = Hooks.ObserverHooks(scope, observer)
+      
+      observer.onEvent(EruEvent.ProgramStart(scope))
+      val (either, fins) = runFiberLoop(start, Nil, hooks).result
+      drainFinalizers(fins).result
+      
       either match {
         case Left(error) =>
           error match {
