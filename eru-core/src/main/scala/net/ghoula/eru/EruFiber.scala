@@ -23,7 +23,7 @@ package net.ghoula.eru
   */
 final case class EruFiber[+E, +A](
   id: FiberId,
-  private[eru] val exit: Exit[E, A], 
+  private[eru] val exit: Exit[E, A],
   private[eru] val finalizers: List[() => Eru[Nothing, Unit]]
 ) {
 
@@ -100,64 +100,45 @@ object EruFiber {
 
   /** Creates a completed EruFiber with a fresh fiber ID for Phase 2 eager evaluation.
     *
-    * In Phase 2, fibers are evaluated immediately to completion and store their result
-    * and accumulated finalizers directly. This enables zero-cast implementation while
-    * maintaining referential transparency.
+    * In Phase 2, fibers are evaluated immediately to completion and store their result and
+    * accumulated finalizers directly. This enables zero-cast implementation while maintaining
+    * referential transparency.
     *
-    * @param exit the completion result of the fiber
-    * @param finalizers the finalizers accumulated during fiber execution (in FILO order)
-    * @tparam E the error type of the fiber's computation
-    * @tparam A the success type of the fiber's computation
-    * @return a completed EruFiber containing the result and finalizers
+    * @param exit
+    *   the completion result of the fiber
+    * @param finalizers
+    *   the finalizers accumulated during fiber execution (in FILO order)
+    * @tparam E
+    *   the error type of the fiber's computation
+    * @tparam A
+    *   the success type of the fiber's computation
+    * @return
+    *   a completed EruFiber containing the result and finalizers
     */
   private[eru] def completed[E, A](
-    exit: Exit[E, A], 
+    exit: Exit[E, A],
     finalizers: List[() => Eru[Nothing, Unit]]
   ): EruFiber[E, A] = EruFiber(FiberId.fresh(), exit, finalizers)
 
   /** Creates an EruFiber handle with a specific fiber ID for Phase 2 eager evaluation.
     *
-    * @param id the fiber ID to use
-    * @param exit the completion result of the fiber
-    * @param finalizers the finalizers accumulated during fiber execution (in FILO order)
-    * @tparam E the error type of the fiber's computation
-    * @tparam A the success type of the fiber's computation
-    * @return an EruFiber with the specified ID and completion state
+    * @param id
+    *   the fiber ID to use
+    * @param exit
+    *   the completion result of the fiber
+    * @param finalizers
+    *   the finalizers accumulated during fiber execution (in FILO order)
+    * @tparam E
+    *   the error type of the fiber's computation
+    * @tparam A
+    *   the success type of the fiber's computation
+    * @return
+    *   an EruFiber with the specified ID and completion state
     */
   private[eru] def withId[E, A](
-    id: FiberId, 
+    id: FiberId,
     exit: Exit[E, A],
     finalizers: List[() => Eru[Nothing, Unit]]
   ): EruFiber[E, A] = EruFiber(id, exit, finalizers)
 
-  /** Test helper: Creates a fresh EruFiber for testing with a dummy success exit.
-    * 
-    * This method is primarily for testing where the completion state doesn't matter.
-    * It's designed to match the old API for backwards compatibility in tests.
-    */
-  private[eru] def fresh[E, A]: EruFiber[E, A] = {
-    // For tests, we create a dummy value - this is acceptable only for testing
-    val dummyValue = try {
-      null.asInstanceOf[A]
-    } catch {
-      case _: Exception => throw new IllegalStateException("EruFiber.fresh should only be used in tests with concrete types")
-    }
-    val exit = Exit.Success(dummyValue)
-    EruFiber(FiberId.fresh(), exit, Nil)
-  }
-
-  /** Test helper: Creates an EruFiber with specified ID for testing.
-    * 
-    * This method is primarily for testing where we need a completed EruFiber with a specific ID.
-    */
-  private[eru] def withId[E, A](id: FiberId): EruFiber[E, A] = {
-    // For tests, we create a dummy value - this is acceptable only for testing  
-    val dummyValue = try {
-      null.asInstanceOf[A]
-    } catch {
-      case _: Exception => throw new IllegalStateException("EruFiber.withId should only be used in tests with concrete types")
-    }
-    val exit = Exit.Success(dummyValue)
-    EruFiber(id, exit, Nil)
-  }
 }

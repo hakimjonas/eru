@@ -16,11 +16,11 @@ class ForkAwaitSpec extends FunSuite {
   }
 
   test("Eru.await creates Await case") {
-    val fiber = EruFiber.fresh[String, Int]
+    val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect = Eru.await(fiber)
 
     // Await should create a pure description
-    val _: Eru[String, Exit[String, Int]] = awaitEffect
+    val _: Eru[Nothing, Exit[Nothing, Int]] = awaitEffect
   }
 
   test("Fork is referentially transparent") {
@@ -34,7 +34,7 @@ class ForkAwaitSpec extends FunSuite {
   }
 
   test("Await is referentially transparent") {
-    val fiber = EruFiber.fresh[String, Int]
+    val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val await1 = Eru.await(fiber)
     val await2 = Eru.await(fiber)
 
@@ -52,7 +52,7 @@ class ForkAwaitSpec extends FunSuite {
   }
 
   test("Await constructs with proper types") {
-    val fiber: EruFiber[String, Int] = EruFiber.fresh[String, Int]
+    val fiber: EruFiber[String, Int] = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect: Eru[String, Exit[String, Int]] = Eru.await(fiber)
 
     // Type constraints should be satisfied at compile time
@@ -89,7 +89,7 @@ class ForkAwaitSpec extends FunSuite {
   }
 
   test("Await preserves error type from fiber") {
-    val fiber: EruFiber[String, Int] = EruFiber.fresh[String, Int]
+    val fiber: EruFiber[String, Int] = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect: Eru[String, Exit[String, Int]] = Eru.await(fiber)
 
     // Await can fail with the same error type as the fiber
@@ -105,7 +105,7 @@ class ForkAwaitSpec extends FunSuite {
   }
 
   test("Await can be mapped over") {
-    val fiber = EruFiber.fresh[String, Int]
+    val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val mappedAwait = Eru.await(fiber).map {
       case Exit.Success(value) => s"Success: $value"
       case Exit.Failure(error) => s"Failure: $error"
@@ -157,23 +157,21 @@ class ForkAwaitSpec extends FunSuite {
     val _: Eru[Nothing, Result[Nothing, Exit[Nothing, Int]]] = attemptedEffect
   }
 
-  test("Fork execution throws in Phase 1") {
+  test("Fork execution works in Phase 2") {
     val computation = Eru.succeed(42)
     val forkEffect = Eru.fork(computation)
 
-    // In Phase 1, fork should throw when executed
-    interceptMessage[IllegalStateException]("Fork operations are not yet supported in the synchronous kernel") {
-      forkEffect.unsafeRunSync()
-    }
+    // In Phase 2, fork should work and return a completed fiber
+    val fiber = forkEffect.unsafeRunSync()
+    assertEquals(fiber.exit, Exit.Success(42))
   }
 
-  test("Await execution throws in Phase 1") {
-    val fiber = EruFiber.fresh[String, Int]
+  test("Await execution works in Phase 2") {
+    val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect = Eru.await(fiber)
 
-    // In Phase 1, await should throw when executed
-    interceptMessage[IllegalStateException]("Await operations are not yet supported in the synchronous kernel") {
-      awaitEffect.unsafeRunSync()
-    }
+    // In Phase 2, await should work and return the exit
+    val result = awaitEffect.unsafeRunSync()
+    assertEquals(result, Exit.Success(42))
   }
 }
