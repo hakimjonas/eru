@@ -596,141 +596,64 @@ class CompetitiveBench {
     items.parTraverse(processItem).unsafeRunSync()
   }
 
-  /** Benchmarks Eru's race performance with fast vs slow effects.
+  /** Benchmarks Eru's timeout performance with long-running effects.
     *
-    * This benchmark measures Eru's race operation with one fast effect (1ms) and one slow effect
-    * (20ms), testing cancellation efficiency and concurrent execution.
+    * This benchmark measures Eru's timeout operation with a long-running effect (50ms) that is
+    * timed out by a shorter duration (10ms), testing timeout efficiency and cancellation behavior.
     *
     * @return
-    *   the result from the winning effect
+    *   true if the operation timed out as expected, false otherwise
     */
   @Benchmark
-  def eruRace(): Either[String, String] = {
-    val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast")
-    val slow = EruRuntime.sleep(Duration.ofMillis(20)).map(_ => "slow")
-    EruRuntime.race(fast, slow).unsafeRunSync()
+  def eruTimeout(): Boolean = {
+    val longRunning = EruRuntime.sleep(Duration.ofMillis(50)).map(_ => "completed")
+    val timedOut = EruRuntime.timeout(Duration.ofMillis(10))(longRunning)
+
+    timedOut.attempt.unsafeRunSync() match {
+      case net.ghoula.eru.Result.Failure(_: java.util.concurrent.TimeoutException) => true
+      case _ => false
+    }
   }
 
-  /** Benchmarks ZIO's race performance with fast vs slow effects.
+  /** Benchmarks ZIO's timeout performance with long-running effects.
     *
-    * This benchmark measures ZIO's race operation with equivalent fast and slow effects, providing
-    * comparable semantics to the Eru race benchmark.
+    * This benchmark measures ZIO's timeout operation with equivalent long-running effect (50ms)
+    * that is timed out by a shorter duration (10ms), providing comparable semantics to the Eru
+    * timeout benchmark.
     *
     * @return
-    *   the result from the winning effect
+    *   true if the operation timed out as expected, false otherwise
     */
   @Benchmark
-  def zioRace(): Either[String, String] = {
-    val fast = ZIO.sleep(java.time.Duration.ofMillis(1)).as("fast")
-    val slow = ZIO.sleep(java.time.Duration.ofMillis(20)).as("slow")
+  def zioTimeout(): Boolean = {
+    val longRunning = ZIO.sleep(java.time.Duration.ofMillis(50)).as("completed")
+    val timedOut = longRunning.timeout(java.time.Duration.ofMillis(10))
 
-    val raced = fast.raceEither(slow)
     Unsafe.unsafe { implicit unsafe =>
-      _root_.zio.Runtime.default.unsafe.run(raced).getOrThrowFiberFailure()
+      _root_.zio.Runtime.default.unsafe.run(timedOut).getOrThrowFiberFailure() match {
+        case None => true // None indicates timeout
+        case Some(_) => false
+      }
     }
   }
 
-  /** Benchmarks Cats Effect's race performance with fast vs slow effects.
+  /** Benchmarks Cats Effect's timeout performance with long-running effects.
     *
-    * This benchmark measures Cats Effect's race operation with equivalent fast and slow effects,
-    * providing comparable semantics to other libraries' race implementations.
-    *
-    * @return
-    *   the result from the winning effect
-    */
-  @Benchmark
-  def catsEffectRace(): Either[String, String] = {
-    val fast = IO.sleep(FiniteDuration(1, java.util.concurrent.TimeUnit.MILLISECONDS)).as("fast")
-    val slow = IO.sleep(FiniteDuration(20, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow")
-    IO.race(fast, slow).unsafeRunSync()
-  }
-
-  /** Benchmarks Eru's raceAll performance with multiple competing effects.
-    *
-    * This benchmark measures Eru's raceAll operation with multiple effects of varying durations,
-    * testing the efficiency of concurrent execution and cancellation behavior. The fastest effect
-    * (1ms) should win consistently, with all losing effects being cancelled properly.
+    * This benchmark measures Cats Effect's timeout operation with equivalent long-running effect
+    * (50ms) that is timed out by a shorter duration (10ms), providing comparable semantics to other
+    * libraries' timeout implementations.
     *
     * @return
-    *   a tuple containing the winning result and its index in the original list
+    *   true if the operation timed out as expected, false otherwise
     */
   @Benchmark
-  def eruRaceAll(): (String, Int) = {
-    import java.time.Duration
-    val effects = List(
-      EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "slow-1"), // index 0
-      EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast"), // index 1 - should win
-      EruRuntime.sleep(Duration.ofMillis(20)).map(_ => "slow-2"), // index 2
-      EruRuntime.sleep(Duration.ofMillis(15)).map(_ => "slow-3") // index 3
-    )
-    EruRuntime.raceAll(effects).unsafeRunSync()
-  }
+  def catsEffectTimeout(): Boolean = {
+    val longRunning = IO.sleep(FiniteDuration(50, java.util.concurrent.TimeUnit.MILLISECONDS)).as("completed")
+    val timedOut = longRunning.timeout(FiniteDuration(10, java.util.concurrent.TimeUnit.MILLISECONDS))
 
-  /** Benchmarks ZIO's equivalent of raceAll using nested ZIO.raceEither operations.
-    *
-    * This benchmark simulates race-all functionality using nested raceEither operations since ZIO
-    * doesn't have a direct raceAll equivalent. This provides comparable timing behavior with
-    * multiple competing effects and proper cancellation.
-    *
-    * @return
-    *   the winning result as a String
-    */
-  @Benchmark
-  def zioRaceAll(): String = {
-    import _root_.zio.*
-    val effects = List(
-      ZIO.sleep(10.millis).as("slow-1"), // index 0
-      ZIO.sleep(1.millis).as("fast"), // index 1 - should win
-      ZIO.sleep(20.millis).as("slow-2"), // index 2
-      ZIO.sleep(15.millis).as("slow-3") // index 3
-    )
-
-    // Simulate raceAll with nested races since ZIO lacks native raceAll
-    def raceAll(effects: List[ZIO[Any, Nothing, String]]): ZIO[Any, Nothing, String] = effects match {
-      case Nil => ZIO.die(new IllegalArgumentException("empty list"))
-      case single :: Nil => single
-      case head :: tail =>
-        head.raceEither(raceAll(tail)).map {
-          case Left(winner) => winner
-          case Right(winner) => winner
-        }
+    timedOut.attempt.unsafeRunSync() match {
+      case Left(_: java.util.concurrent.TimeoutException) => true
+      case _ => false
     }
-
-    val raced = raceAll(effects)
-    Unsafe.unsafe { implicit unsafe =>
-      _root_.zio.Runtime.default.unsafe.run(raced).getOrThrowFiberFailure()
-    }
-  }
-
-  /** Benchmarks Cats Effect's equivalent of raceAll using multiple IO.race operations.
-    *
-    * This benchmark simulates raceAll behavior using nested IO.race operations since Cats Effect
-    * doesn't have a native raceAll. This provides comparable semantics but may have different
-    * performance characteristics due to the nested structure.
-    *
-    * @return
-    *   the winning result as a String
-    */
-  @Benchmark
-  def catsEffectRaceAll(): String = {
-    val effects = List(
-      IO.sleep(FiniteDuration(10, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow-1"),
-      IO.sleep(FiniteDuration(1, java.util.concurrent.TimeUnit.MILLISECONDS)).as("fast"),
-      IO.sleep(FiniteDuration(20, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow-2"),
-      IO.sleep(FiniteDuration(15, java.util.concurrent.TimeUnit.MILLISECONDS)).as("slow-3")
-    )
-
-    // Simulate raceAll with nested races since Cats Effect lacks native raceAll
-    def raceAll(effects: List[IO[String]]): IO[String] = effects match {
-      case Nil => IO.raiseError(new IllegalArgumentException("empty list"))
-      case single :: Nil => single
-      case head :: tail =>
-        IO.race(head, raceAll(tail)).map {
-          case Left(winner) => winner
-          case Right(winner) => winner
-        }
-    }
-
-    raceAll(effects).unsafeRunSync()
   }
 }

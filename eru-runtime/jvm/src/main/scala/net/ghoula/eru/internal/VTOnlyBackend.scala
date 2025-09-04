@@ -6,7 +6,7 @@ import java.util.concurrent.{CountDownLatch, Executors, ScheduledExecutorService
 
 import net.ghoula.eru.*
 
-/** JVM-only Virtual Threads backend (H9.2 fork/await; H9.3 timers non-blocking).
+/** JVM-only Virtual Threads backend.
   *
   * zipPar and race still delegate to the sequential backend for now.
   */
