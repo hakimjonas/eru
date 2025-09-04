@@ -126,6 +126,17 @@ object FiberId {
     *   }}}
     */
   def fresh(): FiberId = next.getAndIncrement()
+
+  /** Extension methods for FiberId */
+  extension (id: FiberId) {
+
+    /** Returns the underlying Long value of this fiber ID.
+      *
+      * @return
+      *   the numeric representation of this fiber ID
+      */
+    def toLong: Long = id
+  }
 }
 
 /** Structured cause of fiber interruption with comprehensive diagnostic information.

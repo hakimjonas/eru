@@ -65,6 +65,12 @@ enum Eru[+E, +A] {
   /** Represents an asynchronous, suspending computation. */
   private case Suspend[E0, A0](register: (Either[E0, A0] => Unit) => Eru[Nothing, Unit]) extends Eru[E0, A0]
 
+  /** Represents forking a computation onto a separate fiber and returning a handle. */
+  private case Fork[E0, A0](computation: Eru[E0, A0]) extends Eru[Nothing, EruFiber[E0, A0]]
+
+  /** Represents awaiting the completion of a fiber. */
+  private case Await[E0, A0](fiber: EruFiber[E0, A0]) extends Eru[E0, Exit[E0, A0]]
+
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
     *
@@ -422,6 +428,53 @@ object Eru {
   /** A successful `Eru` containing `Unit`. */
   val unit: Eru[Nothing, Unit] = succeed(())
 
+  /** Forks a computation onto a separate fiber.
+    *
+    * Creates a new fiber to execute the given computation concurrently. The returned effect
+    * immediately produces an EruFiber handle that can be used to await the computation's completion
+    * or interrupt it. The forked computation begins execution in the background while the calling
+    * fiber continues.
+    *
+    * This operation is pure and referentially transparent - it describes the intent to fork without
+    * actually performing the fork until the returned effect is executed.
+    *
+    * Forked fibers follow structured concurrency principles:
+    *   - Child fibers are automatically interrupted when their parent completes
+    *   - Resource cleanup is guaranteed even during interruption
+    *   - All forked computations complete before the parent can finish
+    *
+    * @param computation
+    *   the computation to execute on a separate fiber
+    * @tparam E
+    *   the error type of the computation
+    * @tparam A
+    *   the success type of the computation
+    * @return
+    *   an effect that produces a fiber handle when executed
+    */
+  @scala.annotation.targetName("forkEru")
+  def fork[E, A](computation: Eru[E, A]): Eru[Nothing, EruFiber[E, A]] = Fork(computation)
+
+  /** Creates an Eru that awaits the given fiber.
+    *
+    * Produces an effect that, when executed, will suspend until the specified fiber completes and
+    * then yield the fiber's Exit outcome. This operation provides a safe way to join with
+    * concurrent computations without throwing exceptions.
+    *
+    * The await operation is pure and referentially transparent - multiple await calls on the same
+    * fiber will all receive the same Exit outcome.
+    *
+    * @param fiber
+    *   the fiber to await
+    * @tparam E
+    *   the error type of the fiber's computation
+    * @tparam A
+    *   the success type of the fiber's computation
+    * @return
+    *   an effect that yields the fiber's exit outcome when executed
+    */
+  def await[E, A](fiber: EruFiber[E, A]): Eru[E, Exit[E, A]] = Await(fiber)
+
   /** The private, cast-free, and stack-safe interpreter for the Eru data type. */
   private object interpreter {
 
@@ -549,6 +602,16 @@ object Eru {
           tailcall(runLoop(source, fins, hooks)).map { case (either, fs) => (either, fin :: fs) }
         case Suspend(register) =>
           handleSuspend(cb => runLoop(register(cb), fins, hooks).result)
+
+        case Fork(_) =>
+          // Phase 1: Fork is not yet implemented in the interpreter
+          // This will be implemented in Phase 2 when the fiber runtime is added
+          throw new IllegalStateException("Fork operations are not yet supported in the synchronous kernel")
+
+        case Await(_) =>
+          // Phase 1: Await is not yet implemented in the interpreter
+          // This will be implemented in Phase 2 when the fiber runtime is added
+          throw new IllegalStateException("Await operations are not yet supported in the synchronous kernel")
       }
 
     /** Executes a continuation stack with the given input value.
@@ -686,6 +749,8 @@ object Eru {
       case VDebug[E0, A0](source: Eru[E0, A0], label: () => String) extends View[E0, A0]
       case VEnsure[E0, A0](source: Eru[E0, A0], finalizer: () => Eru[Nothing, Unit]) extends View[E0, A0]
       case VSuspend[E0, A0](register: (Either[E0, A0] => Unit) => Eru[Nothing, Unit]) extends View[E0, A0]
+      case VFork[E0, A0](computation: Eru[E0, A0]) extends View[Nothing, EruFiber[E0, A0]]
+      case VAwait[E0, A0](fiber: EruFiber[E0, A0]) extends View[E0, Exit[E0, A0]]
     }
 
     import View.*
@@ -702,6 +767,8 @@ object Eru {
       case Debug(source, label) => VDebug(source, label)
       case Ensure(source, finalizer) => VEnsure(source, finalizer)
       case Suspend(register) => VSuspend(register)
+      case Fork(computation) => VFork(computation)
+      case Await(fiber) => VAwait(fiber)
     }
 
   }
