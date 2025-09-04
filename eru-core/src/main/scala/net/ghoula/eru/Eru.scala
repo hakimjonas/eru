@@ -28,22 +28,10 @@ enum Eru[+E, +A] {
   /** Represents a synchronous, side-effecting computation suspended in a thunk. */
   private case Effect(thunk: () => Either[Throwable, A]) extends Eru[Throwable, A]
 
-  /** Represents a chained computation resulting from a `flatMap` operation. The `From` type
-    * parameter is the key to the GADT, allowing us to preserve the intermediate type information.
+  /** Represents a chained computation with a continuation stack. The continuation stack is
+    * represented by a GADT that maintains type safety across the chain of operations.
     */
-  private case Chain[E0, From, +To](source: Eru[E0, From], f: From => Eru[E0, To]) extends Eru[E0, To]
-
-  /** Represents a right-associated shallow chain node for selective flattening. */
-  private case Chain2[E0, From, Mid, +To](source: Eru[E0, From], f1: From => Eru[E0, Mid], f2: Mid => Eru[E0, To])
-      extends Eru[E0, To]
-
-  /** Represents a right-associated shallow chain node for selective flattening. */
-  private case Chain3[E0, From, Mid1, Mid2, +To](
-    source: Eru[E0, From],
-    f1: From => Eru[E0, Mid1],
-    f2: Mid1 => Eru[E0, Mid2],
-    f3: Mid2 => Eru[E0, To]
-  ) extends Eru[E0, To]
+  private case Chain[E0, From, +To](source: Eru[E0, From], cont: Eru.Continuation[E0, From, To]) extends Eru[E0, To]
 
   /** Represents a chain of pure map operations fused together for performance. This avoids creating
     * multiple Chain nodes for consecutive map operations.
@@ -131,7 +119,7 @@ enum Eru[+E, +A] {
             case other => other
           }
         } catch {
-          case NonFatal(ex) => Chain(this, (_: A) => throw ex)
+          case NonFatal(ex) => Chain(this, Eru.Continuation.Step((_: A) => throw ex, Eru.Continuation.End()))
         }
 
       case MapChain(Succeed(sourceValue), g) =>
@@ -142,20 +130,14 @@ enum Eru[+E, +A] {
             case other => other
           }
         } catch {
-          case NonFatal(ex) => Chain(this, (_: A) => throw ex)
+          case NonFatal(ex) => Chain(this, Eru.Continuation.Step((_: A) => throw ex, Eru.Continuation.End()))
         }
 
-      case Chain(source, prevF) =>
-        Chain2(source, prevF, f)
-
-      case Chain2(source, f1, f2) =>
-        Chain3(source, f1, f2, f)
-
-      case Chain3(_, _, _, _) =>
-        Chain(this, f)
+      case Chain(source, cont) =>
+        Chain(source, cont.andThen(f))
 
       case _ =>
-        Chain(this, f)
+        Chain(this, Eru.Continuation.Step(f, Eru.Continuation.End()))
     }
   }
 
@@ -299,6 +281,33 @@ enum Eru[+E, +A] {
 }
 
 object Eru {
+
+  /** GADT representing a stack of continuations in a flatMap chain.
+    *
+    * This data type maintains complete type safety by linking the output type of one function to
+    * the input type of the next, eliminating the need for unsafe casts.
+    */
+  private[eru] enum Continuation[+E, -In, +Out] {
+
+    /** The end of the continuation stack - identity transformation. */
+    case End[A]() extends Continuation[Nothing, A, A]
+
+    /** A step in the continuation chain, linking input type `In` through intermediate type `Mid` to
+      * final output type `Out` via the remaining continuation stack.
+      */
+    case Step[+E, In, Mid, +Out](
+      f: In => Eru[E, Mid],
+      next: Continuation[E, Mid, Out]
+    ) extends Continuation[E, In, Out]
+
+    /** Appends a new function to the end of this continuation stack, maintaining type safety. This
+      * is the key operation that allows us to build continuation chains without casts.
+      */
+    def andThen[E2 >: E, NewOut](g: Out => Eru[E2, NewOut]): Continuation[E2, In, NewOut] = this match {
+      case End() => Step(g, End())
+      case Step(f, next) => Step(f, next.andThen(g))
+    }
+  }
 
   /** Creates an asynchronous, suspending effect by registering a callback with an external source.
     *
@@ -483,34 +492,10 @@ object Eru {
         case Effect(thunk) =>
           done((thunk(), fins))
 
-        case Chain(source, f) =>
+        case Chain(source, cont) =>
           tailcall(runLoop(source, fins, hooks)).flatMap {
-            case (Right(value), fs) => tailcall(runLoop(f(value), fs, hooks))
+            case (Right(value), fs) => tailcall(runContinuation(cont, value, fs, hooks))
             case (Left(error), fs) => done((Left(error), fs))
-          }
-
-        case Chain2(source, f1, f2) =>
-          tailcall(runLoop(source, fins, hooks)).flatMap {
-            case (Right(a), fs1) =>
-              tailcall(runLoop(f1(a), fs1, hooks)).flatMap {
-                case (Right(b), fs2) => tailcall(runLoop(f2(b), fs2, hooks))
-                case (Left(e), fs2) => done((Left(e), fs2))
-              }
-            case (Left(e), fs1) => done((Left(e), fs1))
-          }
-
-        case Chain3(source, f1, f2, f3) =>
-          tailcall(runLoop(source, fins, hooks)).flatMap {
-            case (Right(a), fs1) =>
-              tailcall(runLoop(f1(a), fs1, hooks)).flatMap {
-                case (Right(b), fs2) =>
-                  tailcall(runLoop(f2(b), fs2, hooks)).flatMap {
-                    case (Right(c), fs3) => tailcall(runLoop(f3(c), fs3, hooks))
-                    case (Left(e2), fs3) => done((Left(e2), fs3))
-                  }
-                case (Left(e1), fs2) => done((Left(e1), fs2))
-              }
-            case (Left(e0), fs1) => done((Left(e0), fs1))
           }
 
         case MapChain(source, f) =>
@@ -558,6 +543,29 @@ object Eru {
         case Suspend(register) =>
           handleSuspend(cb => runLoop(register(cb), fins, hooks).result)
       }
+
+    /** Executes a continuation stack with the given input value.
+      *
+      * This method processes the continuation stack step by step, maintaining type safety and stack
+      * safety through TailRec. It handles both End (base case) and Step (recursive case) of the
+      * continuation GADT.
+      */
+    private def runContinuation[E, In, Out](
+      cont: Continuation[E, In, Out],
+      input: In,
+      fins: List[Finalizer],
+      hooks: Hooks
+    ): TailRec[(Either[E, Out], List[Finalizer])] = {
+      cont match {
+        case Continuation.End() =>
+          done((Right(input), fins))
+        case Continuation.Step(f, next) =>
+          tailcall(runLoop(f(input), fins, hooks)).flatMap {
+            case (Right(intermediate), fs) => tailcall(runContinuation(next, intermediate, fs, hooks))
+            case (Left(error), fs) => done((Left(error), fs))
+          }
+      }
+    }
 
     /** Executes all finalizers in FILO (First-In-Last-Out) order with proper nesting support.
       *
@@ -662,15 +670,7 @@ object Eru {
       case VSucceed(value: A)
       case VFail(error: E)
       case VEffect(thunk: () => Either[Throwable, A])
-      case VChain[E0, From, To](source: Eru[E0, From], f: From => Eru[E0, To]) extends View[E0, To]
-      case VChain2[E0, From, Mid, To](source: Eru[E0, From], f1: From => Eru[E0, Mid], f2: Mid => Eru[E0, To])
-          extends View[E0, To]
-      case VChain3[E0, From, Mid1, Mid2, To](
-        source: Eru[E0, From],
-        f1: From => Eru[E0, Mid1],
-        f2: Mid1 => Eru[E0, Mid2],
-        f3: Mid2 => Eru[E0, To]
-      ) extends View[E0, To]
+      case VChain[E0, From, To](source: Eru[E0, From], cont: Continuation[E0, From, To]) extends View[E0, To]
       case VMapChain[E0, From, To](source: Eru[E0, From], f: From => To) extends View[E0, To]
       case VRecoverWith[E0, A0, E2, A1 >: A0](source: Eru[E0, A0], pf: PartialFunction[E0, Eru[E2, A1]])
           extends View[E0 | E2, A1]
@@ -687,9 +687,7 @@ object Eru {
       case Succeed(value) => VSucceed(value)
       case Fail(error) => VFail(error)
       case Effect(thunk) => VEffect(thunk)
-      case Chain(source, f) => VChain(source, f)
-      case Chain2(source, f1, f2) => VChain2(source, f1, f2)
-      case Chain3(source, f1, f2, f3) => VChain3(source, f1, f2, f3)
+      case Chain(source, cont) => VChain(source, cont)
       case MapChain(source, f) => VMapChain(source, f)
       case RecoverWith(source, pf) => VRecoverWith(source, pf)
       case MapError(source, f) => VMapError(source, f)
