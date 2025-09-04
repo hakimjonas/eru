@@ -295,15 +295,15 @@ object Eru {
     /** A step in the continuation chain, linking input type `In` through intermediate type `Mid` to
       * final output type `Out` via the remaining continuation stack.
       */
-    case Step[+E, In, Mid, +Out](
-      f: In => Eru[E, Mid],
-      next: Continuation[E, Mid, Out]
-    ) extends Continuation[E, In, Out]
+    case Step[+E1, In1, Mid1, +Out1](
+      f: In1 => Eru[E1, Mid1],
+      next: Continuation[E1, Mid1, Out1]
+    ) extends Continuation[E1, In1, Out1]
 
     /** Appends a new function to the end of this continuation stack, maintaining type safety. This
       * is the key operation that allows us to build continuation chains without casts.
       */
-    def andThen[E2 >: E, NewOut](g: Out => Eru[E2, NewOut]): Continuation[E2, In, NewOut] = this match {
+    @inline def andThen[E2 >: E, NewOut](g: Out => Eru[E2, NewOut]): Continuation[E2, In, NewOut] = this match {
       case End() => Step(g, End())
       case Step(f, next) => Step(f, next.andThen(g))
     }
@@ -425,19 +425,26 @@ object Eru {
   /** The private, cast-free, and stack-safe interpreter for the Eru data type. */
   private object interpreter {
 
+    /** Helper method for consistent error handling in both runSync variants.
+      *
+      * This consolidates the common pattern of handling Either[E, A] results by throwing
+      * appropriate exceptions, avoiding code duplication between runSync and runSyncWithObserver.
+      */
+    @inline private def handleRunResult[E, A](either: Either[E, A]): A = either match {
+      case Left(error) =>
+        error match {
+          case t: Throwable => throw t
+          case e => throw EruException(e)
+        }
+      case Right(value) => value
+    }
+
     /** The entry point for executing an Eru program.
       */
     def runSync[E, A](start: Eru[E, A]): A = {
       val (either, fins) = runLoop(start, Nil, Hooks.Noop).result
       drainFinalizers(fins).result
-      either match {
-        case Left(error) =>
-          error match {
-            case t: Throwable => throw t
-            case e => throw EruException(e)
-          }
-        case Right(value) => value
-      }
+      handleRunResult(either)
     }
 
     private type Finalizer = () => Eru[Nothing, Unit]
@@ -550,7 +557,7 @@ object Eru {
       * safety through TailRec. It handles both End (base case) and Step (recursive case) of the
       * continuation GADT.
       */
-    private def runContinuation[E, In, Out](
+    @inline private def runContinuation[E, In, Out](
       cont: Continuation[E, In, Out],
       input: In,
       fins: List[Finalizer],
@@ -651,11 +658,10 @@ object Eru {
           error match {
             case t: Throwable =>
               observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.Defect(t)))
-              throw t
             case e =>
               observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.TypedFailure(e)))
-              throw EruException(e)
           }
+          handleRunResult(either)
         case Right(value) =>
           observer.onEvent(EruEvent.ProgramEnd(scope, Outcome.Success))
           value
