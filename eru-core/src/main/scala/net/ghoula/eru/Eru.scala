@@ -149,7 +149,7 @@ enum Eru[+E, +A] {
     * @return
     *   a new `Eru` with the transformed error type.
     */
-  final def mapError[E2](f: E => E2): Eru[E2, A] = MapError(this, f)
+  @inline final def mapError[E2](f: E => E2): Eru[E2, A] = MapError(this, f)
 
   /** Combines this computation with another, producing a pair of their results.
     *
@@ -166,7 +166,7 @@ enum Eru[+E, +A] {
     * @return
     *   an `Eru[E | E2, (A, B)]` that represents the sequential combination of both computations.
     */
-  final def zip[E2, B](that: Eru[E2, B]): Eru[E | E2, (A, B)] = Zip(this, that)
+  @inline final def zip[E2, B](that: Eru[E2, B]): Eru[E | E2, (A, B)] = Zip(this, that)
 
   /** Provides a fallback computation to run if this one fails, regardless of the error.
     *
@@ -175,7 +175,7 @@ enum Eru[+E, +A] {
     * @return
     *   a new `Eru` that tries this computation first, then the fallback if it fails.
     */
-  final def orElse[E2, A1 >: A](that: => Eru[E2, A1]): Eru[E | E2, A1] =
+  @inline final def orElse[E2, A1 >: A](that: => Eru[E2, A1]): Eru[E | E2, A1] =
     recoverWith { case _ => that }
 
   /** Recovers from specific errors by transforming an error into a success value.
@@ -185,7 +185,7 @@ enum Eru[+E, +A] {
     * @return
     *   a new `Eru` that may recover from a failure.
     */
-  final def recover[A1 >: A](pf: PartialFunction[E, A1]): Eru[E, A1] =
+  @inline final def recover[A1 >: A](pf: PartialFunction[E, A1]): Eru[E, A1] =
     recoverWith(pf.andThen(Eru.succeed))
 
   /** Recovers from specific errors by providing an alternative computation.
@@ -206,7 +206,7 @@ enum Eru[+E, +A] {
     * @return
     *   an `Eru[Nothing, Result[E, A]]` that yields `Success(a)` or `Failure(e)` when run.
     */
-  final def attempt: Eru[Nothing, Result[E, A]] = Attempt(this)
+  @inline final def attempt: Eru[Nothing, Result[E, A]] = Attempt(this)
 
   /** Ensures that the provided finalizer runs after this computation, regardless of success or
     * failure.
@@ -245,7 +245,7 @@ enum Eru[+E, +A] {
     * @return
     *   a computation that behaves like this one but emits a debug Step when observed
     */
-  final def debug(label: => String): Eru[E, A] = Debug(this, () => label)
+  @inline final def debug(label: => String): Eru[E, A] = Debug(this, () => label)
 
   /** Executes this computation synchronously and returns the result.
     *
@@ -334,7 +334,7 @@ object Eru {
     * @return
     *   an `Eru[Nothing, A]` that succeeds with the given value.
     */
-  def succeed[A](value: A): Eru[Nothing, A] = Succeed(value)
+  @inline def succeed[A](value: A): Eru[Nothing, A] = Succeed(value)
 
   /** Creates an `Eru[E, Nothing]` that fails with the given error.
     * @param error
@@ -342,7 +342,7 @@ object Eru {
     * @return
     *   an `Eru[E, Nothing]` that fails with the given error.
     */
-  def fail[E](error: E): Eru[E, Nothing] = Fail(error)
+  @inline def fail[E](error: E): Eru[E, Nothing] = Fail(error)
 
   /** Creates an `Eru[Throwable, A]` that represents a synchronous, side-effecting computation. The
     * computation is suspended lazily and will not be executed until `unsafeRunSync` is called. Any
@@ -375,7 +375,7 @@ object Eru {
     * @return
     *   an `Eru[Throwable, A]` representing the suspended computation
     */
-  def blocking[A](thunk: => A): Eru[Throwable, A] = effect(thunk)
+  @inline def blocking[A](thunk: => A): Eru[Throwable, A] = effect(thunk)
 
   /** Creates an `Eru` from an `Either`. `Left` values become failures, `Right` values become
     * successes.
@@ -385,7 +385,7 @@ object Eru {
     * @return
     *   an `Eru[E, A]` representing the `Either`.
     */
-  def fromEither[E, A](either: Either[E, A]): Eru[E, A] =
+  @inline def fromEither[E, A](either: Either[E, A]): Eru[E, A] =
     either.fold(fail, succeed)
 
   /** Creates an `Eru` from a `scala.util.Try`. `Success` values become successes, `Failure`
