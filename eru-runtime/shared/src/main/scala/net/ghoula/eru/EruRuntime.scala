@@ -33,7 +33,7 @@ object EruRuntime {
         System.err.println(s"Failed to initialize async scheduler: $t")
     }
   }
-  
+
   // Initialize scheduler when runtime is loaded
   initializeAsyncScheduler()
 
@@ -182,8 +182,8 @@ object EruRuntime {
     * makes race suitable for timeout patterns and competitive computations.
     *
     * '''Backend Adaptation:''' Cancellation behavior varies by backend capability. Concurrent
-    * backends attempt to interrupt the losing effect cooperatively, while sequential backends
-    * avoid executing the loser entirely.
+    * backends attempt to interrupt the losing effect cooperatively, while sequential backends avoid
+    * executing the loser entirely.
     *
     * @param fa
     *   the first effect to race
@@ -273,8 +273,8 @@ object EruRuntime {
   /** Races an effect against a timer, failing with TimeoutException if the timer wins.
     *
     * This operation implements timeout semantics by racing the provided effect against an internal
-    * timer. If the effect completes first, its result is returned. If the timer completes first,
-    * a TimeoutException is thrown. The timeout behavior delegates to the backend's race
+    * timer. If the effect completes first, its result is returned. If the timer completes first, a
+    * TimeoutException is thrown. The timeout behavior delegates to the backend's race
     * implementation for cancellation semantics.
     *
     * '''Backend Delegation:''' Cancellation behavior when timeout occurs varies by backend

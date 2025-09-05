@@ -131,7 +131,6 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
         )
     }
 
-
   /** Races two effects, returning the result of whichever completes first.
     *
     * Both effects execute concurrently on separate Virtual Threads. The first effect to complete
