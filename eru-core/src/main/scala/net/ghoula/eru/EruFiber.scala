@@ -37,7 +37,7 @@ final case class EruFiber[+E, +A](
   id: FiberId,
   private[eru] val exit: Exit[E, A],
   private[eru] val finalizers: List[() => Eru[Nothing, Unit]]
-) {
+) extends Fiber[E, A] {
 
   /** Creates an Eru effect that awaits this fiber's completion.
     *
@@ -49,7 +49,7 @@ final case class EruFiber[+E, +A](
     * @return
     *   an Eru effect that yields the fiber's exit result when executed
     */
-  def await: Eru[E, Exit[E, A]] = Eru.await(this)
+  def await: Eru[Nothing, Exit[E, A]] = Eru.succeed(exit)
 
   /** Creates an Eru effect that interrupts this fiber with the specified cause.
     *

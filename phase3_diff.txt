@@ -1,0 +1,135 @@
+diff --git a/eru-core/src/main/scala/net/ghoula/eru/Eru.scala b/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
+index 7fc80b9..9601644 100644
+--- a/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
++++ b/eru-core/src/main/scala/net/ghoula/eru/Eru.scala
+@@ -426,6 +426,28 @@ object Eru {
+       Eru.unit
+     }
+ 
++  /** Converts an Exit to an Eru, preserving error information.
++    *
++    * This method provides a convenient way to convert Exit outcomes back into Eru computations,
++    * enabling composition and recovery patterns when working with fiber results.
++    *
++    * @param exit
++    *   the Exit outcome to convert to an Eru
++    * @tparam E
++    *   the error type of the Exit
++    * @tparam A
++    *   the success type of the Exit
++    * @return
++    *   an Eru that represents the same outcome as the Exit, with error type widened to include
++    *   Throwable
++    */
++  def fromExit[E, A](exit: Exit[E, A]): Eru[E | Throwable, A] = exit match {
++    case Exit.Success(value) => Eru.succeed(value)
++    case Exit.Failure(error) => Eru.fail(error)
++    case Exit.Die(throwable) => Eru.effect(throw throwable)
++    case Exit.Interrupt(_, cause) => Eru.effect(throw new InterruptedException(cause.toString))
++  }
++
+   /** A successful `Eru` containing `Unit`. */
+   val unit: Eru[Nothing, Unit] = succeed(())
+ 
+diff --git a/eru-core/src/main/scala/net/ghoula/eru/EruFiber.scala b/eru-core/src/main/scala/net/ghoula/eru/EruFiber.scala
+index bcbfceb..e360a97 100644
+--- a/eru-core/src/main/scala/net/ghoula/eru/EruFiber.scala
++++ b/eru-core/src/main/scala/net/ghoula/eru/EruFiber.scala
+@@ -37,7 +37,7 @@ final case class EruFiber[+E, +A](
+   id: FiberId,
+   private[eru] val exit: Exit[E, A],
+   private[eru] val finalizers: List[() => Eru[Nothing, Unit]]
+-) {
++) extends Fiber[E, A] {
+ 
+   /** Creates an Eru effect that awaits this fiber's completion.
+     *
+@@ -49,7 +49,7 @@ final case class EruFiber[+E, +A](
+     * @return
+     *   an Eru effect that yields the fiber's exit result when executed
+     */
+-  def await: Eru[E, Exit[E, A]] = Eru.await(this)
++  def await: Eru[Nothing, Exit[E, A]] = Eru.succeed(exit)
+ 
+   /** Creates an Eru effect that interrupts this fiber with the specified cause.
+     *
+diff --git a/eru-runtime/shared/src/main/scala/net/ghoula/eru/EruRuntime.scala b/eru-runtime/shared/src/main/scala/net/ghoula/eru/EruRuntime.scala
+index 46e79ba..e0f1c04 100644
+--- a/eru-runtime/shared/src/main/scala/net/ghoula/eru/EruRuntime.scala
++++ b/eru-runtime/shared/src/main/scala/net/ghoula/eru/EruRuntime.scala
+@@ -1,7 +1,6 @@
+ package net.ghoula.eru
+ 
+ import java.time.Duration
+-import scala.annotation.unused
+ 
+ /** Minimal, type-safe runtime functions for concurrency, racing, timeouts, and retries.
+   *
+@@ -137,7 +136,14 @@ object EruRuntime {
+     *   }}}
+     */
+   def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, (A, B)] =
+-    backend.zipPar(fa, fb)
++    for {
++      fiberA <- fork(fa)
++      fiberB <- fork(fb)
++      exitA <- fiberA.await
++      exitB <- fiberB.await
++      resultA <- Eru.fromExit(exitA)
++      resultB <- Eru.fromExit(exitB)
++    } yield (resultA, resultB)
+ 
+   /** Races two effects, returning the result of whichever completes first.
+     *
+@@ -188,7 +194,7 @@ object EruRuntime {
+     * }
+     *   }}}
+     */
+-  def race[E1, E2, A, B](fa: Eru[E1, A], @unused fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
++  def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
+     backend.race(fa, fb)
+ 
+   /** Suspends execution for the specified duration.
+@@ -435,7 +441,32 @@ object EruRuntime {
+     *   }}}
+     */
+   def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
+-    backend.parSequence(effects)
++    effects match {
++      case Nil => Eru.succeed(List.empty[A])
++      case _ =>
++        def forkAll(remaining: List[Eru[E, A]], acc: List[Fiber[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
++          remaining match {
++            case Nil => Eru.succeed(acc.reverse)
++            case head :: tail =>
++              fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
++          }
++
++        def awaitAll(fibers: List[Fiber[E, A]], acc: List[A]): Eru[E | Throwable, List[A]] =
++          fibers match {
++            case Nil => Eru.succeed(acc.reverse)
++            case head :: tail =>
++              for {
++                exit <- head.await
++                result <- Eru.fromExit(exit)
++                rest <- awaitAll(tail, result :: acc)
++              } yield rest
++          }
++
++        for {
++          fibers <- forkAll(effects, Nil)
++          results <- awaitAll(fibers, Nil)
++        } yield results
++    }
+ 
+   /** Executes effects derived from a collection of inputs in parallel.
+     *
+@@ -476,7 +507,7 @@ object EruRuntime {
+     *   }}}
+     */
+   def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
+-    backend.parTraverse(inputs)(f)
++    parSequence(inputs.map(f))
+ 
+   /** Races multiple effects, returning the result of whichever completes first.
+     *

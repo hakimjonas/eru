@@ -426,6 +426,28 @@ object Eru {
       Eru.unit
     }
 
+  /** Converts an Exit to an Eru, preserving error information.
+    *
+    * This method provides a convenient way to convert Exit outcomes back into Eru computations,
+    * enabling composition and recovery patterns when working with fiber results.
+    *
+    * @param exit
+    *   the Exit outcome to convert to an Eru
+    * @tparam E
+    *   the error type of the Exit
+    * @tparam A
+    *   the success type of the Exit
+    * @return
+    *   an Eru that represents the same outcome as the Exit, with error type widened to include
+    *   Throwable
+    */
+  def fromExit[E, A](exit: Exit[E, A]): Eru[E | Throwable, A] = exit match {
+    case Exit.Success(value) => Eru.succeed(value)
+    case Exit.Failure(error) => Eru.fail(error)
+    case Exit.Die(throwable) => Eru.effect(throw throwable)
+    case Exit.Interrupt(_, cause) => Eru.effect(throw new InterruptedException(cause.toString))
+  }
+
   /** A successful `Eru` containing `Unit`. */
   val unit: Eru[Nothing, Unit] = succeed(())
 

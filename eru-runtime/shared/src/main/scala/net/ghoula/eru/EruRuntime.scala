@@ -1,7 +1,6 @@
 package net.ghoula.eru
 
 import java.time.Duration
-import scala.annotation.unused
 
 /** Minimal, type-safe runtime functions for concurrency, racing, timeouts, and retries.
   *
@@ -137,7 +136,14 @@ object EruRuntime {
     *   }}}
     */
   def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, (A, B)] =
-    backend.zipPar(fa, fb)
+    for {
+      fiberA <- fork(fa)
+      fiberB <- fork(fb)
+      exitA <- fiberA.await
+      exitB <- fiberB.await
+      resultA <- Eru.fromExit(exitA)
+      resultB <- Eru.fromExit(exitB)
+    } yield (resultA, resultB)
 
   /** Races two effects, returning the result of whichever completes first.
     *
@@ -188,7 +194,7 @@ object EruRuntime {
     * }
     *   }}}
     */
-  def race[E1, E2, A, B](fa: Eru[E1, A], @unused fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
+  def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
     backend.race(fa, fb)
 
   /** Suspends execution for the specified duration.
@@ -435,7 +441,32 @@ object EruRuntime {
     *   }}}
     */
   def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
-    backend.parSequence(effects)
+    effects match {
+      case Nil => Eru.succeed(List.empty[A])
+      case _ =>
+        def forkAll(remaining: List[Eru[E, A]], acc: List[Fiber[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
+          remaining match {
+            case Nil => Eru.succeed(acc.reverse)
+            case head :: tail =>
+              fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
+          }
+
+        def awaitAll(fibers: List[Fiber[E, A]], acc: List[A]): Eru[E | Throwable, List[A]] =
+          fibers match {
+            case Nil => Eru.succeed(acc.reverse)
+            case head :: tail =>
+              for {
+                exit <- head.await
+                result <- Eru.fromExit(exit)
+                rest <- awaitAll(tail, result :: acc)
+              } yield rest
+          }
+
+        for {
+          fibers <- forkAll(effects, Nil)
+          results <- awaitAll(fibers, Nil)
+        } yield results
+    }
 
   /** Executes effects derived from a collection of inputs in parallel.
     *
@@ -476,7 +507,7 @@ object EruRuntime {
     *   }}}
     */
   def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
-    backend.parTraverse(inputs)(f)
+    parSequence(inputs.map(f))
 
   /** Races multiple effects, returning the result of whichever completes first.
     *
