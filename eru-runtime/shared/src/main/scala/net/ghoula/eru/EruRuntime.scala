@@ -18,8 +18,12 @@ object EruRuntime {
     try {
       val schedulerClass = Class.forName("net.ghoula.eru.internal.VTAsyncScheduler")
       val constructor = schedulerClass.getDeclaredConstructor()
-      val scheduler = constructor.newInstance().asInstanceOf[AsyncScheduler]
-      AsyncScheduler.setScheduler(scheduler)
+      val schedulerInstance = constructor.newInstance()
+      // Type-safe pattern matching instead of casting
+      schedulerInstance match {
+        case scheduler: AsyncScheduler => AsyncScheduler.setScheduler(scheduler)
+        case _ => () // Not an AsyncScheduler, ignore
+      }
     } catch {
       case _: ClassNotFoundException | _: NoSuchMethodException =>
         // VT scheduler not available - core will fall back to synchronous execution
