@@ -431,7 +431,7 @@ object Eru {
     * This method provides a convenient way to convert Exit outcomes back into Eru computations,
     * enabling composition and recovery patterns when working with fiber results. It handles all
     * Exit cases: Success becomes succeed, Failure becomes fail, Die re-throws the exception, and
-    * Interrupt throws InterruptedException.
+    * Interrupt fails with InterruptedException in the error channel.
     *
     * @param exit
     *   the Exit outcome to convert to an Eru
@@ -458,7 +458,7 @@ object Eru {
     case Exit.Success(value) => Eru.succeed(value)
     case Exit.Failure(error) => Eru.fail(error)
     case Exit.Die(throwable) => Eru.effect(throw throwable)
-    case Exit.Interrupt(_, cause) => Eru.effect(throw new InterruptedException(cause.toString))
+    case Exit.Interrupt(_, cause) => Eru.fail(new InterruptedException(cause.toString))
   }
 
   /** A successful `Eru` containing `Unit`. */

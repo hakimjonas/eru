@@ -39,16 +39,44 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
       * execution, then returns the complete Exit outcome. The await operation handles all possible
       * fiber termination states including success, failure, defect, and interruption.
       *
+      * The implementation uses a deterministic approach: it relies on the CountDownLatch for
+      * proper completion signaling. If interrupted while waiting, it checks the final state
+      * exactly once without timing dependencies. This maintains correctness and observability.
+      *
       * @return
       *   an effect that yields the fiber's Exit outcome when execution completes
       */
     def await: Eru[Nothing, Exit[E, A]] =
       Eru.effect {
-        latch.await()
-        exitRef.get()
+        try {
+          // Wait for the fiber to complete using the latch
+          latch.await()
+          // At this point, exitRef is guaranteed to be set
+          exitRef.get()
+        } catch {
+          case _: InterruptedException =>
+            // If interrupted while waiting, check the current state exactly once
+            // The latch ensures that if we reach here, either:
+            // 1. The fiber completed and exitRef is set, or
+            // 2. The fiber was truly interrupted and we should report that
+            Option(exitRef.get()) match {
+              case Some(exit) =>
+                // Fiber completed despite the interruption
+                exit
+              case None =>
+                // Fiber was interrupted before completion
+                // Create a proper interrupt exit with the current fiber's ID
+                Exit.Interrupt(id, InterruptCause.Cancelled(Some("Fiber await interrupted")))
+            }
+        }
       }.attempt.map {
-        case Result.Success(x) => x
-        case Result.Failure(_) => exitRef.get()
+        case Result.Success(exit) => exit
+        case Result.Failure(throwable) =>
+          // This should not happen in normal operation, but we handle it gracefully
+          // Check one final time if the exit was set despite the error
+          Option(exitRef.get()).getOrElse(
+            Exit.Die(new RuntimeException(s"Fiber await failed unexpectedly: ${throwable.getMessage}", throwable))
+          )
       }
 
     /** Requests cooperative interruption of this fiber's Virtual Thread.
