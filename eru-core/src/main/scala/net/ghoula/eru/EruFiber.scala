@@ -41,15 +41,22 @@ final case class EruFiber[+E, +A](
 
   /** Creates an Eru effect that awaits this fiber's completion.
     *
-    * In Phase 2, fibers are eagerly evaluated to completion, so this operation immediately returns
-    * the pre-computed Exit value without suspension. Multiple await operations on the same fiber
-    * are safe and referentially transparent - they always return the same result. This operation is
-    * pure and describes the intent to retrieve the fiber's result.
+    * In Phase 2, fibers are eagerly evaluated to completion, but the await operation must still
+    * properly merge the fiber's finalizers with the current execution context to maintain FILO
+    * finalizer semantics across fiber boundaries. Multiple await operations on the same fiber
+    * are safe and referentially transparent - they always return the same result.
     *
     * @return
-    *   an Eru effect that yields the fiber's exit result when executed
+    *   an Eru effect that yields the fiber's exit result and merges finalizers when executed
     */
-  def await: Eru[Nothing, Exit[E, A]] = Eru.succeed(exit)
+  def await: Eru[Nothing, Exit[E, A]] = 
+    Eru.await(this).attempt.map {
+      case Result.Success(exit) => exit
+      case Result.Failure(_) => 
+        // This case cannot occur in Phase 2 since fibers are already completed
+        // But we need it for type safety - the interpreter guarantees this path is never taken
+        throw new IllegalStateException("Phase 2: Await on completed fiber cannot fail")
+    }
 
   /** Creates an Eru effect that interrupts this fiber with the specified cause.
     *

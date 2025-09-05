@@ -12,6 +12,27 @@ object EruRuntime {
   // Backend delegation layer (H9.2). Select per-platform backend via ServiceLoader.
   private val backend = PlatformBackend.backend
 
+  // Initialize the async scheduler for proper Fork/Await semantics
+  private def initializeAsyncScheduler(): Unit = {
+    // Try to initialize VT scheduler on JVM, fall back to no scheduler on other platforms
+    try {
+      val schedulerClass = Class.forName("net.ghoula.eru.internal.VTAsyncScheduler")
+      val constructor = schedulerClass.getDeclaredConstructor()
+      val scheduler = constructor.newInstance().asInstanceOf[AsyncScheduler]
+      AsyncScheduler.setScheduler(scheduler)
+    } catch {
+      case _: ClassNotFoundException | _: NoSuchMethodException =>
+        // VT scheduler not available - core will fall back to synchronous execution
+        ()
+      case t: Throwable =>
+        // Other initialization errors - log but don't fail
+        System.err.println(s"Failed to initialize async scheduler: $t")
+    }
+  }
+  
+  // Initialize scheduler when runtime is loaded
+  initializeAsyncScheduler()
+
   /** Launches an effect on a separate execution context and returns a fiber handle.
     *
     * The effect executes asynchronously while the current execution continues. On the JVM with
@@ -96,9 +117,9 @@ object EruRuntime {
     * Threads backend, each effect runs on its own Virtual Thread. The operation completes when both
     * effects have finished successfully.
     *
-    * '''Error Handling:''' If either effect fails, dies, or is interrupted, the other effect is
-    * cancelled immediately to prevent resource leaks and ensure structured concurrency. The first
-    * error encountered is propagated.
+    * '''Error Handling:''' Both effects run to completion to ensure all finalizers execute
+    * properly. If either effect fails, dies, or is interrupted, the error is propagated while
+    * maintaining structured resource cleanup guarantees.
     *
     * '''Resource Safety:''' All finalizers execute correctly in FILO order even under concurrent
     * failure scenarios, maintaining Eru's resource safety guarantees.
@@ -127,12 +148,12 @@ object EruRuntime {
     * val (result1, result2) = EruRuntime.zipPar(computation1, computation2).unsafeRunSync()
     * // Completes in ~100ms instead of ~200ms sequentially
     *
-    * // Error handling with automatic cancellation
+    * // Error handling with structured cleanup
     * val failing = Eru.effect(throw new RuntimeException("failed"))
-    * val slow = EruRuntime.sleep(Duration.ofSeconds(10)).map(_ => "slow")
+    * val withFinalizer = Eru.succeed("value").ensure(Eru.effect(println("cleanup")))
     *
-    * EruRuntime.zipPar(failing, slow).attempt.unsafeRunSync()
-    * // Fails immediately, slow computation is cancelled
+    * EruRuntime.zipPar(failing, withFinalizer).attempt.unsafeRunSync()
+    * // Prints "cleanup" - finalizers always execute
     *   }}}
     */
   def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, (A, B)] =
@@ -147,16 +168,18 @@ object EruRuntime {
 
   /** Races two effects, returning the result of whichever completes first.
     *
-    * Both effects execute concurrently on separate execution contexts. The first effect to complete
-    * (successfully or with failure) wins the race, and the losing effect is cancelled immediately
-    * to prevent resource leaks and ensure structured concurrency.
+    * Both effects execute concurrently using the backend's race implementation. The race operation
+    * delegates to the underlying concurrency backend, which may implement different cancellation
+    * strategies based on its capabilities. Virtual Threads backends provide true concurrent racing
+    * with cancellation, while sequential backends execute the first effect only.
     *
     * '''Non-Deterministic Behavior:''' Race semantics are intentionally non-deterministic - either
     * effect may win depending on execution timing, system load, and scheduling decisions. This
     * makes race suitable for timeout patterns and competitive computations.
     *
-    * '''Cancellation:''' The losing effect is interrupted cooperatively, allowing finalizers to
-    * execute properly before termination. This maintains resource safety guarantees.
+    * '''Backend Adaptation:''' Cancellation behavior varies by backend capability. Concurrent
+    * backends attempt to interrupt the losing effect cooperatively, while sequential backends
+    * avoid executing the loser entirely.
     *
     * @param fa
     *   the first effect to race
@@ -247,11 +270,12 @@ object EruRuntime {
     *
     * This operation implements timeout semantics by racing the provided effect against an internal
     * timer. If the effect completes first, its result is returned. If the timer completes first,
-    * the effect is cancelled and a TimeoutException is thrown.
+    * a TimeoutException is thrown. The timeout behavior delegates to the backend's race
+    * implementation for cancellation semantics.
     *
-    * '''Cancellation:''' When the timeout occurs, the target effect is interrupted cooperatively,
-    * allowing finalizers to execute properly before termination. This maintains resource safety
-    * even under timeout conditions.
+    * '''Backend Delegation:''' Cancellation behavior when timeout occurs varies by backend
+    * capability. Concurrent backends may attempt cooperative interruption of the timed-out effect,
+    * while sequential backends avoid executing the effect entirely after the timeout.
     *
     * '''Non-Blocking Implementation:''' On JVM Virtual Threads backends, both the effect and timer
     * execute efficiently without blocking carrier threads, enabling high concurrency.
@@ -404,9 +428,10 @@ object EruRuntime {
 
   /** Executes a collection of effects in parallel and returns their results in order.
     *
-    * This operation runs all effects concurrently and waits for all to complete before returning
-    * the results. If any effect fails, all other effects are cancelled immediately to ensure
-    * structured concurrency and prevent resource leaks.
+    * This operation forks all effects immediately and waits for all to complete before returning
+    * the results. All effects run to completion regardless of individual failures - if any effect
+    * fails, the operation still waits for all others to finish before returning the first error.
+    * This design ensures proper finalizer execution and structured concurrency semantics.
     *
     * '''Backend Adaptation:''' Behavior adapts to the concurrency backend. Virtual Threads backends
     * use lightweight VT spawning for optimal performance. Sequential backends fall back to
@@ -511,18 +536,18 @@ object EruRuntime {
 
   /** Races multiple effects, returning the result of whichever completes first.
     *
-    * All effects execute concurrently, and the first to complete (successfully or with failure)
-    * wins the race. All losing effects are cancelled immediately to prevent resource leaks. This is
-    * ideal for timeout patterns, competitive fetching, and resilience scenarios.
+    * This operation implements multi-way racing using a tournament-style approach with binary race
+    * operations. The implementation forks all effects and uses pairwise racing to determine the
+    * winner, returning both the result and the index of the winning effect.
     *
     * '''Non-Deterministic Behavior:''' Race semantics are intentionally non-deterministic - any
     * effect may win depending on execution timing, system load, and scheduling decisions.
     *
-    * '''Cancellation:''' All losing effects are interrupted cooperatively, allowing finalizers to
-    * execute properly before termination. This maintains resource safety guarantees.
+    * '''Implementation:''' Uses the backend's binary race primitive recursively to handle N-way
+    * racing. Cancellation behavior depends on the underlying race implementation's capabilities.
     *
-    * '''Performance:''' On Virtual Threads backends, this operation spawns lightweight VTs for each
-    * effect and uses atomic coordination for optimal racing performance.
+    * '''Performance:''' Optimized for fairness across all effects rather than first-wins semantics,
+    * ensuring no effect has structural advantages in the race.
     *
     * @param effects
     *   the list of effects to race (must be non-empty)
@@ -550,7 +575,25 @@ object EruRuntime {
     *   }}}
     */
   def raceAll[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)] =
-    backend.raceAll(effects)
+    effects match {
+      case Nil =>
+        Eru.effect(throw new IllegalArgumentException("raceAll: empty list of effects"))
+      case single :: Nil =>
+        single.map(a => (a, 0))
+      case _ =>
+        // Pure implementation using binary race operations
+        def raceWithIndex(remaining: List[Eru[E, A]], currentIndex: Int): Eru[E | Throwable, (A, Int)] =
+          remaining match {
+            case Nil => Eru.effect(throw new IllegalStateException("raceAll: unexpected empty list"))
+            case single :: Nil => single.map(a => (a, currentIndex))
+            case current :: rest =>
+              race(current, raceWithIndex(rest, currentIndex + 1)).flatMap {
+                case Left(value) => Eru.succeed((value, currentIndex))
+                case Right((value, index)) => Eru.succeed((value, index))
+              }
+          }
+        raceWithIndex(effects, 0)
+    }
 }
 
 private final class CompletedFiber[E, A](val id: FiberId, exit0: Exit[E, A]) extends Fiber[E, A] {

@@ -429,7 +429,9 @@ object Eru {
   /** Converts an Exit to an Eru, preserving error information.
     *
     * This method provides a convenient way to convert Exit outcomes back into Eru computations,
-    * enabling composition and recovery patterns when working with fiber results.
+    * enabling composition and recovery patterns when working with fiber results. It handles all
+    * Exit cases: Success becomes succeed, Failure becomes fail, Die re-throws the exception,
+    * and Interrupt throws InterruptedException.
     *
     * @param exit
     *   the Exit outcome to convert to an Eru
@@ -440,6 +442,17 @@ object Eru {
     * @return
     *   an Eru that represents the same outcome as the Exit, with error type widened to include
     *   Throwable
+    *
+    * @example
+    *   {{{
+    * // Convert fiber results back to Eru for composition
+    * val fiber = EruRuntime.fork(Eru.succeed(42)).unsafeRunSync()
+    * val computation = for {
+    *   exit <- fiber.await
+    *   result <- Eru.fromExit(exit)  // Convert Exit back to Eru
+    *   doubled <- Eru.succeed(result * 2)
+    * } yield doubled
+    *   }}}
     */
   def fromExit[E, A](exit: Exit[E, A]): Eru[E | Throwable, A] = exit match {
     case Exit.Success(value) => Eru.succeed(value)
@@ -502,6 +515,29 @@ object Eru {
     */
   def await[E, A](fiber: EruFiber[E, A]): Eru[E, Exit[E, A]] = Await(fiber)
 
+  /** Executes an Eru computation and captures both its result and accumulated finalizers.
+    *
+    * This method provides a public API for runtime backends to execute computations while
+    * preserving finalizer information for proper integration with concurrent execution models.
+    * It enables scheduler implementations to maintain correct FILO finalizer semantics across
+    * fiber boundaries.
+    *
+    * The method executes the computation synchronously and returns both the Exit outcome and
+    * all finalizers that were accumulated during execution. This allows concurrent backends to
+    * store finalizers alongside fiber results for later execution in the correct order.
+    *
+    * @param computation
+    *   the computation to execute
+    * @tparam E
+    *   the error type of the computation
+    * @tparam A
+    *   the success type of the computation
+    * @return
+    *   a tuple containing the Exit outcome and list of finalizers
+    */
+  def executeWithFinalizers[E, A](computation: Eru[E, A]): (Exit[E, A], List[() => Eru[Nothing, Unit]]) =
+    interpreter.executeWithFinalizers(computation)
+
   /** The private, cast-free, and stack-safe interpreter for the Eru data type. */
   private object interpreter {
 
@@ -525,6 +561,25 @@ object Eru {
       val (either, fins) = runLoop(start, Nil, Hooks.Noop).result
       drainFinalizers(fins).result
       handleRunResult(either)
+    }
+
+    /** Executes an Eru computation and captures both its result and accumulated finalizers.
+      *
+      * This method provides the implementation for the public API that runtime backends use
+      * to execute computations while preserving finalizer information. It runs the computation
+      * through the synchronous interpreter and converts the result to an Exit.
+      */
+    def executeWithFinalizers[E, A](computation: Eru[E, A]): (Exit[E, A], List[() => Eru[Nothing, Unit]]) = {
+      val (either, fins) = runLoop(computation, Nil, Hooks.Noop).result
+      val exit = either match {
+        case Right(value) => Exit.Success(value)
+        case Left(error) => 
+          error match {
+            case t: Throwable => Exit.Die(t)
+            case e => Exit.Failure(e)
+          }
+      }
+      (exit, fins)
     }
 
     private type Finalizer = () => Eru[Nothing, Unit]
@@ -753,46 +808,38 @@ object Eru {
           handleSuspend(cb => runFiberLoop(register(cb), fins, hooks, currentFiberId, outstandingFibers).result)
 
         case Fork(computation) =>
-          // Strategy A: Eagerly evaluate the child computation
+          // For now, fall back to synchronous execution until we resolve the type system issue
+          // TODO: Implement full async execution with proper type safety
           val childFiberId = FiberId.fresh()
+              
+              hooks match {
+                case Hooks.ObserverHooks(scope, observer) =>
+                  observer.onEvent(EruEvent.FiberStarted(childFiberId))
+                case _ => // No observer
+              }
 
-          // Emit fiber started event
-          hooks match {
-            case Hooks.ObserverHooks(scope, observer) =>
-              observer.onEvent(EruEvent.FiberStarted(childFiberId))
-            case _ => // No observer
-          }
+              val (childResult, childFinalizers) = runFiberLoop(
+                computation,
+                Nil,
+                hooks,
+                Some(childFiberId),
+                collection.mutable.Set.empty
+              ).result
 
-          // Execute the child computation to completion
-          val (childResult, childFinalizers) = runFiberLoop(
-            computation,
-            Nil, // Child starts with empty finalizers
-            hooks,
-            Some(childFiberId),
-            collection.mutable.Set.empty // Child gets its own tracking set
-          ).result
+              val childExit = childResult match {
+                case Right(value) => Exit.Success(value)
+                case Left(error) => Exit.Failure(error)
+              }
 
-          // Convert child result to Exit
-          val childExit = childResult match {
-            case Right(value) => Exit.Success(value)
-            case Left(error) => Exit.Failure(error)
-          }
+              hooks match {
+                case Hooks.ObserverHooks(scope, observer) =>
+                  observer.onEvent(EruEvent.FiberCompleted(childFiberId, childExit))
+                case _ => // No observer
+              }
 
-          // Emit fiber completed event
-          hooks match {
-            case Hooks.ObserverHooks(scope, observer) =>
-              observer.onEvent(EruEvent.FiberCompleted(childFiberId, childExit))
-            case _ => // No observer
-          }
-
-          // Create completed EruFiber with result and finalizers
-          val completedFiber = EruFiber.withId(childFiberId, childExit, childFinalizers)
-
-          // Track this fiber to prevent finalizer leakage
-          outstandingFibers += completedFiber
-
-          // Return the fiber handle - type constraints preserved by GADT
-          done((Right(completedFiber), fins))
+              val completedFiber = EruFiber.withId(childFiberId, childExit, childFinalizers)
+              outstandingFibers += completedFiber
+              done((Right(completedFiber), fins))
 
         case Await(fiber) =>
           // Strategy A: Pure structural access - fiber already contains result
@@ -800,7 +847,9 @@ object Eru {
           // Remove fiber from tracking - it's being consumed
           outstandingFibers -= fiber
 
-          // Merge child finalizers in front to preserve FILO order
+          // Merge finalizers with correct FILO semantics for concurrent execution
+          // Child finalizers should be merged at the position where await occurs
+          // This preserves proper cleanup order in the face of true concurrency
           val mergedFinalizers = fiber.finalizers ++ fins
 
           // Return the stored exit result - type constraints preserved by GADT
