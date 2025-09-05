@@ -480,20 +480,38 @@ object EruRuntime {
               fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
           }
 
-        def awaitAll(fibers: List[Fiber[E, A]], acc: List[A]): Eru[E | Throwable, List[A]] =
+        def awaitAll(fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
           fibers match {
-            case Nil => Eru.succeed(acc.reverse)
+            case Nil => Eru.succeed(Nil)
             case head :: tail =>
               for {
                 exit <- head.await
-                result <- Eru.fromExit(exit)
-                rest <- awaitAll(tail, result :: acc)
-              } yield rest
+                rest <- awaitAll(tail)
+              } yield exit :: rest
           }
+
+        def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
+          // Find the first error, if any
+          val firstError = exits.collectFirst {
+            case Exit.Failure(error) => Left(error)
+            case Exit.Die(throwable) => Right(throwable)  
+            case Exit.Interrupt(_, cause) => Right(new InterruptedException(cause.toString))
+          }
+          
+          firstError match {
+            case Some(Left(error)) => Eru.fail(error)
+            case Some(Right(throwable)) => Eru.effect(throw throwable)
+            case None => 
+              // All succeeded, collect results in order
+              val results = exits.collect { case Exit.Success(value) => value }
+              Eru.succeed(results)
+          }
+        }
 
         for {
           fibers <- forkAll(effects, Nil)
-          results <- awaitAll(fibers, Nil)
+          exits <- awaitAll(fibers)
+          results <- processExits(exits)
         } yield results
     }
 
