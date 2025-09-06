@@ -193,31 +193,53 @@ final class EruMonadLawsSpec extends FunSuite {
   }
 
   test("stack safety for deep flatMap chains") {
-    // Platform-aware stack test depth for ARM architecture compatibility
-    val stackTestDepth = {
-      val arch = System.getProperty("os.arch")
-      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 5000 else 10000
+    val arch = System.getProperty("os.arch")
+    val default =
+      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 50_000
+      else 150_000
+    val depth = sys.props
+      .get("eru.stack.flatMapDepth")
+      .flatMap(s => scala.util.Try(s.toInt).toOption)
+      .filter(_ > 0)
+      .getOrElse(default)
+
+    def deepFlatMapped(n: Int): Eru[Nothing, Int] = {
+      var i = 0
+      var eff: Eru[Nothing, Int] = Eru.succeed(0)
+      while (i < n) {
+        eff = eff.flatMap(v => Eru.succeed(v + 1))
+        i += 1
+      }
+      eff
     }
 
-    def deepChain(n: Int): Eru[Nothing, Int] = {
-      if (n <= 0) Eru.succeed(0)
-      else Eru.succeed(n).flatMap(_ => deepChain(n - 1))
-    }
-
-    // This should not stack overflow
-    val result = deepChain(stackTestDepth).unsafeRunSync()
-    assertEquals(result, 0)
+    val result = deepFlatMapped(depth).unsafeRunSync()
+    assertEquals(result, depth)
   }
 
   test("stack safety for deep map chains") {
-    val stackTestDepth =
-      if (System.getProperty("os.arch").startsWith("aarch64") || System.getProperty("os.arch").startsWith("arm")) 5000
-      else 10000
+    val arch = System.getProperty("os.arch")
+    val default =
+      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 50_000
+      else 150_000
+    val depth = sys.props
+      .get("eru.stack.mapDepth")
+      .flatMap(s => scala.util.Try(s.toInt).toOption)
+      .filter(_ > 0)
+      .getOrElse(default)
 
-    def deepMap(n: Int): Eru[Nothing, Int] =
-      (0 until n).foldLeft(Eru.succeed(0)) { (acc, _) => acc.map(_ + 1) }
+    def deepMapped(n: Int): Eru[Nothing, Int] = {
+      var i = 0
+      var eff: Eru[Nothing, Int] = Eru.succeed(0)
+      while (i < n) {
+        eff = eff.map(_ + 1)
+        i += 1
+      }
+      eff
+    }
 
-    val result = deepMap(stackTestDepth).unsafeRunSync()
-    assertEquals(result, stackTestDepth)
+    val result = deepMapped(depth).unsafeRunSync()
+    assertEquals(result, depth)
   }
+
 }
