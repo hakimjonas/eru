@@ -39,10 +39,10 @@ enum Exit[+E, +A] {
 
   /** Represents unexpected effect failure due to a system defect.
     *
-    * This outcome indicates that the effect failed due to an unexpected Throwable, representing a
-    * programming error, system failure, or other exceptional condition that was not expected.
-    * Defects typically require immediate attention and often indicate bugs in the application
-    * logic.
+    * This outcome indicates that the effect failed due to an unexpected Throwable, representing an
+    * unexpected or unrecoverable error (a "defect" in the program's logic), as opposed to a typed
+    * error handled in Exit.Failure. These are typically programming errors, system failures, or
+    * other exceptional conditions that require immediate attention.
     *
     * @param throwable
     *   the unexpected Throwable that caused the effect to fail
@@ -53,7 +53,8 @@ enum Exit[+E, +A] {
     *
     * This outcome indicates that the effect was terminated due to an interruption request, such as
     * cancellation, timeout, or structured concurrency requirements. Interruption is cooperative and
-    * allows for proper resource cleanup and graceful shutdown.
+    * allows for proper resource cleanup and graceful shutdown. When a fiber is interrupted, its
+    * finalizers are still guaranteed to be executed before the fiber terminates.
     *
     * @param fiberId
     *   the identifier of the fiber that was interrupted

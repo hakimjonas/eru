@@ -2,9 +2,9 @@ package net.ghoula.eru
 
 /** A pure, immutable handle to a fiber computation.
   *
-  * `EruFiber[E, A]` represents a handle to a computation that executes on a logical fiber. It
-  * provides operations for awaiting the fiber's completion and managing its lifecycle, while
-  * maintaining the pure, referentially transparent nature of the Eru effect system.
+  * `EruFiber[E, A]` is an immutable and pure description of a concurrent computation, not a running
+  * process itself. It represents a handle to a computation that executes on a logical fiber and
+  * provides operations for awaiting the fiber's completion and managing its lifecycle.
   *
   * Key characteristics:
   *   - Pure and immutable: contains no mutable state or side effects
@@ -40,8 +40,10 @@ final case class EruFiber[+E, +A](
     *
     * This operation waits for the fiber to complete and returns its Exit outcome. The await
     * operation properly merges the fiber's finalizers with the current execution context to
-    * maintain FILO finalizer semantics across fiber boundaries. Multiple await operations on the
-    * same fiber are safe and referentially transparent - they always return the same result.
+    * maintain FILO finalizer semantics across fiber boundaries.
+    *
+    * The await will only ever return once - subsequent calls to await on the same fiber will return
+    * the same Exit value immediately without re-executing any logic.
     *
     * @return
     *   an Eru effect that yields the fiber's exit result and merges finalizers when executed
@@ -57,8 +59,9 @@ final case class EruFiber[+E, +A](
   /** Creates an Eru effect that interrupts this fiber with the specified cause.
     *
     * The returned effect describes the intent to interrupt this fiber. When executed, it will
-    * signal the fiber to stop its current computation and begin cleanup. The interruption is
-    * cooperative - the fiber will complete its current step before processing the interrupt signal.
+    * signal the fiber to stop its current computation and begin cleanup. Interrupting a fiber is
+    * also a descriptive action - the interruption will be processed cooperatively by the fiber at
+    * its next safe interruption point.
     *
     * @param cause
     *   the reason for interrupting this fiber

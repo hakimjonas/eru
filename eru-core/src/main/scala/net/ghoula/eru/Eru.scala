@@ -466,22 +466,13 @@ object Eru {
 
   /** Forks a computation onto a separate logical fiber.
     *
-    * This operation creates a new fiber that will execute the given computation. The execution
-    * semantics depend on the runtime backend:
-    *   - On JVM: The computation runs asynchronously on Virtual Threads for true concurrency
-    *   - On Native: The computation runs synchronously but maintains the same API and semantics
+    * Creates a new fiber that will execute the given computation concurrently. The returned effect
+    * produces a fiber handle that provides operations for awaiting the result and managing the
+    * fiber lifecycle.
     *
-    * The returned effect produces a Fiber handle that provides operations for awaiting the result
-    * and managing the fiber lifecycle. Auto-join semantics ensure that finalizers from unawaited
-    * fibers are automatically executed at program completion to prevent resource leaks.
-    *
-    * This operation is pure and referentially transparent - it describes the intent to fork without
-    * actually performing the execution until the returned effect is evaluated.
-    *
-    * Key characteristics:
-    *   - Cross-platform: Works consistently on both JVM and Scala Native
-    *   - Resource-safe: Automatic finalizer cleanup prevents resource leaks
-    *   - Type-safe: No unsafe operations or type casting
+    * Finalizers from unawaited fibers are automatically executed at program completion to prevent
+    * resource leaks. This operation is pure and referentially transparent - it describes the intent
+    * to fork without actually performing the execution until the returned effect is evaluated.
     *
     * @param computation
     *   the computation to execute on a separate fiber

@@ -97,16 +97,12 @@ object EruRuntime {
 
   /** Executes two effects in parallel and combines their results into a pair.
     *
-    * Both effects execute concurrently on separate execution contexts. On the JVM with Virtual
-    * Threads backend, each effect runs on its own Virtual Thread. The operation completes when both
-    * effects have finished successfully.
+    * Both effects execute concurrently and run to completion to ensure all resources are properly
+    * cleaned up. If either effect fails, the first error encountered is propagated after both
+    * effects have finished executing, guaranteeing that all finalizers run correctly.
     *
-    * '''Error Handling:''' Both effects run to completion to ensure all finalizers execute
-    * properly. If either effect fails, dies, or is interrupted, the error is propagated while
-    * maintaining structured resource cleanup guarantees.
-    *
-    * '''Resource Safety:''' All finalizers execute correctly in FILO order even under concurrent
-    * failure scenarios, maintaining Eru's resource safety guarantees.
+    * This approach provides stronger structured concurrency guarantees than immediate cancellation
+    * by ensuring resource cleanup always completes, even under failure conditions.
     *
     * @param fa
     *   the first effect to execute
@@ -152,18 +148,12 @@ object EruRuntime {
 
   /** Races two effects, returning the result of whichever completes first.
     *
-    * Both effects execute concurrently using the backend's race implementation. The race operation
-    * delegates to the underlying concurrency backend, which may implement different cancellation
-    * strategies based on its capabilities. Virtual Threads backends provide true concurrent racing
-    * with cancellation, while sequential backends execute the first effect only.
+    * Races two effects and returns the result of whichever completes first. The loser is signaled
+    * to cancel and its finalizers are guaranteed to run, ensuring proper resource cleanup.
     *
-    * '''Non-Deterministic Behavior:''' Race semantics are intentionally non-deterministic - either
-    * effect may win depending on execution timing, system load, and scheduling decisions. This
-    * makes race suitable for timeout patterns and competitive computations.
-    *
-    * '''Backend Adaptation:''' Cancellation behavior varies by backend capability. Concurrent
-    * backends attempt to interrupt the losing effect cooperatively, while sequential backends avoid
-    * executing the loser entirely.
+    * Race semantics are intentionally non-deterministic - either effect may win depending on
+    * execution timing, system load, and scheduling decisions. This makes race suitable for timeout
+    * patterns and competitive computations.
     *
     * @param fa
     *   the first effect to race
@@ -534,20 +524,12 @@ object EruRuntime {
   def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
     parSequence(inputs.map(f))
 
-  /** Races multiple effects, returning the result of whichever completes first.
+  /** Races multiple effects and returns the result of the first one to complete, along with its
+    * original index.
     *
-    * This operation implements multi-way racing using a tournament-style approach with binary race
-    * operations. The implementation forks all effects and uses pairwise racing to determine the
-    * winner, returning both the result and the index of the winning effect.
-    *
-    * '''Non-Deterministic Behavior:''' Race semantics are intentionally non-deterministic - any
-    * effect may win depending on execution timing, system load, and scheduling decisions.
-    *
-    * '''Implementation:''' Uses the backend's binary race primitive recursively to handle N-way
-    * racing. Cancellation behavior depends on the underlying race implementation's capabilities.
-    *
-    * '''Performance:''' Optimized for fairness across all effects rather than first-wins semantics,
-    * ensuring no effect has structural advantages in the race.
+    * This operation races all effects concurrently and returns both the winning result and the
+    * index of the effect that completed first. Race semantics are intentionally non-deterministic -
+    * any effect may win depending on execution timing and system conditions.
     *
     * @param effects
     *   the list of effects to race (must be non-empty)

@@ -8,7 +8,7 @@ This project is guided by a strong philosophical vision for what a modern effect
 
 ## Status
 
-**Current Development Status (January 2025)**: Eru has achieved complete cross-platform implementation with full concurrency support on JVM and synchronous execution on Native.
+**Current Development Status (September 2025)**: Eru has achieved complete cross-platform implementation with full concurrency support on JVM and synchronous execution on Native.
 
 - **Correctness Foundation**: 214/214 tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
 

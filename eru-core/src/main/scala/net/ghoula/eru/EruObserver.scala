@@ -215,7 +215,8 @@ object EruObserver {
       *
       * This event provides visibility into the internal execution flow of Eru programs, enabling
       * detailed tracing and debugging. Steps are typically emitted at significant points during
-      * effect interpretation.
+      * effect interpretation. This event is intended for low-volume, human-readable debugging
+      * traces and should not be used for high-frequency, performance-critical metrics.
       *
       * @param scopeId
       *   the unique identifier for this program execution scope
