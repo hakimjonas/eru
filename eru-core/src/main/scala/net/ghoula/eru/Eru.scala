@@ -1,7 +1,7 @@
 package net.ghoula.eru
 
 import scala.util.control.NonFatal
-import scala.util.control.TailCalls.{done, tailcall, TailRec}
+import scala.util.control.TailCalls.{TailRec, done, tailcall}
 
 import net.ghoula.eru.EruObserver.*
 

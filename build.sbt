@@ -125,7 +125,7 @@ lazy val root = (project in file("."))
     addCommandAlias("benchValidationSuite", "benchBaseline; benchValidation; benchCore"),
 
     // Build and format commands
-    addCommandAlias("prepare", "scalafixAll; scalafmtAll; scalafmtSbt; Test/compile"),
+    addCommandAlias("prepare", "scalafmtAll; scalafmtSbt; scalafixAll; Test/compile"),
     addCommandAlias(
       "check",
       "scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
