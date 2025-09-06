@@ -123,8 +123,12 @@ final class ConcurrencySpec extends FunSuite {
       case Exit.Success((value, index)) =>
         assertEquals(value, "fast")
         assertEquals(index, 0)
-        // Give a bit of time for cancellation cleanup
-        Thread.sleep(50)
+        // Poll for cancellation with timeout instead of arbitrary sleep
+        val startTime = System.nanoTime()
+        val timeoutNanos = 5_000_000_000L // 5 seconds
+        while (!cancelled.get() && (System.nanoTime() - startTime) < timeoutNanos) {
+          Thread.sleep(1) // Short polling interval
+        }
         assert(cancelled.get(), "losing effect should have been cancelled")
       case other => fail(s"expected success, got $other")
     }

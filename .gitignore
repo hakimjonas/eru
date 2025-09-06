@@ -23,6 +23,10 @@ project/target/
 project/project/target/
 build.sbt.lock
 
+# Coursier cache (as specified in .jvmopts)
+.coursier/
+.ivy2/
+
 # Cross-platform sbt builds (sbt-crossproject)
 */.jvm/target/
 */.js/target/
