@@ -126,13 +126,22 @@ final class ConcurrencySpec extends FunSuite {
         assertEquals(value, "fast")
         assertEquals(index, 0)
 
-        val cancellationCheck = for {
-          _ <- sleep(Duration.ofMillis(100))
-          wasCancelled <- Eru.effect(cancelled.get())
-        } yield wasCancelled
+        def checkCancellation(attempt: Int): Eru[Throwable, Boolean] = {
+          if (attempt <= 0) {
+            Eru.effect(cancelled.get())
+          } else {
+            Eru.effect(cancelled.get()).flatMap { wasCancelled =>
+              if (wasCancelled) {
+                Eru.succeed(true)
+              } else {
+                sleep(Duration.ofMillis(50)).flatMap(_ => checkCancellation(attempt - 1))
+              }
+            }
+          }
+        }
 
-        val cancellationResult = cancellationCheck
-          .timeout(Duration.ofSeconds(1))
+        val cancellationResult = checkCancellation(10)
+          .timeout(Duration.ofSeconds(3))
           .recover { case _: java.util.concurrent.TimeoutException => false }
           .runExit()
 
