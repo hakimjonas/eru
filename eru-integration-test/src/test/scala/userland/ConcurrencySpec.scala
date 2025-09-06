@@ -111,11 +111,13 @@ final class ConcurrencySpec extends FunSuite {
     import java.util.concurrent.atomic.AtomicBoolean
 
     val cancelled = new AtomicBoolean(false)
+    val slowEffect = sleep(Duration.ofSeconds(10))
+      .ensure(Eru.effect(cancelled.set(true)))
+      .map(_ => "slow")
+
     val effects = List(
-      Eru.succeed("fast"), // This wins immediately
-      sleep(Duration.ofSeconds(10))
-        .ensure(Eru.effect(cancelled.set(true))) // This should be cancelled
-        .map(_ => "slow")
+      Eru.succeed("fast"),
+      slowEffect
     )
 
     val result = raceAll(effects).runExit()
@@ -123,13 +125,23 @@ final class ConcurrencySpec extends FunSuite {
       case Exit.Success((value, index)) =>
         assertEquals(value, "fast")
         assertEquals(index, 0)
-        // Poll for cancellation with timeout instead of arbitrary sleep
-        val startTime = System.nanoTime()
-        val timeoutNanos = 5_000_000_000L // 5 seconds
-        while (!cancelled.get() && (System.nanoTime() - startTime) < timeoutNanos) {
-          Thread.sleep(1) // Short polling interval
+
+        val cancellationCheck = for {
+          _ <- sleep(Duration.ofMillis(100))
+          wasCancelled <- Eru.effect(cancelled.get())
+        } yield wasCancelled
+
+        val cancellationResult = cancellationCheck
+          .timeout(Duration.ofSeconds(1))
+          .recover { case _: java.util.concurrent.TimeoutException => false }
+          .runExit()
+
+        cancellationResult match {
+          case Exit.Success(wasCancelled) =>
+            assert(wasCancelled, "losing effect should have been cancelled")
+          case other =>
+            fail(s"cancellation check failed: $other")
         }
-        assert(cancelled.get(), "losing effect should have been cancelled")
       case other => fail(s"expected success, got $other")
     }
   }
@@ -149,7 +161,6 @@ final class ConcurrencySpec extends FunSuite {
     result match {
       case Exit.Success(values) =>
         assertEquals(values, List("first", "second", "third"))
-        // Should take ~30ms (max) not 60ms (sequential)
         assert(elapsed < 50, s"expected parallel execution, took ${elapsed}ms")
       case other => fail(s"expected success, got $other")
     }
@@ -169,7 +180,6 @@ final class ConcurrencySpec extends FunSuite {
     result match {
       case Exit.Success(values) =>
         assertEquals(values, List("A", "B", "C"))
-        // Should take ~10ms (parallel) not 30ms (sequential)
         assert(elapsed < 25, s"expected parallel execution, took ${elapsed}ms")
       case other => fail(s"expected success, got $other")
     }

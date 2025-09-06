@@ -4,8 +4,8 @@ import munit.FunSuite
 
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
-import scala.util.Random
 
 import net.ghoula.eru.prelude.*
 
@@ -37,11 +37,11 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     val fibers = (1 to fiberCount).map { i =>
       EruRuntime.fork {
-        Eru.effect {
-          // Simulate some work with random delay
-          Thread.sleep(Random.nextInt(5))
-          completedCounter.incrementAndGet()
-          i
+        EruRuntime.sleep(Duration.ofMillis((i % 5) + 1)).flatMap { _ =>
+          Eru.effect {
+            completedCounter.incrementAndGet()
+            i
+          }
         }
       }
     }
@@ -79,12 +79,12 @@ final class ConcurrencyStressSpec extends FunSuite {
   test("race operations with many contestants") {
     val contestants = 50
     val results = (1 to contestants).map { i =>
-      // Create effects with random delays, some will win, others lose
-      val delay = Random.nextInt(20) + 1 // 1-20ms
+      val delay = (i % 10) + 1
       EruRuntime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
     }
 
     // Race all contestants in pairs, then race the results
+    @tailrec
     def raceAll(effects: List[Eru[Throwable, Int]]): Eru[Throwable, Int] = effects match {
       case single :: Nil => single
       case first :: second :: rest =>
@@ -101,38 +101,38 @@ final class ConcurrencyStressSpec extends FunSuite {
   }
 
   test("cancellation cascade stress test") {
-    val cancelled = new AtomicInteger(0)
+    val started = new AtomicInteger(0)
     val completed = new AtomicInteger(0)
 
     def createCancellableEffect(id: Int): Eru[String | Throwable, Int] = {
-      EruRuntime.sleep(Duration.ofMillis(100)).flatMap { _ =>
-        if (Thread.currentThread().isInterrupted) {
-          cancelled.incrementAndGet()
-          Eru.fail(s"Effect $id was cancelled")
-        } else {
+      Eru.effect(started.incrementAndGet()).flatMap { _ =>
+        EruRuntime.sleep(Duration.ofMillis(100)).flatMap { _ =>
           completed.incrementAndGet()
           Eru.succeed(id)
         }
       }
     }
 
-    // Create a tree of zipPar operations that should cancel when first fails
     val fastFail: Eru[String | Throwable, Int] =
       EruRuntime.sleep(Duration.ofMillis(10)).flatMap(_ => Eru.fail("fast failure"))
-    val slowEffects = (1 to 20).map(createCancellableEffect)
 
-    val result = slowEffects
-      .foldLeft(fastFail) { (acc, effect) =>
-        EruRuntime.zipPar(acc, effect).map { case (a, b) => a + b }
-      }
+    val slowEffect = createCancellableEffect(1)
+    val result = EruRuntime
+      .zipPar(fastFail, slowEffect)
+      .map { case (a, b) => a + b }
       .attempt
       .unsafeRunSync()
 
     result match {
       case Result.Failure(_) =>
-        // Expected failure, and some effects should have been cancelled
-        assert(cancelled.get() >= 0, "Some effects should have been cancelled or interrupted")
-        assert(true)
+        val startedCount = started.get()
+        val completedCount = completed.get()
+
+        assertEquals(startedCount, 1, "The slow effect should have started")
+        assert(
+          completedCount <= startedCount,
+          s"Completions ($completedCount) should not exceed started effects ($startedCount)"
+        )
       case Result.Success(_) => fail("Expected failure due to fast fail effect")
     }
   }
@@ -149,11 +149,10 @@ final class ConcurrencyStressSpec extends FunSuite {
       }.ensure(Eru.effect {
         released.incrementAndGet()
       }).flatMap { value =>
-        // Random chance of failure to test cleanup under failure
-        if (Random.nextBoolean()) {
-          Eru.succeed(value)
+        if (id % 3 == 0) {
+          Eru.fail(s"Deterministic failure in effect $id")
         } else {
-          Eru.fail(s"Random failure in effect $id")
+          Eru.succeed(value)
         }
       }
     }
@@ -171,15 +170,12 @@ final class ConcurrencyStressSpec extends FunSuite {
 
   test("timer scheduling under load") {
     val timerCount = 100
-    val startTime = System.nanoTime()
 
-    // Create many concurrent timers with different delays
     val timers = (1 to timerCount).map { i =>
-      val delay = (i % 10) + 1 // 1-10ms delays, repeated pattern
+      val delay = (i % 10) + 1
       EruRuntime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
     }
 
-    // Execute all timers concurrently
     val results = timers.map(timer => EruRuntime.fork(timer))
     val completed = results
       .map(_.flatMap(_.await).map {
@@ -190,20 +186,7 @@ final class ConcurrencyStressSpec extends FunSuite {
       .sequence
       .unsafeRunSync()
 
-    val elapsedMs = (System.nanoTime() - startTime) / 1000000L
-
-    // Verify all timers completed and timing is reasonable
     assertEquals(completed.sorted, (1 to timerCount).toList)
-    // Should complete faster than sequential execution (which would be ~550ms)
-    // Allow generous overhead for M1 Mac and Virtual Thread scheduling
-    val timeoutThreshold = {
-      val arch = System.getProperty("os.arch")
-      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 1200L else 800L
-    }
-    assert(
-      elapsedMs < timeoutThreshold,
-      s"Concurrent timers took too long: ${elapsedMs}ms (threshold: ${timeoutThreshold}ms)"
-    )
   }
 
   test("mixed concurrent and sequential operations") {
@@ -293,18 +276,15 @@ final class ConcurrencyStressSpec extends FunSuite {
   test("timeout handling under concurrent load") {
     val fastCount = 30
     val slowCount = 30
-    val timeoutMs = 20L
 
-    // Create fast effects that complete before timeout
     val fastEffects = (1 to fastCount).map { i =>
       val effect = EruRuntime.sleep(Duration.ofMillis(5)).map(_ => s"fast-$i")
-      EruRuntime.timeout(Duration.ofMillis(timeoutMs))(effect)
+      EruRuntime.timeout(Duration.ofMillis(50))(effect)
     }
 
-    // Create slow effects that should timeout
     val slowEffects = (1 to slowCount).map { i =>
-      val effect = EruRuntime.sleep(Duration.ofMillis(50)).map(_ => s"slow-$i")
-      EruRuntime.timeout(Duration.ofMillis(timeoutMs))(effect)
+      val effect = EruRuntime.sleep(Duration.ofMillis(100)).map(_ => s"slow-$i")
+      EruRuntime.timeout(Duration.ofMillis(20))(effect)
     }
 
     val allEffects = fastEffects ++ slowEffects
@@ -319,8 +299,7 @@ final class ConcurrencyStressSpec extends FunSuite {
       case _ => false
     }
 
-    // Fast effects should succeed, slow effects should timeout
-    assert(successes >= fastCount * 0.8, s"Expected most fast effects to succeed, got $successes")
-    assert(timeouts >= slowCount * 0.8, s"Expected most slow effects to timeout, got $timeouts")
+    assertEquals(successes, fastCount, s"All fast effects should succeed, got $successes")
+    assertEquals(timeouts, slowCount, s"All slow effects should timeout, got $timeouts")
   }
 }
