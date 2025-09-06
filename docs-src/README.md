@@ -113,6 +113,14 @@ sbt bench             # Full benchmark suite (JVM only)
 sbt benchCore         # Core performance benchmarks
 ```
 
+## Contributing
+
+Eru welcomes contributions! Please see CONTRIBUTING.md in the repository root for development workflow, code quality standards, and guidelines.
+
+## Author
+
+Eru is designed and developed by **Hakim Jonas Ghoula**.
+
 ## License
 
-Eru is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+Eru is licensed under the MIT License.

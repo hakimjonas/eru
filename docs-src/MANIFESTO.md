@@ -50,3 +50,7 @@ A running program should not be a black box. `Eru` is built from the ground up t
 ---
 
 This manifesto defines `Eru`'s identity: a pioneer, not a follower. It is a testament to the idea that a library can be simultaneously pure, correct, powerful, and a profound joy to use. The existing validation library `Valar` will be rebased on `Eru` in its next release, unifying effect, error, and validation semantics.
+
+---
+
+*Eru is designed and developed by Hakim Jonas Ghoula.*

@@ -1,0 +1,69 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.github.sbt</groupId>
+    <artifactId>sbt-git</artifactId>
+    <packaging>jar</packaging>
+    <description>An sbt plugin that offers git features directly inside sbt</description>
+    <url>https://github.com/sbt/sbt-git</url>
+    <version>2.0.1</version>
+    <licenses>
+        <license>
+            <name>BSD-2-Clause</name>
+            <url>https://opensource.org/licenses/BSD-2-Clause</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <name>sbt-git</name>
+    <inceptionYear>2011</inceptionYear>
+    <organization>
+        <name>com.github.sbt</name>
+        <url>https://github.com/sbt/sbt-git</url>
+    </organization>
+    <scm>
+        <url>https://github.com/sbt/sbt-git</url>
+        <connection>scm:git:git@github.com:sbt/sbt-git.git</connection>
+    </scm>
+    <developers>
+        <developer>
+            <id>jsuereth</id>
+            <name>Josh Suereth</name>
+            <url>http://jsuereth.com/</url>
+            <email>joshua suereth gmail com</email>
+        </developer>
+    </developers>
+    <properties>
+        <scalaVersion>2.12</scalaVersion>
+        <sbtVersion>1.0</sbtVersion>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>2.12.16</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-sbt</groupId>
+            <artifactId>sbt</artifactId>
+            <version>1.7.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <version>5.13.1.202206130422-r</version>
+        </dependency>
+        <dependency>
+            <groupId>com.michaelpollmeier</groupId>
+            <artifactId>versionsort</artifactId>
+            <version>1.0.11</version>
+        </dependency>
+        <dependency>
+            <groupId>org.scalameta</groupId>
+            <artifactId>munit_2.12</artifactId>
+            <version>0.7.29</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>ch.epfl.scala</groupId>
+    <artifactId>sbt-tasty-mima</artifactId>
+    <packaging>jar</packaging>
+    <description>sbt-tasty-mima</description>
+    <url>https://github.com/scalacenter/sbt-tasty-mima</url>
+    <version>1.3.0</version>
+    <licenses>
+        <license>
+            <name>Apache-2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <name>sbt-tasty-mima</name>
+    <organization>
+        <name>ch.epfl.scala</name>
+        <url>https://github.com/scalacenter/sbt-tasty-mima</url>
+    </organization>
+    <scm>
+        <url>https://github.com/scalacenter/sbt-tasty-mima</url>
+        <connection>scm:git@github.com:scalacenter/sbt-tasty-mima.git</connection>
+        <developerConnection>scm:git:git@github.com:scalacenter/sbt-tasty-mima.git</developerConnection>
+    </scm>
+    <developers>
+        <developer>
+            <id>sjrd</id>
+            <name>Sébastien Doeraene</name>
+            <url>https://github.com/sjrd/</url>
+            <email>sjrdoeraene@gmail.com</email>
+        </developer>
+        <developer>
+            <id>bishabosha</id>
+            <name>Jamie Thompson</name>
+            <url>https://github.com/bishabosha</url>
+            <email>bishbashboshjt@gmail.com</email>
+        </developer>
+    </developers>
+    <properties>
+        <scalaVersion>2.12</scalaVersion>
+        <sbtVersion>1.0</sbtVersion>
+        <info.versionScheme>early-semver</info.versionScheme>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>2.12.17</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-sbt</groupId>
+            <artifactId>sbt</artifactId>
+            <version>1.8.2</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.epfl.scala</groupId>
+            <artifactId>tasty-mima-interface</artifactId>
+            <version>1.3.0</version>
+        </dependency>
+    </dependencies>
+</project>

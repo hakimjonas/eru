@@ -90,3 +90,9 @@ Eru is a high-performance effect system built with modern Scala 3, organized as 
 
 ### Performance Expectations
 Eru achieves exceptional performance (4,756-160,143 ops/ms, 50-80x faster than Cats Effect). Maintain this performance standard when making changes.
+
+### JVM Configuration
+The repository includes optimized JVM settings in `.jvmopts` to prevent GC thrashing during development and testing:
+- Heap: 2GB initial, 8GB max
+- G1 Garbage Collector for low-latency performance
+- Optimized for high-throughput testing and benchmarking

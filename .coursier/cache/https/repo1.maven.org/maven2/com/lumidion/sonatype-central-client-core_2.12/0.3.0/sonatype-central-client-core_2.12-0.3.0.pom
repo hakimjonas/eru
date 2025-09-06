@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.lumidion</groupId>
+    <artifactId>sonatype-central-client-core_2.12</artifactId>
+    <packaging>jar</packaging>
+    <description>sonatype-central-client-core</description>
+    <url>https://github.com/lumidion/sonatype-central-client</url>
+    <version>0.3.0</version>
+    <licenses>
+        <license>
+            <name>Apache-2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <name>sonatype-central-client-core</name>
+    <organization>
+        <name>com.lumidion</name>
+        <url>https://github.com/lumidion/sonatype-central-client</url>
+    </organization>
+    <scm>
+        <url>https://github.com/lumidion/sonatype-central-client</url>
+        <connection>scm:git:https://github.com/lumidion/sonatype-central-client.git</connection>
+        <developerConnection>scm:git:git@github.com:lumidion/sonatype-central-client.git</developerConnection>
+    </scm>
+    <developers>
+        <developer>
+            <id>andrapyre</id>
+            <name>David Doyle</name>
+            <url>https://www.lumidion.com/about</url>
+            <email>david@lumidion.com</email>
+        </developer>
+    </developers>
+    <properties>
+        <info.versionScheme>semver-spec</info.versionScheme>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>2.12.19</version>
+        </dependency>
+    </dependencies>
+</project>

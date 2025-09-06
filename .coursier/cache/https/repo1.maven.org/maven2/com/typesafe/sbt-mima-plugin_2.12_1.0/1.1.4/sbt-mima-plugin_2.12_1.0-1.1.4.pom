@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.typesafe</groupId>
+    <artifactId>sbt-mima-plugin_2.12_1.0</artifactId>
+    <packaging>jar</packaging>
+    <description>sbt-mima-plugin</description>
+    <url>http://github.com/lightbend-labs/mima</url>
+    <version>1.1.4</version>
+    <licenses>
+        <license>
+            <name>Apache License v2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <name>sbt-mima-plugin</name>
+    <organization>
+        <name>com.typesafe</name>
+        <url>http://github.com/lightbend-labs/mima</url>
+    </organization>
+    <scm>
+        <url>https://github.com/lightbend-labs/mima</url>
+        <connection>scm:git:git@github.com:lightbend-labs/mima.git</connection>
+    </scm>
+    <developers>
+        <developer>
+            <id>mdotta</id>
+            <name>Mirco Dotta</name>
+            <url>https://github.com/dotta</url>
+            <email>@dotta</email>
+        </developer>
+        <developer>
+            <id>jsuereth</id>
+            <name>Josh Suereth</name>
+            <url>https://github.com/jsuereth</url>
+            <email>@jsuereth</email>
+        </developer>
+        <developer>
+            <id>dwijnand</id>
+            <name>Dale Wijnand</name>
+            <url>https://github.com/dwijnand</url>
+            <email>@dwijnand</email>
+        </developer>
+    </developers>
+    <properties>
+        <scalaVersion>2.12</scalaVersion>
+        <sbtVersion>1.0</sbtVersion>
+        <info.versionScheme>early-semver</info.versionScheme>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>2.12.19</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-sbt</groupId>
+            <artifactId>sbt</artifactId>
+            <version>1.10.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.typesafe</groupId>
+            <artifactId>mima-core_2.12</artifactId>
+            <version>1.1.4</version>
+        </dependency>
+    </dependencies>
+</project>
