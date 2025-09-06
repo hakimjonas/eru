@@ -28,13 +28,14 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
           operationLog += s"Resource $id acquired (total: $count)"
           count
         }.mapError(_ => s"resource-error-$id")
-        result <- if (id % 3 == 0) {
-          operationLog += s"Resource $id failing"
-          Eru.fail(s"resource-$id failed")
-        } else {
-          operationLog += s"Resource $id succeeding"
-          Eru.succeed(s"resource-$id")
-        }
+        result <-
+          if (id % 3 == 0) {
+            operationLog += s"Resource $id failing"
+            Eru.fail(s"resource-$id failed")
+          } else {
+            operationLog += s"Resource $id succeeding"
+            Eru.succeed(s"resource-$id")
+          }
       } yield result
 
       resourceEffect.ensure {
@@ -48,7 +49,7 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
     // Test with just 6 operations sequentially to isolate the issue
     val effects = (1 to 6).map(createTrackedResourceEffect).toList
     val results = effects.map(_.attempt.unsafeRunSync())
-    
+
     println(s"Results: $results")
 
     println(s"Resource counter: ${resourceCounter.get()}")
@@ -56,8 +57,7 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
     println("Operation log:")
     operationLog.foreach(println)
 
-    assertEquals(cleanupCounter.get(), resourceCounter.get(), 
-      s"Sequential cleanup failed. Log: ${operationLog.toList}")
+    assertEquals(cleanupCounter.get(), resourceCounter.get(), s"Sequential cleanup failed. Log: ${operationLog.toList}")
   }
 
   test("parallel resource cleanup diagnostic - small scale") {
@@ -75,12 +75,13 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
           resourceAcquisitionLog.put(id, s"acquired at $timestamp by thread ${Thread.currentThread().getName}")
           count
         }.mapError(_ => s"resource-error-$id")
-        result <- if (id % 7 == 0) {
-          failureCounter.incrementAndGet()
-          Eru.fail(s"resource-$id failed")
-        } else {
-          Eru.succeed(s"resource-$id")
-        }
+        result <-
+          if (id % 7 == 0) {
+            failureCounter.incrementAndGet()
+            Eru.fail(s"resource-$id failed")
+          } else {
+            Eru.succeed(s"resource-$id")
+          }
       } yield result
 
       resourceEffect.ensure {
@@ -96,16 +97,16 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
     val operationCount = 20
     val effects = (1 to operationCount).map(createDiagnosticResourceEffect).toList
     val result = EruRuntime.parSequence(effects).attempt.unsafeRunSync()
-    
+
     println(s"ParSequence result: $result")
 
     println(s"Resource counter: ${resourceCounter.get()}")
     println(s"Cleanup counter: ${cleanupCounter.get()}")
     println(s"Failure counter: ${failureCounter.get()}")
-    
+
     println("\nAcquisition log:")
     resourceAcquisitionLog.forEach((id, msg) => println(s"Resource $id: $msg"))
-    
+
     println("\nCleanup log:")
     cleanupLog.forEach((id, msg) => println(s"Resource $id: $msg"))
 
@@ -123,8 +124,7 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
     }
 
     // This test should help identify exactly which resources are not being cleaned up
-    assertEquals(cleanupCounter.get(), resourceCounter.get(), 
-      s"Parallel cleanup failed. Leaked resources: $leaked")
+    assertEquals(cleanupCounter.get(), resourceCounter.get(), s"Parallel cleanup failed. Leaked resources: $leaked")
   }
 
   test("parSequence early termination behavior with finalizers") {
@@ -141,12 +141,13 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
         }.mapError(_.toString)
         // Add small delay to increase chance of interleaving
         _ <- EruRuntime.sleep(Duration.ofMillis(1)).mapError(_.toString)
-        result <- if (id == 3) { // Fail early
-          Eru.fail(s"early-failure-$id")
-        } else {
-          completedOperations.put(id, true)
-          Eru.succeed(s"resource-$id")
-        }
+        result <-
+          if (id == 3) { // Fail early
+            Eru.fail(s"early-failure-$id")
+          } else {
+            completedOperations.put(id, true)
+            Eru.succeed(s"resource-$id")
+          }
       } yield result
 
       resourceEffect.ensure {
@@ -171,12 +172,17 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
     }
 
     // The key insight: Are finalizers running for operations that started but didn't complete?
-    assert(cleanupCounter.get() >= completedOperations.size(), 
-      "At least completed operations should have finalizers run")
-    
+    assert(
+      cleanupCounter.get() >= completedOperations.size(),
+      "At least completed operations should have finalizers run"
+    )
+
     // This is the critical test: Do ALL started operations get their finalizers executed?
-    assertEquals(cleanupCounter.get(), resourceCounter.get(), 
-      "All started operations should have their finalizers executed, even if they don't complete normally")
+    assertEquals(
+      cleanupCounter.get(),
+      resourceCounter.get(),
+      "All started operations should have their finalizers executed, even if they don't complete normally"
+    )
   }
 
   test("ensure finalizer exception handling doesn't prevent other finalizers") {
@@ -205,7 +211,7 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
     val operationCount = 12
     val effects = (1 to operationCount).map(createResourceWithPotentiallyFailingFinalizer).toList
     val result = EruRuntime.parSequence(effects).attempt.unsafeRunSync()
-    
+
     println(s"Result with failing finalizers: $result")
 
     println(s"Resource counter: ${resourceCounter.get()}")
@@ -214,7 +220,10 @@ class ResourceLeakDiagnosticsSpec extends FunSuite {
 
     // Even with finalizer exceptions, the remaining finalizers should still execute
     val expectedCleanups = (1 to operationCount).count(_ % 4 != 0)
-    assertEquals(cleanupCounter.get(), expectedCleanups,
-      "Finalizer exceptions should not prevent other finalizers from running")
+    assertEquals(
+      cleanupCounter.get(),
+      expectedCleanups,
+      "Finalizer exceptions should not prevent other finalizers from running"
+    )
   }
 }

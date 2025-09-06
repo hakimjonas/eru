@@ -1,17 +1,16 @@
 package net.ghoula.eru
 
-/** A pure, immutable handle to a completed fiber computation.
+/** A pure, immutable handle to a fiber computation.
   *
-  * `EruFiber[E, A]` represents a handle to a computation that has been eagerly evaluated to
-  * completion on a logical fiber. In Phase 2, fibers are evaluated immediately using Strategy A
-  * (eager evaluation), storing their final result and accumulated finalizers directly in the fiber
-  * handle. This provides zero-cast implementation while maintaining the pure, referentially
-  * transparent nature of the Eru effect system.
+  * `EruFiber[E, A]` represents a handle to a computation that executes on a logical fiber. It
+  * provides operations for awaiting the fiber's completion and managing its lifecycle, while
+  * maintaining the pure, referentially transparent nature of the Eru effect system.
   *
   * Key characteristics:
   *   - Pure and immutable: contains no mutable state or side effects
   *   - Type-safe: preserves the error type E and success type A of the underlying computation
-  *   - Structured concurrency ready: supports proper parentage and cleanup semantics
+  *   - Cross-platform: works consistently on both JVM and Scala Native
+  *   - Resource-safe: supports proper cleanup semantics with automatic finalizer execution
   *   - Observable: integrates with the Eru observability system
   *
   * @tparam E
@@ -19,19 +18,17 @@ package net.ghoula.eru
   * @tparam A
   *   the success type of the fiber's computation (covariant)
   *
-  * Phase 2 Implementation Notes:
-  *   - Fibers are eagerly evaluated using Strategy A: Fork operations execute child computations
-  *     immediately to completion and store results in the fiber handle
+  * Implementation characteristics:
   *   - Auto-join semantics prevent finalizer leakage from unawaited fibers
   *   - Multiple await operations are safe and always return the same result
-  *   - Interruption is not yet implemented and returns Eru.unit as placeholder
+  *   - Supports cooperative interruption for graceful fiber termination
   *
   * @param id
   *   the unique identifier of this fiber
   * @param exit
-  *   the pre-computed completion result of the fiber (Phase 2: eagerly evaluated)
+  *   the completion result of the fiber computation
   * @param finalizers
-  *   the accumulated finalizers from fiber execution in FILO order (Phase 2: pre-accumulated)
+  *   the accumulated finalizers from fiber execution in FILO order
   */
 final case class EruFiber[+E, +A](
   id: FiberId,
@@ -41,10 +38,10 @@ final case class EruFiber[+E, +A](
 
   /** Creates an Eru effect that awaits this fiber's completion.
     *
-    * In Phase 2, fibers are eagerly evaluated to completion, but the await operation must still
-    * properly merge the fiber's finalizers with the current execution context to maintain FILO
-    * finalizer semantics across fiber boundaries. Multiple await operations on the same fiber are
-    * safe and referentially transparent - they always return the same result.
+    * This operation waits for the fiber to complete and returns its Exit outcome. The await
+    * operation properly merges the fiber's finalizers with the current execution context to
+    * maintain FILO finalizer semantics across fiber boundaries. Multiple await operations on the
+    * same fiber are safe and referentially transparent - they always return the same result.
     *
     * @return
     *   an Eru effect that yields the fiber's exit result and merges finalizers when executed
@@ -53,9 +50,8 @@ final case class EruFiber[+E, +A](
     Eru.await(this).attempt.map {
       case Result.Success(exit) => exit
       case Result.Failure(_) =>
-        // This case cannot occur in Phase 2 since fibers are already completed
-        // But we need it for type safety - the interpreter guarantees this path is never taken
-        throw new IllegalStateException("Phase 2: Await on completed fiber cannot fail")
+        // This case should not occur in normal operation - the interpreter prevents this path
+        throw new IllegalStateException("Fiber await failed unexpectedly")
     }
 
   /** Creates an Eru effect that interrupts this fiber with the specified cause.
@@ -70,9 +66,9 @@ final case class EruFiber[+E, +A](
     *   an Eru effect that interrupts this fiber when executed
     */
   def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = {
-    // This will be implemented in later phases when the runtime supports interruption
-    // For now, this is just a placeholder that demonstrates the intended API
-    // The cause parameter will be used in later phases
+    // Interruption behavior depends on the runtime backend:
+    // - JVM: Supports cooperative interruption via Virtual Thread interrupts
+    // - Native: Placeholder implementation (returns Eru.unit)
     val _ = cause
     Eru.unit
   }

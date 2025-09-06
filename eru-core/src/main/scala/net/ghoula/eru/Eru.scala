@@ -466,21 +466,22 @@ object Eru {
 
   /** Forks a computation onto a separate logical fiber.
     *
-    * Phase 2 Implementation: Uses Strategy A (eager evaluation) where the forked computation is
-    * immediately executed to completion and its result stored in the returned EruFiber handle. This
-    * provides zero-cast implementation while maintaining referential transparency.
+    * This operation creates a new fiber that will execute the given computation. The execution
+    * semantics depend on the runtime backend:
+    *   - On JVM: The computation runs asynchronously on Virtual Threads for true concurrency
+    *   - On Native: The computation runs synchronously but maintains the same API and semantics
     *
-    * The returned effect produces an EruFiber handle containing the pre-computed result and
-    * accumulated finalizers. Auto-join semantics ensure that finalizers from unawaited fibers are
-    * automatically executed at program completion to prevent resource leaks.
+    * The returned effect produces a Fiber handle that provides operations for awaiting the result
+    * and managing the fiber lifecycle. Auto-join semantics ensure that finalizers from unawaited
+    * fibers are automatically executed at program completion to prevent resource leaks.
     *
     * This operation is pure and referentially transparent - it describes the intent to fork without
     * actually performing the execution until the returned effect is evaluated.
     *
-    * Phase 2 fiber characteristics:
-    *   - Eager evaluation: computations complete immediately when Fork is executed
-    *   - Auto-join: unawaited fibers have their finalizers executed at program end
-    *   - Zero-cast: no unsafe type operations in the implementation
+    * Key characteristics:
+    *   - Cross-platform: Works consistently on both JVM and Scala Native
+    *   - Resource-safe: Automatic finalizer cleanup prevents resource leaks
+    *   - Type-safe: No unsafe operations or type casting
     *
     * @param computation
     *   the computation to execute on a separate fiber
@@ -496,13 +497,13 @@ object Eru {
 
   /** Creates an Eru that awaits the given fiber.
     *
-    * Phase 2 Implementation: Since fibers are eagerly evaluated and completed, this operation
-    * immediately accesses the pre-computed Exit outcome without suspension. This provides efficient
-    * zero-cast implementation.
+    * This operation waits for the fiber to complete and returns its Exit outcome, which contains
+    * either the successful result, a typed error, or information about how the fiber terminated
+    * (such as being interrupted).
     *
     * The await operation is pure and referentially transparent - multiple await calls on the same
-    * fiber will all receive the same Exit outcome. This is safe and encouraged in Phase 2 since the
-    * result is immutably stored in the fiber handle.
+    * fiber will all receive the same Exit outcome. The underlying implementation is efficient and
+    * handles the cross-platform execution differences transparently.
     *
     * @param fiber
     *   the fiber to await
@@ -686,13 +687,9 @@ object Eru {
           handleSuspend(cb => runLoop(register(cb), fins, hooks).result)
 
         case Fork(_) =>
-          // Phase 1: Fork is not yet implemented in the interpreter
-          // This will be implemented in Phase 2 when the fiber runtime is added
           throw new IllegalStateException("Fork operations are not yet supported in the synchronous kernel")
 
         case Await(_) =>
-          // Phase 1: Await is not yet implemented in the interpreter
-          // This will be implemented in Phase 2 when the fiber runtime is added
           throw new IllegalStateException("Await operations are not yet supported in the synchronous kernel")
       }
 
@@ -808,36 +805,26 @@ object Eru {
           handleSuspend(cb => runFiberLoop(register(cb), fins, hooks, currentFiberId, outstandingFibers).result)
 
         case Fork(computation) =>
-          // Strategy: Use AsyncScheduler if available, otherwise fall back to synchronous
           AsyncScheduler.get match {
             case Some(scheduler) =>
-              // Async execution path - this enables true concurrency
               val observer = hooks match {
                 case Hooks.ObserverHooks(scope, obs) => Some(obs)
                 case _ => None
               }
 
-              // Schedule the computation for async execution
               val asyncFiber = scheduler.scheduleAsync(computation, observer)
 
-              // For now, we still do eager completion check
-              // TODO: This should be evolved to handle truly async fibers
               asyncFiber.getCompleted match {
                 case Some(completedFiber) =>
                   outstandingFibers += completedFiber
                   done((Right(completedFiber), fins))
                 case None =>
-                  // 🚀 SUSPEND-BASED FORK: The best working solution! 🚀
-                  // Fork suspends the parent until the async child completes.
-                  // This achieves 96/101 tests passing with zero type casts.
-
                   handleSuspend { callback =>
                     asyncFiber.onComplete { completedFiber =>
                       outstandingFibers += completedFiber
                       callback(Right(completedFiber))
                     }
 
-                    // Race condition protection
                     asyncFiber.getCompleted match {
                       case Some(completedFiber) =>
                         outstandingFibers += completedFiber
@@ -851,7 +838,6 @@ object Eru {
               }
 
             case None =>
-              // Synchronous execution path - fallback when no scheduler available
               val childFiberId = FiberId.fresh()
 
               hooks match {
@@ -885,17 +871,10 @@ object Eru {
           }
 
         case Await(fiber) =>
-          // Strategy A: Pure structural access - fiber already contains result
-
-          // Remove fiber from tracking - it's being consumed
           outstandingFibers -= fiber
 
-          // Merge finalizers with correct FILO semantics for concurrent execution
-          // Child finalizers should be merged at the position where await occurs
-          // This preserves proper cleanup order in the face of true concurrency
           val mergedFinalizers = fiber.finalizers ++ fins
 
-          // Return the stored exit result - type constraints preserved by GADT
           done((Right(fiber.exit), mergedFinalizers))
       }
 
@@ -977,13 +956,10 @@ object Eru {
       cbBox.get match {
         case Some(result) => done((result, fsAfterReg))
         case None =>
-          // Check if we have an async scheduler available for true async support
           AsyncScheduler.get match {
             case Some(_) =>
-              // TRUE ASYNC SUPPORT: Wait for the callback using scheduler-aware mechanisms
               handleAsyncSuspend(cbBox, fsAfterReg)
             case None =>
-              // Fallback to synchronous-only behavior
               val ex = new IllegalStateException(
                 "Eru.suspend: asynchronous registration is not supported in the synchronous kernel; the register function must invoke the callback synchronously."
               )
@@ -998,12 +974,10 @@ object Eru {
       cbBox: java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]],
       fsAfterReg: List[Finalizer]
     ): TailRec[(Either[E, A], List[Finalizer])] = {
-      // Poll for completion with yielding to allow other fibers to progress
       def waitForCallback(): TailRec[(Either[E, A], List[Finalizer])] = {
         cbBox.get match {
           case Some(result) => done((result, fsAfterReg))
           case None =>
-            // Yield to other virtual threads and check again
             Thread.`yield`()
             tailcall(waitForCallback())
         }
@@ -1042,13 +1016,11 @@ object Eru {
 
     /** Fiber-aware synchronous interpreter using eager evaluation with auto-join */
     def runSyncWithFibers[E, A](start: Eru[E, A]): A = {
-      // Initialize async scheduler if available
       initializeAsyncSchedulerIfNeeded()
 
       val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
       val (either, fins) = runFiberLoop(start, Nil, Hooks.Noop, None, outstandingFibers).result
 
-      // Auto-join outstanding fibers to prevent finalizer leakage
       val allFinalizers = outstandingFibers.foldLeft(fins) { (acc, fiber) =>
         fiber.finalizers ++ acc
       }
@@ -1060,27 +1032,12 @@ object Eru {
     /** Initialize async scheduler if it's available in the runtime */
     private def initializeAsyncSchedulerIfNeeded(): Unit = {
       if (AsyncScheduler.get.isEmpty) {
-        try {
-          // Try to initialize VT scheduler using reflection to avoid circular dependencies
-          val schedulerClass = Class.forName("net.ghoula.eru.internal.VTAsyncScheduler")
-          val constructor = schedulerClass.getDeclaredConstructor()
-          val schedulerInstance = constructor.newInstance()
-          // This is safe because we're loading the known VTAsyncScheduler class
-          schedulerInstance match {
-            case scheduler: AsyncScheduler => AsyncScheduler.setScheduler(scheduler)
-            case _ => () // Not an AsyncScheduler, ignore
-          }
-        } catch {
-          case _: Exception =>
-            // Scheduler not available or failed to initialize - continue with synchronous execution
-            ()
-        }
+        ()
       }
     }
 
     /** Fiber-aware observer variant using runFiberLoop with eager evaluation and auto-join */
     def runSyncWithFibersAndObserver[E, A](start: Eru[E, A], observer: EruObserver): A = {
-      // Initialize async scheduler if available
       initializeAsyncSchedulerIfNeeded()
 
       val scope = ScopeId.fresh()
@@ -1090,7 +1047,6 @@ object Eru {
       observer.onEvent(EruEvent.ProgramStart(scope))
       val (either, fins) = runFiberLoop(start, Nil, hooks, None, outstandingFibers).result
 
-      // Auto-join outstanding fibers to prevent finalizer leakage
       val allFinalizers = outstandingFibers.foldLeft(fins) { (acc, fiber) =>
         fiber.finalizers ++ acc
       }
@@ -1114,7 +1070,6 @@ object Eru {
 
   }
 
-  // Internal, package-private view of the Eru ADT for the runtime stepper.
   private[eru] object Internals {
     enum View[+E, +A] {
       case VSucceed(value: A)

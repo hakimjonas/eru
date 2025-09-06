@@ -39,9 +39,9 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
       * execution, then returns the complete Exit outcome. The await operation handles all possible
       * fiber termination states including success, failure, defect, and interruption.
       *
-      * The implementation uses a deterministic approach: it relies on the CountDownLatch for
-      * proper completion signaling. If interrupted while waiting, it checks the final state
-      * exactly once without timing dependencies. This maintains correctness and observability.
+      * The implementation uses a deterministic approach: it relies on the CountDownLatch for proper
+      * completion signaling. If interrupted while waiting, it checks the final state exactly once
+      * without timing dependencies. This maintains correctness and observability.
       *
       * @return
       *   an effect that yields the fiber's Exit outcome when execution completes
@@ -49,31 +49,20 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
     def await: Eru[Nothing, Exit[E, A]] =
       Eru.effect {
         try {
-          // Wait for the fiber to complete using the latch
           latch.await()
-          // At this point, exitRef is guaranteed to be set
           exitRef.get()
         } catch {
           case _: InterruptedException =>
-            // If interrupted while waiting, check the current state exactly once
-            // The latch ensures that if we reach here, either:
-            // 1. The fiber completed and exitRef is set, or
-            // 2. The fiber was truly interrupted and we should report that
             Option(exitRef.get()) match {
               case Some(exit) =>
-                // Fiber completed despite the interruption
                 exit
               case None =>
-                // Fiber was interrupted before completion
-                // Create a proper interrupt exit with the current fiber's ID
                 Exit.Interrupt(id, InterruptCause.Cancelled(Some("Fiber await interrupted")))
             }
         }
       }.attempt.map {
         case Result.Success(exit) => exit
         case Result.Failure(throwable) =>
-          // This should not happen in normal operation, but we handle it gracefully
-          // Check one final time if the exit was set despite the error
           Option(exitRef.get()).getOrElse(
             Exit.Die(new RuntimeException(s"Fiber await failed unexpectedly: ${throwable.getMessage}", throwable))
           )
@@ -97,8 +86,6 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
       Eru.effect {
         if (interrupted.compareAndSet(false, true)) {
           threadRef.get().foreach(_.interrupt())
-          // Note: The actual Exit.Interrupt will be set by the running effect when it
-          // observes the interruption at the next effect boundary
         }
       }.attempt.flatMap(_ => Eru.unit)
   }
@@ -138,7 +125,6 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
       }
 
       val thread = java.lang.Thread.startVirtualThread(runnable)
-      // Set thread reference immediately for early interrupt requests
       threadRef.compareAndSet(None, Some(thread))
 
       new VTFiber[E, A](id, exitAR, latch, threadRef, interrupted)
@@ -148,7 +134,6 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
         val id = FiberId.fresh()
         val exit = Exit.Die(t)
         observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-        // Create a dummy thread reference for the error case
         val dummyThreadRef = new AtomicReference[Option[Thread]](None)
         new VTFiber[E, A](
           id,
@@ -232,7 +217,6 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
         resultRef.get()
       } catch {
         case _: InterruptedException =>
-          // Race was interrupted, return no result to be handled by the outer attempt
           throw new InterruptedException("Race interrupted")
       }
     }.attempt.flatMap {
@@ -259,8 +243,6 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
           future.get() // Virtual Thread will park here, not blocking carrier thread
         } catch {
           case _: InterruptedException =>
-            // Thread was interrupted (likely due to cancellation), complete normally
-            // This is expected behavior in concurrent scenarios
             ()
         }
       }
@@ -270,7 +252,6 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
     duration: Duration
   )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] = {
     import java.util.concurrent.TimeoutException
-    // Race fa against a non-blocking timer; if timer wins, fail with TimeoutException
     val timer = sleep(duration)
     race(fa, timer).flatMap {
       case Left(a) => Eru.succeed(a)
@@ -285,34 +266,28 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
     register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
   ): Eru[Nothing, Either[E | Throwable, A]] =
     Eru.blocking {
-      // Use a CompletableFuture to enable async resumption
       val future = new java.util.concurrent.CompletableFuture[Either[E | Throwable, A]]()
 
-      // Create callback that completes the future when invoked
       val cb: Either[E, A] => Unit = result => {
         if (!future.isDone) {
           future.complete(result)
         }
       }
 
-      // Execute registration asynchronously on a Virtual Thread
       java.util.concurrent.CompletableFuture.supplyAsync(
         () => {
           try {
             val registrationResult = register(cb).attempt.unsafeRunSync()
             registrationResult match {
               case Result.Success(_) =>
-                // Registration succeeded, callback may be invoked async
                 ()
               case Result.Failure(t) =>
-                // Registration failed, complete future with error
                 if (!future.isDone) {
                   future.complete(Left(t))
                 }
             }
           } catch {
             case t: Throwable =>
-              // Registration threw exception, complete future with error
               if (!future.isDone) {
                 future.complete(Left(t))
               }
@@ -322,26 +297,19 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
       )
 
       try {
-        // Park the Virtual Thread until callback is invoked or timeout
-        // This is non-blocking for carrier threads - VT will be parked
         future.get()
       } catch {
         case _: InterruptedException =>
-          // Virtual Thread was interrupted, likely due to cancellation
-          // Complete with interruption cause
           Left(new InterruptedException("Suspend operation interrupted"))
         case ex: java.util.concurrent.ExecutionException =>
-          // Unwrap execution exception from async registration
           val cause = Option(ex.getCause).getOrElse(ex)
           Left(cause)
         case t: Throwable =>
-          // Other errors during suspend operation
           Left(t)
       }
     }.attempt.map {
       case Result.Success(result) => result
       case Result.Failure(t) =>
-        // Blocking operation failed, return error
         Left(t)
     }
 }

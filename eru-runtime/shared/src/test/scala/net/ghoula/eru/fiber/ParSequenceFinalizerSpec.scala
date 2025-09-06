@@ -9,8 +9,8 @@ import net.ghoula.eru.prelude.*
 
 /** Tests to investigate parSequence finalizer execution behavior.
   *
-  * This test suite investigates whether parSequence properly waits for all fiber finalizers
-  * to execute before completing, even when it fails fast on the first error.
+  * This test suite investigates whether parSequence properly waits for all fiber finalizers to
+  * execute before completing, even when it fails fast on the first error.
   */
 class ParSequenceFinalizerSpec extends FunSuite {
 
@@ -23,23 +23,25 @@ class ParSequenceFinalizerSpec extends FunSuite {
       Eru.effect {
         val count = resourceCounter.incrementAndGet()
         completionOrder.add(s"resource-$id acquired (count: $count)")
-      }.mapError(_.toString).ensure {
-        Eru.effect {
-          val count = cleanupCounter.incrementAndGet()
-          completionOrder.add(s"resource-$id cleaned (count: $count)")
-        }
-      }.flatMap { _ =>
-        // Add small delay to make timing more predictable
-        EruRuntime.sleep(Duration.ofMillis(id.toLong)).mapError(_.toString).flatMap { _ =>
-          if (id == 2) { // Early failure
-            completionOrder.add(s"resource-$id FAILING")
-            Eru.fail(s"resource-$id failed")
-          } else {
-            completionOrder.add(s"resource-$id succeeding")
-            Eru.succeed(s"resource-$id")
+      }.mapError(_.toString)
+        .ensure {
+          Eru.effect {
+            val count = cleanupCounter.incrementAndGet()
+            completionOrder.add(s"resource-$id cleaned (count: $count)")
           }
         }
-      }
+        .flatMap { _ =>
+          // Add small delay to make timing more predictable
+          EruRuntime.sleep(Duration.ofMillis(id.toLong)).mapError(_.toString).flatMap { _ =>
+            if (id == 2) { // Early failure
+              completionOrder.add(s"resource-$id FAILING")
+              Eru.fail(s"resource-$id failed")
+            } else {
+              completionOrder.add(s"resource-$id succeeding")
+              Eru.succeed(s"resource-$id")
+            }
+          }
+        }
     }
 
     // Test with small number to see exact behavior
@@ -55,8 +57,11 @@ class ParSequenceFinalizerSpec extends FunSuite {
     println(s"Result: $result")
 
     // The key question: Do all finalizers execute even if parSequence fails fast?
-    assertEquals(cleanupCounter.get(), resourceCounter.get(),
-      "All resources should be cleaned up even on early parSequence failure")
+    assertEquals(
+      cleanupCounter.get(),
+      resourceCounter.get(),
+      "All resources should be cleaned up even on early parSequence failure"
+    )
   }
 
   test("isolated fiber finalizer execution timing") {
@@ -104,23 +109,31 @@ class ParSequenceFinalizerSpec extends FunSuite {
     val parCounter = new java.util.concurrent.atomic.AtomicInteger(0)
 
     def createCountingEffect(counter: java.util.concurrent.atomic.AtomicInteger, id: Int): Eru[String, String] = {
-      Eru.succeed(s"effect-$id").ensure {
-        Eru.effect(counter.incrementAndGet())
-      }.flatMap { result =>
-        if (id == 2) Eru.fail(s"effect-$id failed") else Eru.succeed(result)
-      }
+      Eru
+        .succeed(s"effect-$id")
+        .ensure {
+          Eru.effect(counter.incrementAndGet())
+        }
+        .flatMap { result =>
+          if (id == 2) Eru.fail(s"effect-$id failed") else Eru.succeed(result)
+        }
     }
 
     val effects1 = (1 to 10).map(id => createCountingEffect(seqCounter, id)).toList
     val effects2 = (1 to 10).map(id => createCountingEffect(parCounter, id)).toList
 
     // Sequential execution
-    val seqResult = effects1.foldLeft[Eru[String, List[String]]](Eru.succeed(List.empty)) { (acc, effect) =>
-      acc.flatMap(list => effect.attempt.map {
-        case Result.Success(value) => list :+ value
-        case Result.Failure(_) => list // Continue despite failures
-      })
-    }.attempt.unsafeRunSync()
+    val seqResult = effects1
+      .foldLeft[Eru[String, List[String]]](Eru.succeed(List.empty)) { (acc, effect) =>
+        acc.flatMap(list =>
+          effect.attempt.map {
+            case Result.Success(value) => list :+ value
+            case Result.Failure(_) => list // Continue despite failures
+          }
+        )
+      }
+      .attempt
+      .unsafeRunSync()
 
     // Parallel execution
     val parResult = EruRuntime.parSequence(effects2).attempt.unsafeRunSync()
@@ -131,7 +144,10 @@ class ParSequenceFinalizerSpec extends FunSuite {
     println(s"Parallel result: $parResult")
 
     // Both should execute the same number of finalizers
-    assertEquals(parCounter.get(), seqCounter.get(),
-      "Parallel execution should execute same number of finalizers as sequential")
+    assertEquals(
+      parCounter.get(),
+      seqCounter.get(),
+      "Parallel execution should execute same number of finalizers as sequential"
+    )
   }
 }

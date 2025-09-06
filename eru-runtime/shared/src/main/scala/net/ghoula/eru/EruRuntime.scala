@@ -2,46 +2,26 @@ package net.ghoula.eru
 
 import java.time.Duration
 
-/** Minimal, type-safe runtime functions for concurrency, racing, timeouts, and retries.
+/** Cross-platform runtime functions for concurrency, racing, timeouts, and retries.
   *
-  * This implementation avoids touching or subclassing the sealed Eru internals. It provides
-  * portable, correctness-first semantics that satisfy the public API surface and tests.
+  * EruRuntime provides a complete set of concurrent operations that work consistently across both
+  * JVM and Scala Native platforms. The implementation automatically selects the appropriate backend
+  * based on the target platform, ensuring optimal performance while maintaining API compatibility
+  * and semantic consistency.
+  *
+  * Platform-specific behavior:
+  *   - JVM: Uses Virtual Threads for true concurrent execution with non-blocking operations
+  *   - Native: Uses synchronous execution while preserving the same API and resource semantics
   */
 object EruRuntime {
 
-  // Backend delegation layer (H9.2). Select per-platform backend via ServiceLoader.
   private val backend = PlatformBackend.backend
-
-  // Initialize the async scheduler for proper Fork/Await semantics
-  private def initializeAsyncScheduler(): Unit = {
-    // Try to initialize VT scheduler on JVM, fall back to no scheduler on other platforms
-    try {
-      val schedulerClass = Class.forName("net.ghoula.eru.internal.VTAsyncScheduler")
-      val constructor = schedulerClass.getDeclaredConstructor()
-      val schedulerInstance = constructor.newInstance()
-      // Type-safe pattern matching instead of casting
-      schedulerInstance match {
-        case scheduler: AsyncScheduler => AsyncScheduler.setScheduler(scheduler)
-        case _ => () // Not an AsyncScheduler, ignore
-      }
-    } catch {
-      case _: ClassNotFoundException | _: NoSuchMethodException =>
-        // VT scheduler not available - core will fall back to synchronous execution
-        ()
-      case t: Throwable =>
-        // Other initialization errors - log but don't fail
-        System.err.println(s"Failed to initialize async scheduler: $t")
-    }
-  }
-
-  // Initialize scheduler when runtime is loaded
-  initializeAsyncScheduler()
 
   /** Launches an effect on a separate execution context and returns a fiber handle.
     *
-    * The effect executes asynchronously while the current execution continues. On the JVM with
-    * Virtual Threads backend, the effect runs on its own Virtual Thread. On sequential backends,
-    * the effect executes synchronously and the fiber is immediately completed.
+    * The effect executes according to the platform's concurrency capabilities:
+    *   - JVM: The effect runs asynchronously on its own Virtual Thread
+    *   - Native: The effect executes synchronously but maintains the same API
     *
     * The returned fiber provides await and interrupt capabilities, enabling structured concurrency
     * patterns where parent effects can control and coordinate child computations.
@@ -491,18 +471,16 @@ object EruRuntime {
           }
 
         def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
-          // Find the first error, if any
           val firstError = exits.collectFirst {
             case Exit.Failure(error) => Left(error)
-            case Exit.Die(throwable) => Right(throwable)  
+            case Exit.Die(throwable) => Right(throwable)
             case Exit.Interrupt(_, cause) => Right(new InterruptedException(cause.toString))
           }
-          
+
           firstError match {
             case Some(Left(error)) => Eru.fail(error)
             case Some(Right(throwable)) => Eru.effect(throw throwable)
-            case None => 
-              // All succeeded, collect results in order
+            case None =>
               val results = exits.collect { case Exit.Success(value) => value }
               Eru.succeed(results)
           }
@@ -603,7 +581,6 @@ object EruRuntime {
       case single :: Nil =>
         single.map(a => (a, 0))
       case _ =>
-        // Pure implementation using binary race operations
         def raceWithIndex(remaining: List[Eru[E, A]], currentIndex: Int): Eru[E | Throwable, (A, Int)] =
           remaining match {
             case Nil => Eru.effect(throw new IllegalStateException("raceAll: unexpected empty list"))

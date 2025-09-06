@@ -84,10 +84,8 @@ private[eru] object DefaultBackends {
     )
 
     private def computeExit[E, A](fa: Eru[E, A]): Exit[E, A] =
-      fa.attempt.unsafeRunSync() match {
-        case Result.Success(a) => Exit.Success(a)
-        case Result.Failure(err) => Exit.Failure(err)
-      }
+      try Result.toExit(fa.attempt.unsafeRunSync())
+      catch { case t: Throwable => Exit.Die(t) }
 
     private def completed[E, A](id: FiberId, exit: Exit[E, A], observerOpt: Option[EruObserver]): Fiber[E, A] = {
       observerOpt.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
@@ -168,10 +166,8 @@ private[eru] object DefaultBackends {
         val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
         val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
 
-        // Execute registration
         val registrationExit = register(cb).attempt.unsafeRunSync()
 
-        // Check if callback was invoked synchronously
         cbBox.get() match {
           case Some(result) => result
           case None =>
@@ -187,7 +183,6 @@ private[eru] object DefaultBackends {
       }.attempt.flatMap {
         case Result.Success(result) => Eru.succeed(result)
         case Result.Failure(t) =>
-          // If registration itself failed, return the error wrapped in Left
           Eru.succeed(Left(t))
       }
   }

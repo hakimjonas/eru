@@ -1,6 +1,7 @@
 package net.ghoula.eru.fiber
 
 import munit.FunSuite
+
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
 

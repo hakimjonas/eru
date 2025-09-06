@@ -42,9 +42,8 @@ object EruObserver {
     * lifetime. They provide a lightweight mechanism for correlating events across the execution of
     * a program, useful for debugging and performance analysis.
     *
-    * Thread-safety note: The current implementation uses an unsynchronized mutable counter. In
-    * concurrent environments this may lead to race conditions and duplicate IDs; future runtime
-    * revisions will address this with proper atomic operations.
+    * Thread-safety: ScopeId generation is thread-safe, using atomic operations to ensure unique
+    * identifiers are produced even in highly concurrent environments.
     *
     * @example
     *   {{{

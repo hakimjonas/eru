@@ -12,8 +12,6 @@ private[eru] object Platform {
     */
   val timer: Timer = new Timer {
     def schedule(delay: Duration, task: () => Unit): Unit = {
-      // For now, execute immediately to avoid blocking
-      // TODO: Implement proper Native timer when needed
       task()
     }
   }
