@@ -166,30 +166,23 @@ val result = myProgram.unsafeRunSyncWith(observer)
 ```scala
 import java.time.Duration
 
-val retryPolicy = EruRuntime.Policy.Exponential(
+val resilient = riskyOperation.retryWithBackoff(
   Duration.ofMillis(100), 
   maxRetries = 3
 )
-
-val resilient = riskyOperation.retry(retryPolicy)
 ```
 
 ### Timeout Protection
 ```scala
 val protected = longRunningOperation
-  .timeout(Duration.ofSeconds(5))
-  .recover {
-    case _: java.util.concurrent.TimeoutException => "Operation timed out"
-  }
+  .timeoutTo(Duration.ofSeconds(5), "Operation timed out")
 ```
 
 ### Parallel Processing
 ```scala
 val items = List("item1", "item2", "item3")
 
-val processed = EruRuntime.parSequence(
-  items.map(processItem)
-)
+val processed = EruRuntime.parTraverse(items)(processItem)
 ```
 
 Eru makes it easy to build robust, concurrent applications while maintaining type safety and cross-platform compatibility.

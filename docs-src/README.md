@@ -79,11 +79,13 @@ Eru is organized into focused, cross-platform modules:
 
 ## Documentation
 
-- **[Quick Start Guide](docs-src/QUICKSTART.md)** - Get started with Eru basics
-- **[API Documentation](docs-src/API.md)** - Complete API reference
-- **[Concurrency Guide](docs-src/CONCURRENCY.md)** - Fiber patterns and structured concurrency
-- **[Observability](docs-src/OBSERVER.md)** - Monitoring and debugging with observers
-- **[Development Playbook](docs-src/PLAYBOOK.md)** - Development practices and guidelines
+- **[Quick Start Guide](QUICKSTART.md)** - Get started with Eru basics
+- **[API Documentation](API.md)** - Complete API reference
+- **[Concurrency Guide](CONCURRENCY.md)** - Fiber patterns and structured concurrency
+- **[Resource Management](RESOURCES.md)** - Safe resource patterns and best practices  
+- **[Observability](OBSERVER.md)** - Monitoring and debugging with observers
+- **[Performance](PERFORMANCE.md)** - Performance characteristics and benchmarks
+- **[Reliability](RELIABILITY.md)** - Testing approach and correctness guarantees
 
 ## Commands
 

@@ -77,22 +77,12 @@ object EruRuntime {
   def sleep(duration: java.time.Duration): Eru[Nothing, Unit]
   def timeout[E, A](duration: java.time.Duration)(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A]
   
-  // Retries
-  def retry[E, A](policy: Policy)(fa: Eru[E, A]): Eru[E, A]
   
   // Async boundaries
   def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E | Throwable, A]
 }
 ```
 
-### Retry Policies
-
-```scala
-enum Policy {
-  case Recurs(n: Int) 
-  case Exponential(base: java.time.Duration, maxRetries: Int)
-}
-```
 
 ## Resource Management
 
@@ -201,8 +191,8 @@ def timeout(duration: java.time.Duration): Eru[E | java.util.concurrent.TimeoutE
 def timeoutTo[A1 >: A](duration: java.time.Duration, fallback: A1): Eru[E, A1]
 
 // Retry extensions
-def retry(policy: EruRuntime.Policy): Eru[E, A]
 def retryN(n: Int): Eru[E, A]
+def retryWithBackoff(base: Duration, maxRetries: Int): Eru[E, A]
 
 // Runner conveniences  
 def runExit(): Exit[E, A]
@@ -250,13 +240,7 @@ object FailureThreshold {
 
 ## Code Generation 
 
-Eru provides excellent Scaladoc documentation. Generate locally with:
-
-```bash
-sbt genApiDocs
-```
-
-This produces unified API documentation at `target/scala-3.7.2/unidoc/` covering all public modules.
+Eru provides excellent Scaladoc documentation integrated with the build.
 
 ## Import Structure
 

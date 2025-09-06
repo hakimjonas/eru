@@ -63,13 +63,13 @@ val structured = for {
 ```scala
 def parentTask: Eru[String, String] = for {
   childFiber <- childTask.fork
-  _ <- Eru.sleep(Duration.ofSeconds(1))
+  _ <- EruRuntime.sleep(Duration.ofSeconds(1))
   // If parent is interrupted, child is automatically interrupted
   result <- childFiber.await
 } yield result
 
 def childTask: Eru[String, String] = 
-  Eru.sleep(Duration.ofSeconds(5)).as("child completed")
+  EruRuntime.sleep(Duration.ofSeconds(5)).as("child completed")
 ```
 
 ## Parallel Composition
@@ -82,8 +82,8 @@ Race multiple computations and get the result of whichever completes first:
 import java.time.Duration
 
 val raced = EruRuntime.race(
-  slowOperation.timeoutAfter(Duration.ofSeconds(10)),
-  fastOperation.timeoutAfter(Duration.ofSeconds(1))
+  slowOperation.timeout(Duration.ofSeconds(10)),
+  fastOperation.timeout(Duration.ofSeconds(1))
 )
 
 raced.map {
@@ -153,7 +153,7 @@ val withFallback = riskyOperation
 ```scala
 val interruptible = for {
   fiber <- longRunningTask.fork
-  _ <- Eru.sleep(Duration.ofSeconds(1))
+  _ <- EruRuntime.sleep(Duration.ofSeconds(1))
   _ <- fiber.interrupt(InterruptCause.Cancelled(Some("User requested cancellation")))
   result <- fiber.await // Will be interrupted
 } yield result
@@ -221,28 +221,14 @@ def pipeline[A, B, C, D](
 }
 ```
 
-### Concurrent Producer/Consumer
+### Concurrent Processing Pipeline
 
 ```scala
-def producerConsumer[A](items: List[A]): Eru[String, Unit] = {
+def processPipeline[A, B](items: List[A])(process: A => Eru[String, B]): Eru[String, List[B]] = {
   for {
-    ref <- Ref.make(List.empty[A])
-    
-    // Producer fiber
-    producer <- EruRuntime.parSequence(
-      items.map(item => ref.update(item :: _))
-    ).fork
-    
-    // Consumer fiber  
-    consumer <- (for {
-      _ <- Eru.sleep(Duration.ofMillis(10)) 
-      items <- ref.get
-      _ <- if (items.nonEmpty) processItems(items) else Eru.unit
-    } yield ()).fork
-    
-    _ <- producer.await
-    _ <- consumer.await
-  } yield ()
+    // Process items in parallel
+    processed <- EruRuntime.parTraverse(items)(process)
+  } yield processed
 }
 ```
 
