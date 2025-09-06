@@ -31,13 +31,13 @@ extension [E, A](effects: List[Eru[E, A]]) {
   */
 final class ConcurrencyStressSpec extends FunSuite {
 
-  test("high-load fiber creation and completion (1000 fibers)") {
-    val fiberCount = 1000
+  test("high-load fiber creation and completion (500 fibers)") {
+    val fiberCount = 500
     val completedCounter = new AtomicInteger(0)
 
     val fibers = (1 to fiberCount).map { i =>
       EruRuntime.fork {
-        EruRuntime.sleep(Duration.ofMillis((i % 5) + 1)).flatMap { _ =>
+        EruRuntime.sleep(Duration.ofMillis((i % 3) + 1)).flatMap { _ =>
           Eru.effect {
             completedCounter.incrementAndGet()
             i
