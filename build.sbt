@@ -214,7 +214,7 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
     name := "eru-bench-jvm",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % "2.1.20",
+      "dev.zio" %% "zio" % "2.1.21",
       "org.typelevel" %% "cats-effect" % "3.6.3"
     ),
     // JMH settings
