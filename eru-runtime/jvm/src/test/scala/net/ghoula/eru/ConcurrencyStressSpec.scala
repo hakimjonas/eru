@@ -9,7 +9,6 @@ import scala.jdk.CollectionConverters.*
 
 import net.ghoula.eru.prelude.*
 
-// Simple sequence implementation for testing
 extension [E, A](effects: List[Eru[E, A]]) {
   def sequence: Eru[E, List[A]] = {
     def loop(remaining: List[Eru[E, A]], acc: List[A]): Eru[E, List[A]] =

@@ -7,7 +7,12 @@ import scala.collection.mutable.ListBuffer
 import net.ghoula.eru.CorePrelude.*
 import net.ghoula.eru.trace.EruTrace.Span
 
-class EruTraceSpec extends FunSuite {
+/** Test suite for the EruTrace functionality and tracing infrastructure.
+  *
+  * Validates span creation, trace propagation, observer integration, and the correctness of trace
+  * data collection across effect composition boundaries.
+  */
+final class EruTraceSpec extends FunSuite {
 
   test("SpanId.fresh generates unique identifiers") {
     val id1 = EruTrace.SpanId.fresh()

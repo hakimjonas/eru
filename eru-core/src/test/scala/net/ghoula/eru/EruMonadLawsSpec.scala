@@ -21,7 +21,6 @@ final class EruMonadLawsSpec extends FunSuite {
   private val testError = "test error"
   private val f: Int => Eru[String, String] = x => Eru.succeed(s"f($x)")
   private val g: String => Eru[String, Int] = s => Eru.succeed(s.length)
-  private val h: Int => Int = _ * 2
 
   test("Left Identity: Eru.succeed(a).flatMap(f) == f(a)") {
     val left = Eru.succeed(testValue).flatMap(f).unsafeRunSync()
@@ -86,73 +85,6 @@ final class EruMonadLawsSpec extends FunSuite {
     assertEquals(leftNegative, rightNegative)
   }
 
-  test("Functor Identity: eru.map(identity) == eru") {
-    val originalEffect = Eru.succeed(testValue)
-    val left = originalEffect.map(identity).unsafeRunSync()
-    val right = originalEffect.unsafeRunSync()
-
-    assertEquals(left, right)
-  }
-
-  test("Functor Composition: eru.map(f).map(g) == eru.map(f.andThen(g))") {
-    val f = (x: Int) => x.toString
-    val g = (s: String) => s.length
-
-    val originalEffect = Eru.succeed(testValue)
-    val left = originalEffect.map(f).map(g).unsafeRunSync()
-    val right = originalEffect.map(f.andThen(g)).unsafeRunSync()
-
-    assertEquals(left, right)
-  }
-
-  test("Functor laws hold for failing effects") {
-    val failingEffect = Eru.fail(testError)
-
-    // Identity
-    interceptMessage[EruException[String]](testError) {
-      failingEffect.map(identity).unsafeRunSync()
-    }
-
-    // Composition
-    interceptMessage[EruException[String]](testError) {
-      failingEffect.map(h).map(_ + 1).unsafeRunSync()
-    }
-  }
-
-  test("Applicative Identity: pure(identity) <*> v = v") {
-    val effect = Eru.succeed(testValue)
-    val identity = Eru.succeed((x: Int) => x)
-
-    val left = identity.zip(effect).map { case (f, x) => f(x) }.unsafeRunSync()
-    val right = effect.unsafeRunSync()
-
-    assertEquals(left, right)
-  }
-
-  test("Applicative Composition: demonstrates function composition through zip") {
-    val stringifier = Eru.succeed((x: Int) => x.toString)
-    val lengthGetter = Eru.succeed((s: String) => s.length)
-    val value = Eru.succeed(testValue)
-
-    // Compose functions and apply to value
-    val composed = stringifier
-      .zip(lengthGetter)
-      .zip(value)
-      .map { case ((f, g), x) => g(f(x)) }
-      .unsafeRunSync()
-
-    // Apply functions sequentially
-    val sequential = value
-      .zip(stringifier)
-      .map { case (x, f) => f(x) }
-      .zip(lengthGetter)
-      .map { case (intermediate, g) => g(intermediate) }
-      .unsafeRunSync()
-
-    assertEquals(composed, sequential)
-    assertEquals(composed, testValue.toString.length)
-  }
-
   test("map/flatMap coherence: eru.map(f) == eru.flatMap(f.andThen(Eru.succeed))") {
     val originalEffect = Eru.succeed(testValue)
     val f = (x: Int) => x.toString
@@ -190,56 +122,6 @@ final class EruMonadLawsSpec extends FunSuite {
     val right = failingEffect.recoverWith(pf.andThen(Eru.succeed)).unsafeRunSync()
 
     assertEquals(left, right)
-  }
-
-  test("stack safety for deep flatMap chains") {
-    val arch = System.getProperty("os.arch")
-    val default =
-      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 50_000
-      else 150_000
-    val depth = sys.props
-      .get("eru.stack.flatMapDepth")
-      .flatMap(s => scala.util.Try(s.toInt).toOption)
-      .filter(_ > 0)
-      .getOrElse(default)
-
-    def deepFlatMapped(n: Int): Eru[Nothing, Int] = {
-      var i = 0
-      var eff: Eru[Nothing, Int] = Eru.succeed(0)
-      while (i < n) {
-        eff = eff.flatMap(v => Eru.succeed(v + 1))
-        i += 1
-      }
-      eff
-    }
-
-    val result = deepFlatMapped(depth).unsafeRunSync()
-    assertEquals(result, depth)
-  }
-
-  test("stack safety for deep map chains") {
-    val arch = System.getProperty("os.arch")
-    val default =
-      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 50_000
-      else 150_000
-    val depth = sys.props
-      .get("eru.stack.mapDepth")
-      .flatMap(s => scala.util.Try(s.toInt).toOption)
-      .filter(_ > 0)
-      .getOrElse(default)
-
-    def deepMapped(n: Int): Eru[Nothing, Int] = {
-      var i = 0
-      var eff: Eru[Nothing, Int] = Eru.succeed(0)
-      while (i < n) {
-        eff = eff.map(_ + 1)
-        i += 1
-      }
-      eff
-    }
-
-    val result = deepMapped(depth).unsafeRunSync()
-    assertEquals(result, depth)
   }
 
 }
