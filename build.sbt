@@ -52,7 +52,8 @@ lazy val root = (project in file("."))
     eruRuntimeJVM,
     eruRuntimeNative,
     eruBenchJVM,
-    eruIntegrationTest
+    eruIntegrationTest,
+    docs
   )
   .settings(
     name := "eru-root",
@@ -129,7 +130,11 @@ lazy val root = (project in file("."))
       "check",
       "scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
     ),
-    addCommandAlias("testAll", "test; eruIntegrationTest/test")
+    addCommandAlias("testAll", "test; eruIntegrationTest/test"),
+
+    // Documentation commands
+    addCommandAlias("docs", "docs/mdoc"),
+    addCommandAlias("docsWatch", "docs/mdoc --watch")
   )
 
 // Custom clean task
@@ -239,6 +244,22 @@ lazy val eruIntegrationTest = (project in file("eru-integration-test"))
       "org.scalameta" %% "munit" % "1.1.1" % Test
     ),
     Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
+  )
+
+// ===== Documentation Validation (mdoc) =====
+lazy val docs = project
+  .in(file("eru-docs"))
+  .enablePlugins(MdocPlugin)
+  .dependsOn(eruCoreJVM, eruRuntimeJVM)
+  .settings(
+    name := "eru-docs",
+    publish / skip := true,
+    mdocIn := file("docs-src"),
+    mdocOut := file("target/mdoc"),
+    mdocVariables := Map(
+      "VERSION" -> version.value,
+      "SCALA_VERSION" -> scalaVersion.value
+    )
   )
 
 // ===== Global Settings =====

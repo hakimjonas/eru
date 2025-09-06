@@ -34,6 +34,12 @@ sbt scalafmtAll       # Format all code (120 char width)
 sbt cleanAll          # Clean all target directories
 ```
 
+### Documentation
+```bash
+sbt docs              # Validate documentation examples with mdoc
+sbt docsWatch         # Watch and validate documentation examples
+```
+
 ## Architecture
 
 Eru is a high-performance effect system built with modern Scala 3, organized as a cross-platform library with four core modules:

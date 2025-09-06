@@ -29,10 +29,12 @@ import net.ghoula.eru.prelude.*
 val hello = Eru.succeed("Hello, Eru!")
 
 // Resource-safe operations  
-val fileOp = Eru.resource {
+val fileOp = Eru.effect {
   Files.newBufferedReader(path)
-} { reader =>
+}.bracket { reader =>
   Eru.effect(reader.close())
+} { reader =>
+  Eru.effect(reader.readLine())
 }
 
 // Concurrent operations (JVM) / Sequential (Native)
@@ -95,6 +97,7 @@ sbt prepare          # Format, compile, and prepare for commit
 sbt check            # Validate formatting and run quality checks  
 sbt testAll          # Run all tests including integration tests
 sbt test             # Run unit tests only
+sbt docs             # Validate documentation examples
 ```
 
 ### Platform-Specific Testing

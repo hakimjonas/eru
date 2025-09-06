@@ -77,13 +77,13 @@ Eru ensures resources are properly cleaned up even in the presence of errors:
 import java.nio.file.*
 
 val safeFileRead: Eru[Throwable, String] = 
-  Eru.resource {
+  Eru.effect {
     // Acquire resource
     Files.newBufferedReader(Paths.get("data.txt"))
-  } { reader =>
+  }.bracket { reader =>
     // Release resource (always called)
     Eru.effect(reader.close())
-  }.flatMap { reader =>
+  } { reader =>
     // Use resource safely
     Eru.effect(reader.readLine())
   }
