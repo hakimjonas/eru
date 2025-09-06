@@ -176,7 +176,7 @@ final class EruMonadLawsSpec extends FunSuite {
     val b = Eru.fail("b")
     val c = Eru.succeed(testValue)
 
-    val left = (a.orElse(b)).orElse(c)
+    val left = a.orElse(b).orElse(c)
     val right = a.orElse(b.orElse(c))
 
     assertEquals(left.unsafeRunSync(), right.unsafeRunSync())
@@ -210,18 +210,13 @@ final class EruMonadLawsSpec extends FunSuite {
   }
 
   test("stack safety for deep map chains") {
-    // Platform-aware stack test depth for ARM architecture compatibility
-    val stackTestDepth = {
-      val arch = System.getProperty("os.arch")
-      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 5000 else 10000
-    }
+    val stackTestDepth =
+      if (System.getProperty("os.arch").startsWith("aarch64") || System.getProperty("os.arch").startsWith("arm")) 5000
+      else 10000
 
-    def deepMap(n: Int): Eru[Nothing, Int] = {
-      if (n <= 0) Eru.succeed(0)
-      else deepMap(n - 1).map(_ + 1)
-    }
+    def deepMap(n: Int): Eru[Nothing, Int] =
+      (0 until n).foldLeft(Eru.succeed(0)) { (acc, _) => acc.map(_ + 1) }
 
-    // This should not stack overflow
     val result = deepMap(stackTestDepth).unsafeRunSync()
     assertEquals(result, stackTestDepth)
   }
