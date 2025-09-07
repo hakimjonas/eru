@@ -6,6 +6,13 @@ import scala.collection.mutable.ListBuffer
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Comprehensive test suite for the EruObserver system and event emission.
+  *
+  * Validates the observer pattern implementation including event capture, filtering, and proper
+  * integration with effect execution. Tests ensure that the observer system provides complete
+  * visibility into runtime behavior without affecting computational correctness or performance,
+  * supporting the Exceptional Observability pillar of the Eru framework.
+  */
 class EruObserverSpec extends FunSuite {
 
   private class CollectingObserver extends EruObserver {

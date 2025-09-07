@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Advanced test suite for Phase 2 fiber operations and resource management.
+  *
+  * Validates sophisticated fiber lifecycle scenarios including auto-join behavior, finalizer
+  * leak prevention, and advanced resource cleanup patterns. These tests ensure that the fiber
+  * system maintains resource safety even in complex concurrent scenarios and prevents common
+  * concurrency pitfalls like resource leaks and improper cleanup ordering.
+  */
 class FiberPhase2Spec extends FunSuite {
 
   test("fork without await prevents finalizer leaks via auto-join") {

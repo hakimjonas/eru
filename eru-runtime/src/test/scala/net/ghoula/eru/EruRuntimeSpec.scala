@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import scala.collection.mutable.ListBuffer
 
+/** Comprehensive test suite for the EruRuntime execution engine.
+  *
+  * Validates the core runtime functionality including fiber execution, concurrency primitives,
+  * resource management, and runtime lifecycle. These tests ensure that the runtime provides
+  * correct execution semantics, proper error handling, and maintains the performance
+  * characteristics essential for production workloads.
+  */
 class EruRuntimeSpec extends FunSuite {
 
   test("fork/await returns Exit.Success on success") {

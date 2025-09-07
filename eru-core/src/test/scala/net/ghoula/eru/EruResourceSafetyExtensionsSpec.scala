@@ -6,6 +6,13 @@ import scala.collection.mutable.ListBuffer
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Test suite for advanced resource safety extensions and edge cases.
+  *
+  * Validates complex resource management scenarios including nested finalizers, concurrent
+  * resource access, and error propagation through resource cleanup chains. These tests ensure
+  * that the extended resource safety mechanisms maintain correctness under stress conditions
+  * and provide comprehensive coverage for production workload patterns.
+  */
 class EruResourceSafetyExtensionsSpec extends FunSuite {
 
   test("ensureAll runs multiple finalizers in FILO order") {

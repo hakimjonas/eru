@@ -8,6 +8,13 @@ import java.time.Duration
 
 import net.ghoula.eru.prelude.*
 
+/** Property-based test suite for RetryPolicy functionality and invariants.
+  *
+  * Uses generative testing to validate that retry policies maintain mathematical correctness
+  * across a wide range of inputs and configurations. Tests verify policy composition,
+  * duration calculations, and termination conditions to ensure that retry mechanisms
+  * provide predictable and reliable behavior under all operational scenarios.
+  */
 final class RetryPolicyPropertySpec extends ScalaCheckSuite {
 
   private val nonNegativeSmall: Gen[Int] = Gen.choose(0, 10)

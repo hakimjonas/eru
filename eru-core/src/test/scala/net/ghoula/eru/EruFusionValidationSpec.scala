@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Validation suite for Eru's fusion optimization system.
+  *
+  * Verifies that the internal AST fusion optimizations produce semantically equivalent results
+  * while maintaining correct program structure. Tests ensure that fusion rules preserve
+  * computational semantics and do not introduce performance regressions or correctness issues,
+  * validating the construction-time optimizations critical for high-performance effect execution.
+  */
 class EruFusionValidationSpec extends FunSuite {
 
   test("pure fusion produces correct AST structure") {

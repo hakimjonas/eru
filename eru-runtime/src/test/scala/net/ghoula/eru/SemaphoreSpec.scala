@@ -2,6 +2,13 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+/** Test suite for Semaphore concurrent primitive functionality.
+  *
+  * Validates all operations of the Semaphore data type including permit acquisition, release,
+  * and availability tracking. Semaphore provides counting semaphore semantics that enable
+  * controlled access to limited resources, supporting patterns like connection pools,
+  * rate limiting, and bounded parallelism with complete fiber-safe semantics.
+  */
 final class SemaphoreSpec extends FunSuite {
 
   test("make initializes permitsAvailable") {

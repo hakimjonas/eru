@@ -6,6 +6,14 @@ import java.time.Duration
 
 import net.ghoula.eru.prelude.*
 
+/** Integration test suite for timeout and retry functionality in real-world scenarios.
+  *
+  * Validates timeout operations, retry policies, and their composition in practical use cases
+  * that reflect production application patterns. These tests ensure that timeout and retry
+  * mechanisms provide reliable behavior for handling unreliable external dependencies,
+  * network operations, and other failure-prone interactions while maintaining correctness
+  * and resource safety guarantees.
+  */
 final class TimeoutRetrySpec extends FunSuite {
   test("timeoutTo either preserves value or yields fallback (single-threaded semantics)") {
     val slow = Eru.blocking(Thread.sleep(100)).map(_ => 1)

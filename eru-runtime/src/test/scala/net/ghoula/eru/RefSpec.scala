@@ -2,6 +2,13 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+/** Test suite for Ref concurrent primitive functionality.
+  *
+  * Validates all operations of the Ref data type including atomic updates, modifications,
+  * and state management. Ref provides thread-safe mutable reference semantics that enable
+  * safe shared state management between concurrent fibers, supporting atomic operations
+  * and consistent state transitions with complete memory safety guarantees.
+  */
 final class RefSpec extends FunSuite {
 
   test("make/get returns initial value") {

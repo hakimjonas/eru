@@ -5,6 +5,13 @@ import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 
+/** Test suite for JVM-specific interoperability features in the Eru runtime.
+  *
+  * Validates integration with JVM-specific concurrency primitives including Future interop,
+  * Promise integration, and other JVM-specific runtime features. These tests ensure that
+  * Eru effects can seamlessly integrate with existing JVM ecosystem components while
+  * maintaining type safety and resource management guarantees.
+  */
 final class EruRuntimeInteropSpec extends FunSuite {
 
   test("fromFuture success case yields the Future value") {

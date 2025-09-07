@@ -362,7 +362,6 @@ class FiberErrorPropagationSpec extends FunSuite {
 
     interruptResult.attempt.unsafeRunSync() match {
       case Result.Failure(_: InterruptedException) =>
-      // Expected behavior - Interrupt becomes InterruptedException
       case other =>
         fail(s"Expected fromExit to convert Interrupt to InterruptedException but got: $other")
     }
@@ -414,7 +413,6 @@ class FiberErrorPropagationSpec extends FunSuite {
           childFiber <- EruRuntime.fork(createNestedFiber(depth - 1))
           childExit <- childFiber.await
           result <- {
-            // Handle the union type from fromExit explicitly
             Eru.fromExit(childExit).attempt.flatMap {
               case Result.Success(value) => Eru.succeed(value)
               case Result.Failure(error) =>

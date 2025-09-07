@@ -7,6 +7,13 @@ import scala.annotation.nowarn
 
 import net.ghoula.eru.prelude.*
 
+/** Test suite for JVM timer functionality in the Eru runtime system.
+  *
+  * Validates sleep operations, timeout behavior, and other time-based primitives available
+  * on the JVM platform. These tests ensure that timer operations provide accurate timing,
+  * proper non-blocking semantics, and integrate correctly with the fiber scheduling system
+  * while maintaining high performance under concurrent load.
+  */
 @nowarn("msg=.*")
 final class TimersSpec extends FunSuite {
 

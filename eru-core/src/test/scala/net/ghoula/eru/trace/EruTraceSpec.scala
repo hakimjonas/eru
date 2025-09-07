@@ -175,9 +175,6 @@ final class EruTraceSpec extends FunSuite {
 
     val result = effect.unsafeRunSyncWith(observer)
     assertEquals(result, 42)
-
-    // Note: The current implementation may not work perfectly with observer
-    // due to the way EmitTraceSpan is handled, but we test the basic functionality
   }
 
   test("traced extension method with tags") {
@@ -283,9 +280,7 @@ final class EruTraceSpec extends FunSuite {
   test("getCurrentContext returns None initially") {
     import EruTrace.*
 
-    // In a fresh test context, there should be no current context
     val _ = getCurrentContext
-    // Note: This might not work as expected due to ThreadLocal behavior in tests
   }
 
   test("span status variants work correctly") {

@@ -21,7 +21,7 @@ import net.ghoula.eru.prelude.*
 class FiberStressSpec extends FunSuite {
 
   override def munitTimeout: scala.concurrent.duration.Duration =
-    scala.concurrent.duration.Duration(5, scala.concurrent.duration.MINUTES) // Increase timeout for stress tests
+    scala.concurrent.duration.Duration(5, scala.concurrent.duration.MINUTES)
 
   test("high-volume fiber creation and completion (1000 fibers)") {
     val fiberCount = 1000
@@ -237,19 +237,6 @@ class FiberStressSpec extends FunSuite {
   }
 
   test("resource cleanup under concurrent stress with failures - FIXED") {
-    // CRITICAL BUG - FIXED: parSequence now waits for all fiber finalizers before returning
-    //
-    // Previous Issue: parSequence was failing fast without ensuring all fiber finalizers completed,
-    // causing resource leaks in concurrent scenarios with early failures.
-    //
-    // Fix Applied: Modified parSequence to:
-    // 1. Fork all effects (unchanged)
-    // 2. Await ALL fiber exits (not fail-fast)
-    // 3. Merge all finalizers via await (automatic)
-    // 4. Then process results and determine success/failure
-    //
-    // Status: RESOLVED - Resource safety guarantee now maintained
-
     val operationCount = 150
     val resourceCounter = new java.util.concurrent.atomic.AtomicInteger(0)
     val cleanupCounter = new java.util.concurrent.atomic.AtomicInteger(0)
@@ -271,11 +258,10 @@ class FiberStressSpec extends FunSuite {
     val result = EruRuntime.parSequence(effects).attempt.unsafeRunSync()
 
     result match {
-      case Result.Failure(_) => // Expected failure
-      case Result.Success(_) => // Unexpected success
+      case Result.Failure(_) =>
+      case Result.Success(_) =>
     }
 
-    // This assertion now passes consistently with the fix
     assertEquals(
       cleanupCounter.get(),
       resourceCounter.get(),
@@ -312,7 +298,6 @@ class FiberStressSpec extends FunSuite {
 
       var computation: Eru[Nothing, String] = Eru.succeed(s"fiber-$fiberId")
 
-      // Add finalizers in order: 1, 2, 3, 4, 5
       for (finId <- 1 to finalizersPerFiber) {
         computation = computation.ensure {
           Eru.effect {
@@ -320,9 +305,6 @@ class FiberStressSpec extends FunSuite {
             executionOrder.set(finId :: currentOrder)
             finalizerExecutionCount.incrementAndGet()
 
-            // In concurrent execution, FILO order within a single fiber should be maintained
-            // But we need to be more sophisticated about checking this
-            // For now, just count executions - detailed FILO checking is complex in parallel context
           }
         }
       }
@@ -340,8 +322,6 @@ class FiberStressSpec extends FunSuite {
     assertEquals(fiberCompletions.get(), fiberCount)
     assertEquals(finalizerExecutionCount.get(), fiberCount * finalizersPerFiber)
 
-    // Verify all finalizers executed (FILO order checking simplified for parallel execution)
-    // Note: Full FILO verification across parallel fibers is complex and tested in FiberFinalizerIntegrationSpec
     assert(finalizerExecutionCount.get() > 0, "Some finalizers should have executed")
   }
 
@@ -375,10 +355,9 @@ class FiberStressSpec extends FunSuite {
         (1 to fiberCount).map(id => EruRuntime.fork(createInterruptibleFiber(id))).toList
       )
 
-      // Randomly interrupt some fibers
       _ <- EruRuntime.parSequence {
         fibers.zipWithIndex.collect {
-          case (fiber, idx) if scala.util.Random.nextDouble() < 0.3 => // 30% interrupt rate
+          case (fiber, idx) if scala.util.Random.nextDouble() < 0.3 =>
             EruRuntime.sleep(Duration.ofMillis(scala.util.Random.nextInt(25))).flatMap { _ =>
               fiber.interrupt(InterruptCause.Cancelled(Some(s"random-interrupt-$idx")))
             }
@@ -392,28 +371,25 @@ class FiberStressSpec extends FunSuite {
 
     assertEquals(results.length, fiberCount)
 
-    // All fibers should have executed their finalizers
     assertEquals(finalizerCount.get(), fiberCount)
 
-    // Total should equal fiber count
+
     assertEquals(interruptedCount.get() + completedCount.get(), fiberCount)
   }
 
   test("memory pressure simulation with finalizer cleanup verification") {
-    val rounds = 3 // Reduced from 10 to reduce test time
-    val fibersPerRound = 10 // Reduced from 20
-    val objectSize = 1024 * 8 // Reduced from 64KB to 8KB
+    val rounds = 3
+    val fibersPerRound = 10
+    val objectSize = 1024 * 8
     val cleanupVerification = new java.util.concurrent.atomic.AtomicInteger(0)
 
     for (round <- 1 to rounds) {
       val effects = (1 to fibersPerRound).map { i =>
         val fiberId = round * fibersPerRound + i
 
-        // Simplified without excessive forking
         for {
-          // Simulate memory work more efficiently
           data <- Eru.effect(Array.fill(objectSize)(fiberId.toByte))
-          checksum <- Eru.effect(data.take(100).sum) // Sample instead of full array
+          checksum <- Eru.effect(data.take(100).sum)
           _ <- Eru.effect(cleanupVerification.incrementAndGet())
         } yield s"completed-$fiberId-$checksum"
       }.toList
@@ -422,7 +398,6 @@ class FiberStressSpec extends FunSuite {
       assertEquals(results.length, fibersPerRound)
     }
 
-    // All fibers should have completed cleanup
     assertEquals(cleanupVerification.get(), rounds * fibersPerRound)
   }
 
@@ -437,7 +412,7 @@ class FiberStressSpec extends FunSuite {
         event match {
           case _: EruObserver.EruEvent.FiberStarted => fiberStartEvents.incrementAndGet()
           case _: EruObserver.EruEvent.FiberCompleted => fiberEndEvents.incrementAndGet()
-          case _ => // Other events
+          case _ =>
         }
       }
     }
@@ -463,11 +438,10 @@ class FiberStressSpec extends FunSuite {
 
     assertEquals(results.length, fiberCount)
 
-    // Should have fiber start and end events for each fiber
     assertEquals(fiberStartEvents.get(), fiberCount)
     assertEquals(fiberEndEvents.get(), fiberCount)
 
-    // Total events should be at least start + end events
+
     assert(eventCount.get() >= fiberStartEvents.get() + fiberEndEvents.get())
   }
 }

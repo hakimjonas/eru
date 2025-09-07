@@ -659,7 +659,6 @@ class EruSpec extends FunSuite {
     }
   }
 
-  // --- Eru.blocking tests ---
   test("Eru.blocking is lazy - does not execute computation immediately") {
     var counter = 0
     val eru = Eru.blocking {
@@ -683,8 +682,6 @@ class EruSpec extends FunSuite {
       prog.unsafeRunSync()
     }
   }
-
-  // Tests for Pure Construction-Time Optimizations
 
   test("eager evaluation: succeed().map() evaluates immediately at construction time") {
     var mapCallCount = 0
@@ -795,8 +792,6 @@ class EruSpec extends FunSuite {
     assertEquals(flatMapCallCount, 1, "FlatMap should be called once during execution")
     assertEquals(effectCallCount, 1, "Effect should be called once during execution")
   }
-
-  // Tests for Safe FlatMap Construction-Time Optimizations
 
   test("pure fusion: succeed().flatMap(pure) fuses at construction") {
     var flatMapCallCount = 0

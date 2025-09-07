@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Comprehensive test suite for the Exit data type and its operations.
+  *
+  * Validates all fundamental operations of Exit[E, A] including construction, transformation,
+  * pattern matching, and combinatorial logic. The Exit type represents the final outcome of
+  * fiber execution, encoding success, failure, and interruption states with complete type safety
+  * and providing the foundation for fiber coordination and error propagation.
+  */
 class ExitSpec extends FunSuite {
 
   test("Exit.Success holds the value") {

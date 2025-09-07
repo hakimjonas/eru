@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Comprehensive test suite for Eru resource management functionality.
+  *
+  * Validates all resource safety operations including ensure, bracket, and finalization semantics.
+  * Tests cover proper resource cleanup on both success and failure paths, ensuring that finalizers
+  * are always executed and resources are never leaked, maintaining the correctness guarantees
+  * essential for production effect systems.
+  */
 class EruResourceSpec extends FunSuite {
 
   test("ensure runs finalizer on success") {

@@ -2,6 +2,13 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+/** Test suite for Deferred concurrent primitive functionality.
+  *
+  * Validates all operations of the Deferred data type including construction, completion,
+  * polling, and await semantics. Deferred provides single-assignment variable semantics
+  * that enable safe coordination between concurrent fibers, supporting common patterns
+  * like producer-consumer communication and synchronization barriers.
+  */
 final class DeferredSpec extends FunSuite {
 
   test("poll returns None before completion and Some after completion") {

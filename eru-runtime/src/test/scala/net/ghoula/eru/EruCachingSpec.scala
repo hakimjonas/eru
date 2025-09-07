@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Test suite for Eru caching functionality and memoization operations.
+  *
+  * Validates the cached combinator and other memoization primitives that enable efficient
+  * reuse of expensive computations. These tests ensure that caching maintains correctness
+  * by properly handling success/failure cases, cache invalidation, and concurrent access
+  * patterns while providing the performance benefits expected from memoization.
+  */
 class EruCachingSpec extends FunSuite {
 
   test("cached executes effect only once and reuses result on success") {

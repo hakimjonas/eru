@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Test suite for fork and await operations in the core Eru effect system.
+  *
+  * Validates the construction and basic semantics of fork operations that create concurrent
+  * fibers and await operations that wait for fiber completion. These tests focus on the
+  * core AST construction and semantic validation, with full runtime execution testing
+  * covered in the runtime module specifications.
+  */
 class ForkAwaitSpec extends FunSuite {
 
   test("Eru.fork creates Fork case") {

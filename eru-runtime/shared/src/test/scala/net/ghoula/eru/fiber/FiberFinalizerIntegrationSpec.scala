@@ -33,7 +33,6 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Success("done"))
-    // FILO order: last registered runs first
     assertEquals(executionOrder.toList, List("finalizer3", "finalizer2", "finalizer1"))
   }
 
@@ -58,18 +57,13 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     assertEquals(exit, Exit.Success("outer-inner-done"))
 
-    // The actual behavior shows that child finalizers run first, then parent finalizers
-    // This is correct FILO behavior: child cleanup happens before parent cleanup
     val innerFinalizers = executionOrder.filter(_.startsWith("inner-")).toList
     val outerFinalizers = executionOrder.filter(_.startsWith("outer-")).toList
 
-    // Inner finalizers should be in FILO order
     assertEquals(innerFinalizers, List("inner-fin2", "inner-fin1"))
 
-    // Outer finalizers should be in FILO order
     assertEquals(outerFinalizers, List("outer-fin3", "outer-fin2", "outer-fin1"))
 
-    // Child finalizers should complete before parent finalizers (structured cleanup)
     val lastInnerIndex = executionOrder.lastIndexWhere(_.startsWith("inner-"))
     val firstOuterIndex = executionOrder.indexWhere(_.startsWith("outer-"))
     assert(lastInnerIndex < firstOuterIndex, "Child finalizers should complete before parent finalizers")
@@ -92,8 +86,6 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     assertEquals(result, ("left-done", "right-done"))
 
-    // Both sides should execute their finalizers in FILO order
-    // Order between left and right is not guaranteed, but within each side should be FILO
     val leftFinalizers = executionOrder.filter(_.startsWith("left")).toList
     val rightFinalizers = executionOrder.filter(_.startsWith("right")).toList
 
@@ -119,16 +111,14 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     assertEquals(results, List("effect1-done", "effect2-done", "effect3-done"))
 
-    // Each effect should have its finalizers in FILO order (that executed)
     for (i <- 1 to 3) {
       val effectFinalizers = executionOrder.filter(_.startsWith(s"effect$i")).toList
       if (effectFinalizers.nonEmpty) {
-        // If any finalizers ran, they should be in FILO order
         val expectedFinalizers =
           if (effectFinalizers.contains(s"effect$i-fin1") && effectFinalizers.contains(s"effect$i-fin2")) {
             List(s"effect$i-fin2", s"effect$i-fin1")
           } else {
-            effectFinalizers // Accept whatever actually ran
+            effectFinalizers
           }
         assertEquals(effectFinalizers, expectedFinalizers)
       }
@@ -142,14 +132,13 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
       _ <- Eru.succeed("step1").ensure(Eru.effect(executionOrder += "finalizer1"))
       _ <- Eru.succeed("step2").ensure(Eru.effect(executionOrder += "finalizer2"))
       _ <- Eru.fail("intentional failure")
-      _ <- Eru.succeed("step3").ensure(Eru.effect(executionOrder += "finalizer3")) // Should not register
+      _ <- Eru.succeed("step3").ensure(Eru.effect(executionOrder += "finalizer3"))
     } yield "done"
 
     val fiber = EruRuntime.fork(failingComputation).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Failure("intentional failure"))
-    // Only the finalizers that were registered before the failure should execute
     assertEquals(executionOrder.toList, List("finalizer2", "finalizer1"))
   }
 
@@ -161,7 +150,7 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
       _ <- Eru.succeed("step1").ensure(Eru.effect(executionOrder += "finalizer1"))
       _ <- Eru.succeed("step2").ensure(Eru.effect(executionOrder += "finalizer2"))
       _ <- Eru.effect(throw exception)
-      _ <- Eru.succeed("step3").ensure(Eru.effect(executionOrder += "finalizer3")) // Should not register
+      _ <- Eru.succeed("step3").ensure(Eru.effect(executionOrder += "finalizer3"))
     } yield "done"
 
     val fiber = EruRuntime.fork(dyingComputation).unsafeRunSync()
@@ -172,7 +161,6 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
       case other => fail(s"Expected Die but got $other")
     }
 
-    // Finalizers should still execute in FILO order
     assertEquals(executionOrder.toList, List("finalizer2", "finalizer1"))
   }
 
@@ -193,7 +181,6 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     assertEquals(result, "done")
 
-    // Expected order: after-fin, then nested finalizers in FILO order
     assertEquals(executionOrder.toList, List("after-fin", "nested-fin2", "nested-fin1"))
   }
 
@@ -216,7 +203,6 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     assertEquals(result, "done")
 
-    // All finalizers should execute despite the exception in the middle one
     assertEquals(executionOrder.toList, List("finalizer3", "failing-finalizer", "finalizer1"))
   }
 
@@ -238,8 +224,6 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     assertEquals(result, Left("fast-won"))
 
-    // Fast effect's finalizers should execute in FILO order
-    // Slow effect may or may not have started executing its finalizers
     val fastFinalizers = executionOrder.filter(_.startsWith("fast")).toList
     assertEquals(fastFinalizers, List("fast-fin2", "fast-fin1"))
   }
@@ -253,13 +237,13 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
           _ <- Eru.succeed("fork1").ensure(Eru.effect(executionOrder += "fork1-fin"))
           _ <- Eru.succeed("fork2").ensure(Eru.effect(executionOrder += "fork2-fin"))
         } yield "fork-done"
-      } // Note: not awaiting this fiber
+      }
       _ <- EruRuntime.fork {
         for {
           _ <- Eru.succeed("fork3").ensure(Eru.effect(executionOrder += "fork3-fin"))
           _ <- Eru.succeed("fork4").ensure(Eru.effect(executionOrder += "fork4-fin"))
         } yield "fork2-done"
-      } // Note: not awaiting this fiber either
+      }
       _ <- Eru.succeed("main").ensure(Eru.effect(executionOrder += "main-fin"))
     } yield "main-done"
 
@@ -267,14 +251,12 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     assertEquals(result, "main-done")
 
-    // Auto-join should ensure all finalizers execute
     assert(executionOrder.contains("fork1-fin"))
     assert(executionOrder.contains("fork2-fin"))
     assert(executionOrder.contains("fork3-fin"))
     assert(executionOrder.contains("fork4-fin"))
     assert(executionOrder.contains("main-fin"))
 
-    // Each forked computation should have FILO finalizer order
     val indices = Map(
       "fork1-fin" -> executionOrder.indexOf("fork1-fin"),
       "fork2-fin" -> executionOrder.indexOf("fork2-fin"),
@@ -282,7 +264,6 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
       "fork4-fin" -> executionOrder.indexOf("fork4-fin")
     )
 
-    // Within each fork, FILO order should be maintained
     assert(indices("fork2-fin") < indices("fork1-fin"))
     assert(indices("fork4-fin") < indices("fork3-fin"))
   }
@@ -310,12 +291,10 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     assert(result.contains("leaf"))
 
-    // Verify FILO ordering within each level
     for (depth <- 1 to 5) {
       val levelFinalizers = executionOrder.filter(_.contains(s"nested-$depth-")).toList
 
       if (levelFinalizers.nonEmpty) {
-        // Within each level, inner should come before middle, middle before outer
         val innerIndex = levelFinalizers.indexOf(s"nested-$depth-inner-fin")
         val middleIndex = levelFinalizers.indexOf(s"nested-$depth-middle-fin")
         val outerIndex = levelFinalizers.indexOf(s"nested-$depth-outer-fin")
@@ -357,7 +336,6 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
     val results = computation.unsafeRunSync()
     assertEquals(results.length, 3)
 
-    // Each fiber should maintain its own FILO order regardless of interleaved execution
     for (fiberId <- 1 to 3) {
       val fiberFinalizers = executionOrder.filter(_.startsWith(s"fiber$fiberId-"))
       if (fiberFinalizers.contains(s"fiber$fiberId-fin2") && fiberFinalizers.contains(s"fiber$fiberId-fin1")) {
@@ -396,23 +374,19 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     val (result1, _) = computation.unsafeRunSync()
 
-    // Verify that fiber1 died as expected
     result1 match {
       case Exit.Die(t) => assertEquals(t.getMessage, "cascade failure")
       case other => fail(s"Expected fiber1 to die but got: $other")
     }
 
-    // All registered finalizers should execute in FILO order despite the error
     assert(executionOrder.contains("inner1-fin1"))
     assert(executionOrder.contains("inner2-fin1"))
     assert(executionOrder.contains("outer-fin1"))
     assert(executionOrder.contains("outer-fin2"))
     assert(executionOrder.contains("outer-fin3"))
 
-    // Unreachable finalizers should not execute
     assert(!executionOrder.contains("inner1-unreachable-fin"))
 
-    // Outer finalizers should maintain FILO order
     val outerFin3Idx = executionOrder.indexOf("outer-fin3")
     val outerFin2Idx = executionOrder.indexOf("outer-fin2")
     val outerFin1Idx = executionOrder.indexOf("outer-fin1")
@@ -449,13 +423,10 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     val result = computation.unsafeRunSync()
 
-    // Platform-aware expectations: Native synchronous backend falls back to "fallback"
-    // due to thread-based async callbacks not working in synchronous execution
     val isNative = scala.util.Properties.propOrElse("java.vm.name", "").contains("Scala Native")
     val expectedResult = if (isNative) "fallback" else "suspended-result"
     assertEquals(result, expectedResult)
 
-    // Finalizers should execute in FILO order despite suspend/resume
     assertEquals(executionOrder.toList, List("after-resume-fin", "before-suspend-fin"))
   }
 }

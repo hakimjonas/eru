@@ -12,8 +12,8 @@ import net.ghoula.eru.CorePrelude.*
   *   2. Right Identity: eru.flatMap(Eru.succeed) == eru
   *   3. Associativity: eru.flatMap(f).flatMap(g) == eru.flatMap(a => f(a).flatMap(g))
   *
-  * Additionally verifies functor laws and other algebraic properties to ensure mathematical
-  * correctness of the effect system.
+  * Tests both success and failure cases to ensure the laws hold under all conditions, and
+  * validates coherence between different combinators like map/flatMap and recover/recoverWith.
   */
 final class EruMonadLawsSpec extends FunSuite {
 
@@ -96,7 +96,6 @@ final class EruMonadLawsSpec extends FunSuite {
   }
 
   test("flatMap/join coherence: eru.flatMap(f) == eru.map(f).join") {
-    // Since Eru doesn't have a join method, we'll verify this through flatten behavior
     val nestedEffect = Eru.succeed(Eru.succeed(testValue))
     val flattened = nestedEffect.flatMap(identity).unsafeRunSync()
 

@@ -9,6 +9,14 @@ import scala.jdk.CollectionConverters.*
 
 import net.ghoula.eru.prelude.*
 
+/** Stress test suite for JVM concurrency and fiber management under high load.
+  *
+  * Validates runtime behavior under stress conditions including high fiber counts, concurrent
+  * resource access, and sustained concurrent load. These tests ensure that the runtime
+  * maintains correctness, prevents resource leaks, and provides stable performance
+  * characteristics even under extreme operational conditions that might occur in
+  * production systems with heavy concurrent workloads.
+  */
 extension [E, A](effects: List[Eru[E, A]]) {
   def sequence: Eru[E, List[A]] = {
     def loop(remaining: List[Eru[E, A]], acc: List[A]): Eru[E, List[A]] =
@@ -31,10 +39,9 @@ extension [E, A](effects: List[Eru[E, A]]) {
 final class ConcurrencyStressSpec extends FunSuite {
 
   test("high-load fiber creation and completion (250 fibers)") {
-    val fiberCount = 250 // Reduced from 500 to reduce memory pressure
+    val fiberCount = 250
     val completedCounter = new AtomicInteger(0)
 
-    // Create effects more efficiently without excessive nesting
     val effects = (1 to fiberCount).map { i =>
       Eru.effect {
         completedCounter.incrementAndGet()
@@ -42,14 +49,12 @@ final class ConcurrencyStressSpec extends FunSuite {
       }
     }
 
-    // Use parSequence for better memory efficiency
     val completed = EruRuntime.parSequence(effects.toList).unsafeRunSync()
     assertEquals(completed.sorted, (1 to fiberCount).toList)
     assertEquals(completedCounter.get(), fiberCount)
   }
 
   test("nested zipPar operations stress test") {
-    // Create a tree of nested zipPar operations
     def createNestedZipPar(depth: Int, baseValue: Int): Eru[Throwable, Int] = {
       if (depth == 0) {
         EruRuntime.sleep(Duration.ofMillis(1)).map(_ => baseValue)
@@ -61,7 +66,6 @@ final class ConcurrencyStressSpec extends FunSuite {
     }
 
     val result = createNestedZipPar(8, 1).unsafeRunSync()
-    // With depth 8, we should get a significant sum
     assert(result > 1000, s"Expected large sum, got $result")
   }
 
@@ -72,7 +76,6 @@ final class ConcurrencyStressSpec extends FunSuite {
       EruRuntime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
     }
 
-    // Race all contestants in pairs, then race the results
     @tailrec
     def raceAll(effects: List[Eru[Throwable, Int]]): Eru[Throwable, Int] = effects match {
       case single :: Nil => single
@@ -149,10 +152,8 @@ final class ConcurrencyStressSpec extends FunSuite {
     val effects = (1 to fiberCount).map(createResourceEffect)
     val results = effects.map(_.attempt)
 
-    // Run all effects and wait for completion
     results.toList.sequence.unsafeRunSync()
 
-    // Verify all resources were properly cleaned up
     assertEquals(acquired.get(), fiberCount, "All resources should have been acquired")
     assertEquals(released.get(), fiberCount, "All resources should have been released")
   }
@@ -182,7 +183,6 @@ final class ConcurrencyStressSpec extends FunSuite {
     val concurrentCount = 50
     val sequentialCount = 10
 
-    // Create concurrent operations
     val concurrentOps = (1 to concurrentCount).map { i =>
       EruRuntime.fork {
         EruRuntime.sleep(Duration.ofMillis(2)).map(_ => s"concurrent-$i")
@@ -192,7 +192,6 @@ final class ConcurrencyStressSpec extends FunSuite {
       }
     }
 
-    // Create sequential operations
     def createSequential(remaining: Int, acc: List[String]): Eru[Nothing, List[String]] = {
       if (remaining <= 0) {
         Eru.succeed(acc.reverse)
@@ -205,7 +204,6 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     val sequential = createSequential(sequentialCount, Nil)
 
-    // Combine concurrent and sequential work
     val combined = EruRuntime
       .zipPar(
         concurrentOps.toList.sequence,
@@ -239,23 +237,19 @@ final class ConcurrencyStressSpec extends FunSuite {
         .ensure(Eru.effect { executionOrder.add(s"inner-$id") })
     }
 
-    // Run effects concurrently
     val effects = (1 to fiberCount).map(createEffectWithFinalizers)
     val fibers = effects.map(EruRuntime.fork)
     val results = fibers.map(_.flatMap(_.await)).toList.sequence.unsafeRunSync()
 
-    // Verify all effects completed successfully
     val successCount = results.count {
       case Exit.Success(_) => true
       case _ => false
     }
     assertEquals(successCount, fiberCount)
 
-    // Verify finalizers executed (exact order may vary due to concurrency)
     val orderList = executionOrder.asScala.toList
     assertEquals(orderList.length, fiberCount * 3) // 3 finalizers per effect
 
-    // Verify each fiber's finalizers executed in FILO order (inner first, outer last)
     (1 to fiberCount).foreach { id =>
       val fiberFinalizers = orderList.filter(_.endsWith(s"-$id"))
       assertEquals(fiberFinalizers, List(s"inner-$id", s"middle-$id", s"outer-$id"))

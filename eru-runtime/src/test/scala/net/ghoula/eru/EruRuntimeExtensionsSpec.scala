@@ -4,6 +4,13 @@ import munit.FunSuite
 import java.time.Duration
 import scala.collection.mutable.ListBuffer
 
+/** Test suite for Eru runtime extension methods and enhanced functionality.
+  *
+  * Validates extension methods provided by the runtime system including timeout operations,
+  * retries, and other enhanced combinators. These tests ensure that runtime extensions
+  * provide reliable behavior and integrate properly with the core effect system while
+  * maintaining performance and resource safety characteristics.
+  */
 class EruRuntimeExtensionsSpec extends FunSuite {
 
   test("timeout extension succeeds when effect completes within duration") {
@@ -106,22 +113,45 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   }
 
   test("zipPar extension runs effects in parallel and combines results") {
-    val left = Eru.succeed(10).map(x => { Thread.sleep(10); x + 5 })
-    val right = Eru.succeed(20).map(x => { Thread.sleep(10); x * 2 })
+    // Test parallelism through coordination instead of timing
+    val executionOrder = scala.collection.mutable.ListBuffer.empty[String]
+    val lock = new Object
+    
+    val left = Eru.succeed(10).map { x => 
+      lock.synchronized { executionOrder += "left-start" }
+      // Small computation to allow right to start
+      (1 to 10000).sum
+      lock.synchronized { executionOrder += "left-end" }
+      x + 5
+    }
+    val right = Eru.succeed(20).map { x => 
+      lock.synchronized { executionOrder += "right-start" }
+      (1 to 10000).sum
+      lock.synchronized { executionOrder += "right-end" }
+      x * 2
+    }
 
-    val startTime = System.nanoTime()
     val result = left.zipPar(right).unsafeRunSync()
-    val endTime = System.nanoTime()
-    val elapsedMs = (endTime - startTime) / 1_000_000
+    val order = lock.synchronized { executionOrder.toList }
 
     assertEquals(result, (15, 40))
-    // Should be faster than sequential (< 25ms vs 20ms sequential)
-    assert(elapsedMs < 25)
+    // Verify parallel execution: both should start before either ends
+    val starts = order.filter(_.endsWith("-start"))
+    val firstEndIndex = order.indexWhere(_.endsWith("-end"))
+    val allStartsBeforeFirstEnd = if (firstEndIndex >= 0) {
+      starts.forall(s => order.indexOf(s) < firstEndIndex)
+    } else true
+    assert(allStartsBeforeFirstEnd, s"Effects should execute in parallel. Order: $order")
   }
 
   test("zipPar propagates failure and interrupts partner") {
-    val success = EruRuntime.sleep(Duration.ofMillis(100)).map(_ => 42)
-    val failure = EruRuntime.sleep(Duration.ofMillis(10)).flatMap(_ => Eru.fail("boom"))
+    // Use immediate failure and expensive computation instead of timing
+    val success = Eru.effect {
+      // Expensive computation that would complete eventually
+      (1 to 1000000).sum
+      42
+    }
+    val failure = Eru.fail("boom") // Immediate failure
 
     val ex = intercept[EruException[String]] {
       success.zipPar(failure).unsafeRunSync()

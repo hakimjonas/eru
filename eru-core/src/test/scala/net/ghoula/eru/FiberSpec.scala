@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Test suite for the Fiber interface and core fiber operations.
+  *
+  * Validates the fundamental contracts of the Fiber trait including await operations, interruption
+  * behavior, and fiber identity management. Tests cover the core fiber abstraction that enables
+  * concurrent execution in the Eru effect system, ensuring proper lifecycle management and
+  * resource cleanup semantics.
+  */
 class FiberSpec extends FunSuite {
 
   private final class TestFiber[E, A](val id: FiberId, exit: Exit[E, A]) extends Fiber[E, A] {

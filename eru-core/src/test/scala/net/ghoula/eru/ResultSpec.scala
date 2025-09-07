@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Comprehensive test suite for the Result data type functionality.
+  *
+  * Validates all fundamental operations of Result[E, A] including construction, transformation,
+  * error handling, and pattern matching semantics. The Result type serves as the core value-level
+  * representation of computation outcomes in the Eru effect system, providing both success and
+  * failure modeling with complete type safety.
+  */
 class ResultSpec extends FunSuite {
 
   test("Result.succeed creates a Success with the given value") {

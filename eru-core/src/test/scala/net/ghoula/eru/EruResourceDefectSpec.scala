@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Specialized test suite for resource management under defect conditions.
+  *
+  * Validates resource cleanup behavior when encountering unrecoverable errors (defects) such as
+  * Throwable exceptions during resource usage. These tests ensure that even when the system
+  * encounters unexpected failures, resource finalizers are properly executed and no resource
+  * leaks occur, maintaining system reliability under extreme error conditions.
+  */
 final class EruResourceDefectSpec extends FunSuite {
 
   test("bracket release runs exactly once when use throws Throwable (defect path)") {
