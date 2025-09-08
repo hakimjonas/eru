@@ -187,7 +187,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
 
     eru.unsafeRunSync()
     // Finalizers execute in FILO order (last added, first executed)
-    assertEquals(executionOrder, List("first", "second", "third"))
+    assertEquals(executionOrder, List("third", "second", "first"))
   }
 
   test("ensure with nested computations") {
@@ -356,7 +356,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
     val result = computation.unsafeRunSync()
     assertEquals(result, "resource1-resource2")
     assertEquals(acquired.reverse, List("resource1", "resource2"))
-    assertEquals(released.reverse, List("resource1", "resource2")) // Same order as acquisition
+    assertEquals(released.reverse, List("resource2", "resource1")) // Reverse order of acquisition
   }
 
   property("bracket always releases acquired resources") {

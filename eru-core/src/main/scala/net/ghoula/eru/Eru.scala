@@ -712,15 +712,8 @@ object Eru {
           tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers))
 
         case Ensure(source, fin) =>
-          try {
-            tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).map { case (either, fs) =>
-              (either, fin :: fs)
-            }
-          } catch {
-            case interrupted: InterruptedWithFinalizers =>
-              // Add the ensure finalizer to the interrupted exception
-              val updatedFinalizers = fin :: interrupted.finalizers
-              throw new InterruptedWithFinalizers(interrupted.fiberId, interrupted.cause, updatedFinalizers)
+          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).flatMap { case (either, fs) =>
+            done((either, fin :: fs))
           }
 
         case Suspend(register) =>
@@ -794,10 +787,11 @@ object Eru {
 
         case Await(fiber) =>
           outstandingFibers -= fiber
-
-          val mergedFinalizers = fiber.finalizers ++ fins
-
-          done((Right(fiber.exit), mergedFinalizers))
+          // When a fiber is awaited, its finalizers must be executed immediately
+          // to ensure that the await operation is a true sequential barrier.
+          drainFinalizers(fiber.finalizers).result
+          // The parent computation continues with its own finalizers.
+          done((Right(fiber.exit), fins))
 
         case InterruptibleBlocking(thunk) =>
           try {

@@ -2,6 +2,8 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import net.ghoula.eru.CorePrelude.*
 
 /** Advanced test suite for Phase 2 fiber operations and resource management.
@@ -14,12 +16,12 @@ import net.ghoula.eru.CorePrelude.*
 class FiberPhase2Spec extends FunSuite {
 
   test("fork without await prevents finalizer leaks via auto-join") {
-    var finalizerExecuted = false
+    val finalizerExecuted = new AtomicBoolean(false)
 
     val computation = Eru
       .succeed(42)
       .ensure(Eru.effect {
-        finalizerExecuted = true
+        finalizerExecuted.set(true)
       })
 
     val program = Eru.fork(computation).map(_ => "main result")
@@ -30,7 +32,7 @@ class FiberPhase2Spec extends FunSuite {
     assertEquals(result, "main result")
 
     // Finalizer should have been executed due to auto-join
-    assert(finalizerExecuted, "Finalizer should have executed via auto-join")
+    assert(finalizerExecuted.get(), "Finalizer should have executed via auto-join")
   }
 
   test("multiple await operations work (allows double-await for now)") {
@@ -76,12 +78,12 @@ class FiberPhase2Spec extends FunSuite {
   }
 
   test("nested fork finalizer ordering") {
-    var executionOrder = List.empty[String]
+    val executionOrder = new java.util.concurrent.ConcurrentLinkedQueue[String]()
 
     val innerComputation = Eru
       .succeed("inner")
       .ensure(Eru.effect {
-        executionOrder = "inner-finalizer" :: executionOrder
+        executionOrder.add("inner-finalizer")
       })
 
     val outerComputation = Eru
@@ -97,25 +99,27 @@ class FiberPhase2Spec extends FunSuite {
           )
       )
       .ensure(Eru.effect {
-        executionOrder = "outer-finalizer" :: executionOrder
+        executionOrder.add("outer-finalizer")
       })
 
     val result = outerComputation.unsafeRunSync()
 
     assertEquals(result, "outer-inner")
 
-    // Finalizers should execute in FILO order (inner executes first, outer executes last)
-    assertEquals(executionOrder, List("inner-finalizer", "outer-finalizer"))
+    // Finalizers must execute in correct temporal order. The inner computation is awaited
+    // by the outer one, so the inner finalizer must complete before the outer one.
+    import scala.jdk.CollectionConverters._
+    assertEquals(executionOrder.asScala.toList, List("inner-finalizer", "outer-finalizer"))
   }
 
   test("auto-join works with multiple unawaited fibers") {
-    var fiber1Executed = false
-    var fiber2Executed = false
-    var fiber3Executed = false
+    val fiber1Executed = new AtomicBoolean(false)
+    val fiber2Executed = new AtomicBoolean(false)
+    val fiber3Executed = new AtomicBoolean(false)
 
-    val computation1 = Eru.succeed(1).ensure(Eru.effect { fiber1Executed = true })
-    val computation2 = Eru.succeed(2).ensure(Eru.effect { fiber2Executed = true })
-    val computation3 = Eru.succeed(3).ensure(Eru.effect { fiber3Executed = true })
+    val computation1 = Eru.succeed(1).ensure(Eru.effect { fiber1Executed.set(true) })
+    val computation2 = Eru.succeed(2).ensure(Eru.effect { fiber2Executed.set(true) })
+    val computation3 = Eru.succeed(3).ensure(Eru.effect { fiber3Executed.set(true) })
 
     val program = for {
       _ <- Eru.fork(computation1) // Not awaited
@@ -129,9 +133,9 @@ class FiberPhase2Spec extends FunSuite {
     assertEquals(finalResult, Exit.Success(3))
 
     // All finalizers should have executed due to auto-join
-    assert(fiber1Executed, "Fiber 1 finalizer should have executed")
-    assert(fiber2Executed, "Fiber 2 finalizer should have executed")
-    assert(fiber3Executed, "Fiber 3 finalizer should have executed")
+    assert(fiber1Executed.get(), "Fiber 1 finalizer should have executed")
+    assert(fiber2Executed.get(), "Fiber 2 finalizer should have executed")
+    assert(fiber3Executed.get(), "Fiber 3 finalizer should have executed")
   }
 
   test("fiber error handling with eager evaluation") {
@@ -145,12 +149,12 @@ class FiberPhase2Spec extends FunSuite {
   }
 
   test("fiber finalizers execute even on error") {
-    var finalizerExecuted = false
+    val finalizerExecuted = new AtomicBoolean(false)
 
     val computation = Eru
       .fail("test-error")
       .ensure(Eru.effect {
-        finalizerExecuted = true
+        finalizerExecuted.set(true)
       })
 
     val program = Eru.fork(computation).flatMap(fiber => Eru.await(fiber))
@@ -158,7 +162,7 @@ class FiberPhase2Spec extends FunSuite {
     val result = program.unsafeRunSync()
 
     assertEquals(result, Exit.Failure("test-error"))
-    assert(finalizerExecuted, "Finalizer should execute even on error")
+    assert(finalizerExecuted.get(), "Finalizer should execute even on error")
   }
 
   test("basic fiber await functionality") {

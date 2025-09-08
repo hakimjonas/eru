@@ -228,18 +228,15 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
           exitAR.set(exit)
           observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
         } catch {
-          case _: InterruptedException =>
-            // If interrupted, still need to clean up children before exiting
+          case t: Throwable =>
+            // This is a fallback safety net. Ideally, all Throwables should be caught by the interpreter
+            // inside computeExit and returned as an Exit value. If we get here, it indicates a bug
+            // or a leak in the interpreter. We capture it as a Die exit state.
+            val exit = Exit.Die(t)
+            exitAR.set(exit)
+            observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+            // Still attempt to clean up children even if the parent fiber died unexpectedly.
             executeStructuredCleanup(fiberContext)
-            exitAR.set(Exit.Interrupt(id, InterruptCause.Cancelled(Some("Fiber interrupted during execution"))))
-            observer.foreach(
-              _.onEvent(
-                EruObserver.EruEvent.FiberCompleted(
-                  id,
-                  Exit.Interrupt(id, InterruptCause.Cancelled(Some("Fiber interrupted during execution")))
-                )
-              )
-            )
         } finally {
           currentFiberContext.remove()
           latch.countDown()
