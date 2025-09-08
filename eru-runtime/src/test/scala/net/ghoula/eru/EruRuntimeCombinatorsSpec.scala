@@ -40,7 +40,6 @@ final class EruRuntimeCombinatorsSpec extends FunSuite {
       EruRuntime.sleep(Duration.ofMillis(100)).flatMap(_ => Eru.succeed(1)).ensure(Eru.effect { finalized += 1; () })
     val res = EruRuntime.race(left, right).unsafeRunSync()
     assertEquals(res, Left(10))
-    // loser finalizer should run (either by completion or interruption)
     assertEquals(finalized, 1)
   }
 
@@ -56,16 +55,11 @@ final class EruRuntimeCombinatorsSpec extends FunSuite {
   }
 
   test("sleep suspends for the requested duration (functional test)") {
-    // Test sleep functionality without timing assertions to avoid flakiness
-    // The actual timing verification should be done in dedicated timer tests
     val start = System.nanoTime()
     EruRuntime.sleep(Duration.ofMillis(25)).unsafeRunSync()
     val elapsedMs = (System.nanoTime() - start) / 1000000L
     
-    // Verify that sleep actually suspended (should be at least some duration)
-    // Allow for wide margin due to CI/test environment variations
     assert(elapsedMs >= 10L, s"sleep should suspend execution, elapsed: ${elapsedMs}ms")
-    // Document that exact timing is tested in TimersSpec
   }
 
   test("timeout interrupts a long-running effect and does not interrupt a fast effect") {

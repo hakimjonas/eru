@@ -15,10 +15,8 @@ import net.ghoula.eru.testkit.syntax.value.*
   */
 final class EruAppAndTestkitDemoSpec extends EruSuite with EruAssertions {
 
-  // ===== ERUAPPDEFAULT DEMONSTRATION =====
   
   test("EruAppDefault provides ergonomic app entry point") {
-    // Create a sample application using EruAppDefault
     object SampleApp extends net.ghoula.eru.app.EruAppDefault {
       def run: Eru[Throwable, Unit] =
         for {
@@ -28,20 +26,16 @@ final class EruAppAndTestkitDemoSpec extends EruSuite with EruAssertions {
         } yield ()
     }
     
-    // Verify the app has the expected structure
     val app = SampleApp
     app match {
       case _: net.ghoula.eru.app.EruAppDefault => ()
       case _ => fail("SampleApp should extend EruAppDefault")
     }
     
-    // The main method would call run.unsafeRunSync() automatically
-    // We can't test main directly, but we can test the run method
     val runResult = app.run.unsafeRunSync()
     assertEquals(runResult, ())
   }
 
-  // ===== ERUSUITE DEMONSTRATION =====
 
   testE("testE allows effect-based test bodies") {
     for {
@@ -59,7 +53,6 @@ final class EruAppAndTestkitDemoSpec extends EruSuite with EruAssertions {
     }
   }
 
-  // ===== ERUASSERTIONS DEMONSTRATION =====
 
   test("assertRunsEquals verifies effect results") {
     val computation = for {
@@ -83,10 +76,8 @@ final class EruAppAndTestkitDemoSpec extends EruSuite with EruAssertions {
     assertEquals(exception.error, "expected error")
   }
 
-  // ===== TERSE SYNTAX DEMONSTRATION =====
 
   test("optional value syntax provides concise effect evaluation") {
-    // Using the terse .value syntax for concise test code
     val result = Eru.succeed(42).value
     assertEquals(result, 42)
 
@@ -108,10 +99,9 @@ final class EruAppAndTestkitDemoSpec extends EruSuite with EruAssertions {
     } yield sum
 
     val result = complexEffect.value
-    assertEquals(result, 30) // (1+2+3+4+5) * 2 = 30
+    assertEquals(result, 30)
   }
 
-  // ===== RUNNER CONVENIENCES DEMONSTRATION =====
 
   test("runExit provides structured error handling") {
     val successEffect = Eru.succeed(42)

@@ -391,7 +391,6 @@ class FiberErrorPropagationSpec extends FunSuite {
         fail(s"Expected fromExit to propagate Die as throwable failure but got: $other")
     }
 
-    // Interruptions should be handled through pattern matching, not fromExit
     val fiberId = FiberId.fresh()
     val interruptCause = InterruptCause.Cancelled(Some("test cancellation"))
     val interruptExit: Exit[String, Int] = Exit.Interrupt(fiberId, interruptCause)

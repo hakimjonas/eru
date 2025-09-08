@@ -20,10 +20,8 @@ class FiberPropertySpec extends FunSuite {
   test("fork/await is referentially transparent") {
     val computation = Eru.succeed(42)
 
-    // Direct execution
     val directResult = computation.unsafeRunSync()
 
-    // Fork/await execution
     val fiberResult = for {
       fiber <- EruRuntime.fork(computation)
       exit <- fiber.await
@@ -44,7 +42,6 @@ class FiberPropertySpec extends FunSuite {
     val value = "pure value"
     val pureEffect = Eru.succeed(value)
 
-    // Multiple forks of the same pure computation should behave identically
     val fiber1 = EruRuntime.fork(pureEffect).unsafeRunSync()
     val fiber2 = EruRuntime.fork(pureEffect).unsafeRunSync()
     val fiber3 = EruRuntime.fork(pureEffect).unsafeRunSync()
@@ -83,14 +80,11 @@ class FiberPropertySpec extends FunSuite {
     * fork/await mechanism.
     */
   test("fork/await preserves monad left identity law") {
-    // Left identity: pure(a).flatMap(f) == f(a)
     val a = 42
     val f: Int => Eru[Nothing, String] = x => Eru.succeed(s"value: $x")
 
-    // Direct application
     val direct = f(a).unsafeRunSync()
 
-    // Through fiber
     val throughFiber = for {
       fiber <- EruRuntime.fork(Eru.succeed(a))
       exit <- fiber.await
@@ -109,13 +103,10 @@ class FiberPropertySpec extends FunSuite {
     * mechanism.
     */
   test("fork/await preserves monad right identity law") {
-    // Right identity: m.flatMap(pure) == m
     val m = Eru.succeed("test value")
 
-    // Direct execution
     val direct = m.unsafeRunSync()
 
-    // Through fiber with identity
     val throughFiber = for {
       fiber <- EruRuntime.fork(m)
       exit <- fiber.await
@@ -133,12 +124,10 @@ class FiberPropertySpec extends FunSuite {
     * when executed through the fork/await mechanism.
     */
   test("fork/await preserves monad associativity law") {
-    // Associativity: (m.flatMap(f)).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
     val m = Eru.succeed(10)
     val f: Int => Eru[Nothing, Int] = x => Eru.succeed(x * 2)
     val g: Int => Eru[Nothing, String] = x => Eru.succeed(s"result: $x")
 
-    // Left-associated through fiber
     val leftAssoc = for {
       fiber1 <- EruRuntime.fork(m)
       exit1 <- fiber1.await
@@ -150,7 +139,6 @@ class FiberPropertySpec extends FunSuite {
       result <- g(value2)
     } yield result
 
-    // Right-associated through fiber
     val rightAssoc = for {
       fiber <- EruRuntime.fork(m)
       exit <- fiber.await
@@ -177,7 +165,6 @@ class FiberPropertySpec extends FunSuite {
       c <- Eru.succeed(12)
     } yield a + b + c
 
-    // Run the same computation through fiber multiple times
     val runs = (1 to 10).map { _ =>
       val fiber = EruRuntime.fork(computation).unsafeRunSync()
       val exit = fiber.await.unsafeRunSync()
@@ -187,9 +174,8 @@ class FiberPropertySpec extends FunSuite {
       }
     }
 
-    // All runs should produce the same result
     assert(runs.forall(_ == 42))
-    assertEquals(runs.toSet.size, 1) // All identical
+    assertEquals(runs.toSet.size, 1)
   }
 
   /** Validates that fork operations preserve error types accurately.
@@ -212,7 +198,7 @@ class FiberPropertySpec extends FunSuite {
     val result = fiberResult.unsafeRunSync()
 
     result match {
-      case Exit.Failure(ErrorA) => // Expected
+      case Exit.Failure(ErrorA) =>
       case other => fail(s"Expected Failure(ErrorA) but got $other")
     }
   }
@@ -223,8 +209,6 @@ class FiberPropertySpec extends FunSuite {
     * demonstrating compositional safety.
     */
   test("fork/await composition is associative") {
-    // ((a fork/await) flatMap f) fork/await should behave the same as
-    // (a fork/await) flatMap (x => (f(x) fork/await))
 
     val a = Eru.succeed(5)
     val f: Int => Eru[Nothing, Int] = x => Eru.succeed(x * x)
@@ -235,7 +219,6 @@ class FiberPropertySpec extends FunSuite {
       result <- Eru.fromExit(exit)
     } yield result
 
-    // First approach: fork/await then flatMap then fork/await
     val approach1 = for {
       step1 <- forkAwait(a)
       step2Effect = f(step1)
@@ -243,7 +226,6 @@ class FiberPropertySpec extends FunSuite {
       result <- forkAwait(Eru.succeed(step2))
     } yield result
 
-    // Second approach: fork/await then flatMap with inner fork/await
     val approach2 = for {
       step1 <- forkAwait(a)
       step2Effect = f(step1)
@@ -254,7 +236,7 @@ class FiberPropertySpec extends FunSuite {
     val result2 = approach2.unsafeRunSync()
 
     assertEquals(result1, result2)
-    assertEquals(result1, 25) // 5 * 5
+    assertEquals(result1, 25)
   }
 
   /** Validates that fork preserves side effect ordering within computations.
@@ -272,7 +254,6 @@ class FiberPropertySpec extends FunSuite {
       _ <- Eru.effect(events += "step3")
     } yield "done"
 
-    // Execute through fiber
     val fiber = EruRuntime.fork(computation).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
@@ -361,10 +342,8 @@ class FiberPropertySpec extends FunSuite {
       total = orders.map(_.amount).sum
     } yield (user, total)
 
-    // Direct execution
     val direct = businessLogic.unsafeRunSync()
 
-    // Through fiber
     val throughFiber = for {
       fiber <- EruRuntime.fork(businessLogic)
       exit <- fiber.await

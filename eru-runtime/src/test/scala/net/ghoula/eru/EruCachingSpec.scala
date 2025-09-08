@@ -20,15 +20,13 @@ class EruCachingSpec extends FunSuite {
       42
     }.cached
 
-    // First execution
     val result1 = effect.unsafeRunSync()
     assertEquals(result1, 42)
     assertEquals(executions, 1)
 
-    // Second execution should use cached result
     val result2 = effect.unsafeRunSync()
     assertEquals(result2, 42)
-    assertEquals(executions, 1) // Still 1, not 2
+    assertEquals(executions, 1)
   }
 
   test("cached preserves failure and doesn't cache across different instances") {
@@ -43,23 +41,20 @@ class EruCachingSpec extends FunSuite {
     val effect1 = createFailingEffect
     val effect2 = createFailingEffect
 
-    // First effect fails
     intercept[RuntimeException] {
       effect1.unsafeRunSync()
     }
     assertEquals(executions, 1)
 
-    // Same effect instance should use cached failure
     intercept[RuntimeException] {
       effect1.unsafeRunSync()
     }
-    assertEquals(executions, 1) // Still 1
+    assertEquals(executions, 1)
 
-    // Different effect instance should execute again
     intercept[RuntimeException] {
       effect2.unsafeRunSync()
     }
-    assertEquals(executions, 2) // Now 2
+    assertEquals(executions, 2)
   }
 
   test("cached works with typed failures") {
@@ -73,19 +68,17 @@ class EruCachingSpec extends FunSuite {
       case Result.Failure(_) => Eru.fail("typed error")
     }.cached
 
-    // First execution
     val ex = intercept[EruException[String]] {
       effect.unsafeRunSync()
     }
     assertEquals(ex.error, "typed error")
     assertEquals(executions, 1)
 
-    // Second execution should use cached failure
     val ex2 = intercept[EruException[String]] {
       effect.unsafeRunSync()
     }
     assertEquals(ex2.error, "typed error")
-    assertEquals(executions, 1) // Still cached
+    assertEquals(executions, 1)
   }
 
   test("cached works with complex effect chains") {
@@ -103,12 +96,12 @@ class EruCachingSpec extends FunSuite {
       .cached
 
     val result1 = effect.unsafeRunSync()
-    assertEquals(result1, 31) // (10 + 5) * 2 + 1
+    assertEquals(result1, 31)
     assertEquals(counter, 1)
 
     val result2 = effect.unsafeRunSync()
     assertEquals(result2, 31)
-    assertEquals(counter, 1) // Should not execute the effect block again
+    assertEquals(counter, 1)
   }
 
   test("cached interacts properly with ensure") {
@@ -127,10 +120,9 @@ class EruCachingSpec extends FunSuite {
     assertEquals(effectRuns, 1)
     assertEquals(finalizerRuns, 1)
 
-    // Cached execution - note: finalizer won't run again since we cache the result
     val result2 = effect.unsafeRunSync()
     assertEquals(result2, "cached-with-ensure")
-    assertEquals(effectRuns, 1) // Cached
-    assertEquals(finalizerRuns, 1) // Finalizer was part of the original execution
+    assertEquals(effectRuns, 1)
+    assertEquals(finalizerRuns, 1)
   }
 }

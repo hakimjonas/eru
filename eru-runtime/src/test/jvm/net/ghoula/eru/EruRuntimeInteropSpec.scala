@@ -36,10 +36,10 @@ final class EruRuntimeInteropSpec extends FunSuite {
       called = true
       Future.successful(1)
     }
-    assertEquals(called, false) // should not be called yet
+    assertEquals(called, false)
     
     val result = effect.unsafeRunSync()
-    assertEquals(called, true)   // now it should be called
+    assertEquals(called, true)
     assertEquals(result, 1)
   }
 
@@ -48,7 +48,6 @@ final class EruRuntimeInteropSpec extends FunSuite {
     val futureEffect = FutureInterop.toFuture(eru)
     val future = futureEffect.unsafeRunSync()
     
-    // Wait for the Future to complete
     val result = scala.concurrent.Await.result(future, 1.second)
     assertEquals(result, 100)
   }
@@ -133,7 +132,6 @@ final class EruRuntimeInteropSpec extends FunSuite {
   }
 
   test("fromFuture handles already completed Future immediately") {
-    // Test with a Future that's already completed
     val completedFuture = Future.fromTry(Success(999))
     val result = FutureInterop.fromFuture(completedFuture).unsafeRunSync()
     assertEquals(result, 999)
@@ -143,7 +141,6 @@ final class EruRuntimeInteropSpec extends FunSuite {
     val promise = Promise[String]()
     val effect = FutureInterop.fromFuture(promise.future)
     
-    // Complete the promise in a separate thread after a small delay
     new Thread(() => {
       Thread.sleep(50)
       promise.success("async result")

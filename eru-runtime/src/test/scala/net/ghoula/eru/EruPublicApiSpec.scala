@@ -17,7 +17,6 @@ import java.time.Duration
   */
 final class EruPublicApiSpec extends FunSuite {
 
-  // ===== CORE CONSTRUCTORS =====
 
   test("Eru.succeed creates successful effects") {
     val result = Eru.succeed(42).run()
@@ -42,7 +41,7 @@ final class EruPublicApiSpec extends FunSuite {
 
   test("Eru.blocking handles blocking computations") {
     val result = Eru.blocking {
-      Thread.sleep(1) // Simulate blocking operation
+      Thread.sleep(1)
       "completed"
     }.run()
     assertEquals(result, "completed")
@@ -80,7 +79,6 @@ final class EruPublicApiSpec extends FunSuite {
     assertEquals(result, ())
   }
 
-  // ===== CORE COMBINATORS =====
 
   test("map transforms successful values") {
     val result = Eru.succeed(21)
@@ -111,7 +109,6 @@ final class EruPublicApiSpec extends FunSuite {
     assertEquals(result, 42)
   }
 
-  // ===== CONCURRENCY PRIMITIVES =====
 
   test("Eru.ref creates mutable references") {
     val ref = Eru.ref(0).run()
@@ -187,7 +184,6 @@ final class EruPublicApiSpec extends FunSuite {
     assertEquals(available, 1L, "Permit should be released after use")
   }
 
-  // ===== CONCURRENT COMBINATORS =====
 
   test("fork creates concurrent fibers") {
     val fiber = Eru.succeed("async work").fork.run()
@@ -211,7 +207,6 @@ final class EruPublicApiSpec extends FunSuite {
     assertEquals(result, Left("fast"))
   }
 
-  // ===== RESOURCE SAFETY =====
 
   test("ensure runs finalizers regardless of outcome") {
     var finalized = false
@@ -240,7 +235,6 @@ final class EruPublicApiSpec extends FunSuite {
     assert(finalized, "Finalizer should run even on failure")
   }
 
-  // ===== TIMEOUT COMBINATORS =====
 
   test("timeout fails slow effects") {
     val slow = Eru.effect { Thread.sleep(100); "result" }
@@ -257,7 +251,6 @@ final class EruPublicApiSpec extends FunSuite {
     assertEquals(result, "fallback")
   }
 
-  // ===== RETRY COMBINATORS =====
 
   test("retryN retries failed effects") {
     var attempts = 0
@@ -285,26 +278,20 @@ final class EruPublicApiSpec extends FunSuite {
     assertEquals(attempts, 2)
   }
 
-  // ===== UNIVERSAL RUNNER DEMONSTRATIONS =====
 
   test("run() handles all effect types seamlessly") {
-    // Pure values
     assertEquals(Eru.succeed(42).run(), 42)
     
-    // Side effects
     assertEquals(Eru.effect("side effect").run(), "side effect")
     
-    // Compositions
     assertEquals(
       Eru.succeed(21).flatMap(x => Eru.succeed(x * 2)).run(),
       42
     )
     
-    // Concurrent operations
     val fiber = Eru.succeed("concurrent").fork.run()
     assertEquals(fiber.await.run().toEither, Right("concurrent"))
     
-    // Resource management
     var cleaned = false
     assertEquals(
       Eru.succeed("resource").ensure(Eru.effect { cleaned = true }).run(),
@@ -313,11 +300,8 @@ final class EruPublicApiSpec extends FunSuite {
     assert(cleaned)
   }
 
-  // ===== ERGONOMICS DEMONSTRATIONS =====
 
   test("unified prelude provides single import") {
-    // This test demonstrates that everything needed is available through the single prelude import
-    // at the top of this file: import net.ghoula.eru.prelude.*
     
     val workflow = for {
       ref <- Eru.ref(0)
@@ -342,7 +326,7 @@ final class EruPublicApiSpec extends FunSuite {
     }.recover { 
       case _: RuntimeException => "recovered gracefully" 
     }.ensure {
-      Eru.effect { /* cleanup always runs */ }
+      Eru.effect {}
     }
     
     val result = robustWorkflow.run()

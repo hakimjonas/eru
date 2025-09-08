@@ -20,7 +20,6 @@ import java.time.Duration
 final class PreludeExportsSpec extends FunSuite {
 
   test("core constructors are available from prelude import") {
-    // Verify all core construction methods are accessible
     val _ = Eru.succeed(42)
     val _ = Eru.fail("error")
     val _ = Eru.effect(println("side effect"))
@@ -35,7 +34,6 @@ final class PreludeExportsSpec extends FunSuite {
   test("core combinators are available from prelude import") {
     val effect = Eru.succeed(21)
     
-    // Verify all core combinators work
     val _ = effect.map(_ * 2)
     val _ = effect.flatMap(x => Eru.succeed(x * 2))
     val _ = effect.zip(Eru.succeed(2))
@@ -50,17 +48,13 @@ final class PreludeExportsSpec extends FunSuite {
   }
 
   test("domain and auxiliary types are available from prelude import") {
-    // Verify domain types are accessible
     import scala.compiletime.testing.typeChecks
     
-    // Result type and companions
     val _ = Result.succeed(42)
     val _ = Result.fail("error")
     
-    // EruException
     val _ = EruException("test error")
     
-    // Exit types - verify they exist and can be pattern matched
     val exit: Exit[String, Int] = Exit.Success(42)
     exit match {
       case Exit.Success(value) => value
@@ -72,28 +66,23 @@ final class PreludeExportsSpec extends FunSuite {
   test("runtime operations are available from prelude import") {
     val effect = Eru.succeed(42)
     
-    // Verify concurrent operations
     val _ = effect.fork
     val _ = effect.forkWithObserver(EruObserver.noop)
     val _ = effect.zipPar(Eru.succeed(2))
     val _ = effect.race(Eru.succeed("other"))
     
-    // Verify timeout operations  
     val _ = effect.timeout(Duration.ofSeconds(1))
     val _ = effect.timeoutTo(Duration.ofSeconds(1), 0)
     
-    // Verify retry operations
     val _ = effect.retryN(3)
     val _ = effect.retryWithBackoff(Duration.ofMillis(100), 3)
   }
 
   test("runtime data types are available from prelude import") {
-    // Verify runtime data type constructors are accessible
     val _ = Eru.ref(42)
     val _ = Eru.deferred[String]
     val _ = Eru.semaphore(1L)
     
-    // Verify the types themselves are accessible
     import scala.compiletime.testing.typeChecks
     assert(typeChecks("val _: Ref[Int] = ???"))
     assert(typeChecks("val _: Deferred[String] = ???"))
@@ -105,7 +94,6 @@ final class PreludeExportsSpec extends FunSuite {
     val effect = Eru.succeed(42)
     val observer = EruObserver.noop
     
-    // Verify runner convenience methods are accessible
     val _ = effect.runExit()
     val _ = effect.runWith(observer)
   }
@@ -113,18 +101,15 @@ final class PreludeExportsSpec extends FunSuite {
   test("extension methods from core are available from prelude import") {
     val effect = Eru.succeed(42)
     
-    // Verify core extension methods work
     val _ = effect.cached
     val _ = effect.ensureAll(Eru.unit, Eru.unit)
     val _ = effect.autoCleanup(_ => Eru.unit)
   }
 
   test("observers and tracing are available from prelude import") {
-    // Verify observer types and functionality
     val _ = EruObserver.noop
     val _ = EruObserver.console
     
-    // Verify observer event types are accessible
     import scala.compiletime.testing.typeChecks
     assert(typeChecks("val _: EruObserver.EruEvent = ???"))
   }

@@ -33,7 +33,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     val timedEffect = slowEffect.timeoutTo(Duration.ofMillis(10), 99)
 
     val result = timedEffect.unsafeRunSync()
-    assertEquals(result, 99) // Fallback value
+    assertEquals(result, 99)
   }
 
   test("timeoutTo preserves original value when no timeout") {
@@ -41,7 +41,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     val timedEffect = fastEffect.timeoutTo(Duration.ofSeconds(1), 99)
 
     val result = timedEffect.unsafeRunSync()
-    assertEquals(result, 42) // Original value
+    assertEquals(result, 42)
   }
 
   test("retry with Recurs policy retries specified number of times") {
@@ -95,8 +95,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
 
     assertEquals(result, "done")
     assertEquals(attempts, 3)
-    // Should have some delay due to backoff (at least 10ms + 20ms = 30ms)
-    assert(elapsedMs >= 25) // Allow some margin for timing
+    assert(elapsedMs >= 25)
   }
 
   test("retry does not retry on defects (Throwables)") {
@@ -109,17 +108,15 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     intercept[RuntimeException] {
       defectiveEffect.retry(EruRuntime.Policy.Recurs(5)).unsafeRunSync()
     }
-    assertEquals(attempts, 1) // Should not retry defects
+    assertEquals(attempts, 1)
   }
 
   test("zipPar extension runs effects in parallel and combines results") {
-    // Test parallelism through coordination instead of timing
     val executionOrder = scala.collection.mutable.ListBuffer.empty[String]
     val lock = new Object
     
     val left = Eru.succeed(10).map { x => 
       lock.synchronized { executionOrder += "left-start" }
-      // Small computation to allow right to start
       (1 to 10000).sum
       lock.synchronized { executionOrder += "left-end" }
       x + 5
@@ -135,7 +132,6 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     val order = lock.synchronized { executionOrder.toList }
 
     assertEquals(result, (15, 40))
-    // Verify parallel execution: both should start before either ends
     val starts = order.filter(_.endsWith("-start"))
     val firstEndIndex = order.indexWhere(_.endsWith("-end"))
     val allStartsBeforeFirstEnd = if (firstEndIndex >= 0) {
@@ -145,13 +141,11 @@ class EruRuntimeExtensionsSpec extends FunSuite {
   }
 
   test("zipPar propagates failure and interrupts partner") {
-    // Use immediate failure and expensive computation instead of timing
     val success = Eru.effect {
-      // Expensive computation that would complete eventually
       (1 to 1000000).sum
       42
     }
-    val failure = Eru.fail("boom") // Immediate failure
+    val failure = Eru.fail("boom")
 
     val ex = intercept[EruException[String]] {
       success.zipPar(failure).unsafeRunSync()
@@ -226,7 +220,6 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     val effect = Eru.succeed("observed")
     val fiber = effect.forkWithObserver(observer).unsafeRunSync()
 
-    // Wait for completion
     val exit = fiber.await.unsafeRunSync()
 
     exit match {
@@ -243,7 +236,6 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     val longRunning = EruRuntime.sleep(Duration.ofSeconds(1)).map(_ => "completed")
     val fiber = longRunning.fork.unsafeRunSync()
 
-    // Interrupt the fiber
     fiber.interrupt(InterruptCause.Cancelled(Some("test cancellation"))).unsafeRunSync()
 
     val exit = fiber.await.unsafeRunSync()
@@ -276,7 +268,7 @@ class EruRuntimeExtensionsSpec extends FunSuite {
     var attempts = 0
     val slowEffect = Eru.effect {
       attempts += 1
-      Thread.sleep(50) // Slow operation
+      Thread.sleep(50)
       if (attempts < 2) throw new RuntimeException("retry me")
       else s"success attempt $attempts"
     }.attempt.flatMap {
@@ -284,7 +276,6 @@ class EruRuntimeExtensionsSpec extends FunSuite {
       case Result.Failure(_) => Eru.fail("retry")
     }
 
-    // Timeout should be long enough for retries to succeed
     val result = slowEffect
       .retry(EruRuntime.Policy.Recurs(2))
       .timeout(Duration.ofMillis(200))

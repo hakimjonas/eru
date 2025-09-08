@@ -130,7 +130,6 @@ class EruMacrosSpec extends FunSuite {
     val stringEffect: Eru[Nothing, String] = EruMacros.validated(Eru.succeed("hello"))
     val intEffect: Eru[String, Int] = EruMacros.validated(Eru.fail("error"))
 
-    // These should compile with correct types
     val stringResult = stringEffect.unsafeRunSync()
     assertEquals(stringResult, "hello")
 

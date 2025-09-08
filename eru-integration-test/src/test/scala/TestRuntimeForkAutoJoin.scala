@@ -19,13 +19,12 @@ class TestRuntimeForkAutoJoin extends FunSuite {
     val finalizerRan = new AtomicBoolean(false)
     val childCompleted = new AtomicBoolean(false)
 
-    // Test whether finalizers execute during structured cleanup on short operations
     val parentComputation = for {
       _ <- EruRuntime.fork {
         (for {
-          _ <- Eru.effect { childStarted.countDown() } // Signal child started
-          _ <- EruRuntime.sleep(Duration.ofMillis(100)) // Short sleep
-          _ <- Eru.effect { childCompleted.set(true) } // Should be interrupted before reaching this
+          _ <- Eru.effect { childStarted.countDown() }
+          _ <- EruRuntime.sleep(Duration.ofMillis(100))
+          _ <- Eru.effect { childCompleted.set(true) }
         } yield "child-done").ensure(Eru.effect {
           finalizerRan.set(true)
           println("SHORT SLEEP STRUCTURED CLEANUP FINALIZER EXECUTED")
@@ -39,26 +38,19 @@ class TestRuntimeForkAutoJoin extends FunSuite {
     exit match {
       case Exit.Success(result) =>
         assertEquals(result, "parent-completed")
-        // Give time for cleanup and finalizers
         Thread.sleep(200)
 
         println(s"Child completed: ${childCompleted.get()}")
         println(s"Finalizer ran: ${finalizerRan.get()}")
 
-        // Basic structured concurrency should work regardless of finalizers
-        // If this fails, structured concurrency itself is broken
         assert(!childCompleted.get(), "Child should be interrupted by structured concurrency")
 
-        // CURRENT LIMITATION: Finalizers do not execute during structured cleanup
-        // This is a known limitation of the current implementation
         if (finalizerRan.get()) {
           println("SUCCESS: Finalizer executed during structured cleanup")
         } else {
           println("LIMITATION: Finalizers do not execute during structured cleanup (current implementation)")
         }
 
-      // Document the current limitation instead of failing
-      // assert(finalizerRan.get(), "Finalizer should execute during structured cleanup")
       case other => fail(s"Computation should succeed, got: $other")
     }
   }
@@ -67,19 +59,17 @@ class TestRuntimeForkAutoJoin extends FunSuite {
     val childStarted = new CountDownLatch(1)
     val finalizerRan = new AtomicBoolean(false)
 
-    // Test explicit interruption with finalizer - this should work like the passing mathematical test
     val computation = for {
       fiber <- EruRuntime.fork {
         (for {
-          _ <- Eru.effect { childStarted.countDown() } // Signal child started
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Long sleep
+          _ <- Eru.effect { childStarted.countDown() }
+          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
         } yield "child-done").ensure(Eru.effect {
           finalizerRan.set(true)
           println("EXPLICIT INTERRUPT FINALIZER EXECUTED")
         })
       }
       _ <- Eru.effect { childStarted.await(1, TimeUnit.SECONDS) }
-      // Explicit interruption (not structured concurrency)
       _ <- fiber.interrupt(InterruptCause.Cancelled(Some("Explicit test interruption")))
       exit <- fiber.await
     } yield exit
@@ -88,8 +78,6 @@ class TestRuntimeForkAutoJoin extends FunSuite {
     exit match {
       case Exit.Success(_) =>
         println(s"Finalizer ran: ${finalizerRan.get()}")
-        // CURRENT LIMITATION: Finalizers on sleep operations don't execute even with explicit interruption
-        // This differs from finalizers on immediately-succeeding operations (which do work)
         if (finalizerRan.get()) {
           println("SUCCESS: Finalizer executed during explicit interruption")
         } else {
@@ -98,8 +86,6 @@ class TestRuntimeForkAutoJoin extends FunSuite {
           )
         }
 
-      // Document the current limitation instead of failing
-      // assert(finalizerRan.get(), "Finalizer should execute during explicit interruption")
       case other => fail(s"Computation should succeed, got: $other")
     }
   }
@@ -108,14 +94,12 @@ class TestRuntimeForkAutoJoin extends FunSuite {
     val childStarted = new CountDownLatch(1)
     val childCompleted = new AtomicBoolean(false)
 
-    // Test basic structured concurrency without requiring finalizers
-    // This should always work if structured concurrency is correctly implemented
     val parentComputation = for {
       _ <- EruRuntime.fork {
         for {
-          _ <- Eru.effect { childStarted.countDown() } // Signal child started
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-          _ <- Eru.effect { childCompleted.set(true) } // Should never execute
+          _ <- Eru.effect { childStarted.countDown() }
+          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- Eru.effect { childCompleted.set(true) }
         } yield "child-done"
       }
       _ <- Eru.effect { childStarted.await(1, TimeUnit.SECONDS) }
@@ -130,7 +114,6 @@ class TestRuntimeForkAutoJoin extends FunSuite {
 
         println(s"Child completed: ${childCompleted.get()}")
 
-        // This is the fundamental structured concurrency guarantee
         assert(!childCompleted.get(), "Child should be interrupted by structured concurrency")
       case other => fail(s"Computation should succeed, got: $other")
     }

@@ -480,8 +480,8 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     val computation = for {
       fiber <- EruRuntime.fork(suspendingComputation)
-      _ <- EruRuntime.sleep(Duration.ofMillis(10)) // Let fiber start and suspend
-      _ <- Eru.effect(resumeTrigger.countDown()).attempt // Resume the fiber
+      _ <- EruRuntime.sleep(Duration.ofMillis(10))
+      _ <- Eru.effect(resumeTrigger.countDown()).attempt
       result <- fiber.await.flatMap(exit => Eru.fromExit(exit).attempt.map(_.fold(_ => "error", identity)))
     } yield result
 

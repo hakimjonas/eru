@@ -25,7 +25,7 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     val result = program.unsafeRunSync()
 
     assertEquals(result, 42)
-    assertEquals(order.toList, List("f3", "f2", "f1")) // FILO order
+    assertEquals(order.toList, List("f3", "f2", "f1"))
   }
 
   test("ensureAll runs finalizers even on failure") {
@@ -39,7 +39,7 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     }
 
     assertEquals(ex.error, "boom")
-    assertEquals(order.toList, List("f2", "f1")) // Finalizers still ran in FILO order
+    assertEquals(order.toList, List("f2", "f1"))
   }
 
   test("autoCleanup calls cleanup function on success value") {
@@ -102,7 +102,6 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     val closeable = new FailingCloseable
     val program = Eru.succeed(closeable).autoClose
 
-    // Should succeed despite close() throwing
     val result = program.unsafeRunSync()
     assertEquals(result, closeable)
   }
@@ -123,7 +122,7 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
       }
 
     val result = program.unsafeRunSync()
-    assertEquals(result, 8) // "resource".length
+    assertEquals(result, 8)
     assertEquals(usedValue, Some("resource"))
     assert(cleanupCalled)
   }
@@ -199,10 +198,8 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     }
 
     val program = for {
-      // Create resource with validation
       resource <- Eru.succeed(new TestResource("main")).validateResource(_.name.nonEmpty, "named resource")
 
-      // Use resource with auto-cleanup and additional finalizers
       result <- Eru
         .succeed(resource)
         .autoClose

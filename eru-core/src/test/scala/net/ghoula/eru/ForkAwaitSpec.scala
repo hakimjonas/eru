@@ -17,8 +17,6 @@ class ForkAwaitSpec extends FunSuite {
     val computation = Eru.succeed(42)
     val forkEffect = Eru.fork(computation)
 
-    // Fork should create a pure description - we can't execute it in Phase 1
-    // but we can verify it constructs properly by checking type
     val _: Eru[Nothing, EruFiber[Nothing, Int]] = forkEffect
   }
 
@@ -26,7 +24,6 @@ class ForkAwaitSpec extends FunSuite {
     val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect = Eru.await(fiber)
 
-    // Await should create a pure description
     val _: Eru[Nothing, Exit[Nothing, Int]] = awaitEffect
   }
 
@@ -35,7 +32,6 @@ class ForkAwaitSpec extends FunSuite {
     val fork1 = Eru.fork(computation)
     val fork2 = Eru.fork(computation)
 
-    // Both should be constructable
     val _: Eru[Nothing, EruFiber[Nothing, Int]] = fork1
     val _: Eru[Nothing, EruFiber[Nothing, Int]] = fork2
   }
@@ -45,7 +41,6 @@ class ForkAwaitSpec extends FunSuite {
     val await1 = Eru.await(fiber)
     val await2 = Eru.await(fiber)
 
-    // Both should be constructable
     val _: Eru[String, Exit[String, Int]] = await1
     val _: Eru[String, Exit[String, Int]] = await2
   }
@@ -54,7 +49,6 @@ class ForkAwaitSpec extends FunSuite {
     val computation: Eru[String, Int] = Eru.succeed(42)
     val forkEffect: Eru[Nothing, EruFiber[String, Int]] = Eru.fork(computation)
 
-    // Type constraints should be satisfied at compile time
     val _: Eru[Nothing, EruFiber[String, Int]] = forkEffect
   }
 
@@ -62,7 +56,6 @@ class ForkAwaitSpec extends FunSuite {
     val fiber: EruFiber[String, Int] = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect: Eru[String, Exit[String, Int]] = Eru.await(fiber)
 
-    // Type constraints should be satisfied at compile time
     val _: Eru[String, Exit[String, Int]] = awaitEffect
   }
 
@@ -73,7 +66,6 @@ class ForkAwaitSpec extends FunSuite {
       result <- Eru.await(fiber)
     } yield result
 
-    // Composition should work at construction time
     val _: Eru[Nothing, Exit[Nothing, Int]] = composed
   }
 
@@ -82,7 +74,6 @@ class ForkAwaitSpec extends FunSuite {
     val fork1 = Eru.fork(computation)
     val fork2 = Eru.fork(computation)
 
-    // Each fork should be independent and constructable
     val _: Eru[Nothing, EruFiber[Nothing, Int]] = fork1
     val _: Eru[Nothing, EruFiber[Nothing, Int]] = fork2
   }
@@ -91,7 +82,6 @@ class ForkAwaitSpec extends FunSuite {
     val failingComputation: Eru[String, Int] = Eru.fail("error")
     val forkEffect: Eru[Nothing, EruFiber[String, Int]] = Eru.fork(failingComputation)
 
-    // Fork never fails at the type level - it returns a fiber handle
     val _: Eru[Nothing, EruFiber[String, Int]] = forkEffect
   }
 
@@ -99,7 +89,6 @@ class ForkAwaitSpec extends FunSuite {
     val fiber: EruFiber[String, Int] = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect: Eru[String, Exit[String, Int]] = Eru.await(fiber)
 
-    // Await can fail with the same error type as the fiber
     val _: Eru[String, Exit[String, Int]] = awaitEffect
   }
 
@@ -107,7 +96,6 @@ class ForkAwaitSpec extends FunSuite {
     val computation = Eru.succeed(42)
     val mappedFork = Eru.fork(computation).map(fiber => (fiber, "tagged"))
 
-    // Mapping should work on fork results
     val _: Eru[Nothing, (EruFiber[Nothing, Int], String)] = mappedFork
   }
 
@@ -120,7 +108,6 @@ class ForkAwaitSpec extends FunSuite {
       case Exit.Interrupt(id, cause) => s"Interrupt: $id - $cause"
     }
 
-    // Mapping should work on await results
     val _: Eru[String, String] = mappedAwait
   }
 
@@ -133,7 +120,6 @@ class ForkAwaitSpec extends FunSuite {
         Exit.Success(-1)
       }
 
-    // Error recovery should work at construction time
     val _: Eru[Nothing, Exit[Nothing, Int]] = recovered
   }
 
@@ -149,7 +135,6 @@ class ForkAwaitSpec extends FunSuite {
       outerResult <- Eru.await(outerFiber)
     } yield outerResult
 
-    // Nested fork/await should construct properly
     val _: Eru[Nothing, Exit[Nothing, Exit[Nothing, Int]]] = nestedEffect
   }
 
@@ -160,7 +145,6 @@ class ForkAwaitSpec extends FunSuite {
       .flatMap(Eru.await(_))
       .attempt
 
-    // Attempt should work with fork/await
     val _: Eru[Nothing, Result[Nothing, Exit[Nothing, Int]]] = attemptedEffect
   }
 
@@ -168,7 +152,6 @@ class ForkAwaitSpec extends FunSuite {
     val computation = Eru.succeed(42)
     val forkEffect = Eru.fork(computation)
 
-    // In Phase 2, fork should work and return a completed fiber
     val fiber = forkEffect.unsafeRunSync()
     assertEquals(fiber.exit, Exit.Success(42))
   }
@@ -177,7 +160,6 @@ class ForkAwaitSpec extends FunSuite {
     val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect = Eru.await(fiber)
 
-    // In Phase 2, await should work and return the exit
     val result = awaitEffect.unsafeRunSync()
     assertEquals(result, Exit.Success(42))
   }

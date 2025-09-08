@@ -29,13 +29,13 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     val parentComputation = for {
       _ <- EruRuntime.fork {
         for {
-          _ <- Eru.effect { childStarted.countDown() } // Signal child started
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-          _ <- Eru.effect { childAttemptedCompletion.set(true) } // Should never execute
+          _ <- Eru.effect { childStarted.countDown() }
+          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- Eru.effect { childAttemptedCompletion.set(true) }
         } yield "child-done"
       }
-      _ <- Eru.effect { childStarted.await(1, TimeUnit.SECONDS) } // Wait for child to start
-      result <- Eru.succeed("parent-completed") // Parent completes, triggering structured cleanup
+      _ <- Eru.effect { childStarted.await(1, TimeUnit.SECONDS) }
+      result <- Eru.succeed("parent-completed")
     } yield result
 
     val exit = parentComputation.runIsolatedExit
@@ -60,13 +60,13 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     val parentComputation = for {
       _ <- EruRuntime.fork {
         for {
-          _ <- Eru.effect { childStarted.countDown() } // Signal child started
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-          _ <- Eru.effect { childAttemptedCompletion.set(true) } // Should never execute
+          _ <- Eru.effect { childStarted.countDown() }
+          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- Eru.effect { childAttemptedCompletion.set(true) }
         } yield "child-done"
       }
-      _ <- Eru.effect { childStarted.await(1, TimeUnit.SECONDS) } // Wait for child to start
-      _ <- Eru.fail("parent-failed") // Parent fails, should cleanup children
+      _ <- Eru.effect { childStarted.await(1, TimeUnit.SECONDS) }
+      _ <- Eru.fail("parent-failed")
     } yield "parent-done"
 
     val exit = parentComputation.runIsolatedExit
@@ -89,17 +89,17 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     val childrenAttemptedCompletion = (0 to 2).map(_ => new AtomicBoolean(false)).toArray
 
     def makeChild(i: Int) = for {
-      _ <- Eru.effect { childrenStarted.countDown() } // Signal child started
-      _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-      _ <- Eru.effect { childrenAttemptedCompletion(i).set(true) } // Should never execute
+      _ <- Eru.effect { childrenStarted.countDown() }
+      _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+      _ <- Eru.effect { childrenAttemptedCompletion(i).set(true) }
     } yield s"child-$i-done"
 
     val parentComputation = for {
       _ <- EruRuntime.fork(makeChild(0))
       _ <- EruRuntime.fork(makeChild(1))
       _ <- EruRuntime.fork(makeChild(2))
-      _ <- Eru.effect { childrenStarted.await(2, TimeUnit.SECONDS) } // Wait for children to start
-      result <- Eru.succeed("parent-completed") // Parent completes, should cleanup all children
+      _ <- Eru.effect { childrenStarted.await(2, TimeUnit.SECONDS) }
+      result <- Eru.succeed("parent-completed")
     } yield result
 
     val exit = parentComputation.runIsolatedExit
@@ -130,23 +130,23 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
         for {
           _ <- EruRuntime.fork { // Middle fiber
             for {
-              _ <- EruRuntime.fork { // Innermost fiber
+              _ <- EruRuntime.fork {
                 for {
-                  _ <- Eru.effect { nestedStarted.countDown() } // Signal nested started
-                  _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-                  _ <- Eru.effect { nestedAttemptedWork.set(true) } // Should never execute
+                  _ <- Eru.effect { nestedStarted.countDown() }
+                  _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+                  _ <- Eru.effect { nestedAttemptedWork.set(true) }
                 } yield "nested-done"
               }
-              _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-              _ <- Eru.effect { middleAttemptedWork.set(true) } // Should never execute
+              _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+              _ <- Eru.effect { middleAttemptedWork.set(true) }
             } yield "middle-done"
           }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-          _ <- Eru.effect { outerAttemptedWork.set(true) } // Should never execute
+          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- Eru.effect { outerAttemptedWork.set(true) }
         } yield "outer-done"
       }
-      _ <- Eru.effect { nestedStarted.await(2, TimeUnit.SECONDS) } // Wait for nested to start
-      result <- Eru.succeed("root-completed") // Root completes, should cleanup transitively
+      _ <- Eru.effect { nestedStarted.await(2, TimeUnit.SECONDS) }
+      result <- Eru.succeed("root-completed")
     } yield result
 
     val exit = parentComputation.runIsolatedExit
@@ -174,15 +174,15 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     val parentComputation = for {
       _ <- EruRuntime.fork {
         (for {
-          _ <- Eru.effect { childStarted.countDown() } // Signal child started
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-          _ <- Eru.effect { childCompleted.set(true) } // Should never execute
+          _ <- Eru.effect { childStarted.countDown() }
+          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- Eru.effect { childCompleted.set(true) }
         } yield "child-done").ensure(Eru.effect {
-          finalizerRan.set(true) // This finalizer should run during structured cleanup
+          finalizerRan.set(true)
         })
       }
-      _ <- Eru.effect { childStarted.await(2, TimeUnit.SECONDS) } // Wait for child to start
-      result <- Eru.succeed("parent-completed") // Parent completes, should trigger structured cleanup with finalizers
+      _ <- Eru.effect { childStarted.await(2, TimeUnit.SECONDS) }
+      result <- Eru.succeed("parent-completed")
     } yield result
 
     val exit = parentComputation.runIsolatedExit

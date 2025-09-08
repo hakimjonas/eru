@@ -28,21 +28,16 @@ class FiberPhase2Spec extends FunSuite {
 
     val result = program.unsafeRunSync()
 
-    // Main computation should succeed
     assertEquals(result, "main result")
-
-    // Finalizer should have been executed due to auto-join
     assert(finalizerExecuted.get(), "Finalizer should have executed via auto-join")
   }
 
   test("multiple await operations work (allows double-await for now)") {
     val fiber = EruFiber.completed(Exit.Success(42), Nil)
 
-    // First await should work
     val firstResult = Eru.await(fiber).unsafeRunSync()
     assertEquals(firstResult, Exit.Success(42))
 
-    // Second await should also work (double-await is allowed for now)
     val secondResult = Eru.await(fiber).unsafeRunSync()
     assertEquals(secondResult, Exit.Success(42))
   }
@@ -58,11 +53,9 @@ class FiberPhase2Spec extends FunSuite {
 
     val result = program.unsafeRunSyncWith(observer)
 
-    // Check that we got the expected events
     import scala.jdk.CollectionConverters.*
     val eventList = events.asScala.toList
 
-    // Should have ProgramStart, FiberStarted, FiberCompleted, ProgramEnd
     assertEquals(eventList.length, 4)
 
     eventList match {
@@ -70,7 +63,6 @@ class FiberPhase2Spec extends FunSuite {
           EruEvent.FiberStarted(_) ::
           EruEvent.FiberCompleted(_, Exit.Success(42)) ::
           EruEvent.ProgramEnd(_, Outcome.Success) :: Nil =>
-      // Perfect!
       case _ =>
         fail(s"Unexpected event sequence: ${eventList.map(_.getClass.getSimpleName)}")
     }
@@ -107,8 +99,6 @@ class FiberPhase2Spec extends FunSuite {
 
     assertEquals(result, "outer-inner")
 
-    // Structured concurrency: child finalizers execute before parent finalizers
-    // This ensures proper resource cleanup dependency ordering
     import scala.jdk.CollectionConverters.*
     assertEquals(executionOrder.asScala.toList, List("inner-finalizer", "outer-finalizer"))
   }
@@ -123,17 +113,16 @@ class FiberPhase2Spec extends FunSuite {
     val computation3 = Eru.succeed(3).ensure(Eru.effect { fiber3Executed.set(true) })
 
     val program = for {
-      _ <- Eru.fork(computation1) // Not awaited
-      _ <- Eru.fork(computation2) // Not awaited
+      _ <- Eru.fork(computation1)
+      _ <- Eru.fork(computation2)
       fiber3 <- Eru.fork(computation3)
-      result <- Eru.await(fiber3) // Only this one is awaited
+      result <- Eru.await(fiber3)
     } yield result
 
     val finalResult = program.unsafeRunSync()
 
     assertEquals(finalResult, Exit.Success(3))
 
-    // All finalizers should have executed due to auto-join
     assert(fiber1Executed.get(), "Fiber 1 finalizer should have executed")
     assert(fiber2Executed.get(), "Fiber 2 finalizer should have executed")
     assert(fiber3Executed.get(), "Fiber 3 finalizer should have executed")
@@ -169,7 +158,6 @@ class FiberPhase2Spec extends FunSuite {
   test("basic fiber await functionality") {
     val fiber = EruFiber.completed(Exit.Success(123), Nil)
 
-    // Await should return the exit value
     val result = Eru.await(fiber).unsafeRunSync()
     assertEquals(result, Exit.Success(123))
   }

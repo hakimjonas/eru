@@ -130,7 +130,6 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     val slowEffect = createCancellableEffect(1)
 
-    // By racing the two, the failure of `fastFail` should win and interrupt `slowEffect`
     val result = EruRuntime
       .race(fastFail, slowEffect)
       .attempt
@@ -196,7 +195,7 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     val results = timers.map(timer => EruRuntime.fork(timer))
     val completed = results
-      .map(_.flatMap(_.await).flatMap { // Use flatMap for safety
+      .map(_.flatMap(_.await).flatMap {
         case Exit.Success(value) => Eru.succeed(value)
         case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Timer failed with error: $error"))
         case Exit.Die(t) => Eru.fail(new RuntimeException("Timer died", t))
@@ -221,7 +220,7 @@ final class ConcurrencyStressSpec extends FunSuite {
     val concurrentOps = (1 to concurrentCount).map { i =>
       EruRuntime.fork {
         EruRuntime.sleep(Duration.ofMillis(2)).map(_ => s"concurrent-$i")
-      }.flatMap(_.await).flatMap { // Use flatMap for safety
+      }.flatMap(_.await).flatMap {
         case Exit.Success(value) => Eru.succeed(value)
         case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Concurrent op failed with error: $error"))
         case Exit.Die(t) => Eru.fail(new RuntimeException("Concurrent op died", t))
@@ -291,7 +290,7 @@ final class ConcurrencyStressSpec extends FunSuite {
     assertEquals(successCount, fiberCount)
 
     val orderList = executionOrder.asScala.toList
-    assertEquals(orderList.length, fiberCount * 3) // 3 finalizers per effect
+    assertEquals(orderList.length, fiberCount * 3)
 
     (1 to fiberCount).foreach { id =>
       val fiberFinalizers = orderList.filter(_.endsWith(s"-$id"))
@@ -308,15 +307,14 @@ final class ConcurrencyStressSpec extends FunSuite {
     val fastCount = 30
     val slowCount = 30
 
-    // Use deterministic operations instead of system timing
     val fastEffects = (1 to fastCount).map { i =>
-      val effect = Eru.succeed(s"fast-$i") // Immediate success
-      EruRuntime.timeout(Duration.ofMillis(1000))(effect) // Very generous timeout
+      val effect = Eru.succeed(s"fast-$i")
+      EruRuntime.timeout(Duration.ofMillis(1000))(effect)
     }
 
     val slowEffects = (1 to slowCount).map { i =>
-      val effect = EruRuntime.sleep(Duration.ofMillis(2000)).map(_ => s"slow-$i") // Very long delay
-      EruRuntime.timeout(Duration.ofMillis(10))(effect) // Very short timeout - guaranteed to timeout
+      val effect = EruRuntime.sleep(Duration.ofMillis(2000)).map(_ => s"slow-$i")
+      EruRuntime.timeout(Duration.ofMillis(10))(effect)
     }
 
     val allEffects = fastEffects ++ slowEffects

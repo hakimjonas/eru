@@ -101,7 +101,7 @@ class FiberLifecycleSpec extends FunSuite {
     val computation = for {
       a <- Eru.succeed(10)
       b <- Eru.succeed(20)
-      c <- Eru.effect(a + b + 12) // Total: 42
+      c <- Eru.effect(a + b + 12)
     } yield c
 
     val fiber = EruRuntime.fork(computation).unsafeRunSync()
@@ -135,7 +135,7 @@ class FiberLifecycleSpec extends FunSuite {
     val error = "unhandled error"
     val computation = Eru.fail(error).recoverWith {
       case "different error" => Eru.succeed(42)
-      case _ => Eru.fail(error) // Re-fail with same error
+      case _ => Eru.fail(error)
     }
 
     val fiber = EruRuntime.fork(computation).unsafeRunSync()
@@ -153,7 +153,6 @@ class FiberLifecycleSpec extends FunSuite {
     val fiber = EruRuntime.fork(Eru.succeed(42)).unsafeRunSync()
     val interruptEffect = fiber.interrupt(InterruptCause.Cancelled(Some("test")))
 
-    // In Phase 2, interrupt is placeholder - just verify it returns Unit
     val result = interruptEffect.unsafeRunSync()
     assertEquals(result, ())
   }
@@ -184,7 +183,6 @@ class FiberLifecycleSpec extends FunSuite {
     * subtype substitution in both error and success types.
     */
   test("fiber types preserve variance correctly") {
-    // Test covariance in both error and success types
     val stringFiber: Fiber[String, String] = EruRuntime.fork(Eru.succeed("test")).unsafeRunSync()
     val anyFiber: Fiber[Any, Any] = stringFiber
 

@@ -27,7 +27,7 @@ final class RetryPolicyPropertySpec extends ScalaCheckSuite {
     */
   property("Policy.Recurs(n) bounds attempts and succeeds if successIndex <= n + 1") {
     forAll(nonNegativeSmall, positiveSmall) { (maxRetries, successIndexRaw) =>
-      val successIndex = successIndexRaw // 1 means succeed on first attempt
+      val successIndex = successIndexRaw
       var attempts = 0
 
       val eff: Eru[String | Throwable, Int] = Eru.effect {

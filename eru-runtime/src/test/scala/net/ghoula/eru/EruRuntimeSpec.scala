@@ -60,7 +60,6 @@ class EruRuntimeSpec extends FunSuite {
     }
     val obs = new Obs
     val fiber = Eru.succeed(5).forkWithObserver(obs).unsafeRunSync()
-    // Drive the scheduler by awaiting completion so events are emitted
     fiber.await.unsafeRunSync()
     val evs = obs.buf.toList
     assert(evs.nonEmpty)
@@ -77,7 +76,6 @@ class EruRuntimeSpec extends FunSuite {
     assertEquals(fidCompleted, fiber.id)
   }
 
-  // New tests for zipPar and race placeholders
   test("zipPar success-success returns tuple") {
     val eff = EruRuntime.zipPar(Eru.succeed(1), Eru.succeed("ok"))
     val res = eff.unsafeRunSync()

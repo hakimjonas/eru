@@ -30,9 +30,9 @@ class EruFiberSpec extends FunSuite {
   test("EruFiber equality is based on ID") {
     val id = FiberId.fresh()
     val fiber1 = EruFiber.withId(id, Exit.Success(42), Nil)
-    val fiber2 = EruFiber.withId(id, Exit.Success(24), Nil) // Same ID, different exit
+    val fiber2 = EruFiber.withId(id, Exit.Success(24), Nil)
 
-    assertEquals(fiber1, fiber2) // Should be equal because same ID
+    assertEquals(fiber1, fiber2)
   }
 
   test("EruFiber inequality for different IDs") {
@@ -62,9 +62,6 @@ class EruFiberSpec extends FunSuite {
     val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val awaitEffect = fiber.await
 
-    // The await should be pure - it constructs the effect but doesn't execute
-    // In Phase 2, we can test execution with the new interpreter
-    // This tests the construction-time behavior
     val _: Eru[Nothing, Exit[Nothing, Int]] = awaitEffect
   }
 
@@ -72,7 +69,6 @@ class EruFiberSpec extends FunSuite {
     val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val interruptEffect = fiber.interrupt(InterruptCause.Cancelled(Some("test")))
 
-    // The interrupt should be pure - it constructs the effect but doesn't execute
     val _: Eru[Nothing, Unit] = interruptEffect
   }
 
@@ -80,14 +76,12 @@ class EruFiberSpec extends FunSuite {
     val fiber = EruFiber.completed(Exit.Success(42), Nil)
     val interruptEffect = fiber.interrupt
 
-    // The interrupt should be pure - it constructs the effect but doesn't execute
     val _: Eru[Nothing, Unit] = interruptEffect
   }
 
   test("EruFiber type parameters are covariant") {
     val fiber: EruFiber[Nothing, Int] = EruFiber.completed(Exit.Success(42), Nil)
 
-    // This should compile due to covariance
     val widerFiber: EruFiber[Any, Any] = fiber
     assertEquals(fiber.id, widerFiber.id)
   }

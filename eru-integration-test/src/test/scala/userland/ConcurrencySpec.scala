@@ -133,7 +133,6 @@ final class ConcurrencySpec extends FunSuite {
   }
 
   test("raceAll propagates winner's failure") {
-    // Use immediate failure vs expensive computations
     val effects = List(
       Eru.effect {
         (1 to 500000).sum
