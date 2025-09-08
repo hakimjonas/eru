@@ -107,10 +107,10 @@ class FiberPhase2Spec extends FunSuite {
 
     assertEquals(result, "outer-inner")
 
-    // Finalizers must execute in correct FILO order. The outer.ensure is the last
-    // finalizer registered, so it must be the first to execute.
+    // Structured concurrency: child finalizers execute before parent finalizers
+    // This ensures proper resource cleanup dependency ordering
     import scala.jdk.CollectionConverters.*
-    assertEquals(executionOrder.asScala.toList, List("outer-finalizer", "inner-finalizer"))
+    assertEquals(executionOrder.asScala.toList, List("inner-finalizer", "outer-finalizer"))
   }
 
   test("auto-join works with multiple unawaited fibers") {

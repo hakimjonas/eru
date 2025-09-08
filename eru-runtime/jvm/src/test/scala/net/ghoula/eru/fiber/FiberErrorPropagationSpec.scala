@@ -4,6 +4,7 @@ import munit.FunSuite
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Comprehensive tests for error and defect propagation between parent and child fibers.
   *
@@ -12,6 +13,11 @@ import net.ghoula.eru.prelude.*
   * rather than timing to ensure reliable behavior across different execution environments.
   */
 class FiberErrorPropagationSpec extends FunSuite {
+
+  /** Helper to run operations with isolated runtime to prevent test interference */
+  private def withIsolatedRuntime[A](f: IsolatedTestRunner.IsolatedRuntime => A): A = {
+    IsolatedTestRunner.withIsolatedRuntime(f)
+  }
 
   /** Helper method to create a detailed assertion message for Exit comparisons */
   private def assertExitEquals[E, A](actual: Exit[E, A], expected: Exit[E, A], context: String): Unit = {
@@ -204,23 +210,25 @@ class FiberErrorPropagationSpec extends FunSuite {
   }
 
   test("parSequence fails on first error without waiting for all effects") {
-    val effects = List(
-      Eru.succeed("success1"),
-      Eru.fail("failure"),
-      EruRuntime.sleep(java.time.Duration.ofMillis(100)).map(_ => "slow success")
-    )
+    withIsolatedRuntime { runtime =>
+      val effects = List(
+        Eru.succeed("success1"),
+        Eru.fail("failure"),
+        runtime.sleep(java.time.Duration.ofMillis(100)).map(_ => "slow success")
+      )
 
-    val result = EruRuntime.parSequence(effects).attempt.unsafeRunSync()
+      val result = runtime.parSequence(effects).attempt.unsafeRunSync()
 
-    result match {
-      case Result.Failure(error) =>
-        assertEquals(
-          error,
-          "failure",
-          "parSequence should fail fast with the first error encountered"
-        )
-      case Result.Success(value) =>
-        fail(s"Expected parSequence to fail with 'failure' but got success: $value")
+      result match {
+        case Result.Failure(error) =>
+          assertEquals(
+            error,
+            "failure",
+            "parSequence should fail fast with the first error encountered"
+          )
+        case Result.Success(value) =>
+          fail(s"Expected parSequence to fail with 'failure' but got success: $value")
+      }
     }
   }
 
@@ -247,36 +255,38 @@ class FiberErrorPropagationSpec extends FunSuite {
   }
 
   test("nested error propagation through multiple fiber levels") {
-    val deepError = "deep nested error"
-    val deepEffect = Eru.fail(deepError)
+    withIsolatedRuntime { runtime =>
+      val deepError = "deep nested error"
+      val deepEffect = Eru.fail(deepError)
 
-    val middleEffect = for {
-      deepFiber <- EruRuntime.fork(deepEffect)
-      deepExit <- deepFiber.await
-      deepResult <- deepExit match {
-        case Exit.Success(value) => Eru.succeed(value)
-        case Exit.Failure(error) => Eru.fail(error)
-        case Exit.Die(t) => Eru.effect(throw t)
-        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      val middleEffect = for {
+        deepFiber <- runtime.fork(deepEffect)
+        deepExit <- deepFiber.await
+        deepResult <- deepExit match {
+          case Exit.Success(value) => Eru.succeed(value)
+          case Exit.Failure(error) => Eru.fail(error)
+          case Exit.Die(t) => Eru.effect(throw t)
+          case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+        }
+      } yield s"middle processed: $deepResult"
+
+      val topEffect = for {
+        middleFiber <- runtime.fork(middleEffect)
+        middleExit <- middleFiber.await
+      } yield middleExit
+
+      val result = topEffect.unsafeRunSync()
+
+      result match {
+        case Exit.Failure(error) =>
+          assertEquals(
+            error,
+            deepError,
+            "Error should propagate through multiple fiber levels unchanged"
+          )
+        case other =>
+          fail(s"Expected nested error propagation to produce Failure($deepError) but got: $other")
       }
-    } yield s"middle processed: $deepResult"
-
-    val topEffect = for {
-      middleFiber <- EruRuntime.fork(middleEffect)
-      middleExit <- middleFiber.await
-    } yield middleExit
-
-    val result = topEffect.unsafeRunSync()
-
-    result match {
-      case Exit.Failure(error) =>
-        assertEquals(
-          error,
-          deepError,
-          "Error should propagate through multiple fiber levels unchanged"
-        )
-      case other =>
-        fail(s"Expected nested error propagation to produce Failure($deepError) but got: $other")
     }
   }
 

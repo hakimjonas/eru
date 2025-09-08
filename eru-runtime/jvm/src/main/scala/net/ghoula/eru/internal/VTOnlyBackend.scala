@@ -70,13 +70,10 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
     * parent's executeStructuredCleanup can reliably await completion.
     */
   private def executeDrainedFinalizersSync(finalizers: List[() => Eru[Nothing, Unit]]): Unit = {
-//    println(s"FINALIZER: Executing ${finalizers.size} finalizers synchronously")
-    // Finalizers are already in FILO order from the interpreter, so execute them directly
+    // Finalizers are built in LIFO order by core, execute directly
     finalizers.foreach { finalizer =>
       try {
-//        println("FINALIZER: Executing individual finalizer")
         finalizer().unsafeRunSync()
-//        println("FINALIZER: Individual finalizer completed")
       } catch {
         case ex: Exception =>
           println(
@@ -174,11 +171,11 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
         // Wait for the child to complete - this allows finalizers to execute
         // CRITICAL: Must wait for child completion to ensure finalizers execute
         // This is essential for mathematical correctness of structured concurrency
-        val childExit = childFiber.get.await.unsafeRunSync()
-        println(s"CLEANUP: Child ${childFiber.get.id} completed with exit: $childExit")
+        val _ = childFiber.get.await.unsafeRunSync()
+        // Child completed successfully
       } catch {
-        case ex: Exception =>
-          println(s"CLEANUP: Exception during child cleanup: ${ex.getMessage}")
+        case _: Exception =>
+        // Exception during child cleanup - continue with other cleanups
         // Continue with other cleanups
       }
       childFiber = Option(fiberContext.childFibers.poll())

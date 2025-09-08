@@ -8,6 +8,7 @@ import scala.jdk.CollectionConverters.*
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Critical tests for FILO finalizer semantics across concurrent operations.
   *
@@ -22,116 +23,126 @@ import net.ghoula.eru.prelude.*
 class FiberFinalizerIntegrationSpec extends FunSuite {
 
   test("single fiber finalizer executes in FILO order") {
-    val executionOrder = new ConcurrentLinkedQueue[String]()
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      val executionOrder = new ConcurrentLinkedQueue[String]()
 
-    val computation = for {
-      _ <- Eru.succeed("step1").ensure(Eru.effect(executionOrder.add("finalizer1")))
-      _ <- Eru.succeed("step2").ensure(Eru.effect(executionOrder.add("finalizer2")))
-      _ <- Eru.succeed("step3").ensure(Eru.effect(executionOrder.add("finalizer3")))
-    } yield "done"
+      val computation = for {
+        _ <- Eru.succeed("step1").ensure(Eru.effect(executionOrder.add("finalizer1")))
+        _ <- Eru.succeed("step2").ensure(Eru.effect(executionOrder.add("finalizer2")))
+        _ <- Eru.succeed("step3").ensure(Eru.effect(executionOrder.add("finalizer3")))
+      } yield "done"
 
-    val fiber = EruRuntime.fork(computation).unsafeRunSync()
-    val exit = fiber.await.unsafeRunSync()
+      val fiber = runtime.fork(computation).unsafeRunSync()
+      val exit = fiber.await.unsafeRunSync()
 
-    assertEquals(exit, Exit.Success("done"))
-    assertEquals(executionOrder.asScala.toList, List("finalizer3", "finalizer2", "finalizer1"))
+      assertEquals(exit, Exit.Success("done"))
+      assertEquals(executionOrder.asScala.toList, List("finalizer3", "finalizer2", "finalizer1"))
+    }
   }
 
   test("nested fiber finalizers maintain FILO order across fiber boundaries") {
-    val executionOrder = new ConcurrentLinkedQueue[String]()
+    IsolatedTestRunner.withIsolatedRuntime {
+      runtime =>
+        val executionOrder = new ConcurrentLinkedQueue[String]()
 
-    val innerComputation = for {
-      _ <- Eru.succeed("inner1").ensure(Eru.effect(executionOrder.add("inner-fin1")))
-      _ <- Eru.succeed("inner2").ensure(Eru.effect(executionOrder.add("inner-fin2")))
-    } yield "inner-done"
+      val innerComputation = for {
+        _ <- Eru.succeed("inner1").ensure(Eru.effect(executionOrder.add("inner-fin1")))
+        _ <- Eru.succeed("inner2").ensure(Eru.effect(executionOrder.add("inner-fin2")))
+      } yield "inner-done"
 
-    val outerComputation = for {
-      _ <- Eru.succeed("outer1").ensure(Eru.effect(executionOrder.add("outer-fin1")))
-      innerFiber <- EruRuntime.fork(innerComputation)
-      _ <- Eru.succeed("outer2").ensure(Eru.effect(executionOrder.add("outer-fin2")))
-      innerResult <- innerFiber.await.flatMap(exit =>
-        exit match {
-          case Exit.Success(value) => Eru.succeed(value)
-          case Exit.Failure(error) => Eru.fail(error)
-          case Exit.Die(t) => Eru.effect(throw t)
-          case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
-        }
-      )
-      _ <- Eru.succeed("outer3").ensure(Eru.effect(executionOrder.add("outer-fin3")))
-    } yield s"outer-$innerResult"
+      val outerComputation = for {
+        _ <- Eru.succeed("outer1").ensure(Eru.effect(executionOrder.add("outer-fin1")))
+        innerFiber <- runtime.fork(innerComputation)
+        _ <- Eru.succeed("outer2").ensure(Eru.effect(executionOrder.add("outer-fin2")))
+        innerResult <- innerFiber.await.flatMap(exit =>
+          exit match {
+            case Exit.Success(value) => Eru.succeed(value)
+            case Exit.Failure(error) => Eru.fail(error)
+            case Exit.Die(t) => Eru.effect(throw t)
+            case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+          }
+        )
+        _ <- Eru.succeed("outer3").ensure(Eru.effect(executionOrder.add("outer-fin3")))
+      } yield s"outer-$innerResult"
 
-    val outerFiber = EruRuntime.fork(outerComputation).unsafeRunSync()
-    val exit = outerFiber.await.unsafeRunSync()
+      val outerFiber = runtime.fork(outerComputation).unsafeRunSync()
+      val exit = outerFiber.await.unsafeRunSync()
 
-    assertEquals(exit, Exit.Success("outer-inner-done"))
+      assertEquals(exit, Exit.Success("outer-inner-done"))
 
-    val executionList = executionOrder.asScala.toList
-    val innerFinalizers = executionList.filter(_.startsWith("inner-"))
-    val outerFinalizers = executionList.filter(_.startsWith("outer-"))
+      val executionList = executionOrder.asScala.toList
+      val innerFinalizers = executionList.filter(_.startsWith("inner-"))
+      val outerFinalizers = executionList.filter(_.startsWith("outer-"))
 
-    assertEquals(innerFinalizers, List("inner-fin2", "inner-fin1"))
+      assertEquals(innerFinalizers, List("inner-fin2", "inner-fin1"))
 
-    assertEquals(outerFinalizers, List("outer-fin3", "outer-fin2", "outer-fin1"))
+      assertEquals(outerFinalizers, List("outer-fin3", "outer-fin2", "outer-fin1"))
 
-    val lastInnerIndex = executionList.lastIndexWhere(_.startsWith("inner-"))
-    val firstOuterIndex = executionList.indexWhere(_.startsWith("outer-"))
-    assert(lastInnerIndex < firstOuterIndex, "Child finalizers should complete before parent finalizers")
+      val lastInnerIndex = executionList.lastIndexWhere(_.startsWith("inner-"))
+      val firstOuterIndex = executionList.indexWhere(_.startsWith("outer-"))
+      assert(lastInnerIndex < firstOuterIndex, "Child finalizers should complete before parent finalizers")
+    }
   }
 
   test("zipPar preserves FILO finalizer order from both sides") {
-    val executionOrder = new ConcurrentLinkedQueue[String]()
+    IsolatedTestRunner.withIsolatedRuntime {
+      runtime =>
+        val executionOrder = new ConcurrentLinkedQueue[String]()
 
-    val leftComputation = for {
-      _ <- Eru.succeed("left1").ensure(Eru.effect(executionOrder.add("left-fin1")))
-      _ <- Eru.succeed("left2").ensure(Eru.effect(executionOrder.add("left-fin2")))
-    } yield "left-done"
+      val leftComputation = for {
+        _ <- Eru.succeed("left1").ensure(Eru.effect(executionOrder.add("left-fin1")))
+        _ <- Eru.succeed("left2").ensure(Eru.effect(executionOrder.add("left-fin2")))
+      } yield "left-done"
 
-    val rightComputation = for {
-      _ <- Eru.succeed("right1").ensure(Eru.effect(executionOrder.add("right-fin1")))
-      _ <- Eru.succeed("right2").ensure(Eru.effect(executionOrder.add("right-fin2")))
-    } yield "right-done"
+      val rightComputation = for {
+        _ <- Eru.succeed("right1").ensure(Eru.effect(executionOrder.add("right-fin1")))
+        _ <- Eru.succeed("right2").ensure(Eru.effect(executionOrder.add("right-fin2")))
+      } yield "right-done"
 
-    val result = EruRuntime.zipPar(leftComputation, rightComputation).unsafeRunSync()
+      val result = runtime.zipPar(leftComputation, rightComputation).unsafeRunSync()
 
-    assertEquals(result, ("left-done", "right-done"))
+      assertEquals(result, ("left-done", "right-done"))
 
-    val executionList = executionOrder.asScala.toList
-    val leftFinalizers = executionList.filter(_.startsWith("left"))
-    val rightFinalizers = executionList.filter(_.startsWith("right"))
+      val executionList = executionOrder.asScala.toList
+      val leftFinalizers = executionList.filter(_.startsWith("left"))
+      val rightFinalizers = executionList.filter(_.startsWith("right"))
 
-    assertEquals(leftFinalizers, List("left-fin2", "left-fin1"))
-    assertEquals(rightFinalizers, List("right-fin2", "right-fin1"))
+      assertEquals(leftFinalizers, List("left-fin2", "left-fin1"))
+      assertEquals(rightFinalizers, List("right-fin2", "right-fin1"))
+    }
   }
 
   test("parSequence preserves FILO finalizer order for each effect") {
-    val executionOrder = new ConcurrentLinkedQueue[String]()
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      val executionOrder = new ConcurrentLinkedQueue[String]()
 
-    def createEffect(name: String): Eru[Nothing, String] = for {
-      _ <- Eru.succeed(s"${name}1").ensure(Eru.effect(executionOrder.add(s"$name-fin1")))
-      _ <- Eru.succeed(s"${name}2").ensure(Eru.effect(executionOrder.add(s"$name-fin2")))
-    } yield s"$name-done"
+      def createEffect(name: String): Eru[Nothing, String] = for {
+        _ <- Eru.succeed(s"${name}1").ensure(Eru.effect(executionOrder.add(s"$name-fin1")))
+        _ <- Eru.succeed(s"${name}2").ensure(Eru.effect(executionOrder.add(s"$name-fin2")))
+      } yield s"$name-done"
 
-    val effects = List(
-      createEffect("effect1"),
-      createEffect("effect2"),
-      createEffect("effect3")
-    )
+      val effects = List(
+        createEffect("effect1"),
+        createEffect("effect2"),
+        createEffect("effect3")
+      )
 
-    val results = EruRuntime.parSequence(effects).unsafeRunSync()
+      val results = runtime.parSequence(effects).unsafeRunSync()
 
-    assertEquals(results, List("effect1-done", "effect2-done", "effect3-done"))
+      assertEquals(results, List("effect1-done", "effect2-done", "effect3-done"))
 
-    val executionList = executionOrder.asScala.toList
-    for (i <- 1 to 3) {
-      val effectFinalizers = executionList.filter(_.startsWith(s"effect$i"))
-      if (effectFinalizers.nonEmpty) {
-        val expectedFinalizers =
-          if (effectFinalizers.contains(s"effect$i-fin1") && effectFinalizers.contains(s"effect$i-fin2")) {
-            List(s"effect$i-fin2", s"effect$i-fin1")
-          } else {
-            effectFinalizers
-          }
-        assertEquals(effectFinalizers, expectedFinalizers)
+      val executionList = executionOrder.asScala.toList
+      for (i <- 1 to 3) {
+        val effectFinalizers = executionList.filter(_.startsWith(s"effect$i"))
+        if (effectFinalizers.nonEmpty) {
+          val expectedFinalizers =
+            if (effectFinalizers.contains(s"effect$i-fin1") && effectFinalizers.contains(s"effect$i-fin2")) {
+              List(s"effect$i-fin2", s"effect$i-fin1")
+            } else {
+              effectFinalizers
+            }
+          assertEquals(effectFinalizers, expectedFinalizers)
+        }
       }
     }
   }
@@ -285,53 +296,59 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
   }
 
   test("deeply nested fibers maintain strict FILO ordering across all levels") {
-    val executionOrder = new ConcurrentLinkedQueue[String]()
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      val executionOrder = new ConcurrentLinkedQueue[String]()
 
-    def createNestedFiber(depth: Int, prefix: String): Eru[Nothing, String] = {
-      if (depth <= 0) {
-        Eru.succeed(s"$prefix-leaf").ensure(Eru.effect(executionOrder.add(s"$prefix-leaf-fin")))
-      } else {
-        for {
-          _ <- Eru.succeed(s"$prefix-$depth-outer").ensure(Eru.effect(executionOrder.add(s"$prefix-$depth-outer-fin")))
-          childFiber <- EruRuntime.fork(createNestedFiber(depth - 1, s"$prefix-$depth"))
-          _ <- Eru
-            .succeed(s"$prefix-$depth-middle")
-            .ensure(Eru.effect(executionOrder.add(s"$prefix-$depth-middle-fin")))
-          childResult <- childFiber.await.flatMap(exit =>
-            (exit match {
-              case Exit.Success(value) => Eru.succeed(value)
-              case Exit.Failure(error) => Eru.fail(error)
-              case Exit.Die(t) => Eru.effect(throw t)
-              case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
-            }).attempt.map(_.fold(_ => "error", identity))
-          )
-          _ <- Eru.succeed(s"$prefix-$depth-inner").ensure(Eru.effect(executionOrder.add(s"$prefix-$depth-inner-fin")))
-        } yield s"$prefix-$depth-$childResult"
-      }
-    }
-
-    val result = createNestedFiber(5, "nested").unsafeRunSync()
-
-    assert(result.contains("leaf"))
-
-    val executionList = executionOrder.asScala.toList
-    for (depth <- 1 to 5) {
-      val levelFinalizers = executionList.filter(_.contains(s"nested-$depth-"))
-
-      if (levelFinalizers.nonEmpty) {
-        val innerIndex = levelFinalizers.indexOf(s"nested-$depth-inner-fin")
-        val middleIndex = levelFinalizers.indexOf(s"nested-$depth-middle-fin")
-        val outerIndex = levelFinalizers.indexOf(s"nested-$depth-outer-fin")
-
-        if (innerIndex != -1 && middleIndex != -1) {
-          assert(
-            executionList.indexOf(s"nested-$depth-inner-fin") < executionList.indexOf(s"nested-$depth-middle-fin")
-          )
+      def createNestedFiber(depth: Int, prefix: String): Eru[Nothing, String] = {
+        if (depth <= 0) {
+          Eru.succeed(s"$prefix-leaf").ensure(Eru.effect(executionOrder.add(s"$prefix-leaf-fin")))
+        } else {
+          for {
+            _ <- Eru
+              .succeed(s"$prefix-$depth-outer")
+              .ensure(Eru.effect(executionOrder.add(s"$prefix-$depth-outer-fin")))
+            childFiber <- runtime.fork(createNestedFiber(depth - 1, s"$prefix-$depth"))
+            _ <- Eru
+              .succeed(s"$prefix-$depth-middle")
+              .ensure(Eru.effect(executionOrder.add(s"$prefix-$depth-middle-fin")))
+            childResult <- childFiber.await.flatMap(exit =>
+              (exit match {
+                case Exit.Success(value) => Eru.succeed(value)
+                case Exit.Failure(error) => Eru.fail(error)
+                case Exit.Die(t) => Eru.effect(throw t)
+                case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+              }).attempt.map(_.fold(_ => "error", identity))
+            )
+            _ <- Eru
+              .succeed(s"$prefix-$depth-inner")
+              .ensure(Eru.effect(executionOrder.add(s"$prefix-$depth-inner-fin")))
+          } yield s"$prefix-$depth-$childResult"
         }
-        if (middleIndex != -1 && outerIndex != -1) {
-          assert(
-            executionList.indexOf(s"nested-$depth-middle-fin") < executionList.indexOf(s"nested-$depth-outer-fin")
-          )
+      }
+
+      val result = createNestedFiber(5, "nested").unsafeRunSync()
+
+      assert(result.contains("leaf"))
+
+      val executionList = executionOrder.asScala.toList
+      for (depth <- 1 to 5) {
+        val levelFinalizers = executionList.filter(_.contains(s"nested-$depth-"))
+
+        if (levelFinalizers.nonEmpty) {
+          val innerIndex = levelFinalizers.indexOf(s"nested-$depth-inner-fin")
+          val middleIndex = levelFinalizers.indexOf(s"nested-$depth-middle-fin")
+          val outerIndex = levelFinalizers.indexOf(s"nested-$depth-outer-fin")
+
+          if (innerIndex != -1 && middleIndex != -1) {
+            assert(
+              executionList.indexOf(s"nested-$depth-inner-fin") < executionList.indexOf(s"nested-$depth-middle-fin")
+            )
+          }
+          if (middleIndex != -1 && outerIndex != -1) {
+            assert(
+              executionList.indexOf(s"nested-$depth-middle-fin") < executionList.indexOf(s"nested-$depth-outer-fin")
+            )
+          }
         }
       }
     }

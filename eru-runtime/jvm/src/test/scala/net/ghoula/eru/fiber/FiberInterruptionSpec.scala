@@ -6,6 +6,7 @@ import java.time.Duration
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Comprehensive tests for fiber interruption and cancellation scenarios.
   *
@@ -14,15 +15,23 @@ import net.ghoula.eru.prelude.*
   */
 class FiberInterruptionSpec extends FunSuite {
 
+  /** Helper to run operations with isolated runtime to prevent test interference */
+  private def withIsolatedRuntime[A](f: IsolatedTestRunner.IsolatedRuntime => A): A = {
+    IsolatedTestRunner.withIsolatedRuntime(f)
+  }
+
   test("fiber interrupt with Cancelled cause is handled gracefully") {
-    val longRunning = EruRuntime.sleep(Duration.ofSeconds(10)).map(_ => "completed")
-    val fiber = EruRuntime.fork(longRunning).unsafeRunSync()
+    withIsolatedRuntime {
+      runtime =>
+        val longRunning = runtime.sleep(Duration.ofSeconds(10)).map(_ => "completed")
+        val fiber = runtime.fork(longRunning).unsafeRunSync()
 
-    val cause = InterruptCause.Cancelled(Some("user requested cancellation"))
-    val interruptResult = fiber.interrupt(cause).unsafeRunSync()
+      val cause = InterruptCause.Cancelled(Some("user requested cancellation"))
+      val interruptResult = fiber.interrupt(cause).unsafeRunSync()
 
-    // Phase 2: interrupt is placeholder, should return unit
-    assertEquals(interruptResult, ())
+      // Phase 2: interrupt is placeholder, should return unit
+      assertEquals(interruptResult, ())
+    }
   }
 
   test("fiber interrupt with Timeout cause includes duration information") {

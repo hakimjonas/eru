@@ -1,6 +1,7 @@
 package userland
 
 import munit.FunSuite
+import userland.TestRuntime.*
 
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
@@ -41,7 +42,10 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
       result
     }
 
-    val result = parentComputation.unsafeRunSync()
+    val result = parentComputation.runIsolatedExit match {
+      case Exit.Success(value) => value
+      case other => fail(s"Computation should succeed, got: $other")
+    }
 
     // MATHEMATICAL VERIFICATION:
     assert(result == "parent-completed", "Parent should complete successfully")
@@ -103,10 +107,13 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
       result
     }
 
-    val result = rootComputation.unsafeRunSync()
+    val result = rootComputation.runIsolatedExit match {
+      case Exit.Success(value) => value
+      case other => fail(s"Root computation should succeed, got: $other")
+    }
     Thread.sleep(100) // Allow time for any violations to manifest
 
-    assert(result == "root-completed")
+    assert(result == "root-completed", "Root should complete successfully")
     assert(!bAttemptedWork.get(), "Fiber B should be terminated transitively")
     assert(!cAttemptedWork.get(), "Fiber C should be terminated transitively")
   }
