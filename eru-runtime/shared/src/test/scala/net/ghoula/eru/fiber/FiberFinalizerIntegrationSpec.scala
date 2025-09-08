@@ -243,18 +243,22 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
     val executionOrder = new ConcurrentLinkedQueue[String]()
 
     val computation = for {
-      _ <- EruRuntime.fork {
-        for {
-          _ <- Eru.succeed("fork1").ensure(Eru.effect(executionOrder.add("fork1-fin")))
-          _ <- Eru.succeed("fork2").ensure(Eru.effect(executionOrder.add("fork2-fin")))
-        } yield "fork-done"
-      }
-      _ <- EruRuntime.fork {
-        for {
-          _ <- Eru.succeed("fork3").ensure(Eru.effect(executionOrder.add("fork3-fin")))
-          _ <- Eru.succeed("fork4").ensure(Eru.effect(executionOrder.add("fork4-fin")))
-        } yield "fork2-done"
-      }
+      _ <- EruRuntime.parSequence(
+        List(
+          EruRuntime.fork {
+            for {
+              _ <- Eru.succeed("fork1").ensure(Eru.effect(executionOrder.add("fork1-fin")))
+              _ <- Eru.succeed("fork2").ensure(Eru.effect(executionOrder.add("fork2-fin")))
+            } yield "fork-done"
+          },
+          EruRuntime.fork {
+            for {
+              _ <- Eru.succeed("fork3").ensure(Eru.effect(executionOrder.add("fork3-fin")))
+              _ <- Eru.succeed("fork4").ensure(Eru.effect(executionOrder.add("fork4-fin")))
+            } yield "fork2-done"
+          }
+        )
+      )
       _ <- Eru.succeed("main").ensure(Eru.effect(executionOrder.add("main-fin")))
     } yield "main-done"
 

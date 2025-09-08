@@ -98,34 +98,38 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     def createCancellableEffect(id: Int): Eru[String | Throwable, Int] = {
       Eru.effect(started.incrementAndGet()).flatMap { _ =>
-        EruRuntime.sleep(Duration.ofMillis(100)).flatMap { _ =>
+        EruRuntime.sleep(Duration.ofMillis(200)).flatMap { _ =>
           completed.incrementAndGet()
           Eru.succeed(id)
         }
       }
     }
 
+    // This effect will fail very quickly
     val fastFail: Eru[String | Throwable, Int] =
-      EruRuntime.sleep(Duration.ofMillis(10)).flatMap(_ => Eru.fail("fast failure"))
+      EruRuntime.sleep(Duration.ofMillis(20)).flatMap(_ => Eru.fail("fast failure"))
 
+    // A slower effect that we expect to be cancelled
     val slowEffect = createCancellableEffect(1)
+
+    // By racing the two, the failure of `fastFail` should win and interrupt `slowEffect`
     val result = EruRuntime
-      .zipPar(fastFail, slowEffect)
-      .map { case (a, b) => a + b }
+      .race(fastFail, slowEffect)
       .attempt
       .unsafeRunSync()
 
-    result match {
-      case Result.Failure(_) =>
-        val startedCount = started.get()
-        val completedCount = completed.get()
+    // Allow a brief moment for interruption logic to complete
+    EruRuntime.sleep(Duration.ofMillis(50)).unsafeRunSync()
 
-        assertEquals(startedCount, 1, "The slow effect should have started")
-        assert(
-          completedCount <= startedCount,
-          s"Completions ($completedCount) should not exceed started effects ($startedCount)"
-        )
-      case Result.Success(_) => fail("Expected failure due to fast fail effect")
+    // We expect the race to terminate with the failure from `fastFail`
+    result match {
+      case Result.Failure("fast failure") =>
+        // The race failed as expected.
+        // Now, we verify the side-effects to ensure cancellation happened.
+        assertEquals(started.get(), 1, "The slow effect should have started")
+        assertEquals(completed.get(), 0, "The slow effect should have been interrupted and not completed")
+      case other =>
+        fail(s"Expected the race to fail with 'fast failure', but got $other")
     }
   }
 
@@ -168,9 +172,11 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     val results = timers.map(timer => EruRuntime.fork(timer))
     val completed = results
-      .map(_.flatMap(_.await).map {
-        case Exit.Success(value) => value
-        case other => throw new RuntimeException(s"Timer failed: $other")
+      .map(_.flatMap(_.await).flatMap { // Use flatMap for safety
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Timer failed with error: $error"))
+        case Exit.Die(t) => Eru.fail(new RuntimeException("Timer died", t))
+        case Exit.Interrupt(_, _) => Eru.fail(new RuntimeException("Timer was interrupted"))
       })
       .toList
       .sequence
@@ -186,9 +192,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     val concurrentOps = (1 to concurrentCount).map { i =>
       EruRuntime.fork {
         EruRuntime.sleep(Duration.ofMillis(2)).map(_ => s"concurrent-$i")
-      }.flatMap(_.await).map {
-        case Exit.Success(value) => value
-        case other => throw new RuntimeException(s"Concurrent op failed: $other")
+      }.flatMap(_.await).flatMap { // Use flatMap for safety
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Concurrent op failed with error: $error"))
+        case Exit.Die(t) => Eru.fail(new RuntimeException("Concurrent op died", t))
+        case Exit.Interrupt(_, _) => Eru.fail(new RuntimeException("Concurrent op was interrupted"))
       }
     }
 
