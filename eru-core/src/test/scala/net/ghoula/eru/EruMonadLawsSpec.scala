@@ -12,8 +12,8 @@ import net.ghoula.eru.CorePrelude.*
   *   2. Right Identity: eru.flatMap(Eru.succeed) == eru
   *   3. Associativity: eru.flatMap(f).flatMap(g) == eru.flatMap(a => f(a).flatMap(g))
   *
-  * Tests both success and failure cases to ensure the laws hold under all conditions, and
-  * validates coherence between different combinators like map/flatMap and recover/recoverWith.
+  * Tests both success and failure cases to ensure the laws hold under all conditions, and validates
+  * coherence between different combinators like map/flatMap and recover/recoverWith.
   */
 final class EruMonadLawsSpec extends FunSuite {
 

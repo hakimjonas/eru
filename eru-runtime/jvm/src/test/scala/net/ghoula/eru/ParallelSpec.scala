@@ -6,10 +6,10 @@ import java.time.Duration
 
 /** Test suite for JVM-specific parallel execution functionality.
   *
-  * Validates parallel combinators and concurrent execution on the JVM virtual thread backend.
-  * These tests ensure that parallel operations achieve true concurrency, maintain proper
-  * timing characteristics, and provide correct error handling semantics while leveraging
-  * the performance benefits of the JVM's virtual thread implementation.
+  * Validates parallel combinators and concurrent execution on the JVM virtual thread backend. These
+  * tests ensure that parallel operations achieve true concurrency, maintain proper timing
+  * characteristics, and provide correct error handling semantics while leveraging the performance
+  * benefits of the JVM's virtual thread implementation.
   */
 final class ParallelSpec extends FunSuite {
 

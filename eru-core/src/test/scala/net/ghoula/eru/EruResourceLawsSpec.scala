@@ -9,9 +9,9 @@ import net.ghoula.eru.CorePrelude.*
 /** Verification of resource management laws and invariants in the Eru effect system.
   *
   * This specification ensures that resource management operations follow mathematical laws and
-  * maintain consistent behavior across different execution scenarios. Tests validate that
-  * bracket, ensure, and other resource operations maintain proper ordering, cleanup guarantees,
-  * and compositional properties essential for predictable resource lifecycle management.
+  * maintain consistent behavior across different execution scenarios. Tests validate that bracket,
+  * ensure, and other resource operations maintain proper ordering, cleanup guarantees, and
+  * compositional properties essential for predictable resource lifecycle management.
   */
 class EruResourceLawsSpec extends FunSuite {
 

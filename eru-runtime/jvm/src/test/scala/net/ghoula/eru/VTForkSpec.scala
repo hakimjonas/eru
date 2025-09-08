@@ -6,10 +6,10 @@ import net.ghoula.eru.prelude.*
 
 /** Test suite for JVM Virtual Thread integration in the Eru runtime.
   *
-  * Validates that the JVM runtime backend properly utilizes virtual threads for fiber
-  * execution when available. These tests ensure that the virtual thread integration
-  * provides the expected concurrency characteristics and proper thread management
-  * while maintaining compatibility with the Eru effect system's semantics.
+  * Validates that the JVM runtime backend properly utilizes virtual threads for fiber execution
+  * when available. These tests ensure that the virtual thread integration provides the expected
+  * concurrency characteristics and proper thread management while maintaining compatibility with
+  * the Eru effect system's semantics.
   */
 final class VTForkSpec extends FunSuite {
 

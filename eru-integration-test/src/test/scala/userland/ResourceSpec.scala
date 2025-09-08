@@ -6,11 +6,10 @@ import net.ghoula.eru.prelude.*
 
 /** Integration test suite for resource management in complex real-world scenarios.
   *
-  * Validates resource safety operations including bracket, ensure, and finalizers in
-  * realistic usage patterns that combine resource management with concurrency, error
-  * handling, and other effect operations. These tests ensure that resource safety
-  * guarantees hold under complex compositions that reflect production application
-  * requirements.
+  * Validates resource safety operations including bracket, ensure, and finalizers in realistic
+  * usage patterns that combine resource management with concurrency, error handling, and other
+  * effect operations. These tests ensure that resource safety guarantees hold under complex
+  * compositions that reflect production application requirements.
   */
 final class ResourceSpec extends FunSuite {
   test("bracket ensures cleanup on failure and success") {

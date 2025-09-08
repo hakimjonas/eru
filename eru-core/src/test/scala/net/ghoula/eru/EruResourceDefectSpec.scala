@@ -8,8 +8,8 @@ import net.ghoula.eru.CorePrelude.*
   *
   * Validates resource cleanup behavior when encountering unrecoverable errors (defects) such as
   * Throwable exceptions during resource usage. These tests ensure that even when the system
-  * encounters unexpected failures, resource finalizers are properly executed and no resource
-  * leaks occur, maintaining system reliability under extreme error conditions.
+  * encounters unexpected failures, resource finalizers are properly executed and no resource leaks
+  * occur, maintaining system reliability under extreme error conditions.
   */
 final class EruResourceDefectSpec extends FunSuite {
 

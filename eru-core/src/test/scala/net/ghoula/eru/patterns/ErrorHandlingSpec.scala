@@ -10,8 +10,8 @@ import net.ghoula.eru.CorePrelude.*
   *
   * Validates best practices and common patterns for error handling including recovery strategies,
   * error transformation, and conditional error handling. These tests demonstrate idiomatic
-  * approaches to error management that support the Guided Correctness pillar by making the
-  * correct error handling approach the most natural and ergonomic choice.
+  * approaches to error management that support the Guided Correctness pillar by making the correct
+  * error handling approach the most natural and ergonomic choice.
   */
 class ErrorHandlingSpec extends FunSuite {
 

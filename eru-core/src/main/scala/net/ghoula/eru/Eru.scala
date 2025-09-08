@@ -5,6 +5,13 @@ import scala.util.control.TailCalls.{TailRec, done, tailcall}
 
 import net.ghoula.eru.EruObserver.*
 
+/** Internal exception used to preserve finalizers when InterruptedException occurs */
+private class InterruptedWithFinalizers(
+  val fiberId: FiberId,
+  val cause: InterruptCause,
+  val finalizers: List[() => Eru[Nothing, Unit]]
+) extends InterruptedException(cause.toString)
+
 /** A data type representing a pure, lazy, and composable computation that can produce a value of
   * type `A` or fail with an error of type `E`.
   *
@@ -70,6 +77,12 @@ enum Eru[+E, +A] {
 
   /** Represents awaiting the completion of a fiber. */
   private case Await[E0, A0](fiber: EruFiber[E0, A0]) extends Eru[E0, Exit[E0, A0]]
+
+  /** Represents a synchronous, interruptible blocking computation suspended in a thunk. Unlike
+    * Effect, InterruptedException thrown from the thunk is handled specially by the interpreter to
+    * produce Exit.Interrupt and ensure proper finalizer execution.
+    */
+  private case InterruptibleBlocking[A0](thunk: () => A0) extends Eru[Nothing, A0]
 
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
@@ -384,6 +397,22 @@ object Eru {
     */
   @inline def blocking[A](thunk: => A): Eru[Throwable, A] = effect(thunk)
 
+  /** Creates an `Eru` representing a synchronous, interruptible blocking computation that may be
+    * interrupted via thread interruption. Unlike `blocking`, interruption is handled gracefully by
+    * converting `InterruptedException` to `Exit.Interrupt` and ensuring proper finalizer execution.
+    *
+    * This is the correct constructor for operations that can be interrupted via Java's thread
+    * interruption mechanism, such as `Thread.sleep`, blocking I/O operations, or waiting on
+    * synchronization primitives.
+    *
+    * @param thunk
+    *   the interruptible computation to suspend (by-name)
+    * @return
+    *   an `Eru[Nothing, A]` representing the interruptible computation
+    */
+  def interruptibleBlocking[A](thunk: => A): Eru[Nothing, A] =
+    InterruptibleBlocking(() => thunk)
+
   /** Creates an `Eru` from an `Either`. `Left` values become failures, `Right` values become
     * successes.
     *
@@ -547,31 +576,47 @@ object Eru {
       case Right(value) => value
     }
 
-    /** The entry point for executing an Eru program.
-      */
-    def runSync[E, A](start: Eru[E, A]): A = {
-      val (either, fins) = runLoop(start, Nil, Hooks.Noop).result
-      drainFinalizers(fins).result
-      handleRunResult(either)
-    }
-
     /** Executes an Eru computation and captures both its result and accumulated finalizers.
       *
       * This method provides the implementation for the public API that runtime backends use to
-      * execute computations while preserving finalizer information. It runs the computation through
-      * the synchronous interpreter and converts the result to an Exit.
+      * execute computations while preserving finalizer information. It now uses the unified
+      * fiber-aware interpreter to ensure consistent behavior with unsafeRunSync.
       */
     def executeWithFinalizers[E, A](computation: Eru[E, A]): (Exit[E, A], List[() => Eru[Nothing, Unit]]) = {
-      val (either, fins) = runLoop(computation, Nil, Hooks.Noop).result
-      val exit = either match {
-        case Right(value) => Exit.Success(value)
-        case Left(error) =>
-          error match {
-            case t: Throwable => Exit.Die(t)
-            case e => Exit.Failure(e)
+      initializeAsyncSchedulerIfNeeded()
+
+      val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
+
+      try {
+        val (either, fins) = runFiberLoop(computation, Nil, Hooks.Noop, None, outstandingFibers).result
+
+        val allFinalizers = outstandingFibers.foldLeft(fins) { (acc, fiber) =>
+          fiber.finalizers ++ acc
+        }
+
+        val exit = either match {
+          case Right(value) => Exit.Success(value)
+          case Left(error) =>
+            error match {
+              case t: Throwable => Exit.Die(t)
+              case e => Exit.Failure(e)
+            }
+        }
+
+        (exit, allFinalizers)
+      } catch {
+        case interrupted: InterruptedWithFinalizers =>
+          // Include both the preserved finalizers and outstanding fiber finalizers
+          val allFinalizers = outstandingFibers.foldLeft(interrupted.finalizers) { (acc, fiber) =>
+            fiber.finalizers ++ acc
           }
+          (Exit.Interrupt(interrupted.fiberId, interrupted.cause), allFinalizers)
+        case ex: Throwable =>
+          val allFinalizers = outstandingFibers.foldLeft(List.empty[() => Eru[Nothing, Unit]]) { (acc, fiber) =>
+            fiber.finalizers ++ acc
+          }
+          (Exit.Die(ex), allFinalizers)
       }
-      (exit, fins)
     }
 
     private type Finalizer = () => Eru[Nothing, Unit]
@@ -583,127 +628,6 @@ object Eru {
       val Noop: Hooks = new Hooks { def onStep(label: => String): Unit = () }
       final case class ObserverHooks(scope: ScopeId, observer: EruObserver) extends Hooks {
         def onStep(label: => String): Unit = observer.onEvent(EruEvent.Step(scope, label))
-      }
-    }
-
-    /** Core synchronous interpreter that executes Eru effects step-by-step.
-      *
-      * This method is the brain of synchronous execution, processing each Eru case through pattern
-      * matching while maintaining stack safety via TailRec. It threads a list of finalizers (fins)
-      * through the computation, accumulating cleanup actions that must be executed regardless of
-      * success or failure.
-      *
-      * Key execution flow:
-      *   - Pure values (Succeed/Fail) complete immediately with the current finalizer list
-      *   - Effects (Effect) execute their thunk and return the result
-      *   - Chain operations use flatMap-style composition, threading finalizers through
-      *   - Ensure operations add new finalizers to the front of the list (FILO order)
-      *   - All recursive calls use tailcall() to maintain stack safety in deep compositions
-      *
-      * The fins parameter represents the current stack of finalizers in FILO order: the first
-      * finalizer in the list is the most recently added and will run first during cleanup. This
-      * ensures proper resource cleanup nesting.
-      *
-      * @param eru
-      *   The effect to execute
-      * @param fins
-      *   Current list of finalizers to run (in FILO order)
-      * @return
-      *   TailRec computation yielding (result, accumulated finalizers)
-      */
-    private def runLoop[E, A](
-      eru: Eru[E, A],
-      fins: List[Finalizer],
-      hooks: Hooks
-    ): TailRec[(Either[E, A], List[Finalizer])] =
-      eru match {
-        case Succeed(value) =>
-          done((Right(value), fins))
-
-        case Fail(error) =>
-          done((Left(error), fins))
-
-        case Effect(thunk) =>
-          done((thunk(), fins))
-
-        case Chain(source, cont) =>
-          tailcall(runLoop(source, fins, hooks)).flatMap {
-            case (Right(value), fs) => tailcall(runContinuation(cont, value, fs, hooks))
-            case (Left(error), fs) => done((Left(error), fs))
-          }
-
-        case MapChain(source, f) =>
-          tailcall(runLoop(source, fins, hooks)).map {
-            case (Right(value), fs) => (Right(f(value)), fs)
-            case (Left(error), fs) => (Left(error), fs)
-          }
-
-        case RecoverWith(source, pf) =>
-          tailcall(runLoop(source, fins, hooks)).flatMap {
-            case (Right(value), fs) => done((Right(value), fs))
-            case (Left(error), fs) =>
-              if (pf.isDefinedAt(error)) {
-                tailcall(runLoop(pf(error), fs, hooks))
-              } else {
-                done((Left(error), fs))
-              }
-          }
-
-        case MapError(source, f) =>
-          tailcall(runLoop(source, fins, hooks)).map { case (either, fs) => (either.left.map(f), fs) }
-
-        case Zip(left, right) =>
-          tailcall(runLoop(left, fins, hooks)).flatMap {
-            case (Right(a), fsL) =>
-              tailcall(runLoop(right, fsL, hooks)).map {
-                case (Right(b), fsR) => (Right((a, b)), fsR)
-                case (Left(e1), fsR) => (Left(e1), fsR)
-              }
-            case (Left(e0), fsL) => done((Left(e0), fsL))
-          }
-
-        case Attempt(source) =>
-          tailcall(runLoop(source, fins, hooks)).map {
-            case (Left(e), fs) => (Right(Result.Failure(e)), fs)
-            case (Right(a), fs) => (Right(Result.Success(a)), fs)
-          }
-
-        case Debug(source, label) =>
-          hooks.onStep(label())
-          tailcall(runLoop(source, fins, hooks))
-
-        case Ensure(source, fin) =>
-          tailcall(runLoop(source, fins, hooks)).map { case (either, fs) => (either, fin :: fs) }
-        case Suspend(register) =>
-          handleSuspend(cb => runLoop(register(cb), fins, hooks).result)
-
-        case Fork(_) =>
-          throw new IllegalStateException("Fork operations are not yet supported in the synchronous kernel")
-
-        case Await(_) =>
-          throw new IllegalStateException("Await operations are not yet supported in the synchronous kernel")
-      }
-
-    /** Executes a continuation stack with the given input value.
-      *
-      * This method processes the continuation stack step by step, maintaining type safety and stack
-      * safety through TailRec. It handles both End (base case) and Step (recursive case) of the
-      * continuation GADT.
-      */
-    @inline private def runContinuation[E, In, Out](
-      cont: Continuation[E, In, Out],
-      input: In,
-      fins: List[Finalizer],
-      hooks: Hooks
-    ): TailRec[(Either[E, Out], List[Finalizer])] = {
-      cont match {
-        case Continuation.End() =>
-          done((Right(input), fins))
-        case Continuation.Step(f, next) =>
-          tailcall(runLoop(f(input), fins, hooks)).flatMap {
-            case (Right(intermediate), fs) => tailcall(runContinuation(next, intermediate, fs, hooks))
-            case (Left(error), fs) => done((Left(error), fs))
-          }
       }
     }
 
@@ -788,8 +712,15 @@ object Eru {
           tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers))
 
         case Ensure(source, fin) =>
-          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).map { case (either, fs) =>
-            (either, fin :: fs)
+          try {
+            tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).map { case (either, fs) =>
+              (either, fin :: fs)
+            }
+          } catch {
+            case interrupted: InterruptedWithFinalizers =>
+              // Add the ensure finalizer to the interrupted exception
+              val updatedFinalizers = fin :: interrupted.finalizers
+              throw new InterruptedWithFinalizers(interrupted.fiberId, interrupted.cause, updatedFinalizers)
           }
 
         case Suspend(register) =>
@@ -867,6 +798,19 @@ object Eru {
           val mergedFinalizers = fiber.finalizers ++ fins
 
           done((Right(fiber.exit), mergedFinalizers))
+
+        case InterruptibleBlocking(thunk) =>
+          try {
+            done((Right(thunk()), fins))
+          } catch {
+            case _: InterruptedException =>
+              // Preserve finalizers by wrapping in custom exception
+              val fiberId = currentFiberId.getOrElse(FiberId.fresh())
+              val interruptWithFinalizers = new InterruptedWithFinalizers(fiberId, InterruptCause.Cancelled(), fins)
+              throw interruptWithFinalizers
+            case ex: Throwable =>
+              throw ex
+          }
       }
 
     /** Fiber-aware continuation execution to match runFiberLoop */
@@ -919,8 +863,12 @@ object Eru {
       fins match {
         case Nil => done(())
         case fin :: rest =>
-          tailcall(runLoop(fin(), Nil, Hooks.Noop)).flatMap { case (_, inner) =>
-            tailcall(drainFinalizers(inner ++ rest))
+          val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
+          tailcall(runFiberLoop(fin(), Nil, Hooks.Noop, None, outstandingFibers)).flatMap { case (_, inner) =>
+            val allInnerFinalizers = outstandingFibers.foldLeft(inner) { (acc, fiber) =>
+              fiber.finalizers ++ acc
+            }
+            tailcall(drainFinalizers(allInnerFinalizers ++ rest))
           }
       }
 
@@ -981,8 +929,10 @@ object Eru {
       scope: ScopeId,
       observer: EruObserver,
       fins: List[Finalizer]
-    ): TailRec[(Either[E, A], List[Finalizer])] =
-      tailcall(runLoop(eru, fins, Hooks.ObserverHooks(scope, observer)))
+    ): TailRec[(Either[E, A], List[Finalizer])] = {
+      val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
+      tailcall(runFiberLoop(eru, fins, Hooks.ObserverHooks(scope, observer), None, outstandingFibers))
+    }
 
     /** Observer-aware interpreter variant */
     def runSyncWithObserver[E, A](start: Eru[E, A], observer: EruObserver): A = {
@@ -1078,6 +1028,7 @@ object Eru {
       case VSuspend[E0, A0](register: (Either[E0, A0] => Unit) => Eru[Nothing, Unit]) extends View[E0, A0]
       case VFork[E0, A0](computation: Eru[E0, A0]) extends View[Nothing, EruFiber[E0, A0]]
       case VAwait[E0, A0](fiber: EruFiber[E0, A0]) extends View[E0, Exit[E0, A0]]
+      case VInterruptibleBlocking[A0](thunk: () => A0) extends View[Nothing, A0]
     }
 
     import View.*
@@ -1096,6 +1047,7 @@ object Eru {
       case Suspend(register) => VSuspend(register)
       case Fork(computation) => VFork(computation)
       case Await(fiber) => VAwait(fiber)
+      case InterruptibleBlocking(thunk) => VInterruptibleBlocking(thunk)
     }
 
   }

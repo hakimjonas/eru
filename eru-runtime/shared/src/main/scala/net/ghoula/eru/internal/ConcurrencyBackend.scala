@@ -110,12 +110,10 @@ private[eru] object DefaultBackends {
       fa.map(Left(_))
 
     def sleep(duration: Duration): Eru[Nothing, Unit] =
-      Eru.blocking {
+      Eru.interruptibleBlocking {
         val ms = Math.max(0L, duration.toMillis)
-        try Thread.sleep(ms)
-        catch { case _: InterruptedException => () }
-        ()
-      }.attempt.flatMap(_ => Eru.unit)
+        Thread.sleep(ms)
+      }
 
     def timeout[E, A](
       duration: Duration

@@ -12,10 +12,10 @@ import net.ghoula.eru.prelude.*
 /** Stress test suite for JVM concurrency and fiber management under high load.
   *
   * Validates runtime behavior under stress conditions including high fiber counts, concurrent
-  * resource access, and sustained concurrent load. These tests ensure that the runtime
-  * maintains correctness, prevents resource leaks, and provides stable performance
-  * characteristics even under extreme operational conditions that might occur in
-  * production systems with heavy concurrent workloads.
+  * resource access, and sustained concurrent load. These tests ensure that the runtime maintains
+  * correctness, prevents resource leaks, and provides stable performance characteristics even under
+  * extreme operational conditions that might occur in production systems with heavy concurrent
+  * workloads.
   */
 extension [E, A](effects: List[Eru[E, A]]) {
   def sequence: Eru[E, List[A]] = {

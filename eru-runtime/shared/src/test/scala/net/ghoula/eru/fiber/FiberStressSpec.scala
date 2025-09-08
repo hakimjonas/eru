@@ -373,7 +373,6 @@ class FiberStressSpec extends FunSuite {
 
     assertEquals(finalizerCount.get(), fiberCount)
 
-
     assertEquals(interruptedCount.get() + completedCount.get(), fiberCount)
   }
 
@@ -440,7 +439,6 @@ class FiberStressSpec extends FunSuite {
 
     assertEquals(fiberStartEvents.get(), fiberCount)
     assertEquals(fiberEndEvents.get(), fiberCount)
-
 
     assert(eventCount.get() >= fiberStartEvents.get() + fiberEndEvents.get())
   }

@@ -6,10 +6,10 @@ import net.ghoula.eru.CorePrelude.*
 
 /** Test suite for Eru's macro-based compile-time optimizations and validations.
   *
-  * Validates the behavior of compile-time macros including the validated macro that provides
-  * stack trace preservation and enhanced debugging capabilities. These tests ensure that
-  * macro-generated code maintains semantic equivalence with hand-written effects while
-  * providing additional development-time benefits and optimizations.
+  * Validates the behavior of compile-time macros including the validated macro that provides stack
+  * trace preservation and enhanced debugging capabilities. These tests ensure that macro-generated
+  * code maintains semantic equivalence with hand-written effects while providing additional
+  * development-time benefits and optimizations.
   */
 class EruMacrosSpec extends FunSuite {
 

@@ -4,10 +4,10 @@ import munit.FunSuite
 
 /** Test suite for fiber context and state management.
   *
-  * Validates the behavior of FiberState enumeration, FiberContext operations, and related
-  * fiber management primitives. These tests ensure that fiber state transitions are correct
-  * and that context information is properly maintained throughout fiber lifecycle operations,
-  * supporting reliable concurrent execution in the runtime system.
+  * Validates the behavior of FiberState enumeration, FiberContext operations, and related fiber
+  * management primitives. These tests ensure that fiber state transitions are correct and that
+  * context information is properly maintained throughout fiber lifecycle operations, supporting
+  * reliable concurrent execution in the runtime system.
   */
 class FiberContextSpec extends FunSuite {
 

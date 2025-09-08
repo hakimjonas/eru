@@ -6,11 +6,10 @@ import net.ghoula.eru.prelude.*
 
 /** Integration test suite for the Eru public API surface and prelude functionality.
   *
-  * Validates that all essential Eru functionality is properly exposed through the public
-  * API and that the prelude import provides access to core operations without additional
-  * imports. These tests serve as both API validation and documentation of the intended
-  * user experience, ensuring that the public surface supports the Radical Ergonomics
-  * pillar of the Eru framework.
+  * Validates that all essential Eru functionality is properly exposed through the public API and
+  * that the prelude import provides access to core operations without additional imports. These
+  * tests serve as both API validation and documentation of the intended user experience, ensuring
+  * that the public surface supports the Radical Ergonomics pillar of the Eru framework.
   */
 final class PublicSurfaceSpec extends FunSuite {
   test("prelude provides core constructors and combinators") {

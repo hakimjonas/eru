@@ -6,11 +6,11 @@ import net.ghoula.eru.prelude.*
 
 /** Integration test suite for Eru's observability features in production scenarios.
   *
-  * Validates the observer system, event emission, and runtime visibility features in
-  * realistic application contexts. These tests ensure that the observability system
-  * provides comprehensive runtime insights without affecting performance or correctness,
-  * supporting the Exceptional Observability pillar by making runtime behavior
-  * transparent and debuggable in production environments.
+  * Validates the observer system, event emission, and runtime visibility features in realistic
+  * application contexts. These tests ensure that the observability system provides comprehensive
+  * runtime insights without affecting performance or correctness, supporting the Exceptional
+  * Observability pillar by making runtime behavior transparent and debuggable in production
+  * environments.
   */
 final class ObservabilitySpec extends FunSuite {
   test("observer sees ProgramStart, Step, and ProgramEnd(Success)") {

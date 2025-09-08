@@ -8,8 +8,8 @@ import net.ghoula.eru.CorePrelude.*
   *
   * Validates the concrete EruFiber implementation including fiber creation, state management,
   * interruption handling, and resource cleanup. These tests ensure that the EruFiber provides
-  * reliable implementation of the Fiber interface with correct semantics for concurrent
-  * execution and proper integration with the effect system's resource safety guarantees.
+  * reliable implementation of the Fiber interface with correct semantics for concurrent execution
+  * and proper integration with the effect system's resource safety guarantees.
   */
 class EruFiberSpec extends FunSuite {
 

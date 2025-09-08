@@ -8,8 +8,8 @@ import net.ghoula.eru.CorePrelude.*
   *
   * Validates the fundamental contracts of the Fiber trait including await operations, interruption
   * behavior, and fiber identity management. Tests cover the core fiber abstraction that enables
-  * concurrent execution in the Eru effect system, ensuring proper lifecycle management and
-  * resource cleanup semantics.
+  * concurrent execution in the Eru effect system, ensuring proper lifecycle management and resource
+  * cleanup semantics.
   */
 class FiberSpec extends FunSuite {
 

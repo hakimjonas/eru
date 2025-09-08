@@ -20,7 +20,7 @@ final class ConcurrencySpec extends FunSuite {
   test("race returns first result") {
     // Use deterministic approach: immediate success vs expensive computation
     val fast = Eru.succeed("fast")
-    val slow = Eru.effect { 
+    val slow = Eru.effect {
       // Expensive computation instead of timing
       (1 to 1000000).sum
       "slow"
@@ -29,7 +29,7 @@ final class ConcurrencySpec extends FunSuite {
     val exit = raced.runExit()
     exit match {
       case Exit.Success(Left(value)) => assertEquals(value, "fast")
-      case Exit.Success(Right(value)) => 
+      case Exit.Success(Right(value)) =>
         // If slow wins, it's still correct behavior - race is non-deterministic
         assert(value == "fast" || value == "slow")
       case _ => fail("expected success")
@@ -69,13 +69,13 @@ final class ConcurrencySpec extends FunSuite {
   test("raceAll returns fastest effect with correct index") {
     // Use coordination to ensure deterministic behavior
     val effects = List(
-      Eru.effect { 
+      Eru.effect {
         // Expensive computation instead of sleep
         (1 to 500000).sum
         "slow-1"
       },
       Eru.succeed("fast"),
-      Eru.effect { 
+      Eru.effect {
         // Even more expensive computation
         (1 to 1000000).sum
         "slow-2"
@@ -123,12 +123,12 @@ final class ConcurrencySpec extends FunSuite {
   test("raceAll propagates winner's failure") {
     // Use immediate failure vs expensive computations
     val effects = List(
-      Eru.effect { 
+      Eru.effect {
         (1 to 500000).sum
         "slow"
       },
       Eru.fail("fast-failure"),
-      Eru.effect { 
+      Eru.effect {
         (1 to 1000000).sum
         "slower"
       }
@@ -150,7 +150,7 @@ final class ConcurrencySpec extends FunSuite {
     // Deterministic race: immediate vs expensive computation
     val effects = List(
       Eru.succeed("fast"),
-      Eru.effect { 
+      Eru.effect {
         (1 to 1000000).sum
         "slow"
       }
@@ -176,7 +176,7 @@ final class ConcurrencySpec extends FunSuite {
   test("parSequence executes effects in parallel") {
     val effects = List(
       Eru.succeed("first"),
-      Eru.succeed("second"), 
+      Eru.succeed("second"),
       Eru.succeed("third")
     )
 
