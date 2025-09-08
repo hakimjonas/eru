@@ -27,6 +27,11 @@ class EruDebugSpec extends FunSuite {
     }
   }
 
+  /** Validates that debug method preserves computation results for successful effects.
+    *
+    * Tests that adding debug labels to successful computations does not change the final result
+    * while maintaining semantic transparency.
+    */
   test("debug method does not affect computation result for success") {
     val originalEru = Eru.succeed(42)
     val debuggedEru = originalEru.debug("test debug")
@@ -34,6 +39,11 @@ class EruDebugSpec extends FunSuite {
     assertEquals(originalEru.unsafeRunSync(), debuggedEru.unsafeRunSync())
   }
 
+  /** Validates that debug method preserves computation results for failed effects.
+    *
+    * Tests that adding debug labels to failed computations does not change error propagation or
+    * final failure outcomes.
+    */
   test("debug method does not affect computation result for failure") {
     val originalEru = Eru.fail("test error")
     val debuggedEru = originalEru.debug("test debug")
@@ -47,6 +57,11 @@ class EruDebugSpec extends FunSuite {
     }
   }
 
+  /** Validates that debug method preserves computation results for effectful operations.
+    *
+    * Tests that adding debug labels to side-effecting computations does not interfere with their
+    * execution or results.
+    */
   test("debug method does not affect computation result for effects") {
     val originalEru = Eru.effect(100)
     val debuggedEru = originalEru.debug("effect debug")
@@ -54,6 +69,11 @@ class EruDebugSpec extends FunSuite {
     assertEquals(originalEru.unsafeRunSync(), debuggedEru.unsafeRunSync())
   }
 
+  /** Validates that debug emits Step events with correct labels when observer is present.
+    *
+    * Tests that debug labels are properly emitted as Step events through the observer system when
+    * effects are executed with observability enabled.
+    */
   test("debug emits Step event with correct label when executed with observer") {
     val observer = new TestObserver()
     val debugLabel = "computation step"
@@ -63,11 +83,16 @@ class EruDebugSpec extends FunSuite {
     val events = observer.getEvents
     val stepEvents = events.collect { case step: EruEvent.Step => step }
 
-    assert(stepEvents.nonEmpty, "Should emit at least one Step event")
+    assert(stepEvents.nonEmpty)
     val stepEvent = stepEvents.find(_.label == debugLabel)
-    assert(stepEvent.isDefined, s"Should emit Step event with label '$debugLabel'")
+    assert(stepEvent.isDefined)
   }
 
+  /** Validates that debug labels are evaluated lazily for performance.
+    *
+    * Tests that debug label computation is deferred until actually needed, avoiding unnecessary
+    * work when no observer is present.
+    */
   test("debug label is evaluated lazily") {
     var labelEvaluated = false
 
@@ -76,12 +101,17 @@ class EruDebugSpec extends FunSuite {
       "lazy label"
     }
 
-    assert(!labelEvaluated, "Label should not be evaluated when creating debug effect")
+    assert(!labelEvaluated)
 
     debuggedEru.unsafeRunSync()
-    assert(!labelEvaluated, "Label should not be evaluated during unsafeRunSync without observer")
+    assert(!labelEvaluated)
   }
 
+  /** Validates that debug labels are evaluated only when observer is present.
+    *
+    * Tests that label evaluation occurs exactly once when an observer is attached to the execution
+    * context, ensuring efficient lazy evaluation.
+    */
   test("debug label is evaluated only when observer is present") {
     var labelEvaluationCount = 0
     val observer = new TestObserver()
@@ -93,9 +123,14 @@ class EruDebugSpec extends FunSuite {
 
     debuggedEru.unsafeRunSyncWith(observer)
 
-    assertEquals(labelEvaluationCount, 1, "Label should be evaluated exactly once with observer")
+    assertEquals(labelEvaluationCount, 1)
   }
 
+  /** Validates that multiple debug labels in chain emit multiple Step events.
+    *
+    * Tests that chaining multiple debug operations produces distinct Step events for each debug
+    * label in the correct execution sequence.
+    */
   test("multiple debug labels in chain emit multiple Step events") {
     val observer = new TestObserver()
 
@@ -111,14 +146,19 @@ class EruDebugSpec extends FunSuite {
     val stepEvents = observer.getEvents.collect { case step: EruEvent.Step => step }
     val stepLabels = stepEvents.map(_.label)
 
-    assert(stepLabels.contains("step 1"), "Should contain first debug label")
-    assert(stepLabels.contains("step 2"), "Should contain second debug label")
-    assert(stepLabels.contains("step 3"), "Should contain third debug label")
-    assertEquals(stepLabels.count(_ == "step 1"), 1, "Each label should appear exactly once")
-    assertEquals(stepLabels.count(_ == "step 2"), 1, "Each label should appear exactly once")
-    assertEquals(stepLabels.count(_ == "step 3"), 1, "Each label should appear exactly once")
+    assert(stepLabels.contains("step 1"))
+    assert(stepLabels.contains("step 2"))
+    assert(stepLabels.contains("step 3"))
+    assertEquals(stepLabels.count(_ == "step 1"), 1)
+    assertEquals(stepLabels.count(_ == "step 2"), 1)
+    assertEquals(stepLabels.count(_ == "step 3"), 1)
   }
 
+  /** Validates that debug works correctly with error handling chains.
+    *
+    * Tests that debug labels are properly emitted during error recovery operations, maintaining
+    * observability throughout error handling flows.
+    */
   test("debug works correctly with error handling chains") {
     val observer = new TestObserver()
 
@@ -134,10 +174,15 @@ class EruDebugSpec extends FunSuite {
     val stepEvents = observer.getEvents.collect { case step: EruEvent.Step => step }
     val stepLabels = stepEvents.map(_.label)
 
-    assert(stepLabels.contains("before recover"), "Should emit debug before recover")
-    assert(stepLabels.contains("after recover"), "Should emit debug after recover")
+    assert(stepLabels.contains("before recover"))
+    assert(stepLabels.contains("after recover"))
   }
 
+  /** Validates that debug integrates correctly with resource management.
+    *
+    * Tests that debug labels are properly emitted during resource acquisition, usage, and cleanup
+    * phases while maintaining resource safety guarantees.
+    */
   test("debug integrates correctly with resource management") {
     val observer = new TestObserver()
     var resourceClosed = false
@@ -152,15 +197,20 @@ class EruDebugSpec extends FunSuite {
       .unsafeRunSyncWith(observer)
 
     assertEquals(result, "used test resource")
-    assert(resourceClosed, "Resource should be closed")
+    assert(resourceClosed)
 
     val stepEvents = observer.getEvents.collect { case step: EruEvent.Step => step }
     val stepLabels = stepEvents.map(_.label)
 
-    assert(stepLabels.contains("acquired resource"), "Should emit debug for resource acquisition")
-    assert(stepLabels.contains("using resource"), "Should emit debug for resource usage")
+    assert(stepLabels.contains("acquired resource"))
+    assert(stepLabels.contains("using resource"))
   }
 
+  /** Validates that debug works with complex effect compositions.
+    *
+    * Tests that debug labels are properly emitted during complex monadic compositions, maintaining
+    * observability across for-comprehension chains.
+    */
   test("debug works with complex effect compositions") {
     val observer = new TestObserver()
 
@@ -174,29 +224,39 @@ class EruDebugSpec extends FunSuite {
     assertEquals(result, 25)
 
     val stepEvents = observer.getEvents.collect { case step: EruEvent.Step => step }
-    assertEquals(stepEvents.length, 3, "Should emit exactly 3 debug steps")
+    assertEquals(stepEvents.length, 3)
 
     val expectedLabels = List("initial value", "doubled value", "final computation")
     val actualLabels = stepEvents.map(_.label)
 
     expectedLabels.foreach { expectedLabel =>
-      assert(actualLabels.contains(expectedLabel), s"Should contain debug label: $expectedLabel")
+      assert(actualLabels.contains(expectedLabel))
     }
   }
 
+  /** Validates that debug step events contain valid scope information.
+    *
+    * Tests that Step events generated by debug operations contain correct label and scope
+    * information for proper observability tracking.
+    */
   test("debug step events contain valid scope information") {
     val observer = new TestObserver()
 
     Eru.succeed(42).debug("scoped step").unsafeRunSyncWith(observer)
 
     val stepEvents = observer.getEvents.collect { case step: EruEvent.Step => step }
-    assert(stepEvents.nonEmpty, "Should emit Step events")
+    assert(stepEvents.nonEmpty)
 
     stepEvents.foreach { stepEvent =>
-      assertEquals(stepEvent.label, "scoped step", "Step event should have correct label")
+      assertEquals(stepEvent.label, "scoped step")
     }
   }
 
+  /** Validates that debug preserves execution order in observer events.
+    *
+    * Tests that Step events from debug operations are emitted in the correct execution order,
+    * maintaining temporal consistency in the observer stream.
+    */
   test("debug preserves execution order in observer events") {
     val observer = new TestObserver()
 
@@ -210,13 +270,12 @@ class EruDebugSpec extends FunSuite {
     val stepEvents = observer.getEvents.collect { case step: EruEvent.Step => step }
     val stepLabels = stepEvents.map(_.label)
 
-    // Debug events should appear in execution order
     val firstIndex = stepLabels.indexOf("first")
     val secondIndex = stepLabels.indexOf("second")
     val thirdIndex = stepLabels.indexOf("third")
 
-    assert(firstIndex >= 0 && secondIndex >= 0 && thirdIndex >= 0, "All debug labels should be present")
-    assert(firstIndex < secondIndex, "First debug should come before second")
-    assert(secondIndex < thirdIndex, "Second debug should come before third")
+    assert(firstIndex >= 0 && secondIndex >= 0 && thirdIndex >= 0)
+    assert(firstIndex < secondIndex)
+    assert(secondIndex < thirdIndex)
   }
 }

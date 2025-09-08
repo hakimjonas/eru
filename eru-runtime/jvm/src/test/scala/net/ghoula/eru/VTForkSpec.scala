@@ -13,6 +13,11 @@ import net.ghoula.eru.prelude.*
   */
 final class VTForkSpec extends FunSuite {
 
+  /** Validates that fork runs effects on virtual threads in the JVM backend.
+    *
+    * Tests that the JVM runtime backend properly utilizes virtual threads for fiber execution when
+    * available.
+    */
   test("fork runs effect on a virtual thread (JVM VT backend)") {
     val isVirtualEffect: Eru[Throwable, Boolean] = Eru.effect(Thread.currentThread().isVirtual)
     val fiber = isVirtualEffect.fork.unsafeRunSync()
@@ -23,6 +28,11 @@ final class VTForkSpec extends FunSuite {
     }
   }
 
+  /** Validates that forkWithObserver emits proper lifecycle events with consistent IDs.
+    *
+    * Tests that the observability system emits FiberStarted and FiberCompleted events with matching
+    * fiber IDs for proper event correlation.
+    */
   test("forkWithObserver emits FiberStarted then FiberCompleted with same id") {
     val events = scala.collection.mutable.ListBuffer.empty[EruObserver.EruEvent]
     val obs = new EruObserver { def onEvent(e: EruObserver.EruEvent): Unit = events += e }

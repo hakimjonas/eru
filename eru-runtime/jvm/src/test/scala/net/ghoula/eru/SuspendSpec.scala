@@ -19,10 +19,8 @@ import net.ghoula.eru.test.IsolatedTestRunner
   */
 final class SuspendSpec extends FunSuite {
 
-  // Create a single isolated runtime instance for the entire test class to prevent interference
   private val isolatedRuntime = IsolatedTestRunner.createIsolatedRuntime()
 
-  // Override EruRuntime with isolated instance for this test suite
   private object LocalEruRuntime {
     def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E | Throwable, A] =
       isolatedRuntime.suspend(register)
@@ -32,10 +30,14 @@ final class SuspendSpec extends FunSuite {
       isolatedRuntime.timeout(duration)(effect)
   }
 
+  /** Validates that suspend with synchronous callback invocation succeeds immediately.
+    *
+    * Tests that when the callback is invoked synchronously during registration, the suspend
+    * operation completes immediately with the provided value.
+    */
   test("suspend with synchronous callback invocation succeeds immediately") {
     val result = LocalEruRuntime
       .suspend[String, Int] { callback =>
-        // Invoke callback synchronously during registration
         callback(Right(42))
         Eru.unit
       }
@@ -44,10 +46,14 @@ final class SuspendSpec extends FunSuite {
     assertEquals(result, 42)
   }
 
+  /** Validates that suspend with synchronous error callback propagates failure correctly.
+    *
+    * Tests that when the callback is invoked synchronously with an error during registration, the
+    * suspend operation fails immediately with the provided error.
+    */
   test("suspend with synchronous error callback propagates failure correctly") {
     val result = LocalEruRuntime
       .suspend[String, Int] { callback =>
-        // Invoke callback synchronously with error
         callback(Left("sync error"))
         Eru.unit
       }
@@ -60,10 +66,13 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend integrates correctly with CompletableFuture for async completion.
+    *
+    * Tests that suspend can properly handle asynchronous completion through CompletableFuture
+    * integration, ensuring the callback is invoked when the future completes.
+    */
   test("suspend with CompletableFuture integration handles async completion") {
     val future = new CompletableFuture[String]()
-
-    // Start the suspend operation
     val suspendEffect = LocalEruRuntime.suspend[Throwable, String] { callback =>
       future.whenComplete { (value, throwable) =>
         Option(throwable) match {
@@ -74,9 +83,8 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Complete the future asynchronously on another thread
     java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10) // Small delay to ensure async behavior
+      Thread.sleep(10)
       future.complete("async result")
     })
 
@@ -84,6 +92,11 @@ final class SuspendSpec extends FunSuite {
     assertEquals(result, "async result")
   }
 
+  /** Validates that suspend properly propagates CompletableFuture exceptions.
+    *
+    * Tests that when a CompletableFuture completes exceptionally, the suspend operation correctly
+    * propagates the exception through the error callback.
+    */
   test("suspend with CompletableFuture exception handling propagates errors") {
     val future = new CompletableFuture[String]()
 
@@ -97,7 +110,6 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Complete the future with exception asynchronously
     java.util.concurrent.CompletableFuture.runAsync(() => {
       Thread.sleep(10)
       future.completeExceptionally(new RuntimeException("async error"))
@@ -110,6 +122,11 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend integrates correctly with Scala Future for successful completion.
+    *
+    * Tests that suspend can properly handle Scala Future completion using Promise/Future
+    * integration, ensuring the callback is invoked when the future succeeds.
+    */
   test("suspend with Scala Future integration handles successful completion") {
     val promise = Promise[Int]()
     val future = promise.future
@@ -122,7 +139,6 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Complete the promise asynchronously
     java.util.concurrent.CompletableFuture.runAsync(() => {
       Thread.sleep(10)
       promise.success(123)
@@ -132,6 +148,11 @@ final class SuspendSpec extends FunSuite {
     assertEquals(result, 123)
   }
 
+  /** Validates that suspend properly propagates Scala Future failures.
+    *
+    * Tests that when a Scala Future fails, the suspend operation correctly propagates the failure
+    * through the error callback.
+    */
   test("suspend with Scala Future failure propagates exceptions correctly") {
     val promise = Promise[Int]()
     val future = promise.future
@@ -144,7 +165,6 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Fail the promise asynchronously
     java.util.concurrent.CompletableFuture.runAsync(() => {
       Thread.sleep(10)
       promise.failure(new IllegalArgumentException("future failed"))
@@ -157,6 +177,11 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend prevents multiple callback invocations through idempotency.
+    *
+    * Tests that only the first callback invocation is processed, and subsequent invocations are
+    * ignored to ensure consistent behavior.
+    */
   test("suspend prevents multiple callback invocations (idempotency)") {
     var callbackCount = 0
     val future = new CompletableFuture[String]()
@@ -169,7 +194,6 @@ final class SuspendSpec extends FunSuite {
           case None => callback(Right(value))
         }
 
-        // Try to invoke callback again (should be ignored)
         Option(throwable) match {
           case Some(error) => callback(Left(error))
           case None => callback(Right("second call"))
@@ -178,7 +202,6 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Complete future and verify only first result is used
     java.util.concurrent.CompletableFuture.runAsync(() => {
       Thread.sleep(10)
       future.complete("first result")
@@ -189,6 +212,11 @@ final class SuspendSpec extends FunSuite {
     assertEquals(callbackCount, 1)
   }
 
+  /** Validates that suspend properly handles registration failures.
+    *
+    * Tests that when the registration function throws an exception, the suspend operation correctly
+    * propagates the failure.
+    */
   test("suspend handles registration failure correctly") {
     val suspendEffect = LocalEruRuntime.suspend[String, Int] { _ =>
       throw new RuntimeException("registration failed")
@@ -201,6 +229,11 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend executes finalizers on successful completion.
+    *
+    * Tests that ensure finalizers are properly executed when a suspend operation completes
+    * successfully, maintaining resource safety guarantees.
+    */
   test("suspend with finalizers executes cleanup on success") {
     var finalizerExecuted = false
 
@@ -216,6 +249,11 @@ final class SuspendSpec extends FunSuite {
     assert(finalizerExecuted, "Finalizer should have been executed")
   }
 
+  /** Validates that suspend executes finalizers on failure.
+    *
+    * Tests that ensure finalizers are properly executed when a suspend operation fails, maintaining
+    * resource safety guarantees even in error conditions.
+    */
   test("suspend with finalizers executes cleanup on failure") {
     var finalizerExecuted = false
 
@@ -233,6 +271,11 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend maintains FILO execution order for nested finalizers.
+    *
+    * Tests that multiple finalizers attached to a suspend operation execute in the correct
+    * First-In-Last-Out order for proper resource cleanup.
+    */
   test("suspend with nested finalizers maintains FILO execution order") {
     var executionOrder: List[String] = Nil
 
@@ -249,11 +292,15 @@ final class SuspendSpec extends FunSuite {
     assertEquals(executionOrder, List("outer", "inner"))
   }
 
+  /** Validates that suspend integrates correctly with timeout operations.
+    *
+    * Tests that suspend operations can be properly timed out when they exceed the specified
+    * duration, ensuring responsive behavior.
+    */
   test("suspend with timeout integration works correctly") {
     val longRunning = LocalEruRuntime.suspend[String, Int] { callback =>
-      // Simulate long async operation that never completes in time
       java.util.concurrent.CompletableFuture.runAsync(() => {
-        Thread.sleep(100) // Longer than timeout
+        Thread.sleep(100)
         callback(Right(42))
       })
       Eru.unit
@@ -262,26 +309,28 @@ final class SuspendSpec extends FunSuite {
     val result = LocalEruRuntime.timeout(Duration.ofMillis(20))(longRunning).attempt.unsafeRunSync()
     result match {
       case Result.Failure(_: java.util.concurrent.TimeoutException) =>
-        // Expected timeout
         assert(true)
       case other => fail(s"Expected TimeoutException but got: $other")
     }
   }
 
+  /** Validates that suspend operations remain thread-safe under concurrent access.
+    *
+    * Tests that multiple suspend operations can execute concurrently without interference,
+    * maintaining correctness and thread safety.
+    */
   test("suspend with concurrent access remains thread-safe") {
     val iterations = 100
     val results = (1 to iterations).map { i =>
       LocalEruRuntime.suspend[String, Int] { callback =>
-        // Simulate concurrent async completion
         java.util.concurrent.CompletableFuture.runAsync(() => {
-          Thread.sleep(scala.util.Random.nextInt(5)) // Random small delay
+          Thread.sleep(scala.util.Random.nextInt(5))
           callback(Right(i))
         })
         Eru.unit
       }
     }
 
-    // Execute all suspend operations and collect results
     val completed = results.map(_.unsafeRunSync()).toList
     assertEquals(completed.sorted, (1 to iterations).toList)
   }

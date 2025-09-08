@@ -12,6 +12,12 @@ import net.ghoula.eru.prelude.*
   * that the public surface supports the Radical Ergonomics pillar of the Eru framework.
   */
 final class PublicSurfaceSpec extends FunSuite {
+
+  /** Validates that the prelude import provides access to core Eru functionality.
+    *
+    * Tests that essential Eru constructors and combinators are accessible through the prelude
+    * import without requiring additional imports, supporting the Radical Ergonomics principle.
+    */
   test("prelude provides core constructors and combinators") {
     val e = Eru.succeed(42).map(_ + 1).flatMap(n => Eru.succeed(n * 2))
     val exit = e.runExit()
@@ -21,6 +27,11 @@ final class PublicSurfaceSpec extends FunSuite {
     }
   }
 
+  /** Validates that internal implementation details are not exposed through prelude.
+    *
+    * Tests that the prelude import only exposes intended public API and does not leak internal
+    * implementation types, maintaining clean API boundaries.
+    */
   test("internal names are not pulled in by the prelude import") {
     assert(!scala.compiletime.testing.typeChecks("import net.ghoula.eru.prelude.*; val _: PreludeApi.type = ???"))
     assert(

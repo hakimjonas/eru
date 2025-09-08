@@ -38,6 +38,11 @@ extension [E, A](effects: List[Eru[E, A]]) {
   */
 final class ConcurrencyStressSpec extends FunSuite {
 
+  /** Validates high-load fiber creation and completion under stress.
+    *
+    * Tests that the runtime can handle concurrent creation and completion of 250 fibers
+    * simultaneously without performance degradation or correctness issues.
+    */
   test("high-load fiber creation and completion (250 fibers)") {
     val fiberCount = 250
     val completedCounter = new AtomicInteger(0)
@@ -54,6 +59,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     assertEquals(completedCounter.get(), fiberCount)
   }
 
+  /** Validates nested zipPar operations under stress conditions.
+    *
+    * Tests deeply nested parallel operations to ensure the runtime maintains correctness and
+    * performance when combining multiple levels of concurrent computations.
+    */
   test("nested zipPar operations stress test") {
     def createNestedZipPar(depth: Int, baseValue: Int): Eru[Throwable, Int] = {
       if (depth == 0) {
@@ -69,6 +79,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     assert(result > 1000, s"Expected large sum, got $result")
   }
 
+  /** Validates race operations with multiple competing effects.
+    *
+    * Tests the race combinator with many concurrent contestants to ensure fair competition and
+    * proper resource cleanup of losing effects.
+    */
   test("race operations with many contestants") {
     val contestants = 50
     val results = (1 to contestants).map { i =>
@@ -92,6 +107,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     assert(winner >= 1 && winner <= contestants, s"Winner $winner should be in range 1-$contestants")
   }
 
+  /** Validates cancellation cascade behavior under stress conditions.
+    *
+    * Tests that cancellation properly propagates through a hierarchy of effects, ensuring
+    * fast-failing behavior and proper resource cleanup.
+    */
   test("cancellation cascade stress test") {
     val started = new AtomicInteger(0)
     val completed = new AtomicInteger(0)
@@ -105,11 +125,9 @@ final class ConcurrencyStressSpec extends FunSuite {
       }
     }
 
-    // This effect will fail very quickly
     val fastFail: Eru[String | Throwable, Int] =
       EruRuntime.sleep(Duration.ofMillis(20)).flatMap(_ => Eru.fail("fast failure"))
 
-    // A slower effect that we expect to be cancelled
     val slowEffect = createCancellableEffect(1)
 
     // By racing the two, the failure of `fastFail` should win and interrupt `slowEffect`
@@ -118,14 +136,10 @@ final class ConcurrencyStressSpec extends FunSuite {
       .attempt
       .unsafeRunSync()
 
-    // Allow a brief moment for interruption logic to complete
     EruRuntime.sleep(Duration.ofMillis(50)).unsafeRunSync()
 
-    // We expect the race to terminate with the failure from `fastFail`
     result match {
       case Result.Failure("fast failure") =>
-        // The race failed as expected.
-        // Now, we verify the side-effects to ensure cancellation happened.
         assertEquals(started.get(), 1, "The slow effect should have started")
         assertEquals(completed.get(), 0, "The slow effect should have been interrupted and not completed")
       case other =>
@@ -133,6 +147,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     }
   }
 
+  /** Validates resource cleanup behavior under high concurrency stress.
+    *
+    * Tests that resource acquisition and cleanup work correctly when many concurrent fibers are
+    * acquiring and releasing resources simultaneously.
+    */
   test("resource cleanup under high concurrency") {
     val acquired = new AtomicInteger(0)
     val released = new AtomicInteger(0)
@@ -162,6 +181,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     assertEquals(released.get(), fiberCount, "All resources should have been released")
   }
 
+  /** Validates timer scheduling behavior under concurrent load.
+    *
+    * Tests that the timer system can handle multiple concurrent sleep operations with different
+    * durations while maintaining timing accuracy.
+    */
   test("timer scheduling under load") {
     val timerCount = 100
 
@@ -185,6 +209,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     assertEquals(completed.sorted, (1 to timerCount).toList)
   }
 
+  /** Validates mixed concurrent and sequential operations under stress.
+    *
+    * Tests that combining concurrent operations with sequential ones maintains correctness and
+    * proper execution order under high load.
+    */
   test("mixed concurrent and sequential operations") {
     val concurrentCount = 50
     val sequentialCount = 10
@@ -233,6 +262,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     )
   }
 
+  /** Validates finalizer execution order under concurrent stress conditions.
+    *
+    * Tests that finalizers maintain their FILO execution order guarantees even when multiple
+    * concurrent fibers complete simultaneously.
+    */
   test("finalizer execution order under concurrent stress") {
     val executionOrder = new java.util.concurrent.ConcurrentLinkedQueue[String]()
     val fiberCount = 100
@@ -265,6 +299,11 @@ final class ConcurrencyStressSpec extends FunSuite {
     }
   }
 
+  /** Validates timeout handling behavior under concurrent load.
+    *
+    * Tests that timeout operations work correctly when applied to multiple concurrent effects with
+    * different completion times, ensuring proper timing behavior.
+    */
   test("timeout handling under concurrent load") {
     val fastCount = 30
     val slowCount = 30

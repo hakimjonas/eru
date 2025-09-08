@@ -9,36 +9,37 @@ import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import net.ghoula.eru.*
 
-/** Mathematically correct test for structured concurrency This test proves (not just suggests) that
-  * structured concurrency works
+/** Mathematically rigorous tests for structured concurrency guarantees.
+  *
+  * These tests provide mathematical proofs (not just suggestions) that structured concurrency works
+  * correctly by establishing formal properties and verifying them through deterministic
+  * synchronization mechanisms rather than timing assumptions.
   */
 class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
 
-  /** MATHEMATICAL PROPERTY: Parent-Child Lifetime Binding ∀ parent, child: lifetime(child) ⊆
-    * lifetime(parent)
+  /** Validates the mathematical property of parent-child lifetime binding.
     *
-    * PROOF METHOD: Use a synchronization primitive that can only be satisfied if the child is
-    * terminated when parent completes.
+    * Mathematical Property: ∀ parent, child: lifetime(child) ⊆ lifetime(parent) Proof Method: Uses
+    * synchronization primitives that can only be satisfied if the child is properly terminated when
+    * the parent completes.
     */
   test("parent-child lifetime binding - mathematical property") {
     val childStarted = new CountDownLatch(1)
     val parentCompleted = new CountDownLatch(1)
     val childAttemptedCompletion = new AtomicBoolean(false)
 
-    // Create a computation where child CANNOT complete if properly terminated
     val parentComputation = for {
       _ <- EruRuntime.fork {
         for {
-          _ <- Eru.effect { childStarted.countDown() } // Signal child started
-          // Child does long-running work that should be interrupted
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // This should be interrupted
+          _ <- Eru.effect { childStarted.countDown() }
+          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
           _ <- Eru.effect { childAttemptedCompletion.set(true) }
         } yield "child-done"
       }
-      _ <- Eru.effect { childStarted.await(5, TimeUnit.SECONDS) } // Wait for child to start
+      _ <- Eru.effect { childStarted.await(5, TimeUnit.SECONDS) }
       result <- Eru.succeed("parent-completed")
     } yield {
-      parentCompleted.countDown() // Signal parent is completing
+      parentCompleted.countDown()
       result
     }
 
@@ -47,23 +48,20 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
       case other => fail(s"Computation should succeed, got: $other")
     }
 
-    // MATHEMATICAL VERIFICATION:
     assert(result == "parent-completed", "Parent should complete successfully")
 
-    // Give the child a moment to attempt completion after parent signals
     Thread.sleep(100)
 
-    // CRITICAL ASSERTION: If structured concurrency is correct,
-    // the child should be interrupted BEFORE it can set childAttemptedCompletion
     assert(
       !childAttemptedCompletion.get(),
       "STRUCTURED CONCURRENCY VIOLATION: Child continued executing after parent completed"
     )
   }
 
-  /** MATHEMATICAL PROPERTY: Transitive Termination If A spawns B and B spawns C, then completion of
-    * A should terminate both B and C This tests the mathematical property: parent(A,B) ∧
-    * parent(B,C) → terminate(A) ⇒ terminate(B) ∧ terminate(C)
+  /** Validates the mathematical property of transitive termination.
+    *
+    * Mathematical Property: If A spawns B and B spawns C, then completion of A should terminate
+    * both B and C. Formally: parent(A,B) ∧ parent(B,C) → terminate(A) ⇒ terminate(B) ∧ terminate(C)
     */
   test("transitive termination - mathematical property") {
     val aStarted = new CountDownLatch(1)
@@ -75,25 +73,24 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
     val bAttemptedWork = new AtomicBoolean(false)
 
     val rootComputation = for {
-      _ <- EruRuntime.fork { // Fiber A
+      _ <- EruRuntime.fork {
         for {
           _ <- Eru.effect { aStarted.countDown() }
-          _ <- EruRuntime.fork { // Fiber B (child of A)
+          _ <- EruRuntime.fork {
             for {
               _ <- Eru.effect { bStarted.countDown() }
-              _ <- EruRuntime.fork { // Fiber C (child of B, grandchild of root)
+              _ <- EruRuntime.fork {
                 for {
                   _ <- Eru.effect { cStarted.countDown() }
-                  _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-                  _ <- Eru.effect { cAttemptedWork.set(true) } // Should never execute
+                  _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+                  _ <- Eru.effect { cAttemptedWork.set(true) }
                 } yield "c-done"
               }
-              _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
-              _ <- Eru.effect { bAttemptedWork.set(true) } // Should never execute
+              _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+              _ <- Eru.effect { bAttemptedWork.set(true) }
             } yield "b-done"
           }
-          // Make A wait so it doesn't complete immediately - this is key for transitive termination!
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10)) // Should be interrupted
+          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
         } yield "a-done"
       }
       _ <- Eru.effect {
@@ -111,7 +108,7 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
       case Exit.Success(value) => value
       case other => fail(s"Root computation should succeed, got: $other")
     }
-    Thread.sleep(100) // Allow time for any violations to manifest
+    Thread.sleep(100)
 
     assert(result == "root-completed", "Root should complete successfully")
     assert(!bAttemptedWork.get(), "Fiber B should be terminated transitively")

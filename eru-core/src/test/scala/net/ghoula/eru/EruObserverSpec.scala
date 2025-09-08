@@ -20,6 +20,11 @@ class EruObserverSpec extends FunSuite {
     def onEvent(event: EruEvent): Unit = events += event
   }
 
+  /** Validates that unsafeRunSyncWith emits ProgramStart and ProgramEnd Success events.
+    *
+    * Tests that successful effect execution produces the correct observer events with matching
+    * scope identifiers and success outcome.
+    */
   test("unsafeRunSyncWith emits ProgramStart and ProgramEnd Success") {
     val obs = new CollectingObserver
     val out = Eru.succeed(123).unsafeRunSyncWith(obs)
@@ -29,14 +34,19 @@ class EruObserverSpec extends FunSuite {
     val end = obs.events(1)
     val scope = start match {
       case EruEvent.ProgramStart(s) => s
-      case other => fail(s"expected ProgramStart, got $other")
+      case other => fail(s"Expected ProgramStart, got $other")
     }
     end match {
       case EruEvent.ProgramEnd(s, Outcome.Success) => assertEquals(s, scope)
-      case other => fail(s"expected ProgramEnd Success, got $other")
+      case other => fail(s"Expected ProgramEnd Success, got $other")
     }
   }
 
+  /** Validates that debug emits Step event with label before execution.
+    *
+    * Tests that debug operations produce Step events with correct labels and scope information in
+    * the proper execution order.
+    */
   test("debug emits Step event with label before execution") {
     val obs = new CollectingObserver
     val p = Eru.succeed(1).debug("step-1")
@@ -48,20 +58,25 @@ class EruObserverSpec extends FunSuite {
     val end = obs.events(2)
     val scope = start match {
       case EruEvent.ProgramStart(s) => s
-      case other => fail(s"expected ProgramStart, got $other")
+      case other => fail(s"Expected ProgramStart, got $other")
     }
     step match {
       case EruEvent.Step(s, label) =>
         assertEquals(s, scope)
         assertEquals(label, "step-1")
-      case other => fail(s"expected Step, got $other")
+      case other => fail(s"Expected Step, got $other")
     }
     end match {
       case EruEvent.ProgramEnd(s, Outcome.Success) => assertEquals(s, scope)
-      case other => fail(s"expected ProgramEnd Success, got $other")
+      case other => fail(s"Expected ProgramEnd Success, got $other")
     }
   }
 
+  /** Validates that typed failure emits ProgramEnd TypedFailure and throws EruException.
+    *
+    * Tests that typed failures produce the correct observer events with failure outcomes while
+    * still throwing the appropriate exception.
+    */
   test("typed failure emits ProgramEnd TypedFailure and throws EruException") {
     val obs = new CollectingObserver
     intercept[EruException[String]] {
@@ -72,16 +87,21 @@ class EruObserverSpec extends FunSuite {
     val end = obs.events(1)
     val scope = start match {
       case EruEvent.ProgramStart(s) => s
-      case other => fail(s"expected ProgramStart, got $other")
+      case other => fail(s"Expected ProgramStart, got $other")
     }
     end match {
       case EruEvent.ProgramEnd(s, Outcome.TypedFailure(e)) =>
         assertEquals(s, scope)
         assertEquals(e, "oops")
-      case other => fail(s"expected ProgramEnd TypedFailure, got $other")
+      case other => fail(s"Expected ProgramEnd TypedFailure, got $other")
     }
   }
 
+  /** Validates that defect emits ProgramEnd Defect and rethrows Throwable.
+    *
+    * Tests that unhandled exceptions produce the correct observer events with defect outcomes while
+    * still rethrowing the original exception.
+    */
   test("defect emits ProgramEnd Defect and rethrows Throwable") {
     val obs = new CollectingObserver
     val ex = new RuntimeException("boom")
@@ -93,16 +113,21 @@ class EruObserverSpec extends FunSuite {
     val end = obs.events(1)
     val scope = start match {
       case EruEvent.ProgramStart(s) => s
-      case other => fail(s"expected ProgramStart, got $other")
+      case other => fail(s"Expected ProgramStart, got $other")
     }
     end match {
       case EruEvent.ProgramEnd(s, Outcome.Defect(t)) =>
         assertEquals(s, scope)
         assertEquals(t, ex)
-      case other => fail(s"expected ProgramEnd Defect, got $other")
+      case other => fail(s"Expected ProgramEnd Defect, got $other")
     }
   }
 
+  /** Validates that ProgramEnd is emitted after finalizers are drained.
+    *
+    * Tests that observer events maintain correct ordering with finalizer execution, ensuring
+    * ProgramEnd occurs only after all cleanup is complete.
+    */
   test("ProgramEnd is emitted after finalizers are drained") {
     var finalized = 0
     class SnapObserver extends EruObserver {

@@ -13,6 +13,11 @@ import net.ghoula.eru.CorePrelude.*
   */
 class EruResourceSpec extends FunSuite {
 
+  /** Validates that ensure finalizers run on successful completion.
+    *
+    * Tests that finalizer effects are executed when the main computation completes successfully,
+    * ensuring proper resource cleanup.
+    */
   test("ensure runs finalizer on success") {
     var finalized = 0
     val prog = Eru.succeed(42).ensure(Eru.effect { finalized += 1; () })
@@ -21,6 +26,11 @@ class EruResourceSpec extends FunSuite {
     assertEquals(finalized, 1)
   }
 
+  /** Validates that ensure finalizers run on typed failures.
+    *
+    * Tests that finalizer effects are executed even when the main computation fails with a typed
+    * error, maintaining resource safety.
+    */
   test("ensure runs finalizer on typed failure") {
     var finalized = 0
     val prog: Eru[String, Int] = Eru.fail("boom").ensure(Eru.effect { finalized += 1; () })
@@ -29,6 +39,11 @@ class EruResourceSpec extends FunSuite {
     assertEquals(finalized, 1)
   }
 
+  /** Validates that ensure finalizers run on Throwable failures and rethrow appropriately.
+    *
+    * Tests that finalizers execute when effects throw exceptions and that the exception is properly
+    * rethrown after cleanup.
+    */
   test("ensure runs finalizer on Throwable failure from effect and rethrows at edge") {
     var finalized = 0
     val err = new RuntimeException("x")
@@ -37,6 +52,11 @@ class EruResourceSpec extends FunSuite {
     assertEquals(finalized, 1)
   }
 
+  /** Validates that nested ensure finalizers execute in FILO order.
+    *
+    * Tests that multiple nested finalizers execute in First-In-Last-Out order, ensuring proper
+    * cleanup sequence for resource hierarchies.
+    */
   test("ensure finalizers run in FILO order when nested") {
     val order = scala.collection.mutable.ListBuffer.empty[String]
     val f1 = Eru.effect { order += "f1"; () }
@@ -46,6 +66,11 @@ class EruResourceSpec extends FunSuite {
     assertEquals(order.toList, List("f2", "f1"))
   }
 
+  /** Validates that bracket releases resources exactly once on both success and failure.
+    *
+    * Tests that the bracket pattern ensures resources are acquired and released exactly once
+    * regardless of whether the use function succeeds or fails.
+    */
   test("bracket releases exactly once on success and failure") {
     var acquired = 0
     var released = 0

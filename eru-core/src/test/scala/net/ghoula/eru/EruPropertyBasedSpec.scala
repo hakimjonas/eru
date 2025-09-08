@@ -120,7 +120,6 @@ class EruPropertyBasedSpec extends ScalaCheckSuite {
 
   property("attempt never fails at type level - always produces Result") {
     forAll(arbitraryEru) { eru =>
-      // attempt should never throw - it always succeeds with a Result
       val result = eru.attempt.unsafeRunSync()
       result match {
         case EruResult.Success(_) => true
@@ -189,7 +188,6 @@ class EruPropertyBasedSpec extends ScalaCheckSuite {
 
         recoveredResult == EruResult.Failure(actualError)
       } else {
-        // Skip this case when errors match
         true
       }
     }

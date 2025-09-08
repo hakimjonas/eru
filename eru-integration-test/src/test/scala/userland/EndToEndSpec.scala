@@ -14,6 +14,13 @@ import net.ghoula.eru.prelude.*
   * performance, and safety guarantees when features are composed in production-like usage patterns.
   */
 final class EndToEndSpec extends FunSuite {
+
+  /** Validates comprehensive end-to-end composition of all Eru features.
+    *
+    * Tests a complex workflow that combines concurrency, state management, retry logic, timeouts,
+    * resource safety, and observability to ensure all features work together cohesively in
+    * realistic application scenarios.
+    */
   test("end-to-end composition across concurrency, state, retry, timeout, ensure, observer") {
     val events = scala.collection.mutable.ArrayBuffer.empty[EruObserver.EruEvent]
     val observer = new EruObserver {
@@ -22,8 +29,8 @@ final class EndToEndSpec extends FunSuite {
 
     val program = for {
       ref <- Eru.ref(List.empty[Int])
-      _ <- (Eru.succeed(1).flatMap(n => ref.update(n :: _))).fork
-      _ <- (Eru.succeed(2).flatMap(n => ref.update(n :: _))).fork
+      _ <- Eru.succeed(1).flatMap(n => ref.update(n :: _)).fork
+      _ <- Eru.succeed(2).flatMap(n => ref.update(n :: _)).fork
       _ <- Eru.blocking(Thread.sleep(10))
       l <- ref.get
       ok <- Eru.succeed(l.sum).retryWithBackoff(Duration.ofMillis(10), maxRetries = 2)

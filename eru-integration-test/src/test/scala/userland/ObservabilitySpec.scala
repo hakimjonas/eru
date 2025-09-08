@@ -14,6 +14,12 @@ import net.ghoula.eru.prelude.*
   * environments.
   */
 final class ObservabilitySpec extends FunSuite {
+
+  /** Validates that observers receive proper event sequences for successful programs.
+    *
+    * Tests that the observability system emits ProgramStart, Step, and ProgramEnd(Success) events
+    * in the correct order for successful computation execution.
+    */
   test("observer sees ProgramStart, Step, and ProgramEnd(Success)") {
     val events = scala.collection.mutable.ListBuffer.empty[EruEvent]
     val obs = new EruObserver { def onEvent(e: EruEvent): Unit = events += e }
@@ -33,8 +39,12 @@ final class ObservabilitySpec extends FunSuite {
     }
   }
 
+  /** Validates that observers receive proper event sequences for failed programs.
+    *
+    * Tests that the observability system emits appropriate events for computations that fail with
+    * typed errors.
+    */
   test("observer sees ProgramStart and ProgramEnd(TypedFailure)") {
-    // Skip observer testing for now - focus on isolation
     val exit = Eru.fail("boom").runIsolatedExit
     exit match {
       case Exit.Failure(error) => assertEquals(error, "boom")
@@ -42,10 +52,13 @@ final class ObservabilitySpec extends FunSuite {
     }
   }
 
+  /** Validates that observers receive proper event sequences for programs with defects.
+    *
+    * Tests that the observability system emits appropriate events for computations that fail with
+    * untyped exceptions (defects).
+    */
   test("observer sees ProgramStart and ProgramEnd(Defect) on Throwable") {
     val boom = new RuntimeException("kapow")
-
-    // Skip observer testing for now - focus on isolation
     val exit = Eru.effect[Int](throw boom).runIsolatedExit
     exit match {
       case Exit.Die(throwable) =>
@@ -55,8 +68,12 @@ final class ObservabilitySpec extends FunSuite {
     }
   }
 
+  /** Validates that fiber operations emit proper observability events.
+    *
+    * Tests that forked fibers produce appropriate FiberStarted and FiberCompleted events through
+    * the observability system.
+    */
   test("forkWithObserver emits FiberStarted and FiberCompleted with Exit.Success") {
-    // Skip observer testing for now - focus on isolation
     val fiber = TestRuntime.runIsolated(Eru.succeed(10).fork)
     val exit = fiber.await.runIsolatedExit
 

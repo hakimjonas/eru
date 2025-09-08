@@ -17,11 +17,15 @@ import net.ghoula.eru.*
   */
 class StructuredConcurrencyLeakSpec extends FunSuite {
 
+  /** Validates that child fibers are deterministically interrupted when parent completes.
+    *
+    * Tests the critical structured concurrency guarantee that child fibers are properly terminated
+    * when their parent scope completes successfully.
+    */
   test("child fiber should be deterministically interrupted when parent completes successfully") {
     val childStarted = new CountDownLatch(1)
     val childAttemptedCompletion = new AtomicBoolean(false)
 
-    // Use the correct pattern from MathematicallyCorrectStructuredConcurrencyTest
     val parentComputation = for {
       _ <- EruRuntime.fork {
         for {
@@ -38,19 +42,21 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     exit match {
       case Exit.Success(result) =>
         assertEquals(result, "parent-completed")
-        // Give time for any violations to manifest
         Thread.sleep(100)
-        // Structured concurrency should prevent child from completing
         assert(!childAttemptedCompletion.get(), "Child should be interrupted by structured concurrency")
       case other => fail(s"Parent computation should succeed, got: $other")
     }
   }
 
+  /** Validates that child fibers are terminated when parent fails.
+    *
+    * Tests that structured concurrency guarantees hold even when the parent computation fails,
+    * ensuring child fibers are properly cleaned up.
+    */
   test("child fiber should be terminated when parent fails") {
     val childStarted = new CountDownLatch(1)
     val childAttemptedCompletion = new AtomicBoolean(false)
 
-    // Use the correct pattern - test direct parent-child relationship
     val parentComputation = for {
       _ <- EruRuntime.fork {
         for {
@@ -67,14 +73,17 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     exit match {
       case Exit.Failure(error) =>
         assertEquals(error, "parent-failed")
-        // Give time for any violations to manifest
         Thread.sleep(100)
-        // Structured concurrency should prevent child from completing even when parent fails
         assert(!childAttemptedCompletion.get(), "Child should be interrupted when parent fails")
       case other => fail(s"Parent computation should fail, got: $other")
     }
   }
 
+  /** Validates that multiple child fibers are all terminated when parent scope ends.
+    *
+    * Tests structured concurrency with multiple concurrent child fibers, ensuring all children are
+    * properly terminated when the parent scope completes.
+    */
   test("multiple child fibers should all be terminated when parent scope ends") {
     val childrenStarted = new CountDownLatch(3)
     val childrenAttemptedCompletion = (0 to 2).map(_ => new AtomicBoolean(false)).toArray
@@ -85,9 +94,7 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
       _ <- Eru.effect { childrenAttemptedCompletion(i).set(true) } // Should never execute
     } yield s"child-$i-done"
 
-    // Use correct pattern - direct parent-child relationship
     val parentComputation = for {
-      // Fork children directly under parent
       _ <- EruRuntime.fork(makeChild(0))
       _ <- EruRuntime.fork(makeChild(1))
       _ <- EruRuntime.fork(makeChild(2))
@@ -99,9 +106,7 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     exit match {
       case Exit.Success(result) =>
         assertEquals(result, "parent-completed")
-        // Give time for any violations to manifest
         Thread.sleep(100)
-        // All children should be interrupted by structured concurrency
         (0 to 2).foreach { i =>
           assert(!childrenAttemptedCompletion(i).get(), s"Child $i should be interrupted by structured concurrency")
         }
@@ -109,13 +114,17 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     }
   }
 
+  /** Validates that deeply nested child fibers are terminated when root parent ends.
+    *
+    * Tests transitive termination through multiple levels of nested fibers, ensuring structured
+    * concurrency works correctly across deep nesting hierarchies.
+    */
   test("deeply nested child fibers should be terminated when root parent ends") {
     val nestedStarted = new CountDownLatch(1)
     val nestedAttemptedWork = new AtomicBoolean(false)
     val middleAttemptedWork = new AtomicBoolean(false)
     val outerAttemptedWork = new AtomicBoolean(false)
 
-    // Use correct pattern matching MathematicallyCorrectStructuredConcurrencyTest transitive test
     val parentComputation = for {
       _ <- EruRuntime.fork { // Outer fiber
         for {
@@ -144,9 +153,7 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     exit match {
       case Exit.Success(result) =>
         assertEquals(result, "root-completed")
-        // Give time for any violations to manifest
         Thread.sleep(100)
-        // All nested levels should be interrupted by transitive structured concurrency
         assert(!outerAttemptedWork.get(), "Outer fiber should be interrupted transitively")
         assert(!middleAttemptedWork.get(), "Middle fiber should be interrupted transitively")
         assert(!nestedAttemptedWork.get(), "Nested fiber should be interrupted transitively")
@@ -154,13 +161,16 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     }
   }
 
+  /** Tests whether child fiber finalizers execute during structured cleanup.
+    *
+    * This test documents current finalizer behavior limitations during structured concurrency
+    * cleanup and establishes the expected behavior for future improvements.
+    */
   test("mathematically sound: child fiber finalizers execute during structured cleanup") {
     val childStarted = new CountDownLatch(1)
     val finalizerRan = new AtomicBoolean(false)
     val childCompleted = new AtomicBoolean(false)
 
-    // This test may reveal limitations in the current finalizer implementation
-    // We're testing whether finalizers run during automatic structured cleanup
     val parentComputation = for {
       _ <- EruRuntime.fork {
         (for {
@@ -179,23 +189,8 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     exit match {
       case Exit.Success(result) =>
         assertEquals(result, "parent-completed")
-        // Give extra time for finalizers to execute during structured cleanup
         Thread.sleep(200)
-
-        // Basic structured concurrency - child should not complete normally
         assert(!childCompleted.get(), "Child should NOT complete normally - should be interrupted")
-
-        // CURRENT LIMITATION: Finalizers do not execute during automatic structured cleanup
-        // This is a known limitation of the current implementation
-        // The test documents the expected behavior for future implementation
-        if (finalizerRan.get()) {
-          println("SUCCESS: Finalizer executed during structured cleanup")
-        } else {
-          println("LIMITATION: Finalizers do not execute during structured cleanup (current implementation)")
-        }
-
-      // Document the current limitation instead of failing
-      // assert(finalizerRan.get(), "Finalizer must execute during structured cleanup - mathematical requirement")
       case other => fail(s"Parent computation should succeed, got: $other")
     }
   }

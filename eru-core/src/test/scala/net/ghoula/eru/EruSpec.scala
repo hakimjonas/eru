@@ -13,16 +13,31 @@ import net.ghoula.eru.CorePrelude.*
   */
 class EruSpec extends FunSuite {
 
+  /** Validates that Eru.succeed creates a successful computation with the given value.
+    *
+    * Tests that Eru.succeed properly constructs a successful effect that contains the provided
+    * value and executes without errors.
+    */
   test("Eru.succeed creates a Succeed with the given value") {
     val eru = Eru.succeed(42)
     assertEquals(eru.unsafeRunSync(), 42)
   }
 
+  /** Validates that Eru.effect creates an effectful computation with the given thunk.
+    *
+    * Tests that Eru.effect properly constructs a lazy effect that executes the provided computation
+    * when run.
+    */
   test("Eru.effect creates an Effect with the given computation") {
     val eru = Eru.effect(42)
     assertEquals(eru.unsafeRunSync(), 42)
   }
 
+  /** Validates that Eru.succeed has eager evaluation semantics.
+    *
+    * Tests that Eru.succeed evaluates its argument immediately at construction time rather than
+    * deferring evaluation until execution.
+    */
   test("Eru.succeed is eager - it evaluates its argument immediately") {
     var counter = 0
     val eru = Eru.succeed {
@@ -34,6 +49,11 @@ class EruSpec extends FunSuite {
     assertEquals(counter, 1, "Value should only be evaluated once")
   }
 
+  /** Validates that Eru.effect has lazy evaluation semantics.
+    *
+    * Tests that Eru.effect defers computation execution until the effect is run, ensuring proper
+    * lazy evaluation behavior.
+    */
   test("Eru.effect is lazy - does not execute computation immediately") {
     var counter = 0
     val eru = Eru.effect {
@@ -45,6 +65,11 @@ class EruSpec extends FunSuite {
     assertEquals(counter, 1, "Computation should be executed exactly once when running")
   }
 
+  /** Validates that map operations transform values lazily.
+    *
+    * Tests that map transformations are deferred until effect execution, ensuring lazy evaluation
+    * semantics are preserved.
+    */
   test("map transforms values lazily") {
     var mapCounter = 0
     var effectCounter = 0
@@ -66,11 +91,21 @@ class EruSpec extends FunSuite {
     assertEquals(mapCounter, 1, "Map function should be executed exactly once")
   }
 
+  /** Validates that map operations on Succeed values transform correctly.
+    *
+    * Tests that mapping over successful values applies the transformation function and produces the
+    * expected result.
+    */
   test("map on Succeed transforms values correctly") {
     val eru = Eru.succeed(5).map(_ * 3)
     assertEquals(eru.unsafeRunSync(), 15)
   }
 
+  /** Validates that flatMap operations chain computations lazily.
+    *
+    * Tests that flatMap preserves lazy evaluation semantics while properly chaining dependent
+    * computations.
+    */
   test("flatMap chains computations lazily") {
     var firstCounter = 0
     var secondCounter = 0
@@ -98,11 +133,21 @@ class EruSpec extends FunSuite {
     assertEquals(flatMapCounter, 1, "FlatMap function should be executed exactly once")
   }
 
+  /** Validates that flatMap with Succeed values chains correctly.
+    *
+    * Tests that flatMap operations on successful values properly chain to the next computation in
+    * the sequence.
+    */
   test("flatMap with Succeed chains correctly") {
     val eru = Eru.succeed(5).flatMap(x => Eru.effect(x * 2))
     assertEquals(eru.unsafeRunSync(), 10)
   }
 
+  /** Validates complex chaining operations using both map and flatMap.
+    *
+    * Tests that combinations of map and flatMap operations work correctly together in complex
+    * computation chains.
+    */
   test("complex chaining with map and flatMap") {
     val eru = Eru
       .succeed(5)
@@ -113,6 +158,11 @@ class EruSpec extends FunSuite {
     assertEquals(eru.unsafeRunSync(), 26)
   }
 
+  /** Validates complex chaining operations with effectful computations.
+    *
+    * Tests that chaining operations work correctly when applied to effectful computations that
+    * involve side effects.
+    */
   test("complex chaining with Effects") {
     val eru = Eru
       .effect(5)
@@ -123,6 +173,11 @@ class EruSpec extends FunSuite {
     assertEquals(eru.unsafeRunSync(), 26)
   }
 
+  /** Validates that unsafeRunSync handles nested flatMap operations correctly.
+    *
+    * Tests that complex nested flatMap chains execute properly when run synchronously without stack
+    * overflow or incorrect results.
+    */
   test("unsafeRunSync handles nested flatMap correctly") {
     val eru = Eru
       .succeed(1)
@@ -133,6 +188,11 @@ class EruSpec extends FunSuite {
     assertEquals(eru.unsafeRunSync(), 4)
   }
 
+  /** Validates stack safety with large numbers of flatMap chains.
+    *
+    * Tests that deep flatMap chains do not cause stack overflow errors, ensuring the runtime
+    * provides proper stack safety guarantees.
+    */
   test("stack safety with large number of flatMap chains") {
     val chainSize = 10000
 
@@ -143,6 +203,11 @@ class EruSpec extends FunSuite {
     assertEquals(eru.unsafeRunSync(), chainSize)
   }
 
+  /** Validates stack safety with large numbers of map chains.
+    *
+    * Tests that deep map chains do not cause stack overflow errors, ensuring proper stack safety
+    * for transformation operations.
+    */
   test("stack safety with large number of map chains") {
     val chainSize = 10000
 
@@ -153,6 +218,11 @@ class EruSpec extends FunSuite {
     assertEquals(eru.unsafeRunSync(), chainSize)
   }
 
+  /** Validates stack safety with mixed map and flatMap operation chains.
+    *
+    * Tests that combinations of deep map and flatMap chains maintain stack safety without causing
+    * overflow errors.
+    */
   test("stack safety with mixed map and flatMap chains") {
     val chainSize = 5000
 
@@ -167,23 +237,43 @@ class EruSpec extends FunSuite {
     assertEquals(eru.unsafeRunSync(), chainSize)
   }
 
+  /** Validates that Eru is covariant in its success type parameter.
+    *
+    * Tests that Eru[E, A] can be safely upcast to Eru[E, B] when A <: B, demonstrating proper
+    * variance relationships.
+    */
   test("Eru is covariant in success type") {
     val stringValue: Eru[Nothing, String] = Eru.succeed("value")
     val anyValue: Eru[Nothing, Any] = stringValue
     assertEquals(anyValue.unsafeRunSync(), "value")
   }
 
+  /** Validates that map operations preserve type covariance.
+    *
+    * Tests that mapping operations maintain proper covariance relationships in the success type
+    * parameter.
+    */
   test("map preserves type covariance") {
     val intEru: Eru[Nothing, Int] = Eru.succeed(42)
     val stringEru: Eru[Nothing, String] = intEru.map(_.toString)
     assertEquals(stringEru.unsafeRunSync(), "42")
   }
 
+  /** Validates that flatMap operations maintain type safety.
+    *
+    * Tests that flatMap preserves type safety guarantees while chaining computations with
+    * potentially different types.
+    */
   test("flatMap maintains type safety") {
     val eru: Eru[Nothing, String] = Eru.succeed(5).flatMap(x => Eru.succeed(x.toString))
     assertEquals(eru.unsafeRunSync(), "5")
   }
 
+  /** Validates that effects with side effects execute correctly.
+    *
+    * Tests that effectful computations that perform side effects execute properly and produce the
+    * expected results.
+    */
   test("effect with side effects executes correctly") {
     var sideEffectCounter = 0
     val eru = Eru.effect {
@@ -197,6 +287,11 @@ class EruSpec extends FunSuite {
     assertEquals(sideEffectCounter, 1, "Side effect should execute exactly once")
   }
 
+  /** Validates that multiple runs of the same Eru execute independently.
+    *
+    * Tests that running the same effect multiple times produces independent executions without
+    * shared state interference.
+    */
   test("multiple runs of the same Eru execute independently") {
     var counter = 0
     val eru = Eru.effect {
@@ -209,6 +304,11 @@ class EruSpec extends FunSuite {
     assertEquals(eru.unsafeRunSync(), 3)
   }
 
+  /** Validates that Eru.succeed works correctly with Unit type.
+    *
+    * Tests that Unit-typed successful effects are handled properly, which is common for
+    * side-effect-only operations.
+    */
   test("succeed with Unit type") {
     val eru = Eru.succeed(())
     assertEquals(eru.unsafeRunSync(), ())

@@ -12,6 +12,11 @@ import net.ghoula.eru.prelude.*
   */
 class FiberPropertySpec extends FunSuite {
 
+  /** Validates that fork/await operations are referentially transparent.
+    *
+    * Tests that executing a computation directly produces the same result as forking it into a
+    * fiber and awaiting the result.
+    */
   test("fork/await is referentially transparent") {
     val computation = Eru.succeed(42)
 
@@ -30,6 +35,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(directResult, forkedResult)
   }
 
+  /** Validates that fork preserves referential transparency for pure values.
+    *
+    * Tests that multiple forks of the same pure computation produce identical results,
+    * demonstrating referential transparency.
+    */
   test("fork preserves referential transparency for pure values") {
     val value = "pure value"
     val pureEffect = Eru.succeed(value)
@@ -48,6 +58,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(exit1, Exit.Success(value))
   }
 
+  /** Validates that fork preserves referential transparency for failing computations.
+    *
+    * Tests that multiple forks of the same failing computation produce identical error results,
+    * demonstrating referential transparency for failures.
+    */
   test("fork preserves referential transparency for failures") {
     val error = "test error"
     val failingEffect = Eru.fail(error)
@@ -62,6 +77,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(exit1, Exit.Failure(error))
   }
 
+  /** Validates that fork/await preserves the monad left identity law.
+    *
+    * Tests the mathematical property: pure(a).flatMap(f) == f(a) when executed through the
+    * fork/await mechanism.
+    */
   test("fork/await preserves monad left identity law") {
     // Left identity: pure(a).flatMap(f) == f(a)
     val a = 42
@@ -83,6 +103,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(direct, fiberResult)
   }
 
+  /** Validates that fork/await preserves the monad right identity law.
+    *
+    * Tests the mathematical property: m.flatMap(pure) == m when executed through the fork/await
+    * mechanism.
+    */
   test("fork/await preserves monad right identity law") {
     // Right identity: m.flatMap(pure) == m
     val m = Eru.succeed("test value")
@@ -102,6 +127,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(direct, fiberResult)
   }
 
+  /** Validates that fork/await preserves the monad associativity law.
+    *
+    * Tests the mathematical property: (m.flatMap(f)).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
+    * when executed through the fork/await mechanism.
+    */
   test("fork/await preserves monad associativity law") {
     // Associativity: (m.flatMap(f)).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
     val m = Eru.succeed(10)
@@ -135,6 +165,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(leftResult, "result: 20")
   }
 
+  /** Validates that fork operations are deterministic for pure computations.
+    *
+    * Tests that running the same pure computation through fork multiple times produces identical
+    * results consistently.
+    */
   test("fork is deterministic for pure computations") {
     val computation = for {
       a <- Eru.succeed(10)
@@ -157,6 +192,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(runs.toSet.size, 1) // All identical
   }
 
+  /** Validates that fork operations preserve error types accurately.
+    *
+    * Tests that custom error types are maintained correctly through the fork/await mechanism
+    * without type erasure or corruption.
+    */
   test("fork preserves error types accurately") {
     sealed trait CustomError
     case object ErrorA extends CustomError
@@ -177,6 +217,11 @@ class FiberPropertySpec extends FunSuite {
     }
   }
 
+  /** Validates that fork/await composition maintains associativity.
+    *
+    * Tests that different approaches to composing fork/await operations produce equivalent results,
+    * demonstrating compositional safety.
+    */
   test("fork/await composition is associative") {
     // ((a fork/await) flatMap f) fork/await should behave the same as
     // (a fork/await) flatMap (x => (f(x) fork/await))
@@ -212,6 +257,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(result1, 25) // 5 * 5
   }
 
+  /** Validates that fork preserves side effect ordering within computations.
+    *
+    * Tests that the sequential order of side effects is maintained when a computation is executed
+    * through the fork/await mechanism.
+    */
   test("fork does not affect external side effects ordering within a computation") {
     import scala.collection.mutable
     val events = mutable.ListBuffer.empty[String]
@@ -230,6 +280,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(events.toList, List("step1", "step2", "step3"))
   }
 
+  /** Validates that multiple fork/await operations maintain independence.
+    *
+    * Tests that concurrent fork/await operations do not interfere with each other's execution or
+    * side effects, ensuring proper isolation.
+    */
   test("multiple fork/await operations maintain independence") {
     import scala.collection.mutable
     val events1 = mutable.ListBuffer.empty[String]
@@ -262,6 +317,11 @@ class FiberPropertySpec extends FunSuite {
     assertEquals(events2.toList, List("comp2-step1", "comp2-step2"))
   }
 
+  /** Validates the fiber identity property for pure computations.
+    *
+    * Tests the mathematical identity: await(fork(a)) ≈ a, demonstrating that fork/await operations
+    * form an identity for pure values.
+    */
   test("fiber identity: await(fork(a)) ≈ a for pure computations") {
     val values = List(42, "hello", List(1, 2, 3), Map("key" -> "value"))
 
@@ -279,6 +339,11 @@ class FiberPropertySpec extends FunSuite {
     }
   }
 
+  /** Validates that fork/await preserves computation structure for complex effects.
+    *
+    * Tests that complex multi-step computations maintain their structure and behavior when executed
+    * through the fork/await mechanism.
+    */
   test("fork/await preserves computation structure for complex effects") {
     case class User(id: Int, name: String)
     case class Order(userId: Int, amount: Double)

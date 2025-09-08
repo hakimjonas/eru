@@ -12,16 +12,25 @@ import net.ghoula.eru.prelude.*
   * Pillars principles.
   */
 final class ConcurrencySpec extends FunSuite {
+
+  /** Validates that zipPar correctly combines independent effects in parallel.
+    *
+    * Tests the zipPar combinator by running two independent computations in parallel and combining
+    * their results using a provided function.
+    */
   test("zipPar combines independent effects") {
     val e = Eru.succeed(21).zipPar(Eru.succeed(2)).map(_ * _)
     assertEquals(e.runExit(), Exit.Success(42))
   }
 
+  /** Validates that race returns the result of the first completing effect.
+    *
+    * Tests the race combinator using deterministic computation differences rather than timing
+    * assumptions to ensure reliable test behavior across environments.
+    */
   test("race returns first result") {
-    // Use deterministic approach: immediate success vs expensive computation
     val fast = Eru.succeed("fast")
     val slow = Eru.effect {
-      // Expensive computation instead of timing
       (1 to 1000000).sum
       "slow"
     }
@@ -30,12 +39,16 @@ final class ConcurrencySpec extends FunSuite {
     exit match {
       case Exit.Success(Left(value)) => assertEquals(value, "fast")
       case Exit.Success(Right(value)) =>
-        // If slow wins, it's still correct behavior - race is non-deterministic
         assert(value == "fast" || value == "slow")
-      case _ => fail("expected success")
+      case other => fail(s"Expected success, got: $other")
     }
   }
 
+  /** Validates that Deferred and Ref primitives work correctly for fiber coordination.
+    *
+    * Tests Deferred for inter-fiber communication and Ref for concurrent state management, ensuring
+    * proper coordination between concurrent computations.
+    */
   test("Deferred coordinates fibers and Ref holds state") {
     val program = for {
       d <- Eru.deferred[Int]
@@ -66,17 +79,19 @@ final class ConcurrencySpec extends FunSuite {
     assertEquals(refProg.runExit(), Exit.Success(2))
   }
 
+  /** Validates that raceAll returns the fastest effect with correct index information.
+    *
+    * Tests raceAll combinator using deterministic computation differences to ensure reliable
+    * behavior while documenting the inherent non-determinism of race operations.
+    */
   test("raceAll returns fastest effect with correct index") {
-    // Use coordination to ensure deterministic behavior
     val effects = List(
       Eru.effect {
-        // Expensive computation instead of sleep
         (1 to 500000).sum
         "slow-1"
       },
       Eru.succeed("fast"),
       Eru.effect {
-        // Even more expensive computation
         (1 to 1000000).sum
         "slow-2"
       }
@@ -85,13 +100,10 @@ final class ConcurrencySpec extends FunSuite {
     val result = raceAll(effects).runExit()
     result match {
       case Exit.Success((value, index)) =>
-        // Fast effect should typically win, but race behavior is inherently non-deterministic
         if (value == "fast" && index == 1) {
-          // Expected case
           assertEquals(value, "fast")
           assertEquals(index, 1)
         } else {
-          // Still valid race outcome - document the behavior
           assert(effects.indices.contains(index))
           assert(List("fast", "slow-1", "slow-2").contains(value))
         }
@@ -137,17 +149,19 @@ final class ConcurrencySpec extends FunSuite {
     val result = raceAll(effects).runExit()
     result match {
       case Exit.Failure(error: String) =>
-        // Immediate failure should typically win
         assertEquals(error, "fast-failure")
       case Exit.Success((value, _)) =>
-        // If slow effect wins, that's also valid race behavior
         assert(List("slow", "slower").contains(value))
       case other => fail(s"expected failure or success, got $other")
     }
   }
 
+  /** Validates that raceAll returns the winning effect with proper result structure.
+    *
+    * Tests raceAll with deterministic computation differences to verify that the winning effect's
+    * result is returned correctly along with its index.
+    */
   test("raceAll returns winning effect properly") {
-    // Deterministic race: immediate vs expensive computation
     val effects = List(
       Eru.succeed("fast"),
       Eru.effect {
@@ -158,14 +172,11 @@ final class ConcurrencySpec extends FunSuite {
 
     raceAll(effects).runExit() match {
       case Exit.Success((winner, index)) =>
-        // Fast should typically win, but document both possibilities
         if (winner == "fast" && index == 0) {
-          // Expected case
           assertEquals(winner, "fast")
           assertEquals(index, 0)
         } else if (winner == "slow" && index == 1) {
-          // Also valid race outcome
-          assert(true) // Document that this is acceptable
+          assert(true)
         } else {
           fail(s"Unexpected race result: winner=$winner, index=$index")
         }
@@ -173,6 +184,11 @@ final class ConcurrencySpec extends FunSuite {
     }
   }
 
+  /** Validates that parSequence executes multiple effects in parallel.
+    *
+    * Tests the parSequence combinator by running a list of effects in parallel and collecting their
+    * results in the same order as the input list.
+    */
   test("parSequence executes effects in parallel") {
     val effects = List(
       Eru.succeed("first"),
@@ -189,12 +205,15 @@ final class ConcurrencySpec extends FunSuite {
     }
   }
 
+  /** Validates that parTraverse processes inputs in parallel with a transformation function.
+    *
+    * Tests the parTraverse combinator by applying a transformation function to each input in
+    * parallel and collecting the results in order.
+    */
   test("parTraverse processes inputs in parallel") {
     val inputs = List("a", "b", "c")
 
-    def processInput(s: String): Eru[Nothing, String] = {
-      Eru.succeed(s.toUpperCase)
-    }
+    def processInput(s: String): Eru[Nothing, String] = Eru.succeed(s.toUpperCase)
 
     val result = parTraverse(inputs)(processInput).runExit()
 

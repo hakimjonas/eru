@@ -20,6 +20,11 @@ final class RetryPolicyPropertySpec extends ScalaCheckSuite {
   private val nonNegativeSmall: Gen[Int] = Gen.choose(0, 10)
   private val positiveSmall: Gen[Int] = Gen.choose(1, 10)
 
+  /** Validates that Policy.Recurs bounds retry attempts and succeeds appropriately.
+    *
+    * Property test that verifies Recurs policy limits attempts to the specified maximum and
+    * succeeds when the success condition is met within the retry limit.
+    */
   property("Policy.Recurs(n) bounds attempts and succeeds if successIndex <= n + 1") {
     forAll(nonNegativeSmall, positiveSmall) { (maxRetries, successIndexRaw) =>
       val successIndex = successIndexRaw // 1 means succeed on first attempt
@@ -50,6 +55,11 @@ final class RetryPolicyPropertySpec extends ScalaCheckSuite {
     }
   }
 
+  /** Validates that Policy.Exponential bounds attempts deterministically.
+    *
+    * Property test that verifies Exponential policy limits attempts correctly using zero delay to
+    * ensure deterministic timing behavior.
+    */
   property("Policy.Exponential(base, max) bounds attempts deterministically (base ZERO to avoid delay)") {
     forAll(nonNegativeSmall, positiveSmall) { (maxRetries, successIndexRaw) =>
       val base = Duration.ZERO
@@ -81,6 +91,11 @@ final class RetryPolicyPropertySpec extends ScalaCheckSuite {
     }
   }
 
+  /** Validates that defects (Throwables) are not subject to retry policies.
+    *
+    * Property test that verifies untyped exceptions bypass retry logic and are propagated
+    * immediately without retry attempts.
+    */
   property("Defects (Throwable) are not retried") {
     forAll(nonNegativeSmall) { (maxRetries) =>
       var attempts = 0
