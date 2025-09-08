@@ -70,6 +70,14 @@ private[eru] trait ConcurrencyBackend {
   def handleSuspend[E, A](
     register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
   ): Eru[Nothing, Either[E | Throwable, A]]
+
+  /** Cleanup method called at the end of unsafeRunSync to finalize backend state.
+    *
+    * This enables backends to perform necessary cleanup operations such as draining outstanding
+    * child fibers, executing remaining finalizers, and releasing resources. The method is called
+    * after all primary computation has completed but before returning the final result to the user.
+    */
+  def cleanup(): Unit = ()
 }
 
 /** Default backend implementations. */

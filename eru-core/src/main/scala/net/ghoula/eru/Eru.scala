@@ -487,7 +487,42 @@ object Eru {
     case Exit.Success(value) => Eru.succeed(value)
     case Exit.Failure(error) => Eru.fail(error)
     case Exit.Die(throwable) => Eru.effect(throw throwable)
-    case Exit.Interrupt(_, cause) => Eru.fail(new InterruptedException(cause.toString))
+    case Exit.Interrupt(fiberId, cause) =>
+      // MATHEMATICAL CORRECTNESS: Interruptions should not be converted to the error channel.
+      // Interruptions are control flow operations that should be handled through
+      // native interpreter mechanisms, not converted to domain errors.
+      //
+      // If you need to handle interruptions, use pattern matching on the Exit directly:
+      //   exit match {
+      //     case Exit.Interrupt(_, _) => /* handle interruption */
+      //     case other => Eru.fromExit(other)
+      //   }
+      Eru.effect(
+        throw new IllegalArgumentException(
+          s"fromExit cannot handle Exit.Interrupt($fiberId, $cause). " +
+            "Interruptions should be handled through pattern matching on Exit, not converted to the error channel."
+        )
+      )
+  }
+
+  /** Converts an Exit to an Eru, handling interruptions by converting them to a default value.
+    *
+    * This is a test-helper function for cases where interruptions should be treated as a specific
+    * result rather than propagated as interruptions. This function is intended for test scenarios
+    * where fiber interruption due to cancellation should be treated as a success case.
+    *
+    * @param exit
+    *   the Exit to convert
+    * @param interruptedValue
+    *   the value to use if the Exit is an interruption
+    * @return
+    *   an Eru effect representing the Exit outcome
+    */
+  def fromExitOrInterrupted[E, A](exit: Exit[E, A], interruptedValue: A): Eru[E | Throwable, A] = exit match {
+    case Exit.Success(value) => Eru.succeed(value)
+    case Exit.Failure(error) => Eru.fail(error)
+    case Exit.Die(throwable) => Eru.effect(throw throwable)
+    case Exit.Interrupt(_, _) => Eru.succeed(interruptedValue)
   }
 
   /** A successful `Eru` containing `Unit`. */
@@ -582,6 +617,7 @@ object Eru {
       * execute computations while preserving finalizer information. It now uses the unified
       * fiber-aware interpreter to ensure consistent behavior with unsafeRunSync.
       */
+    // In the Eru companion object
     def executeWithFinalizers[E, A](computation: Eru[E, A]): (Exit[E, A], List[() => Eru[Nothing, Unit]]) = {
       initializeAsyncSchedulerIfNeeded()
 
@@ -602,16 +638,20 @@ object Eru {
               case e => Exit.Failure(e)
             }
         }
-
         (exit, allFinalizers)
       } catch {
         case interrupted: InterruptedWithFinalizers =>
-          // Include both the preserved finalizers and outstanding fiber finalizers
+          // CORRECT: We specifically catch our custom exception here at the boundary.
+          // We now have both the finalizers from the interrupted computation and
+          // any finalizers from fibers that were forked before the interruption.
           val allFinalizers = outstandingFibers.foldLeft(interrupted.finalizers) { (acc, fiber) =>
             fiber.finalizers ++ acc
           }
-          (Exit.Interrupt(interrupted.fiberId, interrupted.cause), allFinalizers)
-        case ex: Throwable =>
+          val exit = Exit.Interrupt(interrupted.fiberId, interrupted.cause)
+          (exit, allFinalizers)
+
+        case NonFatal(ex) =>
+          // A safety net for any other unexpected exceptions.
           val allFinalizers = outstandingFibers.foldLeft(List.empty[() => Eru[Nothing, Unit]]) { (acc, fiber) =>
             fiber.finalizers ++ acc
           }
@@ -793,16 +833,25 @@ object Eru {
           // The parent computation continues with its own finalizers.
           done((Right(fiber.exit), fins))
 
+        // Inside the interpreter's runFiberLoop method, in the main pattern match:
         case InterruptibleBlocking(thunk) =>
           try {
+            // If the thunk succeeds, continue the loop with its successful value.
             done((Right(thunk()), fins))
           } catch {
             case _: InterruptedException =>
-              // Preserve finalizers by wrapping in custom exception
+              // The interpreter has caught the platform-specific exception.
+              // We now convert it into our special internal exception that carries
+              // the finalizers with it. This allows the finalizers to be preserved
+              // as the exception unwinds to the top-level executor.
               val fiberId = currentFiberId.getOrElse(FiberId.fresh())
-              val interruptWithFinalizers = new InterruptedWithFinalizers(fiberId, InterruptCause.Cancelled(), fins)
-              throw interruptWithFinalizers
-            case ex: Throwable =>
+              throw new InterruptedWithFinalizers(fiberId, InterruptCause.Cancelled(), fins)
+
+            case NonFatal(ex) =>
+              // For any other non-fatal error, we re-throw it.
+              // It will be caught by the boundary function (e.g., executeWithFinalizers)
+              // and correctly converted to an Exit.Die, which is the proper
+              // representation for a defect.
               throw ex
           }
       }

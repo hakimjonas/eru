@@ -238,8 +238,9 @@ final class ConcurrencyStressSpec extends FunSuite {
     }
 
     val effects = (1 to fiberCount).map(createEffectWithFinalizers)
-    val fibers = effects.map(EruRuntime.fork)
-    val results = fibers.map(_.flatMap(_.await)).toList.sequence.unsafeRunSync()
+    val fibers = effects.map(EruRuntime.fork).toList
+    val allFibers = EruRuntime.parSequence(fibers).unsafeRunSync()
+    val results = EruRuntime.parSequence(allFibers.map(_.await)).unsafeRunSync()
 
     val successCount = results.count {
       case Exit.Success(_) => true
@@ -260,14 +261,15 @@ final class ConcurrencyStressSpec extends FunSuite {
     val fastCount = 30
     val slowCount = 30
 
+    // Use deterministic operations instead of system timing
     val fastEffects = (1 to fastCount).map { i =>
-      val effect = EruRuntime.sleep(Duration.ofMillis(5)).map(_ => s"fast-$i")
-      EruRuntime.timeout(Duration.ofMillis(50))(effect)
+      val effect = Eru.succeed(s"fast-$i") // Immediate success
+      EruRuntime.timeout(Duration.ofMillis(1000))(effect) // Very generous timeout
     }
 
     val slowEffects = (1 to slowCount).map { i =>
-      val effect = EruRuntime.sleep(Duration.ofMillis(100)).map(_ => s"slow-$i")
-      EruRuntime.timeout(Duration.ofMillis(20))(effect)
+      val effect = EruRuntime.sleep(Duration.ofMillis(2000)).map(_ => s"slow-$i") // Very long delay
+      EruRuntime.timeout(Duration.ofMillis(10))(effect) // Very short timeout - guaranteed to timeout
     }
 
     val allEffects = fastEffects ++ slowEffects

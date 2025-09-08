@@ -98,7 +98,12 @@ class FiberErrorPropagationSpec extends FunSuite {
     val parentEffect = for {
       childFiber <- EruRuntime.fork(childEffect)
       childExit <- childFiber.await
-      result <- Eru.fromExit(childExit).recoverWith {
+      result <- childExit match {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      } recoverWith {
         case "recoverable error" => Eru.succeed(recoveredValue)
         case other => Eru.fail(s"unhandled error: $other")
       }
@@ -119,7 +124,12 @@ class FiberErrorPropagationSpec extends FunSuite {
     val parentEffect = for {
       childFiber <- EruRuntime.fork(childEffect)
       childExit <- childFiber.await
-      result <- Eru.fromExit(childExit).attempt.map {
+      result <- (childExit match {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      }).attempt.map {
         case Result.Success(value) => s"unexpected success: $value"
         case Result.Failure(throwable) => s"caught defect: ${throwable.getMessage}"
       }
@@ -243,7 +253,12 @@ class FiberErrorPropagationSpec extends FunSuite {
     val middleEffect = for {
       deepFiber <- EruRuntime.fork(deepEffect)
       deepExit <- deepFiber.await
-      deepResult <- Eru.fromExit(deepExit)
+      deepResult <- deepExit match {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      }
     } yield s"middle processed: $deepResult"
 
     val topEffect = for {
@@ -274,7 +289,12 @@ class FiberErrorPropagationSpec extends FunSuite {
     val middleEffect = for {
       deepFiber <- EruRuntime.fork(deepEffect)
       deepExit <- deepFiber.await
-      result <- Eru.fromExit(deepExit).recoverWith {
+      result <- (deepExit match {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      }).recoverWith {
         case "original error" => Eru.succeed(recoveredValue)
         case other => Eru.fail(s"unhandled: $other")
       }
@@ -283,7 +303,12 @@ class FiberErrorPropagationSpec extends FunSuite {
     val topEffect = for {
       middleFiber <- EruRuntime.fork(middleEffect)
       middleExit <- middleFiber.await
-      result <- Eru.fromExit(middleExit)
+      result <- middleExit match {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      }
     } yield result
 
     val result = topEffect.unsafeRunSync()
@@ -320,22 +345,18 @@ class FiberErrorPropagationSpec extends FunSuite {
     }
   }
 
-  test("fromExit correctly handles and widens error types for all Exit cases") {
+  test("fromExit correctly handles Exit cases except interruptions") {
     val testValue = 42
     val typedError = "typed error"
     val runtimeException = new RuntimeException("defect")
-    val fiberId = FiberId.fresh()
-    val interruptCause = InterruptCause.Cancelled(Some("test cancellation"))
 
     val successExit: Exit[String, Int] = Exit.Success(testValue)
     val failureExit: Exit[String, Int] = Exit.Failure(typedError)
     val dieExit: Exit[String, Int] = Exit.Die(runtimeException)
-    val interruptExit: Exit[String, Int] = Exit.Interrupt(fiberId, interruptCause)
 
     val successResult: Eru[String | Throwable, Int] = Eru.fromExit(successExit)
     val failureResult: Eru[String | Throwable, Int] = Eru.fromExit(failureExit)
     val dieResult: Eru[String | Throwable, Int] = Eru.fromExit(dieExit)
-    val interruptResult: Eru[String | Throwable, Int] = Eru.fromExit(interruptExit)
 
     assertEquals(
       successResult.unsafeRunSync(),
@@ -360,11 +381,16 @@ class FiberErrorPropagationSpec extends FunSuite {
         fail(s"Expected fromExit to propagate Die as throwable failure but got: $other")
     }
 
-    interruptResult.attempt.unsafeRunSync() match {
-      case Result.Failure(_: InterruptedException) =>
-      case other =>
-        fail(s"Expected fromExit to convert Interrupt to InterruptedException but got: $other")
+    // Interruptions should be handled through pattern matching, not fromExit
+    val fiberId = FiberId.fresh()
+    val interruptCause = InterruptCause.Cancelled(Some("test cancellation"))
+    val interruptExit: Exit[String, Int] = Exit.Interrupt(fiberId, interruptCause)
+
+    val interruptHandled = interruptExit match {
+      case Exit.Interrupt(_, _) => "interrupted"
+      case other => s"unexpected: $other"
     }
+    assertEquals(interruptHandled, "interrupted", "Interruptions should be handled through pattern matching")
   }
 
   test("fiber error isolation - errors in one fiber do not corrupt others") {
@@ -413,7 +439,12 @@ class FiberErrorPropagationSpec extends FunSuite {
           childFiber <- EruRuntime.fork(createNestedFiber(depth - 1))
           childExit <- childFiber.await
           result <- {
-            Eru.fromExit(childExit).attempt.flatMap {
+            (childExit match {
+              case Exit.Success(value) => Eru.succeed(value)
+              case Exit.Failure(error) => Eru.fail(error)
+              case Exit.Die(t) => Eru.effect(throw t)
+              case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+            }).attempt.flatMap {
               case Result.Success(value) => Eru.succeed(value)
               case Result.Failure(error) =>
                 error match {

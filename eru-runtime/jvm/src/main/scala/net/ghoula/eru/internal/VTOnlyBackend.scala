@@ -18,6 +18,9 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
   // ThreadLocal to track the current fiber context for structured concurrency
   private val currentFiberContext: ThreadLocal[Option[FiberContext]] = ThreadLocal.withInitial(() => None)
 
+  // ThreadLocal to track if we're in the root unsafeRunSync call
+  private val isRootCall: ThreadLocal[Boolean] = ThreadLocal.withInitial(() => false)
+
   // Global root context to track children forked from main thread (unsafeRunSync)
   private val rootFiberContext = FiberContext(
     FiberId.fresh(), // Root fiber context
@@ -38,14 +41,29 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
 
   def computeExit[E, A](fa: Eru[E, A], fiberId: FiberId): Exit[E, A] = {
     val _ = fiberId // Suppress unused parameter warning
-    // UNIFIED SOLUTION: Use executeWithFinalizers directly to avoid circular dependency
-    // This now uses the unified fiber-aware interpreter consistently
-    val (exit, finalizers) = Eru.executeWithFinalizers(fa)
 
-    // Execute finalizers synchronously to maintain structured concurrency guarantees
-    executeDrainedFinalizersSync(finalizers)
+    // Detect if this is the root call from unsafeRunSync (no fiber context = root)
+    val isRoot = currentFiberContext.get().isEmpty && !isRootCall.get()
+    if (isRoot) {
+      isRootCall.set(true)
+    }
 
-    exit
+    try {
+      // UNIFIED SOLUTION: Use executeWithFinalizers directly to avoid circular dependency
+      // This now uses the unified fiber-aware interpreter consistently
+      val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+
+      // Execute finalizers synchronously to maintain structured concurrency guarantees
+      executeDrainedFinalizersSync(finalizers)
+
+      exit
+    } finally {
+      // If this was the root call, clean up any outstanding root children
+      if (isRoot) {
+        cleanup()
+        isRootCall.set(false)
+      }
+    }
   }
 
   /** Synchronously executes finalizers in FILO order with coordination guarantee. This ensures the
@@ -304,11 +322,11 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
             trySet(() => Eru.fail(e1), () => rightThreadRef.get().foreach(_.interrupt()))
           case Exit.Die(t) =>
             trySet(() => Eru.effect(throw t), () => rightThreadRef.get().foreach(_.interrupt()))
-          case Exit.Interrupt(_, c) =>
-            trySet(
-              () => Eru.effect(throw new InterruptedException(s"Fiber interrupted: $c")),
-              () => rightThreadRef.get().foreach(_.interrupt())
-            )
+          case Exit.Interrupt(_, _) =>
+            // Child fiber was interrupted (likely cancelled by the other side winning)
+            // This should not cause the race to be interrupted - just ignore this fiber
+            // The race continues until a winner is found or the coordinator is interrupted
+            ()
         }
       }
 
@@ -323,11 +341,11 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
             trySet(() => Eru.fail(e2), () => leftThreadRef.get().foreach(_.interrupt()))
           case Exit.Die(t) =>
             trySet(() => Eru.effect(throw t), () => leftThreadRef.get().foreach(_.interrupt()))
-          case Exit.Interrupt(_, c) =>
-            trySet(
-              () => Eru.effect(throw new InterruptedException(s"Fiber interrupted: $c")),
-              () => leftThreadRef.get().foreach(_.interrupt())
-            )
+          case Exit.Interrupt(_, _) =>
+            // Child fiber was interrupted (likely cancelled by the other side winning)
+            // This should not cause the race to be interrupted - just ignore this fiber
+            // The race continues until a winner is found or the coordinator is interrupted
+            ()
         }
       }
 
@@ -337,8 +355,10 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
         latch.await()
         resultRef.get()
       } catch {
-        case _: InterruptedException =>
-          throw new InterruptedException("Race interrupted")
+        case ie: InterruptedException =>
+          // Race coordinator was interrupted - preserve the InterruptedException for the interpreter to handle
+          // The interpreter will catch this and convert it to Exit.Interrupt properly
+          throw ie
       }
     }.attempt.flatMap {
       case Result.Success(Some(thunk)) => thunk()
@@ -383,10 +403,12 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
   def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A] =
     delegate.retry(policy)(fa)
 
-  /** Cleans up all root-level child fibers that were forked from unsafeRunSync. This should be
-    * called when the main computation completes to ensure structured concurrency.
+  /** Cleanup method called at the end of unsafeRunSync to finalize backend state.
+    *
+    * This ensures structured concurrency by cleaning up all root-level child fibers that were
+    * forked during the main computation but never awaited.
     */
-  def cleanupRootChildren(): Unit = {
+  override def cleanup(): Unit = {
     println(s"ROOT CLEANUP: Cleaning up root children. Root child count: ${rootFiberContext.childFibers.size()}")
     executeStructuredCleanup(rootFiberContext)
   }

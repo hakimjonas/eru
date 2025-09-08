@@ -48,9 +48,9 @@ class FiberPhase2Spec extends FunSuite {
   }
 
   test("fiber lifecycle events are emitted") {
-    var events = List.empty[EruEvent]
+    val events = new java.util.concurrent.ConcurrentLinkedQueue[EruEvent]()
     val observer = new EruObserver {
-      def onEvent(event: EruEvent): Unit = events = event :: events
+      def onEvent(event: EruEvent): Unit = events.add(event)
     }
 
     val computation = Eru.succeed(42)
@@ -59,19 +59,20 @@ class FiberPhase2Spec extends FunSuite {
     val result = program.unsafeRunSyncWith(observer)
 
     // Check that we got the expected events
-    val reversedEvents = events.reverse
+    import scala.jdk.CollectionConverters.*
+    val eventList = events.asScala.toList
 
     // Should have ProgramStart, FiberStarted, FiberCompleted, ProgramEnd
-    assertEquals(reversedEvents.length, 4)
+    assertEquals(eventList.length, 4)
 
-    reversedEvents match {
+    eventList match {
       case EruEvent.ProgramStart(_) ::
           EruEvent.FiberStarted(_) ::
           EruEvent.FiberCompleted(_, Exit.Success(42)) ::
           EruEvent.ProgramEnd(_, Outcome.Success) :: Nil =>
       // Perfect!
       case _ =>
-        fail(s"Unexpected event sequence: ${reversedEvents.map(_.getClass.getSimpleName)}")
+        fail(s"Unexpected event sequence: ${eventList.map(_.getClass.getSimpleName)}")
     }
 
     assertEquals(result, Exit.Success(42))
@@ -106,10 +107,10 @@ class FiberPhase2Spec extends FunSuite {
 
     assertEquals(result, "outer-inner")
 
-    // Finalizers must execute in correct temporal order. The inner computation is awaited
-    // by the outer one, so the inner finalizer must complete before the outer one.
-    import scala.jdk.CollectionConverters._
-    assertEquals(executionOrder.asScala.toList, List("inner-finalizer", "outer-finalizer"))
+    // Finalizers must execute in correct FILO order. The outer.ensure is the last
+    // finalizer registered, so it must be the first to execute.
+    import scala.jdk.CollectionConverters.*
+    assertEquals(executionOrder.asScala.toList, List("outer-finalizer", "inner-finalizer"))
   }
 
   test("auto-join works with multiple unawaited fibers") {

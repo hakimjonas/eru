@@ -142,9 +142,30 @@ object EruRuntime {
       fiberB <- fork(fb)
       exitA <- fiberA.await
       exitB <- fiberB.await
-      resultA <- Eru.fromExit(exitA)
-      resultB <- Eru.fromExit(exitB)
-    } yield (resultA, resultB)
+      result <- (exitA, exitB) match {
+        // Both successful
+        case (Exit.Success(a), Exit.Success(b)) =>
+          Eru.succeed((a, b))
+
+        // One or both failed - propagate first failure
+        case (Exit.Failure(e), _) => Eru.fail(e)
+        case (_, Exit.Failure(e)) => Eru.fail(e)
+
+        // One or both died - propagate first defect
+        case (Exit.Die(t), _) => Eru.effect(throw t)
+        case (_, Exit.Die(t)) => Eru.effect(throw t)
+
+        // Both interrupted - zipPar should be interrupted
+        case (Exit.Interrupt(_, _), Exit.Interrupt(_, _)) =>
+          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: both fibers interrupted") }
+
+        // One interrupted, one successful - this is a cancellation race, treat as interrupted
+        case (Exit.Interrupt(_, _), Exit.Success(_)) =>
+          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber A interrupted") }
+        case (Exit.Success(_), Exit.Interrupt(_, _)) =>
+          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber B interrupted") }
+      }
+    } yield result
 
   /** Races two effects, returning the result of whichever completes first.
     *
@@ -461,18 +482,27 @@ object EruRuntime {
           }
 
         def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
-          val firstError = exits.collectFirst {
-            case Exit.Failure(error) => Left(error)
-            case Exit.Die(throwable) => Right(throwable)
-            case Exit.Interrupt(_, cause) => Right(new InterruptedException(cause.toString))
-          }
-
-          firstError match {
-            case Some(Left(error)) => Eru.fail(error)
-            case Some(Right(throwable)) => Eru.effect(throw throwable)
+          // Check for interruptions first - if any fiber was interrupted, interrupt this computation
+          exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
+            case Some((fiberId, cause)) =>
+              // Use interruptibleBlocking to trigger interruption through the interpreter
+              Eru.interruptibleBlocking {
+                throw new InterruptedException(s"ParSequence interrupted due to fiber $fiberId: $cause")
+              }
             case None =>
-              val results = exits.collect { case Exit.Success(value) => value }
-              Eru.succeed(results)
+              // No interruptions, handle errors normally
+              val firstError = exits.collectFirst {
+                case Exit.Failure(error) => Left(error)
+                case Exit.Die(throwable) => Right(throwable)
+              }
+
+              firstError match {
+                case Some(Left(error)) => Eru.fail(error)
+                case Some(Right(throwable)) => Eru.effect(throw throwable)
+                case None =>
+                  val results = exits.collect { case Exit.Success(value) => value }
+                  Eru.succeed(results)
+              }
           }
         }
 
