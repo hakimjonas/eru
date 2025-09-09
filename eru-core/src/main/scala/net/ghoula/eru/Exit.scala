@@ -82,16 +82,13 @@ enum Exit[+E, +A] {
   *
   * @example
   *   {{{
-  * // Generate unique fiber identifiers
   * val fiberId1 = FiberId.fresh()
   * val fiberId2 = FiberId.fresh()
-  * assert(fiberId1 != fiberId2) // Always unique
+  * assert(fiberId1 != fiberId2)
   *
-  * // Use in fiber management
   * val fiberRegistry = mutable.Map[FiberId, FiberState]()
   * fiberRegistry(fiberId1) = FiberState.Running
   *
-  * // Correlation in logging
   * logger.info(s"Fiber $fiberId1 started processing request")
   *   }}}
   */
@@ -118,12 +115,10 @@ object FiberId {
     *
     * @example
     *   {{{
-    * // Simple fiber ID generation
     * val newFiberId = FiberId.fresh()
     *
-    * // Bulk generation for fiber pools
     * val fiberIds = (1 to 1000).map(_ => FiberId.fresh())
-    * assert(fiberIds.distinct.size == 1000) // All unique
+    * assert(fiberIds.distinct.size == 1000)
     *   }}}
     */
   def fresh(): FiberId = next.getAndIncrement()

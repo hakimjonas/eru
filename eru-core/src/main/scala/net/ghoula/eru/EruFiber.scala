@@ -18,8 +18,8 @@ package net.ghoula.eru
   * @tparam A
   *   the success type of the fiber's computation (covariant)
   *
-  * Implementation characteristics:
-  *   - Auto-join semantics prevent finalizer leakage from unawaited fibers
+  * Fiber characteristics:
+  *   - Auto-join semantics prevent resource leakage from unawaited fibers
   *   - Multiple await operations are safe and always return the same result
   *   - Supports cooperative interruption for graceful fiber termination
   *
@@ -52,7 +52,6 @@ final case class EruFiber[+E, +A](
     Eru.await(this).attempt.map {
       case Result.Success(exit) => exit
       case Result.Failure(_) =>
-        // This case should not occur in normal operation - the interpreter prevents this path
         throw new IllegalStateException("Fiber await failed unexpectedly")
     }
 
@@ -69,9 +68,6 @@ final case class EruFiber[+E, +A](
     *   an Eru effect that interrupts this fiber when executed
     */
   def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = {
-    // Interruption behavior depends on the runtime backend:
-    // - JVM: Supports cooperative interruption via Virtual Thread interrupts
-    // - Native: Placeholder implementation (returns Eru.unit)
     val _ = cause
     Eru.unit
   }

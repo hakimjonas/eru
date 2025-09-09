@@ -116,8 +116,10 @@ object DomainTypes {
     * effects through controlled randomization.
     *
     * @example
-    *   {{{ val jitter = JitterFactor(0.1) // 10% jitter val delay = baseDelay * (1 + jitter.value *
-    *   random.nextDouble()) }}}
+    *   {{{
+    * val jitter = JitterFactor(0.1)
+    * val delay = baseDelay * (1 + jitter.value * random.nextDouble())
+    *   }}}
     */
   opaque type JitterFactor = Double
 

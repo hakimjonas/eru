@@ -22,19 +22,19 @@ final class EruMonadLawsSpec extends ScalaCheckSuite {
 
   /** Generator for small positive integers to control test complexity. */
   private val smallInts: Gen[Int] = Gen.choose(1, 100)
-  
+
   /** Generator for error strings. */
   private val errorStrings: Gen[String] = Gen.oneOf("error1", "error2", "network failure", "timeout")
-  
+
   /** Generator for successful Eru effects. */
   private val successfulEru: Gen[Eru[String, Int]] = smallInts.map(Eru.succeed)
-  
+
   /** Generator for failed Eru effects. */
   private val failedEru: Gen[Eru[String, Int]] = errorStrings.map(Eru.fail)
-  
+
   /** Generator for arbitrary Eru effects. */
   private val arbitraryEru: Gen[Eru[String, Int]] = Gen.oneOf(successfulEru, failedEru)
-  
+
   /** Generator for pure functions. */
   private val pureFunctions: Gen[Int => Int] = Gen.oneOf(
     Gen.const((x: Int) => x + 1),
@@ -156,7 +156,7 @@ final class EruMonadLawsSpec extends ScalaCheckSuite {
   }
 
   // Property-based monad law tests
-  
+
   property("Functor law: fmap(id) = id") {
     forAll(arbitraryEru) { eru =>
       val mapped = eru.map(identity).attempt.unsafeRunSync()

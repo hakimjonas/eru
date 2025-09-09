@@ -8,10 +8,10 @@ import net.ghoula.eru.prelude.*
 
 /** Performance characteristics validation for the Eru effect system.
   *
-  * Tests that verify expected performance characteristics including stack safety,
-  * memory efficiency, and execution speed under various load conditions. These tests
-  * ensure that the effect system maintains its performance guarantees and helps
-  * detect performance regressions across different usage patterns.
+  * Tests that verify expected performance characteristics including stack safety, memory
+  * efficiency, and execution speed under various load conditions. These tests ensure that the
+  * effect system maintains its performance guarantees and helps detect performance regressions
+  * across different usage patterns.
   */
 class PerformanceCharacteristicsSpec extends FunSuite {
 
@@ -22,7 +22,7 @@ class PerformanceCharacteristicsSpec extends FunSuite {
     }
 
     val result = deepChain(50000).runExit()
-    
+
     result match {
       case Exit.Success(value) => assertEquals(value, 50000)
       case _ => fail("Stack safety test should succeed")
@@ -36,7 +36,7 @@ class PerformanceCharacteristicsSpec extends FunSuite {
     }
 
     val result = deepMap(100000).runExit()
-    
+
     result match {
       case Exit.Success(value) => assertEquals(value, 100000)
       case _ => fail("Deep map chain should succeed")
@@ -49,10 +49,12 @@ class PerformanceCharacteristicsSpec extends FunSuite {
 
     def createEffectChain(): Eru[Nothing, Long] = {
       (1 to 100).foldLeft(Eru.succeed(0L)) { (acc, i) =>
-        acc.flatMap(n => Eru.succeed {
-          counter.incrementAndGet()
-          n + i
-        })
+        acc.flatMap(n =>
+          Eru.succeed {
+            counter.incrementAndGet()
+            n + i
+          }
+        )
       }
     }
 
@@ -72,20 +74,20 @@ class PerformanceCharacteristicsSpec extends FunSuite {
 
   test("execution speed with parallel operations") {
     val startTime = System.nanoTime()
-    
+
     val parallelOps = (1 to 4).map { i =>
       Eru.succeed(i * 2)
     }
 
     // Use zipPar for parallel operations
     val program = parallelOps.head.zipPar(parallelOps(1)).map { case (a, b) => a + b }
-    
+
     val result = program.runExit()
     val endTime = System.nanoTime()
     val durationMs = (endTime - startTime) / 1_000_000
 
     result match {
-      case Exit.Success(_) => 
+      case Exit.Success(_) =>
         // Should complete reasonably quickly due to parallelism
         assert(durationMs < 1000) // Less than 1 second for parallel execution
       case _ => fail("Parallel execution should succeed")
@@ -107,9 +109,9 @@ class PerformanceCharacteristicsSpec extends FunSuite {
     }
 
     val result = program.runExit()
-    
+
     result match {
-      case Exit.Success(total) => 
+      case Exit.Success(total) =>
         assertEquals(total, (1 to resourceCount).sum)
         assertEquals(cleanupCount.get(), resourceCount.toLong)
       case _ => fail("Resource cleanup test should succeed")
@@ -127,7 +129,7 @@ class PerformanceCharacteristicsSpec extends FunSuite {
 
     val program = errorChain(10000).orElse(Eru.succeed(42))
     val result = program.runExit()
-    
+
     result match {
       case Exit.Success(42) => () // Expected fallback value
       case _ => fail("Error handling should recover with fallback")

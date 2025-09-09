@@ -9,10 +9,10 @@ import net.ghoula.eru.prelude.*
 
 /** Test suite for fiber execution, lifecycle, and resource management.
   *
-  * Validates fiber execution scenarios including auto-join behavior, finalizer leak
-  * prevention, and advanced resource cleanup patterns. These tests ensure that the fiber system
-  * maintains resource safety even in complex concurrent scenarios and prevents common concurrency
-  * pitfalls like resource leaks and improper cleanup ordering.
+  * Validates fiber execution scenarios including auto-join behavior, finalizer leak prevention, and
+  * advanced resource cleanup patterns. These tests ensure that the fiber system maintains resource
+  * safety even in complex concurrent scenarios and prevents common concurrency pitfalls like
+  * resource leaks and improper cleanup ordering.
   */
 class FiberExecutionSpec extends FunSuite {
 

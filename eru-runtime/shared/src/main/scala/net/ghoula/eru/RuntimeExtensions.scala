@@ -10,22 +10,20 @@ package net.ghoula.eru
   *
   * val a = Eru.succeed(1) val b = Eru.succeed(2)
   *
-  * // Parallel composition val ab: Eru[Throwable, (Int, Int)] = a.zipPar(b)
+  * val ab: Eru[Throwable, (Int, Int)] = a.zipPar(b)
   *
-  * // Race two effects and handle the first result val raced: Eru[Throwable, String] =
-  * a.race(b).map { case Left(x) => s"a won: $x" case Right(y) => s"b won: $y" }
+  * val raced: Eru[Throwable, String] = a.race(b).map { case Left(x) => s"a won: $x" case Right(y) =>
+  * s"b won: $y" }
   *
-  * // Time-bounded execution val slow = Eru.blocking { Thread.sleep(1000); 42 } val fastOrTimeout:
-  * Eru[Throwable | java.util.concurrent.TimeoutException | Throwable, Int] =
+  * val slow = Eru.blocking { Thread.sleep(1000); 42 } val fastOrTimeout =
   * slow.timeout(Duration.ofMillis(50))
   *
-  * // Fallback on timeout val fallback: Eru[Throwable, Int] = slow.timeoutTo(Duration.ofMillis(50),
-  * -1)
+  * val fallback: Eru[Throwable, Int] = slow.timeoutTo(Duration.ofMillis(50), -1)
   *
-  * // Reliability val flaky: Eru[String, Int] = Eru.fail("boom").recover { case _ => 0 }.retryN(3)
+  * val flaky: Eru[String, Int] = Eru.fail("boom").recover { case _ => 0 }.retryN(3)
   *
-  * // Runner conveniences val exit: Exit[String, Int] = flaky.runExit() val value: Int =
-  * a.runWith(new EruObserver { def onEvent(e: EruEvent): Unit = () }) }}
+  * val exit: Exit[String, Int] = flaky.runExit() val value: Int = a.runWith(new EruObserver { def
+  * onEvent(e: EruEvent): Unit = () }) }}}
   */
 object RuntimeExtensions {
 

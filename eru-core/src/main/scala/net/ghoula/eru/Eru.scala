@@ -119,11 +119,6 @@ enum Eru[+E, +A] {
   /** Chains another computation to be run after this one completes. This is the Monad `flatMap` (or
     * `bind`) operation.
     *
-    * @note
-    *   This implementation includes a construction-time optimization that detects pure flatMap
-    *   chains where both the source and continuation result are immediate successes, evaluating
-    *   them at construction time. It also flattens chains of `flatMap` calls to a certain depth to
-    *   improve performance.
     * @param f
     *   the function to apply to the success value, returning the next `Eru`.
     * @return

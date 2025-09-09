@@ -10,8 +10,8 @@ import net.ghoula.eru.CorePrelude.*
   *
   * Validates complex resource management scenarios including nested finalizers, sequential resource
   * cleanup chains, and error propagation through resource finalizer execution. These tests ensure
-  * that the extended resource safety mechanisms maintain correctness under various failure conditions
-  * and provide comprehensive coverage for advanced resource management patterns.
+  * that the extended resource safety mechanisms maintain correctness under various failure
+  * conditions and provide comprehensive coverage for advanced resource management patterns.
   */
 class EruResourceSafetyExtensionsSpec extends FunSuite {
 
@@ -284,10 +284,12 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
       .flatMap(_ =>
         Eru
           .succeed("resource2")
-          .autoCleanup(_ => Eru.effect {
-            finalizer2Executed = true
-            throw new RuntimeException("finalizer2 failed")
-          })
+          .autoCleanup(_ =>
+            Eru.effect {
+              finalizer2Executed = true
+              throw new RuntimeException("finalizer2 failed")
+            }
+          )
           .flatMap(_ =>
             Eru
               .succeed("resource3")

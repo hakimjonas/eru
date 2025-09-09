@@ -52,15 +52,12 @@ object IsolatedTestRunner {
             }
 
           def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
-            // Check for interruptions first - if any fiber was interrupted, interrupt this computation
             exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
               case Some((fiberId, cause)) =>
-                // Use interruptibleBlocking to trigger interruption through the interpreter
                 Eru.interruptibleBlocking {
                   throw new InterruptedException(s"ParSequence interrupted due to fiber $fiberId: $cause")
                 }
               case None =>
-                // No interruptions, handle errors normally
                 val firstError = exits.collectFirst {
                   case Exit.Failure(error) => Left(error)
                   case Exit.Die(throwable) => Right(throwable)
@@ -70,7 +67,6 @@ object IsolatedTestRunner {
                   case Some(Left(error)) => Eru.fail(error)
                   case Some(Right(throwable)) => Eru.effect(throw throwable)
                   case None =>
-                    // All successful - collect results
                     val results = exits.collect { case Exit.Success(value) => value }
                     Eru.succeed(results)
                 }
@@ -91,22 +87,16 @@ object IsolatedTestRunner {
         exitA <- fiberA.await
         exitB <- fiberB.await
         result <- (exitA, exitB) match {
-          // Both successful
           case (Exit.Success(a), Exit.Success(b)) =>
             Eru.succeed((a, b))
-          // First failed
           case (Exit.Failure(error), _) =>
             Eru.fail(error)
-          // Second failed
           case (_, Exit.Failure(error)) =>
             Eru.fail(error)
-          // First died
           case (Exit.Die(throwable), _) =>
             Eru.effect(throw throwable)
-          // Second died
           case (_, Exit.Die(throwable)) =>
             Eru.effect(throw throwable)
-          // Interruption handling
           case (Exit.Interrupt(_, _), _) | (_, Exit.Interrupt(_, _)) =>
             Eru.interruptibleBlocking {
               throw new InterruptedException("ZipPar interrupted")

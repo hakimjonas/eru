@@ -2,17 +2,17 @@ package userland
 
 import munit.FunSuite
 
-import java.util.concurrent.{TimeUnit}
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 import net.ghoula.eru.prelude.*
 
 /** Integration test suite for external system interaction patterns.
   *
-  * Tests real-world scenarios where Eru effects interact with external systems including
-  * databases, web services, message queues, and other asynchronous resources. Validates
-  * proper resource management, error handling, timeout behavior, and cancellation
-  * semantics in production-like environments.
+  * Tests real-world scenarios where Eru effects interact with external systems including databases,
+  * web services, message queues, and other asynchronous resources. Validates proper resource
+  * management, error handling, timeout behavior, and cancellation semantics in production-like
+  * environments.
   */
 class ExternalSystemIntegrationSpec extends FunSuite {
 
@@ -20,13 +20,15 @@ class ExternalSystemIntegrationSpec extends FunSuite {
     val connectionPool = new java.util.concurrent.ArrayBlockingQueue[String](2)
     connectionPool.put("conn1")
     connectionPool.put("conn2")
-    
+
     val completedQueries = new AtomicInteger(0)
 
     def acquireConnection(): Eru[String, String] = {
       Eru.effect {
-        val conn = connectionPool.poll(100, TimeUnit.MILLISECONDS)
-        if (conn != null) conn else throw new RuntimeException("Connection timeout")
+        Option(connectionPool.poll(100, TimeUnit.MILLISECONDS)) match {
+          case Some(conn) => conn
+          case None => throw new RuntimeException("Connection timeout")
+        }
       }.mapError(_.getMessage)
     }
 
@@ -48,14 +50,14 @@ class ExternalSystemIntegrationSpec extends FunSuite {
 
     val query1 = acquireConnection()
       .bracket(releaseConnection)(conn => executeQuery(conn, "SELECT 1"))
-    
+
     val query2 = acquireConnection()
       .bracket(releaseConnection)(conn => executeQuery(conn, "SELECT 2"))
 
     val program = query1.zipPar(query2).map { case (r1, r2) => List(r1, r2) }
 
     val result = program.runExit()
-    
+
     result match {
       case Exit.Success(_) => assert(completedQueries.get() == 2)
       case _ => fail("Expected successful database queries")
@@ -68,11 +70,11 @@ class ExternalSystemIntegrationSpec extends FunSuite {
     def webServiceCall(endpoint: String): Eru[String, String] = {
       Eru.effect {
         val count = callCount.incrementAndGet()
-        
+
         if (count <= 2) {
           throw new RuntimeException(s"Service unavailable (attempt $count)")
         }
-        
+
         s"Success response from $endpoint"
       }.mapError(_.getMessage)
     }
@@ -82,7 +84,7 @@ class ExternalSystemIntegrationSpec extends FunSuite {
       .orElse(webServiceCall("/api/data"))
 
     val result = retryProgram.runExit()
-    
+
     result match {
       case Exit.Success(_) => assertEquals(callCount.get(), 3)
       case _ => fail("Expected successful retry")
@@ -112,9 +114,9 @@ class ExternalSystemIntegrationSpec extends FunSuite {
     } yield (msg1, msg2)
 
     val result = program.runExit()
-    
+
     result match {
-      case Exit.Success((Some(m1), Some(m2))) => 
+      case Exit.Success((Some(m1), Some(m2))) =>
         assert(Set(m1, m2) == Set("message-1", "message-2"))
       case _ => fail("Expected both messages to be consumed")
     }
@@ -159,9 +161,9 @@ class ExternalSystemIntegrationSpec extends FunSuite {
       }
 
     val result = program.runExit()
-    
+
     result match {
-      case Exit.Success(content) => 
+      case Exit.Success(content) =>
         assert(content.startsWith("CONTENT FOR"))
       case _ => fail("Expected successful file processing")
     }
@@ -171,7 +173,7 @@ class ExternalSystemIntegrationSpec extends FunSuite {
     def executeCommand(command: String*): Eru[String, String] = {
       Eru.effect {
         val process = new ProcessBuilder(command*).start()
-        
+
         try {
           val completed = process.waitFor(2, TimeUnit.SECONDS)
           if (!completed) {
@@ -183,12 +185,12 @@ class ExternalSystemIntegrationSpec extends FunSuite {
             process.destroyForcibly()
             throw new RuntimeException("Process interrupted")
         }
-        
+
         val output = new String(process.getInputStream.readAllBytes())
         if (process.exitValue() != 0) {
           throw new RuntimeException(s"Process failed with exit code: ${process.exitValue()}")
         }
-        
+
         output.trim()
       }.mapError(_.getMessage)
     }
@@ -196,9 +198,9 @@ class ExternalSystemIntegrationSpec extends FunSuite {
     val program = executeCommand("echo", "Hello World")
 
     val result = program.runExit()
-    
+
     result match {
-      case Exit.Success(output) => 
+      case Exit.Success(output) =>
         assertEquals(output, "Hello World")
       case _ => fail("Expected successful command execution")
     }

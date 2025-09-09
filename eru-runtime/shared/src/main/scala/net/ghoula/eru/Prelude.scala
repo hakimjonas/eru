@@ -8,28 +8,35 @@ package net.ghoula.eru
   * users get a single, canonical import with no exposure of internal packages.
   *
   * @example
-  *   {{{ import net.ghoula.eru.prelude.* import java.time.Duration
+  *   {{{
+  * import net.ghoula.eru.prelude.*
+  * import java.time.Duration
   *
-  * // Core usage val hello: Eru[Nothing, String] = Eru.succeed("hello") val value: String =
-  * hello.unsafeRunSync()
+  * val hello: Eru[Nothing, String] = Eru.succeed("hello")
+  * val value: String = hello.unsafeRunSync()
   *
-  * // Constructors for runtime data types via Eru companion val refProg: Eru[Nothing, Ref[Int]] =
-  * Eru.ref(0) val defProg: Eru[Nothing, Deferred[String]] = Eru.deferred[String] val semProg:
-  * Eru[Nothing, Semaphore] = Eru.semaphore(2)
+  * val refProg: Eru[Nothing, Ref[Int]] = Eru.ref(0)
+  * val defProg: Eru[Nothing, Deferred[String]] = Eru.deferred[String]
+  * val semProg: Eru[Nothing, Semaphore] = Eru.semaphore(2)
   *
-  * // Concurrency and reliability extensions val a = Eru.succeed(1) val b = Eru.succeed(2) val par:
-  * Eru[Throwable, (Int, Int)] = a.zipPar(b) val raced: Eru[Throwable, Either[Int, Int]] = a.race(b)
-  * val timed: Eru[Throwable | java.util.concurrent.TimeoutException | Throwable, Int] = a.map(_ =>
-  * 42).timeout(Duration.ofMillis(50)) val fallback: Eru[Throwable, Int] = a.map(_ =>
-  * 42).timeoutTo(Duration.ofMillis(50), -1)
+  * val a = Eru.succeed(1)
+  * val b = Eru.succeed(2)
+  * val par: Eru[Throwable, (Int, Int)] = a.zipPar(b)
+  * val raced: Eru[Throwable, Either[Int, Int]] = a.race(b)
+  * val timed = a.map(_ => 42).timeout(Duration.ofMillis(50))
+  * val fallback: Eru[Throwable, Int] = a.map(_ => 42).timeoutTo(Duration.ofMillis(50), -1)
   *
-  * // Observability helpers through the same import class PrintingObserver extends EruObserver {
-  * def onEvent(e: EruEvent): Unit = println(e) } val observed: Int = Eru.succeed(123).runWith(new
-  * PrintingObserver)
+  * class PrintingObserver extends EruObserver {
+  *   def onEvent(e: EruEvent): Unit = println(e)
+  * }
+  * val observed: Int = Eru.succeed(123).runWith(new PrintingObserver)
   *
-  * // Exit inspection at the observable boundary val exit: Exit[Nothing, Int] =
-  * Eru.succeed(1).runExit() exit match { case Exit.Success(v) => println(s"ok=$v") case _ => () }
-  * }}
+  * val exit: Exit[Nothing, Int] = Eru.succeed(1).runExit()
+  * exit match {
+  *   case Exit.Success(v) => println(s"ok=$v")
+  *   case _ => ()
+  * }
+  *   }}}
   */
 object prelude {
   export net.ghoula.eru.CorePrelude.*

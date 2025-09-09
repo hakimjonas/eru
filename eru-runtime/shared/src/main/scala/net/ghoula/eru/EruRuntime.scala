@@ -37,12 +37,10 @@ object EruRuntime {
     *
     * @example
     *   {{{
-    * // Fork a long-running computation
     * val fiber = EruRuntime.fork {
     *   EruRuntime.sleep(Duration.ofSeconds(1)).map(_ => "completed")
     * }.unsafeRunSync()
     *
-    * // Continue with other work, then await the result
     * val result = fiber.await.unsafeRunSync() match {
     *   case Exit.Success(value) => s"Got: $value"
     *   case Exit.Failure(error) => s"Failed: $error"
@@ -76,20 +74,17 @@ object EruRuntime {
     *
     * @example
     *   {{{
-    * // Create an observer to track fiber events
     * val events = scala.collection.mutable.ListBuffer.empty[EruObserver.EruEvent]
     * val observer = new EruObserver {
     *   def onEvent(event: EruObserver.EruEvent): Unit = events += event
     * }
     *
-    * // Fork with observation
     * val fiber = EruRuntime.forkWithObserver(
     *   EruRuntime.sleep(Duration.ofMillis(10)).map(_ => 42),
     *   observer
     * ).unsafeRunSync()
     *
     * val result = fiber.await.unsafeRunSync()
-    * // events now contains FiberStarted and FiberCompleted events
     *   }}}
     */
   def forkWithObserver[E, A](fa: Eru[E, A], observer: EruObserver): Eru[Nothing, Fiber[E, A]] =

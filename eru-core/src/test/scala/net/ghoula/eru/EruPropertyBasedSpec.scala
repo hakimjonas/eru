@@ -11,9 +11,8 @@ import net.ghoula.eru.Result as EruResult
   *
   * This specification leverages generative testing to verify behavioral properties, error handling,
   * and combinator semantics across a wide range of inputs. Focuses on practical effect system
-  * behavior rather than mathematical laws (which are tested in EruMonadLawsSpec).
-  * Properties are verified using ScalaCheck generators with random inputs to ensure correctness
-  * holds universally.
+  * behavior rather than mathematical laws (which are tested in EruMonadLawsSpec). Properties are
+  * verified using ScalaCheck generators with random inputs to ensure correctness holds universally.
   */
 class EruPropertyBasedSpec extends ScalaCheckSuite {
 

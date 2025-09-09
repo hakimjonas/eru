@@ -49,7 +49,6 @@ object EruObserver {
     *   {{{
     * val scopeId = ScopeId.fresh()
     * logger.info(s"Starting execution with scope $scopeId")
-    * // Use scopeId for correlation across events
     *   }}}
     */
   opaque type ScopeId = Long
@@ -150,7 +149,6 @@ object EruObserver {
     *
     * @example
     *   {{{
-    * // Pattern matching on events for structured handling
     * def handleEvent(event: EruEvent): Unit = event match {
     *   case ProgramStart(scopeId) =>
     *     startTimer(scopeId)
@@ -296,7 +294,6 @@ object EruObserver {
     *
     * @example
     *   {{{
-    * // Production-ready observer with multiple backends
     * class CompositeObserver(
     *   logger: Logger,
     *   metrics: MetricsCollector,
@@ -305,26 +302,20 @@ object EruObserver {
     *
     *   def onEvent(event: EruEvent): Unit = {
     *     try {
-    *       // Log all events
     *       logEvent(event)
-    *
-    *       // Extract metrics
     *       collectMetrics(event)
-    *
-    *       // Forward tracing events
     *       event match {
     *         case TraceSpan(span) => tracer.recordSpan(span)
     *         case _ => ()
     *       }
     *     } catch {
     *       case NonFatal(e) =>
-    *         // Never let observer exceptions escape
     *         System.err.println(s"Observer error: $e")
     *     }
     *   }
     *
-    *   private def logEvent(event: EruEvent): Unit = // ...
-    *   private def collectMetrics(event: EruEvent): Unit = // ...
+    *   private def logEvent(event: EruEvent): Unit = ???
+    *   private def collectMetrics(event: EruEvent): Unit = ???
     * }
     *   }}}
     */
