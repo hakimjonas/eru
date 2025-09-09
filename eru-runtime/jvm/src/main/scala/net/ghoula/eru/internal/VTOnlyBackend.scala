@@ -19,17 +19,17 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
 
   private val isRootCall: ThreadLocal[Boolean] = ThreadLocal.withInitial(() => false)
 
-  private val rootFiberContext = FiberContext(
+  private val rootFiberContext = new FiberContext(
     FiberId.fresh(),
     new java.util.concurrent.ConcurrentLinkedQueue[VTFiber[?, ?]]()
   )
 
-  private case class FiberContext(
-    id: FiberId,
-    childFibers: java.util.concurrent.ConcurrentLinkedQueue[VTFiber[?, ?]]
+  private final class FiberContext(
+    val id: FiberId,
+    val childFibers: java.util.concurrent.ConcurrentLinkedQueue[VTFiber[?, ?]]
   )
 
-  val capabilities: BackendCapabilities = BackendCapabilities(
+  val capabilities: BackendCapabilities = new BackendCapabilities(
     virtualThreads = true,
     structuredScopes = false,
     timersNonBlocking = true
@@ -196,7 +196,7 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
       }
 
       val runnable: Runnable = () => {
-        val fiberContext = FiberContext(id, new java.util.concurrent.ConcurrentLinkedQueue[VTFiber[?, ?]]())
+        val fiberContext = new FiberContext(id, new java.util.concurrent.ConcurrentLinkedQueue[VTFiber[?, ?]]())
         currentFiberContext.set(Some(fiberContext))
 
         try {

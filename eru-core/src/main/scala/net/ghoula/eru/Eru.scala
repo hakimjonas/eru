@@ -661,7 +661,7 @@ object Eru {
     }
     private object Hooks {
       val Noop: Hooks = new Hooks { def onStep(label: => String): Unit = () }
-      final case class ObserverHooks(scope: ScopeId, observer: EruObserver) extends Hooks {
+      final class ObserverHooks(val scope: ScopeId, val observer: EruObserver) extends Hooks {
         def onStep(label: => String): Unit = observer.onEvent(EruEvent.Step(scope, label))
       }
     }
@@ -758,7 +758,7 @@ object Eru {
           AsyncScheduler.get match {
             case Some(scheduler) =>
               val observer = hooks match {
-                case Hooks.ObserverHooks(scope, obs) => Some(obs)
+                case obs: Hooks.ObserverHooks => Some(obs.observer)
                 case _ => None
               }
 
@@ -791,8 +791,8 @@ object Eru {
               val childFiberId = FiberId.fresh()
 
               hooks match {
-                case Hooks.ObserverHooks(scope, observer) =>
-                  observer.onEvent(EruEvent.FiberStarted(childFiberId))
+                case obs: Hooks.ObserverHooks =>
+                  obs.observer.onEvent(EruEvent.FiberStarted(childFiberId))
                 case _ => // No observer
               }
 
@@ -810,8 +810,8 @@ object Eru {
               }
 
               hooks match {
-                case Hooks.ObserverHooks(scope, observer) =>
-                  observer.onEvent(EruEvent.FiberCompleted(childFiberId, childExit))
+                case obs: Hooks.ObserverHooks =>
+                  obs.observer.onEvent(EruEvent.FiberCompleted(childFiberId, childExit))
                 case _ => // No observer
               }
 
@@ -969,7 +969,7 @@ object Eru {
       fins: List[Finalizer]
     ): TailRec[(Either[E, A], List[Finalizer])] = {
       val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
-      tailcall(runFiberLoop(eru, fins, Hooks.ObserverHooks(scope, observer), None, outstandingFibers))
+      tailcall(runFiberLoop(eru, fins, new Hooks.ObserverHooks(scope, observer), None, outstandingFibers))
     }
 
     /** Observer-aware interpreter variant */
@@ -1020,7 +1020,7 @@ object Eru {
       initializeAsyncSchedulerIfNeeded()
 
       val scope = ScopeId.fresh()
-      val hooks = Hooks.ObserverHooks(scope, observer)
+      val hooks = new Hooks.ObserverHooks(scope, observer)
       val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
 
       observer.onEvent(EruEvent.ProgramStart(scope))

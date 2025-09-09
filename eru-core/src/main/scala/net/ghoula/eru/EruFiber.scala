@@ -30,8 +30,8 @@ package net.ghoula.eru
   * @param finalizers
   *   the accumulated finalizers from fiber execution in FILO order
   */
-final case class EruFiber[+E, +A](
-  id: FiberId,
+final class EruFiber[+E, +A](
+  val id: FiberId,
   private[eru] val exit: Exit[E, A],
   private[eru] val finalizers: List[() => Eru[Nothing, Unit]]
 ) extends Fiber[E, A] {
@@ -133,7 +133,7 @@ object EruFiber {
   private[eru] def completed[E, A](
     exit: Exit[E, A],
     finalizers: List[() => Eru[Nothing, Unit]]
-  ): EruFiber[E, A] = EruFiber(FiberId.fresh(), exit, finalizers)
+  ): EruFiber[E, A] = new EruFiber(FiberId.fresh(), exit, finalizers)
 
   /** Creates an EruFiber handle with a specific fiber ID for Phase 2 eager evaluation.
     *
@@ -154,6 +154,6 @@ object EruFiber {
     id: FiberId,
     exit: Exit[E, A],
     finalizers: List[() => Eru[Nothing, Unit]]
-  ): EruFiber[E, A] = EruFiber(id, exit, finalizers)
+  ): EruFiber[E, A] = new EruFiber(id, exit, finalizers)
 
 }

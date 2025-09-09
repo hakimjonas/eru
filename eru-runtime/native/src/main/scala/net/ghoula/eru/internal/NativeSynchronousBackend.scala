@@ -22,7 +22,7 @@ private[eru] object NativeSynchronousBackend extends ConcurrencyBackend {
 
   private val sequential = DefaultBackends.sequential
 
-  val capabilities: BackendCapabilities = BackendCapabilities(
+  val capabilities: BackendCapabilities = new BackendCapabilities(
     virtualThreads = false,
     structuredScopes = false,
     timersNonBlocking = false

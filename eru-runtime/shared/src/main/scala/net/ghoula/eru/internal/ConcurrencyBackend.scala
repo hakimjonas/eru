@@ -13,10 +13,10 @@ import net.ghoula.eru.*
   * @param timersNonBlocking
   *   whether timers/sleeps are implemented without blocking threads
   */
-private[eru] final case class BackendCapabilities(
-  virtualThreads: Boolean,
-  structuredScopes: Boolean,
-  timersNonBlocking: Boolean
+private[eru] final class BackendCapabilities(
+  val virtualThreads: Boolean,
+  val structuredScopes: Boolean,
+  val timersNonBlocking: Boolean
 )
 
 /** Internal SPI for providing concurrency semantics to EruRuntime.
@@ -85,7 +85,7 @@ private[eru] object DefaultBackends {
 
   /** Sequential, portability-first backend identical to current runtime semantics. */
   val sequential: ConcurrencyBackend = new ConcurrencyBackend {
-    val capabilities: BackendCapabilities = BackendCapabilities(
+    val capabilities: BackendCapabilities = new BackendCapabilities(
       virtualThreads = false,
       structuredScopes = false,
       timersNonBlocking = false
