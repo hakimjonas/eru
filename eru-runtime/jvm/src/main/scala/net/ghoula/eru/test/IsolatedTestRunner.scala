@@ -176,7 +176,7 @@ object IsolatedTestRunner {
 
   /** Executes an Eru computation with complete test isolation.
     *
-    * Creates a fresh VTOnlyBackend instance for this test execution only, ensuring no shared state
+    * Creates a fresh RuntimeBackend instance for this test execution only, ensuring no shared state
     * with other tests. The backend is properly cleaned up after execution completes.
     *
     * @param computation
@@ -205,7 +205,7 @@ object IsolatedTestRunner {
 
   /** Executes an Eru computation with complete test isolation and observer support.
     *
-    * Creates a fresh VTOnlyBackend instance for this test execution only, ensuring no shared state
+    * Creates a fresh RuntimeBackend instance for this test execution only, ensuring no shared state
     * with other tests. The backend is properly cleaned up after execution completes.
     *
     * @param computation
@@ -242,7 +242,7 @@ object IsolatedTestRunner {
 
   /** Executes an Eru computation that may fail with complete test isolation.
     *
-    * Creates a fresh VTOnlyBackend instance for this test execution only, ensuring no shared state
+    * Creates a fresh RuntimeBackend instance for this test execution only, ensuring no shared state
     * with other tests. The backend is properly cleaned up after execution completes. Returns the
     * Exit result instead of throwing exceptions.
     *
@@ -262,7 +262,7 @@ object IsolatedTestRunner {
 
   /** Executes an Eru computation that may fail with complete test isolation and observer.
     *
-    * Creates a fresh VTOnlyBackend instance for this test execution only, ensuring no shared state
+    * Creates a fresh RuntimeBackend instance for this test execution only, ensuring no shared state
     * with other tests. The backend is properly cleaned up after execution completes. Returns the
     * Exit result instead of throwing exceptions.
     *

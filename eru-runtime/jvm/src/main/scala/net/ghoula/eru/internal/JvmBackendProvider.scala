@@ -7,5 +7,5 @@ package net.ghoula.eru.internal
   * this provider and use its backend.
   */
 private[eru] final class JvmBackendProvider extends BackendProvider {
-  val backend: ConcurrencyBackend = JVMBackends.vtOnly
+  val backend: ConcurrencyBackend = RuntimeBackendAdapter.virtualThreads()
 }

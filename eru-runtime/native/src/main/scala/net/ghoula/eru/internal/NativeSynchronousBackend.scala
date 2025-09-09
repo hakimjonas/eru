@@ -20,7 +20,7 @@ import net.ghoula.eru.*
   */
 private[eru] object NativeSynchronousBackend extends ConcurrencyBackend {
 
-  private val sequential = DefaultBackends.sequential
+  private val shared = SharedSynchronousBackend
 
   val capabilities: BackendCapabilities = new BackendCapabilities(
     virtualThreads = false,
@@ -29,24 +29,24 @@ private[eru] object NativeSynchronousBackend extends ConcurrencyBackend {
   )
 
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver] = None): Eru[Nothing, Fiber[E, A]] =
-    sequential.fork(fa, observer)
+    shared.fork(fa, observer)
 
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
-    sequential.race(fa, fb)
+    shared.race(fa, fb)
 
   def sleep(duration: java.time.Duration): Eru[Nothing, Unit] =
-    sequential.sleep(duration)
+    shared.sleep(duration)
 
   def timeout[E, A](duration: java.time.Duration)(
     fa: Eru[E, A]
   ): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
-    sequential.timeout(duration)(fa)
+    shared.timeout(duration)(fa)
 
   def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A] =
-    sequential.retry(policy)(fa)
+    shared.retry(policy)(fa)
 
   def handleSuspend[E, A](
     register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
   ): Eru[Nothing, Either[E | Throwable, A]] =
-    sequential.handleSuspend(register)
+    shared.handleSuspend(register)
 }

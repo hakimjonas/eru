@@ -1,6 +1,6 @@
 package net.ghoula.eru
 
-import net.ghoula.eru.internal.{BackendProvider, ConcurrencyBackend, DefaultBackends}
+import net.ghoula.eru.internal.{BackendProvider, ConcurrencyBackend, SharedSynchronousBackend}
 
 /** Selects the platform-specific concurrency backend using ServiceLoader.
   *
@@ -12,7 +12,7 @@ private[eru] object PlatformBackend {
   private def discover(): ConcurrencyBackend = {
     val loader = java.util.ServiceLoader.load(classOf[BackendProvider], this.getClass.getClassLoader)
     val it = loader.iterator()
-    if (it.hasNext) it.next().backend else DefaultBackends.sequential
+    if (it.hasNext) it.next().backend else SharedSynchronousBackend
   }
   val backend: ConcurrencyBackend = discover()
 }

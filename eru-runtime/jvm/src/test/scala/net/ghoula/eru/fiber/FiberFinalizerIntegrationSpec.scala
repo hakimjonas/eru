@@ -54,14 +54,12 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
         _ <- Eru.succeed("outer1").ensure(Eru.effect(executionOrder.add("outer-fin1")))
         innerFiber <- runtime.fork(innerComputation)
         _ <- Eru.succeed("outer2").ensure(Eru.effect(executionOrder.add("outer-fin2")))
-        innerResult <- innerFiber.await.flatMap(exit =>
-          exit match {
-            case Exit.Success(value) => Eru.succeed(value)
-            case Exit.Failure(error) => Eru.fail(error)
-            case Exit.Die(t) => Eru.effect(throw t)
-            case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
-          }
-        )
+        innerResult <- innerFiber.await.flatMap {
+          case Exit.Success(value) => Eru.succeed(value)
+          case Exit.Failure(error) => Eru.fail(error)
+          case Exit.Die(t) => Eru.effect(throw t)
+          case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+        }
         _ <- Eru.succeed("outer3").ensure(Eru.effect(executionOrder.add("outer-fin3")))
       } yield s"outer-$innerResult"
 
@@ -372,30 +370,24 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
       fiber1 <- EruRuntime.fork(createDelayedFiber(1, 50))
       fiber2 <- EruRuntime.fork(createDelayedFiber(2, 20))
       fiber3 <- EruRuntime.fork(createDelayedFiber(3, 80))
-      result1 <- fiber1.await.flatMap(exit =>
-        exit match {
-          case Exit.Success(value) => Eru.succeed(value)
-          case Exit.Failure(error) => Eru.fail(error)
-          case Exit.Die(t) => Eru.effect(throw t)
-          case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
-        }
-      )
-      result2 <- fiber2.await.flatMap(exit =>
-        exit match {
-          case Exit.Success(value) => Eru.succeed(value)
-          case Exit.Failure(error) => Eru.fail(error)
-          case Exit.Die(t) => Eru.effect(throw t)
-          case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
-        }
-      )
-      result3 <- fiber3.await.flatMap(exit =>
-        exit match {
-          case Exit.Success(value) => Eru.succeed(value)
-          case Exit.Failure(error) => Eru.fail(error)
-          case Exit.Die(t) => Eru.effect(throw t)
-          case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
-        }
-      )
+      result1 <- fiber1.await.flatMap {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      }
+      result2 <- fiber2.await.flatMap {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      }
+      result3 <- fiber3.await.flatMap {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
+      }
     } yield List(result1, result2, result3)
 
     val results = computation.unsafeRunSync()

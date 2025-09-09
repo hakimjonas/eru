@@ -80,116 +80,99 @@ private[eru] trait ConcurrencyBackend {
   def cleanup(): Unit = ()
 }
 
-/** Default backend implementations. */
-private[eru] object DefaultBackends {
+/** Shared synchronous backend for fallback scenarios. */
+private[eru] object SharedSynchronousBackend extends ConcurrencyBackend {
 
-  /** Sequential, portability-first backend identical to current runtime semantics. */
-  val sequential: ConcurrencyBackend = new ConcurrencyBackend {
-    val capabilities: BackendCapabilities = new BackendCapabilities(
-      virtualThreads = false,
-      structuredScopes = false,
-      timersNonBlocking = false
-    )
+  val capabilities: BackendCapabilities = new BackendCapabilities(
+    virtualThreads = false,
+    structuredScopes = false,
+    timersNonBlocking = false
+  )
 
-    private def computeExit[E, A](fa: Eru[E, A]): Exit[E, A] =
-      try Result.toExit(fa.attempt.unsafeRunSync())
-      catch { case t: Throwable => Exit.Die(t) }
+  private def computeExit[E, A](fa: Eru[E, A]): Exit[E, A] =
+    try Result.toExit(fa.attempt.unsafeRunSync())
+    catch { case t: Throwable => Exit.Die(t) }
 
-    private def completed[E, A](id: FiberId, exit: Exit[E, A], observerOpt: Option[EruObserver]): Fiber[E, A] = {
-      observerOpt.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-      UnifiedFiber.completed[E, A](id, exit)
-    }
-
-    def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =
-      Eru.effect {
-        val id = FiberId.fresh()
-        observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
-        val exit = computeExit(fa)
-        completed(id, exit, observer)
-      }.attempt.map {
-        case Result.Success(fiber) => fiber
-        case Result.Failure(t) =>
-          val id = FiberId.fresh()
-          val exit: Exit[E, A] = Exit.Die(t)
-          completed(id, exit, observer)
-      }
-
-    def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
-      fa.map(Left(_))
-
-    def sleep(duration: Duration): Eru[Nothing, Unit] =
-      Eru.interruptibleBlocking {
-        val ms = Math.max(0L, duration.toMillis)
-        Thread.sleep(ms)
-      }
-
-    def timeout[E, A](
-      duration: Duration
-    )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] = {
-      import java.util.concurrent.TimeoutException
-      race(fa, sleep(duration)).flatMap {
-        case Left(a) => Eru.succeed(a)
-        case Right(_) => Eru.effect(throw new TimeoutException(s"Operation timed out after $duration"))
-      }
-    }
-
-    def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A] = {
-      import EruRuntime.Policy.*
-      def delay(i: Int): Option[Duration] = policy match {
-        case Recurs(n) => if (i < n) Some(Duration.ZERO) else None
-        case Exponential(base, maxRet) => if (i < maxRet) Some(base.multipliedBy(1L << i)) else None
-      }
-      def loop(i: Int): Eru[E, A] =
-        fa.recoverWith {
-          case t: Throwable => Eru.fail(t)
-          case e =>
-            delay(i) match {
-              case Some(d) => sleep(d).flatMap(_ => loop(i + 1))
-              case None => Eru.fail(e)
-            }
-        }
-      loop(0)
-    }
-
-    /** Handles suspend operations with synchronous callback semantics.
-      *
-      * This implementation preserves the current synchronous kernel behavior: the register function
-      * must invoke the callback synchronously during execution. If the callback is not invoked
-      * immediately, an IllegalStateException is thrown to maintain backward compatibility.
-      *
-      * This approach ensures that the sequential backend remains predictable and deterministic
-      * while providing a clear error message for unsupported async operations.
-      *
-      * @param register
-      *   function to register callback with async source
-      * @return
-      *   effect yielding the suspended result
-      */
-    def handleSuspend[E, A](
-      register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
-    ): Eru[Nothing, Either[E | Throwable, A]] =
-      Eru.effect {
-        val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
-        val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
-
-        val registrationExit = register(cb).attempt.unsafeRunSync()
-
-        cbBox.get() match {
-          case Some(result) => result
-          case None =>
-            registrationExit match {
-              case Result.Success(_) =>
-                throw new IllegalStateException(
-                  "Eru.suspend: asynchronous registration is not supported in the synchronous kernel; the register function must invoke the callback synchronously."
-                )
-              case Result.Failure(t) =>
-                throw t
-            }
-        }
-      }.attempt.flatMap {
-        case Result.Success(result) => Eru.succeed(result)
-        case Result.Failure(t) =>
-          Eru.succeed(Left(t))
-      }
+  private def completed[E, A](id: FiberId, exit: Exit[E, A], observerOpt: Option[EruObserver]): Fiber[E, A] = {
+    observerOpt.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+    UnifiedFiber.completed[E, A](id, exit)
   }
+
+  def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver] = None): Eru[Nothing, Fiber[E, A]] =
+    Eru.effect {
+      val id = FiberId.fresh()
+      observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+      val exit = computeExit(fa)
+      completed(id, exit, observer)
+    }.attempt.map {
+      case Result.Success(fiber) => fiber
+      case Result.Failure(t) =>
+        val id = FiberId.fresh()
+        val exit: Exit[E, A] = Exit.Die(t)
+        completed(id, exit, observer)
+    }
+
+  def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
+    fa.map(Left(_))
+
+  def sleep(duration: java.time.Duration): Eru[Nothing, Unit] =
+    Eru.interruptibleBlocking {
+      val ms = Math.max(0L, duration.toMillis)
+      Thread.sleep(ms)
+    }
+
+  def timeout[E, A](duration: java.time.Duration)(
+    fa: Eru[E, A]
+  ): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] = {
+    import java.util.concurrent.TimeoutException
+    race(fa, sleep(duration)).flatMap {
+      case Left(a) => Eru.succeed(a)
+      case Right(_) => Eru.effect(throw new TimeoutException(s"Operation timed out after $duration"))
+    }
+  }
+
+  def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A] = {
+    import EruRuntime.Policy.*
+    def delay(i: Int): Option[java.time.Duration] = policy match {
+      case Recurs(n) => if (i < n) Some(java.time.Duration.ZERO) else None
+      case Exponential(base, maxRet) => if (i < maxRet) Some(base.multipliedBy(1L << i)) else None
+    }
+    def loop(i: Int): Eru[E, A] =
+      fa.recoverWith {
+        case t: Throwable => Eru.fail(t)
+        case e =>
+          delay(i) match {
+            case Some(d) => sleep(d).flatMap(_ => loop(i + 1))
+            case None => Eru.fail(e)
+          }
+      }
+    loop(0)
+  }
+
+  def handleSuspend[E, A](
+    register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
+  ): Eru[Nothing, Either[E | Throwable, A]] =
+    Eru.effect {
+      val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
+      val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
+
+      val registrationExit = register(cb).attempt.unsafeRunSync()
+
+      cbBox.get() match {
+        case Some(result) => result
+        case None =>
+          registrationExit match {
+            case Result.Success(_) =>
+              throw new IllegalStateException(
+                "Eru.suspend: asynchronous registration is not supported in the synchronous kernel; the register function must invoke the callback synchronously."
+              )
+            case Result.Failure(t) =>
+              throw t
+          }
+      }
+    }.attempt.flatMap {
+      case Result.Success(result) => Eru.succeed(result)
+      case Result.Failure(t) =>
+        Eru.succeed(Left(t))
+    }
 }
