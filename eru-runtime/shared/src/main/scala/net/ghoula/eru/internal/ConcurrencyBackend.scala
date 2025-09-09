@@ -97,7 +97,7 @@ private[eru] object DefaultBackends {
 
     private def completed[E, A](id: FiberId, exit: Exit[E, A], observerOpt: Option[EruObserver]): Fiber[E, A] = {
       observerOpt.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-      new CompletedFiber[E, A](id, exit)
+      UnifiedFiber.completed[E, A](id, exit)
     }
 
     def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =

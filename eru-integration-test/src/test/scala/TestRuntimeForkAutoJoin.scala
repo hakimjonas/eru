@@ -28,7 +28,10 @@ class TestRuntimeForkAutoJoin extends FunSuite {
         println(s"DEBUG: Structured cleanup started for fiber $fiberId with $childCount children")
 
       override def onChildInterruptionRequested(
-        parentId: FiberId, childId: FiberId, cause: InterruptCause, childWasRunning: Boolean
+        parentId: FiberId,
+        childId: FiberId,
+        cause: InterruptCause,
+        childWasRunning: Boolean
       ): Unit =
         if (childWasRunning) {
           println(s"DEBUG: Parent $parentId interrupting RUNNING child $childId: $cause")
@@ -37,7 +40,9 @@ class TestRuntimeForkAutoJoin extends FunSuite {
         }
 
       override def onStructuredCleanupCompleted(fiberId: FiberId, interruptedCount: Int, completedCount: Int): Unit =
-        println(s"DEBUG: Structured cleanup completed for fiber $fiberId: interrupted=$interruptedCount, completed=$completedCount")
+        println(
+          s"DEBUG: Structured cleanup completed for fiber $fiberId: interrupted=$interruptedCount, completed=$completedCount"
+        )
 
       override def onFiberLifecycle(event: EruEvent): Unit = event match {
         case EruEvent.FiberStarted(id) => println(s"DEBUG: Fiber $id started")

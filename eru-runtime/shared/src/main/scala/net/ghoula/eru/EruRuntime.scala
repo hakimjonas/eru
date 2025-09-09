@@ -601,8 +601,3 @@ object EruRuntime {
         raceWithIndex(effects, 0)
     }
 }
-
-private final class CompletedFiber[E, A](val id: FiberId, exit0: Exit[E, A]) extends Fiber[E, A] {
-  def await: Eru[Nothing, Exit[E, A]] = Eru.succeed(exit0)
-  def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = Eru.unit
-}

@@ -251,48 +251,51 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
   }
 
   test("auto-join prevents finalizer leaks from unawaited fibers") {
-    val executionOrder = new ConcurrentLinkedQueue[String]()
+    IsolatedTestRunner.withIsolatedRuntime {
+      _ =>
+        val executionOrder = new ConcurrentLinkedQueue[String]()
 
-    val computation = for {
-      _ <- EruRuntime.parSequence(
-        List(
-          EruRuntime.fork {
-            for {
-              _ <- Eru.succeed("fork1").ensure(Eru.effect(executionOrder.add("fork1-fin")))
-              _ <- Eru.succeed("fork2").ensure(Eru.effect(executionOrder.add("fork2-fin")))
-            } yield "fork-done"
-          },
-          EruRuntime.fork {
-            for {
-              _ <- Eru.succeed("fork3").ensure(Eru.effect(executionOrder.add("fork3-fin")))
-              _ <- Eru.succeed("fork4").ensure(Eru.effect(executionOrder.add("fork4-fin")))
-            } yield "fork2-done"
-          }
-        )
+        val computation = for {
+          _ <- EruRuntime.parSequence(
+            List(
+              EruRuntime.fork {
+                for {
+                  _ <- Eru.succeed("fork1").ensure(Eru.effect(executionOrder.add("fork1-fin")))
+                  _ <- Eru.succeed("fork2").ensure(Eru.effect(executionOrder.add("fork2-fin")))
+                } yield "fork-done"
+              },
+              EruRuntime.fork {
+                for {
+                  _ <- Eru.succeed("fork3").ensure(Eru.effect(executionOrder.add("fork3-fin")))
+                  _ <- Eru.succeed("fork4").ensure(Eru.effect(executionOrder.add("fork4-fin")))
+                } yield "fork2-done"
+              }
+            )
+          )
+          _ <- Eru.succeed("main").ensure(Eru.effect(executionOrder.add("main-fin")))
+        } yield "main-done"
+
+      val result = computation.unsafeRunSync()
+
+      assertEquals(result, "main-done")
+
+      val executionList = executionOrder.asScala.toList
+      assert(executionList.contains("fork1-fin"))
+      assert(executionList.contains("fork2-fin"))
+      assert(executionList.contains("fork3-fin"))
+      assert(executionList.contains("fork4-fin"))
+      assert(executionList.contains("main-fin"))
+
+      val indices = Map(
+        "fork1-fin" -> executionList.indexOf("fork1-fin"),
+        "fork2-fin" -> executionList.indexOf("fork2-fin"),
+        "fork3-fin" -> executionList.indexOf("fork3-fin"),
+        "fork4-fin" -> executionList.indexOf("fork4-fin")
       )
-      _ <- Eru.succeed("main").ensure(Eru.effect(executionOrder.add("main-fin")))
-    } yield "main-done"
 
-    val result = computation.unsafeRunSync()
-
-    assertEquals(result, "main-done")
-
-    val executionList = executionOrder.asScala.toList
-    assert(executionList.contains("fork1-fin"))
-    assert(executionList.contains("fork2-fin"))
-    assert(executionList.contains("fork3-fin"))
-    assert(executionList.contains("fork4-fin"))
-    assert(executionList.contains("main-fin"))
-
-    val indices = Map(
-      "fork1-fin" -> executionList.indexOf("fork1-fin"),
-      "fork2-fin" -> executionList.indexOf("fork2-fin"),
-      "fork3-fin" -> executionList.indexOf("fork3-fin"),
-      "fork4-fin" -> executionList.indexOf("fork4-fin")
-    )
-
-    assert(indices("fork2-fin") < indices("fork1-fin"))
-    assert(indices("fork4-fin") < indices("fork3-fin"))
+      assert(indices("fork2-fin") < indices("fork1-fin"))
+      assert(indices("fork4-fin") < indices("fork3-fin"))
+    }
   }
 
   test("deeply nested fibers maintain strict FILO ordering across all levels") {

@@ -146,11 +146,11 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
   /** Executes structured cleanup of all child fibers for the given context.
     *
     * This method ensures all child fibers are properly interrupted and awaited, implementing
-    * structured concurrency semantics. Only interrupts children that are still running,
-    * allowing finalizers to execute properly during interruption.
+    * structured concurrency semantics. Only interrupts children that are still running, allowing
+    * finalizers to execute properly during interruption.
     *
-    * Enhanced with comprehensive observability events to provide complete visibility into
-    * the structured concurrency lifecycle, enabling debugging and monitoring of cleanup behavior.
+    * Enhanced with comprehensive observability events to provide complete visibility into the
+    * structured concurrency lifecycle, enabling debugging and monitoring of cleanup behavior.
     */
   private def executeStructuredCleanup(fiberContext: FiberContext, observer: Option[EruObserver]): Unit = {
     // First, count all children to emit accurate metrics
@@ -174,9 +174,16 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
           val cause = InterruptCause.ParentTerminated(fiberContext.id, Exit.Success(()))
 
           // Emit detailed interruption event for observability
-          observer.foreach(_.onEvent(EruObserver.EruEvent.ChildInterruptionRequested(
-            fiberContext.id, childFiber.id, cause, childWasRunning
-          )))
+          observer.foreach(
+            _.onEvent(
+              EruObserver.EruEvent.ChildInterruptionRequested(
+                fiberContext.id,
+                childFiber.id,
+                cause,
+                childWasRunning
+              )
+            )
+          )
 
           // Only interrupt if the child is still running
           if (childWasRunning) {
@@ -185,18 +192,24 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
           } else {
             completedCount += 1
           }
-          
+
           // Always await completion to ensure proper cleanup
           val _ = childFiber.await.unsafeRunSync()
         } catch {
           case _: Exception =>
-            // Silent failure - structured cleanup should be resilient
+          // Silent failure - structured cleanup should be resilient
         }
       }
 
-      observer.foreach(_.onEvent(EruObserver.EruEvent.StructuredCleanupCompleted(
-        fiberContext.id, interruptedCount, completedCount
-      )))
+      observer.foreach(
+        _.onEvent(
+          EruObserver.EruEvent.StructuredCleanupCompleted(
+            fiberContext.id,
+            interruptedCount,
+            completedCount
+          )
+        )
+      )
     }
   }
 

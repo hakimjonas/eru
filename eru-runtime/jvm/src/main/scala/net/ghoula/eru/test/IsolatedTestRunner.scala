@@ -3,25 +3,29 @@ package net.ghoula.eru.test
 import java.time.Duration
 
 import net.ghoula.eru.*
-import net.ghoula.eru.internal.VTOnlyBackend
+import net.ghoula.eru.internal.{ConcurrencyBackend, RuntimeBackendAdapter}
+import net.ghoula.eru.prelude.*
 
 /** Test utility providing complete isolation between test executions.
   *
-  * This utility ensures that each test runs with a completely fresh VTOnlyBackend instance,
-  * preventing any state leakage between tests. The backend's cleanup() method is always called
-  * after test completion, even if the test fails or throws an exception.
+  * This utility ensures that each test runs with a completely fresh backend instance, preventing
+  * any state leakage between tests. The backend's cleanup() method is always called after test
+  * completion, even if the test fails or throws an exception.
   *
-  * This solves the critical issue where tests pass individually but fail when run as part of the
-  * larger test suite due to shared global runtime state.
+  * Updated to use the new RuntimeBackend architecture while maintaining compatibility. This solves
+  * the critical issue where tests pass individually but fail when run as part of the larger test
+  * suite due to shared global runtime state.
   */
 object IsolatedTestRunner {
 
   /** Isolated runtime that provides the same API as EruRuntime but with fresh backend per test.
     *
-    * This class wraps a fresh VTOnlyBackend instance and provides all the standard EruRuntime
-    * methods. Use this in tests instead of the global EruRuntime to avoid state interference.
+    * This class wraps a fresh backend instance and provides all the standard EruRuntime methods.
+    * Use this in tests instead of the global EruRuntime to avoid state interference.
+    *
+    * Updated to use the new unified RuntimeBackend architecture.
     */
-  class IsolatedRuntime(private val backend: VTOnlyBackend) {
+  class IsolatedRuntime(private val backend: ConcurrencyBackend) {
     def fork[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] = backend.fork(fa)
 
     def sleep(duration: Duration): Eru[Nothing, Unit] = backend.sleep(duration)
@@ -150,7 +154,7 @@ object IsolatedTestRunner {
     * Remember to call cleanup() after your test completes.
     */
   def createIsolatedRuntime(): IsolatedRuntime = {
-    val backend = new VTOnlyBackend()
+    val backend = RuntimeBackendAdapter.virtualThreads()
     new IsolatedRuntime(backend)
   }
 
@@ -185,10 +189,9 @@ object IsolatedTestRunner {
     *   if the computation fails with an untyped exception
     */
   def runIsolated[A](computation: Eru[Nothing, A]): A = {
-    val backend = new VTOnlyBackend()
+    val backend = RuntimeBackendAdapter.virtualThreads()
     try {
-      val fiberId = FiberId.fresh()
-      backend.computeExit(computation, fiberId) match {
+      computation.runExit() match {
         case Exit.Success(value) => value
         case Exit.Failure(error) => throw EruException(error)
         case Exit.Die(throwable) => throw throwable
@@ -217,12 +220,12 @@ object IsolatedTestRunner {
     *   if the computation fails with an untyped exception
     */
   def runIsolatedWith[A](computation: Eru[Nothing, A], observer: EruObserver): A = {
-    val backend = new VTOnlyBackend()
+    val backend = RuntimeBackendAdapter.virtualThreads()
     try {
       val fiberId = FiberId.fresh()
       observer.onEvent(EruObserver.EruEvent.FiberStarted(fiberId))
 
-      val exit = backend.computeExit(computation, fiberId)
+      val exit = computation.runExit()
       observer.onEvent(EruObserver.EruEvent.FiberCompleted(fiberId, exit))
 
       exit match {
@@ -249,10 +252,9 @@ object IsolatedTestRunner {
     *   the Exit result of the computation
     */
   def runIsolatedExit[E, A](computation: Eru[E, A]): Exit[E, A] = {
-    val backend = new VTOnlyBackend()
+    val backend = RuntimeBackendAdapter.virtualThreads()
     try {
-      val fiberId = FiberId.fresh()
-      backend.computeExit(computation, fiberId)
+      computation.runExit()
     } finally {
       backend.cleanup()
     }
@@ -272,12 +274,12 @@ object IsolatedTestRunner {
     *   the Exit result of the computation
     */
   def runIsolatedExitWith[E, A](computation: Eru[E, A], observer: EruObserver): Exit[E, A] = {
-    val backend = new VTOnlyBackend()
+    val backend = RuntimeBackendAdapter.virtualThreads()
     try {
       val fiberId = FiberId.fresh()
       observer.onEvent(EruObserver.EruEvent.FiberStarted(fiberId))
 
-      val exit = backend.computeExit(computation, fiberId)
+      val exit = computation.runExit()
       observer.onEvent(EruObserver.EruEvent.FiberCompleted(fiberId, exit))
 
       exit

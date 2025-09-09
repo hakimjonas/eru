@@ -282,9 +282,9 @@ object EruObserver {
 
     /** Signals the establishment of a parent-child fiber relationship.
       *
-      * This event is emitted when a fiber is forked within another fiber's context, establishing
-      * a structured concurrency hierarchy. This enables tracking of parent-child relationships
-      * and understanding the scope boundaries for structured cleanup.
+      * This event is emitted when a fiber is forked within another fiber's context, establishing a
+      * structured concurrency hierarchy. This enables tracking of parent-child relationships and
+      * understanding the scope boundaries for structured cleanup.
       *
       * @param parentId
       *   the unique identifier of the parent fiber
@@ -309,9 +309,9 @@ object EruObserver {
 
     /** Signals the completion of structured cleanup for a fiber's children.
       *
-      * This event is emitted when a fiber has successfully completed the structured cleanup
-      * process for all its child fibers. This ensures observers can track when structured
-      * concurrency guarantees have been properly enforced and all children have been cleaned up.
+      * This event is emitted when a fiber has successfully completed the structured cleanup process
+      * for all its child fibers. This ensures observers can track when structured concurrency
+      * guarantees have been properly enforced and all children have been cleaned up.
       *
       * @param fiberId
       *   the unique identifier of the parent fiber that completed cleanup
@@ -324,9 +324,9 @@ object EruObserver {
 
     /** Signals the interruption request sent to a child fiber during structured cleanup.
       *
-      * This event is emitted when a parent fiber sends an interruption request to a child fiber
-      * as part of structured cleanup. This provides visibility into the structured concurrency
-      * process and helps debug timing issues or cleanup problems.
+      * This event is emitted when a parent fiber sends an interruption request to a child fiber as
+      * part of structured cleanup. This provides visibility into the structured concurrency process
+      * and helps debug timing issues or cleanup problems.
       *
       * @param parentId
       *   the unique identifier of the parent fiber requesting interruption
@@ -427,16 +427,16 @@ object EruObserver {
     * It follows Eru's Radical Ergonomics pillar by providing an intuitive API for common
     * observability patterns.
     *
-    * The default implementations are no-ops, allowing users to override only the events they
-    * care about. This makes it easy to create focused observers for specific use cases like
-    * debugging structured concurrency issues or monitoring fiber lifecycle patterns.
+    * The default implementations are no-ops, allowing users to override only the events they care
+    * about. This makes it easy to create focused observers for specific use cases like debugging
+    * structured concurrency issues or monitoring fiber lifecycle patterns.
     *
     * @example
     *   {{{
     * class StructuredConcurrencyDebugObserver extends StructuredConcurrencyObserver {
     *   override def onStructuredCleanupStarted(fiberId: FiberId, childCount: Int): Unit =
     *     println(s"Starting cleanup of $childCount children for fiber $fiberId")
-    *     
+    *
     *   override def onChildInterruptionRequested(
     *     parentId: FiberId, childId: FiberId, cause: InterruptCause, childWasRunning: Boolean
     *   ): Unit =
@@ -452,32 +452,43 @@ object EruObserver {
 
     /** Called when a parent-child fiber relationship is established.
       *
-      * @param parentId the unique identifier of the parent fiber
-      * @param childId the unique identifier of the child fiber that was forked
+      * @param parentId
+      *   the unique identifier of the parent fiber
+      * @param childId
+      *   the unique identifier of the child fiber that was forked
       */
     def onFiberForked(parentId: FiberId, childId: FiberId): Unit = ()
 
     /** Called when structured cleanup begins for a fiber's children.
       *
-      * @param fiberId the unique identifier of the parent fiber initiating cleanup
-      * @param childCount the number of child fibers that need to be cleaned up
+      * @param fiberId
+      *   the unique identifier of the parent fiber initiating cleanup
+      * @param childCount
+      *   the number of child fibers that need to be cleaned up
       */
     def onStructuredCleanupStarted(fiberId: FiberId, childCount: Int): Unit = ()
 
     /** Called when structured cleanup completes for a fiber's children.
       *
-      * @param fiberId the unique identifier of the parent fiber that completed cleanup
-      * @param interruptedCount the number of child fibers that were actively interrupted
-      * @param completedCount the number of child fibers that had already completed
+      * @param fiberId
+      *   the unique identifier of the parent fiber that completed cleanup
+      * @param interruptedCount
+      *   the number of child fibers that were actively interrupted
+      * @param completedCount
+      *   the number of child fibers that had already completed
       */
     def onStructuredCleanupCompleted(fiberId: FiberId, interruptedCount: Int, completedCount: Int): Unit = ()
 
     /** Called when a child interruption is requested during structured cleanup.
       *
-      * @param parentId the unique identifier of the parent fiber requesting interruption
-      * @param childId the unique identifier of the child fiber being interrupted
-      * @param cause the structured cause of the interruption request
-      * @param childWasRunning whether the child fiber was still running when interruption was requested
+      * @param parentId
+      *   the unique identifier of the parent fiber requesting interruption
+      * @param childId
+      *   the unique identifier of the child fiber being interrupted
+      * @param cause
+      *   the structured cause of the interruption request
+      * @param childWasRunning
+      *   whether the child fiber was still running when interruption was requested
       */
     def onChildInterruptionRequested(
       parentId: FiberId,
@@ -488,31 +499,34 @@ object EruObserver {
 
     /** Called for fiber lifecycle events (started, completed, interrupted).
       *
-      * @param event the fiber lifecycle event
+      * @param event
+      *   the fiber lifecycle event
       */
     def onFiberLifecycle(event: EruEvent): Unit = ()
 
     /** Called for program lifecycle events (started, ended, steps).
       *
-      * @param event the program lifecycle event
+      * @param event
+      *   the program lifecycle event
       */
     def onProgramLifecycle(event: EruEvent): Unit = ()
 
     /** Called for tracing events.
       *
-      * @param span the completed tracing span
+      * @param span
+      *   the completed tracing span
       */
     def onTracing(span: net.ghoula.eru.trace.EruTrace.Span): Unit = ()
 
     override def onEvent(event: EruEvent): Unit = {
       event match {
-        case EruEvent.FiberForked(parentId, childId) => 
+        case EruEvent.FiberForked(parentId, childId) =>
           onFiberForked(parentId, childId)
-        case EruEvent.StructuredCleanupStarted(fiberId, childCount) => 
+        case EruEvent.StructuredCleanupStarted(fiberId, childCount) =>
           onStructuredCleanupStarted(fiberId, childCount)
-        case EruEvent.StructuredCleanupCompleted(fiberId, interruptedCount, completedCount) => 
+        case EruEvent.StructuredCleanupCompleted(fiberId, interruptedCount, completedCount) =>
           onStructuredCleanupCompleted(fiberId, interruptedCount, completedCount)
-        case EruEvent.ChildInterruptionRequested(parentId, childId, cause, wasRunning) => 
+        case EruEvent.ChildInterruptionRequested(parentId, childId, cause, wasRunning) =>
           onChildInterruptionRequested(parentId, childId, cause, wasRunning)
         case event @ (EruEvent.FiberStarted(_) | EruEvent.FiberCompleted(_, _) | EruEvent.FiberInterrupted(_, _)) =>
           onFiberLifecycle(event)
@@ -526,14 +540,15 @@ object EruObserver {
 
   /** Enhanced EruObserver that can handle trace events.
     *
-    * This trait provides a specialized interface for observing tracing events, making it easier
-    * to build observers that focus on performance analysis and distributed tracing integration.
+    * This trait provides a specialized interface for observing tracing events, making it easier to
+    * build observers that focus on performance analysis and distributed tracing integration.
     */
   trait TracingEruObserver extends EruObserver {
 
     /** Called when a trace span completes.
       *
-      * @param span the completed tracing span with timing and metadata
+      * @param span
+      *   the completed tracing span with timing and metadata
       */
     def onSpanCompleted(span: net.ghoula.eru.trace.EruTrace.Span): Unit
 
@@ -546,7 +561,8 @@ object EruObserver {
 
     /** Handle non-tracing events (can be overridden).
       *
-      * @param event the non-tracing event
+      * @param event
+      *   the non-tracing event
       */
     def onOtherEvent(event: EruEvent): Unit = ()
   }
