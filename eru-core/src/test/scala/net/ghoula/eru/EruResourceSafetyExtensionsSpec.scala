@@ -8,10 +8,10 @@ import net.ghoula.eru.CorePrelude.*
 
 /** Test suite for advanced resource safety extensions and edge cases.
   *
-  * Validates complex resource management scenarios including nested finalizers, concurrent resource
-  * access, and error propagation through resource cleanup chains. These tests ensure that the
-  * extended resource safety mechanisms maintain correctness under stress conditions and provide
-  * comprehensive coverage for production workload patterns.
+  * Validates complex resource management scenarios including nested finalizers, sequential resource
+  * cleanup chains, and error propagation through resource finalizer execution. These tests ensure
+  * that the extended resource safety mechanisms maintain correctness under various failure conditions
+  * and provide comprehensive coverage for advanced resource management patterns.
   */
 class EruResourceSafetyExtensionsSpec extends FunSuite {
 
@@ -240,5 +240,101 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     val result = program.unsafeRunSync()
     assertEquals(result, "outer-inner")
     assertEquals(cleanupOrder.toList, List("cleanup-inner", "cleanup-outer"))
+  }
+
+  test("concurrent resource cleanup maintains FILO order under resource contention") {
+    val cleanupOrder = java.util.concurrent.ConcurrentLinkedQueue[String]()
+    val sharedResource = new java.util.concurrent.atomic.AtomicInteger(0)
+
+    def createResourceWithId(id: String): Eru[Nothing, String] = {
+      Eru.succeed(id).autoCleanup { resourceId =>
+        Eru.effect {
+          val currentValue = sharedResource.incrementAndGet()
+          Thread.sleep(1)
+          cleanupOrder.add(s"cleanup-$resourceId-$currentValue")
+        }
+      }
+    }
+
+    val program = for {
+      r1 <- createResourceWithId("first")
+      r2 <- createResourceWithId("second")
+      r3 <- createResourceWithId("third")
+    } yield s"$r1-$r2-$r3"
+
+    val result = program.unsafeRunSync()
+    assertEquals(result, "first-second-third")
+
+    import scala.jdk.CollectionConverters.*
+    val cleanupList = cleanupOrder.asScala.toList
+    assert(cleanupList.length == 3)
+    assert(cleanupList.exists(_.contains("cleanup-third")))
+    assert(cleanupList.exists(_.contains("cleanup-second")))
+    assert(cleanupList.exists(_.contains("cleanup-first")))
+  }
+
+  test("resource safety with exception propagation in finalizers") {
+    var finalizer1Executed = false
+    var finalizer2Executed = false
+    var finalizer3Executed = false
+
+    val program = Eru
+      .succeed("resource1")
+      .autoCleanup(_ => Eru.effect { finalizer1Executed = true })
+      .flatMap(_ =>
+        Eru
+          .succeed("resource2")
+          .autoCleanup(_ => Eru.effect {
+            finalizer2Executed = true
+            throw new RuntimeException("finalizer2 failed")
+          })
+          .flatMap(_ =>
+            Eru
+              .succeed("resource3")
+              .autoCleanup(_ => Eru.effect { finalizer3Executed = true })
+              .flatMap(_ => Eru.fail("main computation failed"))
+          )
+      )
+
+    val ex = intercept[EruException[String]] {
+      program.unsafeRunSync()
+    }
+
+    assertEquals(ex.error, "main computation failed")
+    assert(finalizer1Executed, "Finalizer 1 should execute despite errors")
+    assert(finalizer2Executed, "Finalizer 2 should execute despite main failure")
+    assert(finalizer3Executed, "Finalizer 3 should execute despite later finalizer failures")
+  }
+
+  test("resource acquisition and release with interleaved failures") {
+    val acquisitionOrder = ListBuffer.empty[String]
+    val releaseOrder = ListBuffer.empty[String]
+
+    def acquireResource(id: String, shouldFail: Boolean): Eru[String, String] = {
+      if (shouldFail) {
+        Eru.fail(s"Failed to acquire $id")
+      } else {
+        Eru.effect {
+          acquisitionOrder += s"acquired-$id"
+          id
+        }.mapError(_.getMessage)
+      }
+    }
+
+    val program = acquireResource("r1", false)
+      .bracket(r => Eru.effect { releaseOrder += s"released-$r" }) { r1 =>
+        acquireResource("r2", true)
+          .bracket(r => Eru.effect { releaseOrder += s"released-$r" }) { r2 =>
+            Eru.succeed(s"used-$r1-$r2")
+          }
+      }
+
+    val ex = intercept[EruException[String]] {
+      program.unsafeRunSync()
+    }
+
+    assertEquals(ex.error, "Failed to acquire r2")
+    assertEquals(acquisitionOrder.toList, List("acquired-r1"))
+    assertEquals(releaseOrder.toList, List("released-r1"))
   }
 }

@@ -4,14 +4,14 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
-/** Comprehensive test suite for smart constructor optimizations in Eru effect construction.
+/** Comprehensive test suite for constructor optimizations in Eru effect construction.
   *
   * Validates that construction-time optimizations maintain identical semantics to manual
   * construction while providing performance benefits through compile-time fusion and chain
   * optimization. Tests cover flatMap chaining, map fusion, error propagation, and stack safety of
   * optimized operations.
   */
-class EruSmartConstructorSpec extends FunSuite {
+class EruConstructorOptimizationSpec extends FunSuite {
 
   /** Validates that fromEither optimization creates direct Succeed/Fail instances.
     *

@@ -1,19 +1,20 @@
-package net.ghoula.eru
+package net.ghoula.eru.fiber
 
 import munit.FunSuite
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import net.ghoula.eru.CorePrelude.*
+import net.ghoula.eru.*
+import net.ghoula.eru.prelude.*
 
-/** Advanced test suite for Phase 2 fiber operations and resource management.
+/** Test suite for fiber execution, lifecycle, and resource management.
   *
-  * Validates sophisticated fiber lifecycle scenarios including auto-join behavior, finalizer leak
+  * Validates fiber execution scenarios including auto-join behavior, finalizer leak
   * prevention, and advanced resource cleanup patterns. These tests ensure that the fiber system
   * maintains resource safety even in complex concurrent scenarios and prevents common concurrency
   * pitfalls like resource leaks and improper cleanup ordering.
   */
-class FiberPhase2Spec extends FunSuite {
+class FiberExecutionSpec extends FunSuite {
 
   test("fork without await prevents finalizer leaks via auto-join") {
     val finalizerExecuted = new AtomicBoolean(false)
