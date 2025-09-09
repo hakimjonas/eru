@@ -292,13 +292,9 @@ enum RuntimeBackend {
     * This is called at the end of execution to ensure all child fibers are properly cleaned up
     * according to structured concurrency semantics.
     */
-  def cleanup(): Unit = this match {
-    case Synchronous =>
-      // No cleanup needed for synchronous execution
-      ()
-    case VirtualThreads =>
-      // Clean up any unawaited root-level fibers (auto-join behavior)
-      StructuredConcurrency.cleanupRootFibers()
+  def cleanup(): Unit = {
+    // Clean up any unawaited root-level fibers (auto-join behavior)
+    StructuredConcurrency.cleanupRootFibers()
   }
 }
 
