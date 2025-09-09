@@ -82,6 +82,9 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
     interrupted: java.util.concurrent.atomic.AtomicBoolean
   ) extends Fiber[E, A] {
 
+    /** Checks if this fiber is still running (not yet completed). */
+    private[VTOnlyBackend] def isRunning: Boolean = latch.getCount() > 0
+
     /** Waits for this fiber to complete and returns its structured exit outcome.
       *
       * This operation blocks the calling fiber until this fiber completes via Virtual Thread
@@ -143,20 +146,57 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
   /** Executes structured cleanup of all child fibers for the given context.
     *
     * This method ensures all child fibers are properly interrupted and awaited, implementing
-    * structured concurrency semantics. It waits for each child to actually terminate, ensuring
-    * finalizers have time to execute.
+    * structured concurrency semantics. Only interrupts children that are still running,
+    * allowing finalizers to execute properly during interruption.
+    *
+    * Enhanced with comprehensive observability events to provide complete visibility into
+    * the structured concurrency lifecycle, enabling debugging and monitoring of cleanup behavior.
     */
-  private def executeStructuredCleanup(fiberContext: FiberContext): Unit = {
-    var childFiber = Option(fiberContext.childFibers.poll())
-    while (childFiber.nonEmpty) {
-      try {
-        childFiber.get.interrupt(InterruptCause.ParentTerminated(fiberContext.id, Exit.Success(()))).unsafeRunSync()
+  private def executeStructuredCleanup(fiberContext: FiberContext, observer: Option[EruObserver]): Unit = {
+    // First, count all children to emit accurate metrics
+    val allChildren = collection.mutable.ListBuffer[VTFiber[?, ?]]()
+    var child = Option(fiberContext.childFibers.poll())
+    while (child.nonEmpty) {
+      allChildren += child.get
+      child = Option(fiberContext.childFibers.poll())
+    }
 
-        val _ = childFiber.get.await.unsafeRunSync()
-      } catch {
-        case _: Exception =>
+    val totalChildCount = allChildren.size
+    if (totalChildCount > 0) {
+      observer.foreach(_.onEvent(EruObserver.EruEvent.StructuredCleanupStarted(fiberContext.id, totalChildCount)))
+
+      var interruptedCount = 0
+      var completedCount = 0
+
+      allChildren.foreach { childFiber =>
+        try {
+          val childWasRunning = childFiber.isRunning
+          val cause = InterruptCause.ParentTerminated(fiberContext.id, Exit.Success(()))
+
+          // Emit detailed interruption event for observability
+          observer.foreach(_.onEvent(EruObserver.EruEvent.ChildInterruptionRequested(
+            fiberContext.id, childFiber.id, cause, childWasRunning
+          )))
+
+          // Only interrupt if the child is still running
+          if (childWasRunning) {
+            childFiber.interrupt(cause).unsafeRunSync()
+            interruptedCount += 1
+          } else {
+            completedCount += 1
+          }
+          
+          // Always await completion to ensure proper cleanup
+          val _ = childFiber.await.unsafeRunSync()
+        } catch {
+          case _: Exception =>
+            // Silent failure - structured cleanup should be resilient
+        }
       }
-      childFiber = Option(fiberContext.childFibers.poll())
+
+      observer.foreach(_.onEvent(EruObserver.EruEvent.StructuredCleanupCompleted(
+        fiberContext.id, interruptedCount, completedCount
+      )))
     }
   }
 
@@ -191,8 +231,10 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
       currentFiberContext.get() match {
         case Some(parentContext) =>
           parentContext.childFibers.offer(childFiber)
+          observer.foreach(_.onEvent(EruObserver.EruEvent.FiberForked(parentContext.id, id)))
         case None =>
           rootFiberContext.childFibers.offer(childFiber)
+          observer.foreach(_.onEvent(EruObserver.EruEvent.FiberForked(rootFiberContext.id, id)))
       }
 
       val runnable: Runnable = () => {
@@ -202,15 +244,15 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
         try {
           threadRef.set(Some(Thread.currentThread()))
           val exit = computeExit(fa, id)
-          executeStructuredCleanup(fiberContext)
+          executeStructuredCleanup(fiberContext, observer)
           exitAR.set(exit)
           observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
         } catch {
           case t: Throwable =>
             val exit = Exit.Die(t)
+            executeStructuredCleanup(fiberContext, observer)
             exitAR.set(exit)
             observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-            executeStructuredCleanup(fiberContext)
         } finally {
           currentFiberContext.remove()
           latch.countDown()
@@ -359,7 +401,7 @@ private[eru] final class VTOnlyBackend extends ConcurrencyBackend {
     * forked during the main computation but never awaited.
     */
   override def cleanup(): Unit = {
-    executeStructuredCleanup(rootFiberContext)
+    executeStructuredCleanup(rootFiberContext, None)
   }
 
   def handleSuspend[E, A](

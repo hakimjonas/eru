@@ -65,6 +65,7 @@ object TestRuntime {
     computation.attempt.map(Result.toExit).runWith(observer)
   }
 
+
   /** Extension methods to provide a more natural API for test execution. */
   extension [E, A](computation: Eru[E, A]) {
 
