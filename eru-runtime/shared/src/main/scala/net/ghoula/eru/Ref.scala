@@ -61,14 +61,9 @@ object Ref {
   private final class RuntimeRef[A](init: A) extends Ref[A] {
     private val state = new java.util.concurrent.atomic.AtomicReference(init)
 
-    private def unwrapOr[T](r: Result[Throwable, T], fallback: => T): T = r match {
-      case Result.Success(v) => v
-      case Result.Failure(_) => fallback
-    }
+    def get: Eru[Nothing, A] = Eru.succeed(state.get())
 
-    def get: Eru[Nothing, A] = Eru.effect(state.get()).attempt.map(r => unwrapOr(r, state.get()))
-
-    def set(a: A): Eru[Nothing, Unit] = Eru.effect { state.set(a) }.attempt.flatMap(_ => Eru.unit)
+    def set(a: A): Eru[Nothing, Unit] = Eru.effect { state.set(a); () }.attempt.map(_ => ())
 
     def update(f: A => A): Eru[Nothing, A] =
       Eru.effect {
@@ -80,7 +75,10 @@ object Ref {
           else loop()
         }
         loop()
-      }.attempt.map(r => unwrapOr(r, state.get()))
+      }.attempt.map({
+        case Result.Success(v) => v
+        case Result.Failure(_) => state.get() // This should never happen, but provides fallback
+      })
 
     def modify[B](f: A => (A, B)): Eru[Nothing, B] =
       Eru.effect {
@@ -92,6 +90,9 @@ object Ref {
           else loop()
         }
         loop()
-      }.attempt.map(r => unwrapOr(r, f(state.get())._2))
+      }.attempt.map({
+        case Result.Success(v) => v
+        case Result.Failure(_) => f(state.get())._2 // This should never happen, but provides fallback
+      })
   }
 }

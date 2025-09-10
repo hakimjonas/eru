@@ -29,11 +29,6 @@ trait Deferred[A] {
 
 object Deferred {
 
-  private def unwrapOr[T](r: Result[Throwable, T], fallback: => T): T = r match {
-    case Result.Success(v) => v
-    case Result.Failure(_) => fallback
-  }
-
   /** Creates a new, empty `Deferred[A]`.
     * @tparam A
     *   the value type
@@ -41,7 +36,7 @@ object Deferred {
     *   an effect that yields the created deferred
     */
   def make[A]: Eru[Nothing, Deferred[A]] =
-    Eru.effect { new RuntimeDeferred[A] }.attempt.map(r => unwrapOr(r, new RuntimeDeferred[A]))
+    Eru.succeed(new RuntimeDeferred[A])
 
   private final class RuntimeDeferred[A] extends Deferred[A] {
     private val state = new java.util.concurrent.atomic.AtomicReference[Option[A]](None)
@@ -49,7 +44,10 @@ object Deferred {
     def complete(a: A): Eru[Nothing, Boolean] =
       Eru.effect {
         state.compareAndSet(None, Some(a))
-      }.attempt.map(r => Deferred.unwrapOr(r, state.get().isDefined))
+      }.attempt.map({
+        case Result.Success(b) => b
+        case Result.Failure(_) => state.get().isDefined // Fallback check
+      })
 
     def poll: Eru[Nothing, Option[A]] = Eru.succeed(state.get())
   }

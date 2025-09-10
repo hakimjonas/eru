@@ -72,10 +72,10 @@ object Semaphore {
           } else false
         }
         loop()
-      }.attempt.map {
+      }.attempt.map({
         case Result.Success(b) => b
-        case Result.Failure(_) => permits.get() > 0
-      }
+        case Result.Failure(_) => permits.get() > 0 // Fallback check
+      })
 
     def tryAcquireN(n: Long): Eru[Nothing, Boolean] =
       if (n <= 0) Eru.succeed(true)
@@ -90,17 +90,17 @@ object Semaphore {
             } else false
           }
           loop()
-        }.attempt.map {
+        }.attempt.map({
           case Result.Success(b) => b
-          case Result.Failure(_) => permits.get() >= n
-        }
+          case Result.Failure(_) => permits.get() >= n // Fallback check
+        })
 
     def release: Eru[Nothing, Unit] =
-      Eru.effect { permits.getAndAdd(1) }.attempt.flatMap(_ => Eru.unit)
+      Eru.effect { permits.getAndAdd(1); () }.attempt.map(_ => ())
 
     def releaseN(n: Long): Eru[Nothing, Unit] =
       if (n <= 0) Eru.unit
-      else Eru.effect { permits.getAndAdd(n) }.attempt.flatMap(_ => Eru.unit)
+      else Eru.effect { permits.getAndAdd(n); () }.attempt.map(_ => ())
 
     def withPermit[E, A](fa: => Eru[E, A]): Eru[E, Option[A]] =
       withPermits(1)(fa)
