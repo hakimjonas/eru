@@ -57,9 +57,8 @@ class ConcurrencyBench {
   def eruRefSequential(): Int = {
     val program = for {
       ref <- Eru.ref(0)
-      result <- (1 to operations).foldLeft(ref.get) { (acc, i) =>
-        acc.flatMap(_ => ref.update(_ + i))
-      }
+      _ <- Eru.foreachDiscard(1 to operations)(i => ref.update(_ + i))
+      result <- ref.get
     } yield result
 
     program.unsafeRunSync()
@@ -100,18 +99,18 @@ class ConcurrencyBench {
   def eruSemaphoreBasic(): Int = {
     val program = for {
       semaphore <- Eru.semaphore(contention)
-      results <- (1 to operations).foldLeft(Eru.succeed(0)) { (acc, _) =>
-        acc.flatMap { count =>
-          semaphore.tryAcquire.flatMap { acquired =>
-            if (acquired) {
-              semaphore.release.map(_ => count + 1)
-            } else {
-              Eru.succeed(count)
-            }
+      ref <- Eru.ref(0)
+      _ <- Eru.foreachDiscard(1 to operations) { _ =>
+        semaphore.tryAcquire.flatMap { acquired =>
+          if (acquired) {
+            ref.update(_ + 1).flatMap(_ => semaphore.release)
+          } else {
+            Eru.unit
           }
         }
       }
-    } yield results
+      result <- ref.get
+    } yield result
 
     program.unsafeRunSync()
   }
@@ -168,10 +167,8 @@ class ConcurrencyBench {
       waiterFiber <- Eru.fork(deferred.await)
       producerFiber <- Eru.fork {
         // Simulate some work before producing value
-        (1 to operations / 10)
-          .foldLeft(Eru.unit) { (acc, _) =>
-            acc.flatMap(_ => Eru.succeed(()))
-          }
+        Eru
+          .foreachDiscard(1 to operations / 10)(_ => Eru.unit)
           .flatMap(_ => deferred.complete(operations))
       }
       _ <- producerFiber.await
@@ -238,14 +235,12 @@ class ConcurrencyBench {
 
       // Producer that coordinates access to shared state
       producer <- Eru.fork {
-        (1 to operations / 10)
-          .foldLeft(Eru.unit) { (acc, i) =>
-            acc.flatMap { _ =>
-              semaphore.tryAcquire.flatMap { acquired =>
-                if (acquired) {
-                  ref.update(_ + i).flatMap(_ => semaphore.release)
-                } else Eru.unit
-              }
+        Eru
+          .foreachDiscard(1 to operations / 10) { i =>
+            semaphore.tryAcquire.flatMap { acquired =>
+              if (acquired) {
+                ref.update(_ + i).flatMap(_ => semaphore.release)
+              } else Eru.unit
             }
           }
           .flatMap { _ =>

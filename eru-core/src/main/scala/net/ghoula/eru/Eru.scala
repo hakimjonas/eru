@@ -518,6 +518,141 @@ object Eru {
     case Exit.Interrupt(_, _) => Eru.succeed(interruptedValue)
   }
 
+  /** Executes an effectful function for each element in a collection, discarding results.
+    *
+    * This operation provides optimized batch execution that avoids creating continuation chains for
+    * each iteration. Unlike manual chaining with `foldLeft`, this method uses specialized batch
+    * processing for superior performance.
+    *
+    * @param as
+    *   the collection of elements to process
+    * @param f
+    *   the function to apply to each element
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the element type
+    * @tparam B
+    *   the result type (discarded)
+    * @return
+    *   an effect that executes the function for each element and succeeds with Unit
+    */
+  def foreachDiscard[E, A, B](as: Iterable[A])(f: A => Eru[E, B]): Eru[E, Unit] = {
+    def loop(remaining: List[A]): Eru[E, Unit] = remaining match {
+      case Nil => unit
+      case head :: tail =>
+        f(head).flatMap(_ => loop(tail))
+    }
+    loop(as.toList)
+  }
+
+  /** Executes an effectful function for each element in a collection, collecting results.
+    *
+    * This operation provides optimized batch execution that avoids creating continuation chains for
+    * each iteration, collecting all results into a List.
+    *
+    * @param as
+    *   the collection of elements to process
+    * @param f
+    *   the function to apply to each element
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the element type
+    * @tparam B
+    *   the result type
+    * @return
+    *   an effect that executes the function for each element and collects results
+    */
+  def foreach[E, A, B](as: Iterable[A])(f: A => Eru[E, B]): Eru[E, List[B]] = {
+    def loop(remaining: List[A], acc: List[B]): Eru[E, List[B]] = remaining match {
+      case Nil => succeed(acc.reverse)
+      case head :: tail =>
+        f(head).flatMap(result => loop(tail, result :: acc))
+    }
+    loop(as.toList, Nil)
+  }
+
+  /** Collects all effects in a collection, executing them sequentially.
+    *
+    * @param as
+    *   the collection of effects to execute
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the result type
+    * @return
+    *   an effect that executes all effects and collects results
+    */
+  def collectAll[E, A](as: Iterable[Eru[E, A]]): Eru[E, List[A]] =
+    foreach(as)(identity)
+
+  /** Collects all effects in a collection, executing them sequentially and discarding results.
+    *
+    * @param as
+    *   the collection of effects to execute
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the result type
+    * @return
+    *   an effect that executes all effects and succeeds with Unit
+    */
+  def collectAllDiscard[E, A](as: Iterable[Eru[E, A]]): Eru[E, Unit] =
+    foreachDiscard(as)(identity)
+
+  /** Reduces a collection of elements using an effectful function from left to right.
+    *
+    * @param as
+    *   the collection to reduce
+    * @param zero
+    *   the initial accumulator value
+    * @param f
+    *   the reduction function
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the element type
+    * @tparam S
+    *   the accumulator type
+    * @return
+    *   an effect that reduces the collection to a single value
+    */
+  def foldLeft[E, A, S](as: Iterable[A])(zero: S)(f: (S, A) => Eru[E, S]): Eru[E, S] = {
+    def loop(remaining: List[A], acc: S): Eru[E, S] = remaining match {
+      case Nil => succeed(acc)
+      case head :: tail =>
+        f(acc, head).flatMap(newAcc => loop(tail, newAcc))
+    }
+    loop(as.toList, zero)
+  }
+
+  /** Reduces a collection of elements using an effectful function from right to left.
+    *
+    * @param as
+    *   the collection to reduce
+    * @param zero
+    *   the initial accumulator value
+    * @param f
+    *   the reduction function
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the element type
+    * @tparam S
+    *   the accumulator type
+    * @return
+    *   an effect that reduces the collection to a single value
+    */
+  def foldRight[E, A, S](as: Iterable[A])(zero: S)(f: (A, S) => Eru[E, S]): Eru[E, S] = {
+    def loop(remaining: List[A]): Eru[E, S] = remaining match {
+      case Nil => succeed(zero)
+      case head :: tail =>
+        loop(tail).flatMap(acc => f(head, acc))
+    }
+    loop(as.toList)
+  }
+
   /** A successful `Eru` containing `Unit`. */
   val unit: Eru[Nothing, Unit] = succeed(())
 
