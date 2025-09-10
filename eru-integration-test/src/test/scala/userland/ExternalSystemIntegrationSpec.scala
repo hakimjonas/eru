@@ -16,6 +16,8 @@ import net.ghoula.eru.prelude.*
   */
 class ExternalSystemIntegrationSpec extends FunSuite {
 
+  given runtime: EruRuntime = EruRuntime.create()
+
   test("database connection pool simulation with resource limits") {
     val connectionPool = new java.util.concurrent.ArrayBlockingQueue[String](2)
     connectionPool.put("conn1")

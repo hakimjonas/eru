@@ -16,7 +16,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * maintaining high performance under concurrent load.
   */
 @nowarn("msg=.*")
-final class TimersSpec extends FunSuite {
+final class TimersSpec extends TestWithRuntime {
 
   test("sleep completes after duration (non-blocking semantics)") {
     IsolatedTestRunner.withIsolatedRuntime { runtime =>

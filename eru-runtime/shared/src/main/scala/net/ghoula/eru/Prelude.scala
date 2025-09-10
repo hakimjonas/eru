@@ -42,6 +42,12 @@ object prelude {
   export net.ghoula.eru.CorePrelude.*
   export net.ghoula.eru.RuntimeExtensions.*
 
+  /** Exposes the EruRuntime companion object for runtime creation and Policy types. */
+  val EruRuntime = net.ghoula.eru.EruRuntime
+
+  /** Type alias for the runtime, re-exposed for discoverability. */
+  type EruRuntime = net.ghoula.eru.EruRuntime
+
   /** Exposes the EruObserver companion via the unified prelude so that observer helpers (e.g.,
     * noop, console) and event types are available from the same canonical import.
     */

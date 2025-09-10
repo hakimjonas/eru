@@ -20,6 +20,8 @@ import java.util.concurrent.TimeUnit
 @Fork(1)
 @State(Scope.Benchmark)
 class EruRuntimeBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   /** Measures the overhead of basic Eru operations like flatMap and map.
     *

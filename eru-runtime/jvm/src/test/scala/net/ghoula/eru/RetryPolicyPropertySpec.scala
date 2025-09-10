@@ -17,6 +17,8 @@ import net.ghoula.eru.prelude.*
   */
 final class RetryPolicyPropertySpec extends ScalaCheckSuite {
 
+  given runtime: EruRuntime = EruRuntime.create()
+
   private val nonNegativeSmall: Gen[Int] = Gen.choose(0, 10)
   private val positiveSmall: Gen[Int] = Gen.choose(1, 10)
 

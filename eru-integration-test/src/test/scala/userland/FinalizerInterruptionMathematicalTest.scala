@@ -23,7 +23,7 @@ class FinalizerInterruptionMathematicalTest extends FunSuite {
     val finalizerExecuted = new AtomicBoolean(false)
 
     val computation = for {
-      fiber <- EruRuntime.fork {
+      fiber <- runtime.fork {
         Eru
           .succeed("running")
           .ensure(Eru.effect {
@@ -49,9 +49,9 @@ class FinalizerInterruptionMathematicalTest extends FunSuite {
     val finalizerExecuted = new AtomicBoolean(false)
 
     val computation = for {
-      fiber <- EruRuntime.fork {
+      fiber <- runtime.fork {
         import java.time.Duration
-        EruRuntime
+        runtime
           .sleep(Duration.ofSeconds(10))
           .ensure(Eru.effect {
             finalizerExecuted.set(true)

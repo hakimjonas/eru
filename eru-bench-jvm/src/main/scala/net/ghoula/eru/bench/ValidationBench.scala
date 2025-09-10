@@ -5,7 +5,7 @@ import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.TimeUnit
 
-import net.ghoula.eru.CorePrelude.*
+import net.ghoula.eru.prelude.*
 
 /** JMH validation benchmarks to test JVM optimization behavior.
   *
@@ -27,6 +27,8 @@ import net.ghoula.eru.CorePrelude.*
 @Fork(1)
 @State(Scope.Benchmark)
 class ValidationBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   /** Test for Dead Code Elimination - this should be optimized to near-zero time.
     *

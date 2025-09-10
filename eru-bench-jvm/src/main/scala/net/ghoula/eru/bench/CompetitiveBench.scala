@@ -73,6 +73,8 @@ extension [E, A](effects: List[Eru[E, A]]) {
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 class CompetitiveBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   /** The recursion depth parameter for effect chain construction.
     *
@@ -502,9 +504,9 @@ class CompetitiveBench {
     */
   @Benchmark
   def eruZipPar(): (Int, Int) = {
-    val left = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 1)
-    val right = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 2)
-    EruRuntime.zipPar(left, right).unsafeRunSync()
+    val left = runtime.sleep(Duration.ofMillis(1)).map(_ => 1)
+    val right = runtime.sleep(Duration.ofMillis(1)).map(_ => 2)
+    runtime.zipPar(left, right).unsafeRunSync()
   }
 
   /** Benchmarks ZIO's zipPar performance with concurrent execution.
@@ -552,10 +554,10 @@ class CompetitiveBench {
   def eruParTraverse(): List[Int] = {
     val items = (1 to concurrency).toList
     def processItem(item: Int): Eru[Nothing, Int] =
-      EruRuntime.sleep(Duration.ofMillis(1)).map(_ => item * 2)
+      runtime.sleep(Duration.ofMillis(1)).map(_ => item * 2)
 
     // Use the new native parTraverse implementation
-    EruRuntime.parTraverse(items)(processItem).unsafeRunSync()
+    runtime.parTraverse(items)(processItem).unsafeRunSync()
   }
 
   /** Benchmarks ZIO's parTraverse performance with concurrent list processing.
@@ -606,8 +608,8 @@ class CompetitiveBench {
     */
   @Benchmark
   def eruTimeout(): Boolean = {
-    val longRunning = EruRuntime.sleep(Duration.ofMillis(50)).map(_ => "completed")
-    val timedOut = EruRuntime.timeout(Duration.ofMillis(10))(longRunning)
+    val longRunning = runtime.sleep(Duration.ofMillis(50)).map(_ => "completed")
+    val timedOut = runtime.timeout(Duration.ofMillis(10))(longRunning)
 
     timedOut.attempt.unsafeRunSync() match {
       case net.ghoula.eru.Result.Failure(_: java.util.concurrent.TimeoutException) => true

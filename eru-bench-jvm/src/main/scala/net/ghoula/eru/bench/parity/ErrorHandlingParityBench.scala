@@ -7,7 +7,7 @@ import zio.{Unsafe, ZIO}
 
 import java.util.concurrent.TimeUnit
 
-import net.ghoula.eru.CorePrelude.*
+import net.ghoula.eru.prelude.*
 
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
@@ -16,6 +16,8 @@ import net.ghoula.eru.CorePrelude.*
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 class ErrorHandlingParityBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   @Param(Array("success", "failure"))
   var path: String = "success"

@@ -22,7 +22,7 @@ final class ObservabilitySpec extends FunSuite {
     */
   test("observer sees ProgramStart, Step, and ProgramEnd(Success)") {
     val events = scala.collection.mutable.ListBuffer.empty[EruEvent]
-    val obs = new EruObserver { def onEvent(e: EruEvent): Unit = events += e }
+    val obs: EruObserver = new EruObserver { def onEvent(e: EruEvent): Unit = events += e }
 
     val value = TestRuntime.runIsolatedWith(Eru.succeed(123).debug("step-1"), obs)
 
@@ -74,16 +74,22 @@ final class ObservabilitySpec extends FunSuite {
     * the observability system.
     */
   test("forkWithObserver emits FiberStarted and FiberCompleted with Exit.Success") {
-    val fiber = TestRuntime.runIsolated(Eru.succeed(10).fork)
+    val fiber = TestRuntime.runIsolated(runtime.fork(Eru.succeed(10)))
     val exit = fiber.await.runIsolatedExit
 
-    exit match {
-      case Exit.Success(value) =>
-        value match {
-          case Exit.Success(innerValue) => assertEquals(innerValue, 10)
-          case other => fail(s"Expected inner Success(10), got: $other")
+    // The outer exit wraps the inner exit
+    val result = exit match {
+      case Exit.Success(innerExit) =>
+        innerExit match {
+          case Exit.Success(value) =>
+            assertEquals(value, 10, "Inner value should be 10")
+            "success"
+          case other =>
+            fail(s"Expected inner Success(10), got: $other")
         }
-      case other => fail(s"Expected Success, got: $other")
+      case other =>
+        fail(s"Expected Success, got: $other")
     }
+    assertEquals(result, "success", "Test should complete successfully")
   }
 }

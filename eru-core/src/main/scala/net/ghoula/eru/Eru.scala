@@ -747,8 +747,23 @@ object Eru {
           tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers))
 
         case Ensure(source, fin) =>
-          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).flatMap { case (either, fs) =>
-            done((either, fin :: fs))
+          // FIXED: Use TailRec with exception handling to properly collect ensure finalizers
+          // even when InterruptedWithFinalizers is thrown from the source computation
+          tailcall {
+            try {
+              runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers).result match {
+                case (either, fs) => done((either, fin :: fs))
+              }
+            } catch {
+              case interrupted: InterruptedWithFinalizers =>
+                // When source computation is interrupted, merge the ensure finalizer with
+                // the existing finalizers in the exception, then re-throw.
+                throw new InterruptedWithFinalizers(
+                  interrupted.fiberId,
+                  interrupted.cause,
+                  fin :: interrupted.finalizers
+                )
+            }
           }
 
         case Suspend(register) =>
@@ -835,8 +850,8 @@ object Eru {
             done((Right(thunk()), fins))
           } catch {
             case _: InterruptedException =>
-              // The interpreter has caught the platform-specific exception.
-              // We now convert it into our special internal exception that carries
+              // When the blocking thread is interrupted (via Thread.interrupt()),
+              // we convert to our internal exception format, taking care to preserve
               // the finalizers with it. This allows the finalizers to be preserved
               // as the exception unwinds to the top-level executor.
               val fiberId = currentFiberId.getOrElse(FiberId.fresh())

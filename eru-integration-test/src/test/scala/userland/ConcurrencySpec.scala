@@ -13,6 +13,8 @@ import net.ghoula.eru.prelude.*
   */
 final class ConcurrencySpec extends FunSuite {
 
+  given runtime: EruRuntime = EruRuntime.create()
+
   /** Validates that zipPar correctly combines independent effects in parallel.
     *
     * Tests the zipPar combinator by running two independent computations in parallel and combining

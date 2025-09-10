@@ -11,7 +11,7 @@ import scala.collection.mutable.ListBuffer
   * correct execution semantics, proper error handling, and maintains the performance
   * characteristics essential for production workloads.
   */
-class EruRuntimeSpec extends FunSuite {
+class EruRuntimeSpec extends TestWithRuntime {
 
   test("fork/await returns Exit.Success on success") {
     val fiber = Eru.succeed(42).fork.unsafeRunSync()

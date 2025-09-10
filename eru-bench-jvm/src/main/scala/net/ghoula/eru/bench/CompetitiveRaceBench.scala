@@ -41,6 +41,8 @@ import net.ghoula.eru.EruRuntime
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 class CompetitiveRaceBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   /** The number of competing effects parameter for raceAll benchmarks.
     *
@@ -60,9 +62,9 @@ class CompetitiveRaceBench {
     */
   @Benchmark
   def eruRace(): Either[String, String] = {
-    val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast")
-    val slow = EruRuntime.sleep(Duration.ofMillis(20)).map(_ => "slow")
-    EruRuntime.race(fast, slow).unsafeRunSync()
+    val fast = runtime.sleep(Duration.ofMillis(1)).map(_ => "fast")
+    val slow = runtime.sleep(Duration.ofMillis(20)).map(_ => "slow")
+    runtime.race(fast, slow).unsafeRunSync()
   }
 
   /** Benchmarks ZIO's race performance with fast vs slow effects.
@@ -98,10 +100,10 @@ class CompetitiveRaceBench {
   def eruRaceAll(): String = {
     val effects = (0 until effectCount).map { i =>
       val delay = if (i == 1) 1 else 10 + i * 5 // Effect at index 1 wins with 1ms delay
-      EruRuntime.sleep(Duration.ofMillis(delay)).map(_ => s"effect-$i")
+      runtime.sleep(Duration.ofMillis(delay)).map(_ => s"effect-$i")
     }.toList
 
-    EruRuntime.raceAll(effects).unsafeRunSync()._1
+    runtime.raceAll(effects).unsafeRunSync()._1
   }
 
   /** Benchmarks ZIO's raceAll performance with multiple competing effects.

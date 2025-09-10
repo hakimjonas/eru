@@ -29,10 +29,10 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
     val childAttemptedCompletion = new AtomicBoolean(false)
 
     val parentComputation = for {
-      _ <- EruRuntime.fork {
+      _ <- runtime.fork {
         for {
           _ <- Eru.effect { childStarted.countDown() }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- runtime.sleep(Duration.ofSeconds(10))
           _ <- Eru.effect { childAttemptedCompletion.set(true) }
         } yield "child-done"
       }
@@ -73,24 +73,24 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
     val bAttemptedWork = new AtomicBoolean(false)
 
     val rootComputation = for {
-      _ <- EruRuntime.fork {
+      _ <- runtime.fork {
         for {
           _ <- Eru.effect { aStarted.countDown() }
-          _ <- EruRuntime.fork {
+          _ <- runtime.fork {
             for {
               _ <- Eru.effect { bStarted.countDown() }
-              _ <- EruRuntime.fork {
+              _ <- runtime.fork {
                 for {
                   _ <- Eru.effect { cStarted.countDown() }
-                  _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+                  _ <- runtime.sleep(Duration.ofSeconds(10))
                   _ <- Eru.effect { cAttemptedWork.set(true) }
                 } yield "c-done"
               }
-              _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+              _ <- runtime.sleep(Duration.ofSeconds(10))
               _ <- Eru.effect { bAttemptedWork.set(true) }
             } yield "b-done"
           }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- runtime.sleep(Duration.ofSeconds(10))
         } yield "a-done"
       }
       _ <- Eru.effect {

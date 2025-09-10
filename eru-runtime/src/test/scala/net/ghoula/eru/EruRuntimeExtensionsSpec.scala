@@ -11,7 +11,7 @@ import scala.collection.mutable.ListBuffer
   * provide reliable behavior and integrate properly with the core effect system while
   * maintaining performance and resource safety characteristics.
   */
-class EruRuntimeExtensionsSpec extends FunSuite {
+class EruRuntimeExtensionsSpec extends TestWithRuntime {
 
   test("timeout extension succeeds when effect completes within duration") {
     val effect = Eru.succeed(42).timeout(Duration.ofSeconds(1))

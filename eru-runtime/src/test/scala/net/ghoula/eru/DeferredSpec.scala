@@ -9,7 +9,7 @@ import munit.FunSuite
   * that enable safe coordination between concurrent fibers, supporting common patterns
   * like producer-consumer communication and synchronization barriers.
   */
-final class DeferredSpec extends FunSuite {
+final class DeferredSpec extends TestWithRuntime {
 
   test("poll returns None before completion and Some after completion") {
     val d = Deferred.make[Int].unsafeRunSync()

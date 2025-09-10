@@ -13,6 +13,8 @@ import net.ghoula.eru.prelude.*
   */
 final class PublicSurfaceSpec extends FunSuite {
 
+  given runtime: EruRuntime = EruRuntime.create()
+
   /** Validates that the prelude import provides access to core Eru functionality.
     *
     * Tests that essential Eru constructors and combinators are accessible through the prelude

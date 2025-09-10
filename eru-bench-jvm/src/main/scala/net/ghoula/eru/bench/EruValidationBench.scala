@@ -5,7 +5,7 @@ import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.TimeUnit
 
-import net.ghoula.eru.CorePrelude.*
+import net.ghoula.eru.prelude.*
 
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -23,6 +23,8 @@ import net.ghoula.eru.CorePrelude.*
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 class EruValidationBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   @Benchmark
   def pureFusionBaseline(h: Blackhole): Unit = {

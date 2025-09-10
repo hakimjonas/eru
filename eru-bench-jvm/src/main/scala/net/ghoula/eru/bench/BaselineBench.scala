@@ -5,7 +5,7 @@ import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.TimeUnit
 
-import net.ghoula.eru.CorePrelude.*
+import net.ghoula.eru.prelude.*
 
 /** JMH baseline benchmarks to establish minimum overhead measurements.
   *
@@ -24,6 +24,8 @@ import net.ghoula.eru.CorePrelude.*
 @Fork(1)
 @State(Scope.Benchmark)
 class BaselineBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   /** Absolute baseline: empty benchmark to measure JMH harness overhead. */
   @Benchmark

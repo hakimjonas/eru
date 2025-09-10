@@ -11,7 +11,7 @@ import net.ghoula.eru.prelude.*
   * concurrency characteristics and proper thread management while maintaining compatibility with
   * the Eru effect system's semantics.
   */
-final class VTForkSpec extends FunSuite {
+final class VTForkSpec extends TestWithRuntime {
 
   /** Validates that fork runs effects on virtual threads in the JVM backend.
     *

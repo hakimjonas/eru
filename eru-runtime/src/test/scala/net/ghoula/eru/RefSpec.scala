@@ -9,7 +9,7 @@ import munit.FunSuite
   * safe shared state management between concurrent fibers, supporting atomic operations
   * and consistent state transitions with complete memory safety guarantees.
   */
-final class RefSpec extends FunSuite {
+final class RefSpec extends TestWithRuntime {
 
   test("make/get returns initial value") {
     val ref = Ref.make(10).unsafeRunSync()

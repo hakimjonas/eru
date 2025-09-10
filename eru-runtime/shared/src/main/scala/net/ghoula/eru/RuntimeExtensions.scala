@@ -3,41 +3,35 @@ package net.ghoula.eru
 /** Runtime extensions and constructors available from the unified prelude.
   *
   * These enrich the Eru public API with concurrency, timeouts, retries, runner conveniences, and
-  * constructors for runtime data types.
+  * constructors for runtime data types. These extensions require an implicit EruRuntime instance to
+  * ensure proper isolation and no global shared state.
   *
   * @example
-  *   {{{ import net.ghoula.eru.prelude.* import java.time.Duration
+  *   {{{
+  * import net.ghoula.eru.prelude.*
+  * import java.time.Duration
   *
-  * val a = Eru.succeed(1) val b = Eru.succeed(2)
+  * given runtime: EruRuntime = EruRuntime.create()
+  *
+  * val a = Eru.succeed(1)
+  * val b = Eru.succeed(2)
   *
   * val ab: Eru[Throwable, (Int, Int)] = a.zipPar(b)
-  *
-  * val raced: Eru[Throwable, String] = a.race(b).map { case Left(x) => s"a won: $x" case Right(y) =>
-  * s"b won: $y" }
-  *
-  * val slow = Eru.blocking { Thread.sleep(1000); 42 } val fastOrTimeout =
-  * slow.timeout(Duration.ofMillis(50))
-  *
-  * val fallback: Eru[Throwable, Int] = slow.timeoutTo(Duration.ofMillis(50), -1)
-  *
-  * val flaky: Eru[String, Int] = Eru.fail("boom").recover { case _ => 0 }.retryN(3)
-  *
-  * val exit: Exit[String, Int] = flaky.runExit() val value: Int = a.runWith(new EruObserver { def
-  * onEvent(e: EruEvent): Unit = () }) }}}
+  *   }}}
   */
 object RuntimeExtensions {
 
   /** Extension methods that add concurrency, reliability, and runner operations to all `Eru[E, A]`
-    * values.
+    * values. These require an implicit EruRuntime instance.
     */
-  extension [E, A](self: Eru[E, A]) {
+  extension [E, A](self: Eru[E, A])(using runtime: EruRuntime) {
 
     /** Forks this effect onto a new fiber.
       *
       * @return
       *   an effect that produces a Fiber which can be awaited or interrupted
       */
-    def fork: Eru[Nothing, Fiber[E, A]] = EruRuntime.fork(self)
+    def fork: Eru[Nothing, Fiber[E, A]] = runtime.fork(self)
 
     /** Forks this effect with the provided observer, emitting fiber lifecycle events.
       *
@@ -47,7 +41,7 @@ object RuntimeExtensions {
       *   an effect that produces the forked fiber
       */
     def forkWithObserver(observer: EruObserver): Eru[Nothing, Fiber[E, A]] =
-      EruRuntime.forkWithObserver(self, observer)
+      runtime.forkWithObserver(self, observer)
 
     /** Runs this effect and another in parallel, combining results.
       *
@@ -59,7 +53,7 @@ object RuntimeExtensions {
       *   an effect that yields a tuple of both results on success
       */
     def zipPar[E1 >: E, B](that: Eru[E1, B]): Eru[E1 | Throwable, (A, B)] =
-      EruRuntime.zipPar(self, that)
+      runtime.zipPar(self, that)
 
     /** Races this effect against another, returning the first result to complete.
       *
@@ -71,7 +65,7 @@ object RuntimeExtensions {
       *   either Left(thisValue) or Right(thatValue) depending on the winner
       */
     def race[E1 >: E, B](that: Eru[E1, B]): Eru[E1 | Throwable, Either[A, B]] =
-      EruRuntime.race(self, that)
+      runtime.race(self, that)
 
     /** Adds a timeout to this effect, failing with TimeoutException if not completed in time.
       *
@@ -81,7 +75,7 @@ object RuntimeExtensions {
       *   an effect that either succeeds normally or fails with TimeoutException
       */
     def timeout(duration: java.time.Duration): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
-      EruRuntime.timeout(duration)(self)
+      runtime.timeout(duration)(self)
 
     /** Adds a timeout with a fallback value instead of failing on timeout.
       *
@@ -106,14 +100,14 @@ object RuntimeExtensions {
       * @return
       *   an effect that may retry on failure
       */
-    def retry(policy: EruRuntime.Policy): Eru[E, A] = EruRuntime.retry(policy)(self)
+    def retry(policy: EruRuntime.Policy): Eru[E, A] = runtime.retry(policy)(self)
 
     /** Retries this effect up to `maxRetries` times without delay.
       *
       * @param maxRetries
       *   maximum number of retries (not counting the initial attempt)
       */
-    def retryN(maxRetries: Int): Eru[E, A] = EruRuntime.retry(EruRuntime.Policy.Recurs(maxRetries))(self)
+    def retryN(maxRetries: Int): Eru[E, A] = runtime.retry(EruRuntime.Policy.Recurs(maxRetries))(self)
 
     /** Retries this effect with exponential backoff starting from `baseDuration`.
       *
@@ -123,7 +117,11 @@ object RuntimeExtensions {
       *   maximum number of retries (not counting the initial attempt)
       */
     def retryWithBackoff(baseDuration: java.time.Duration, maxRetries: Int): Eru[E, A] =
-      EruRuntime.retry(EruRuntime.Policy.Exponential(baseDuration, maxRetries))(self)
+      runtime.retry(EruRuntime.Policy.Exponential(baseDuration, maxRetries))(self)
+  }
+
+  /** Extension methods for running Eru effects (no runtime required). */
+  extension [E, A](self: Eru[E, A]) {
 
     /** Executes this effect and returns a structured Exit value instead of throwing.
       *
@@ -184,8 +182,8 @@ object RuntimeExtensions {
     * @return
     *   an effect that completes after the duration
     */
-  def sleep(duration: java.time.Duration): Eru[Nothing, Unit] =
-    EruRuntime.sleep(duration)
+  def sleep(duration: java.time.Duration)(using runtime: EruRuntime): Eru[Nothing, Unit] =
+    runtime.sleep(duration)
 
   /** Executes a collection of effects in parallel, returning results in order.
     *
@@ -194,8 +192,8 @@ object RuntimeExtensions {
     * @return
     *   an effect that yields all results in the same order as input
     */
-  def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
-    EruRuntime.parSequence(effects)
+  def parSequence[E, A](effects: List[Eru[E, A]])(using runtime: EruRuntime): Eru[E | Throwable, List[A]] =
+    runtime.parSequence(effects)
 
   /** Executes effects derived from inputs in parallel, returning results in order.
     *
@@ -206,8 +204,8 @@ object RuntimeExtensions {
     * @return
     *   an effect that yields all results in the same order as inputs
     */
-  def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
-    EruRuntime.parTraverse(inputs)(f)
+  def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B])(using runtime: EruRuntime): Eru[E | Throwable, List[B]] =
+    runtime.parTraverse(inputs)(f)
 
   /** Races multiple effects, returning the result of whichever completes first.
     *
@@ -216,6 +214,6 @@ object RuntimeExtensions {
     * @return
     *   an effect that yields the winning result and its index
     */
-  def raceAll[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)] =
-    EruRuntime.raceAll(effects)
+  def raceAll[E, A](effects: List[Eru[E, A]])(using runtime: EruRuntime): Eru[E | Throwable, (A, Int)] =
+    runtime.raceAll(effects)
 }

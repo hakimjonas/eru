@@ -13,6 +13,11 @@ import net.ghoula.eru.prelude.*
   */
 object TestRuntime {
 
+  /** Shared runtime instance for tests that need fork/concurrency operations. Each test class
+    * should create its own runtime for proper isolation.
+    */
+  val runtime: EruRuntime = EruRuntime.create()
+
   /** Executes an Eru computation that cannot fail.
     *
     * @param computation

@@ -5,7 +5,11 @@ package net.ghoula.eru.internal
   * Exposes the JVM-specific ConcurrencyBackend (virtual threads) to the shared selector without
   * requiring reflection. When present on the classpath, the shared PlatformBackend will discover
   * this provider and use its backend.
+  *
+  * This provider creates a singleton backend with its own fiber tracking queue, ensuring production
+  * code has proper auto-join cleanup support while maintaining isolation from tests.
   */
 private[eru] final class JvmBackendProvider extends BackendProvider {
+  // Singleton backend instance with its own fiber tracking
   val backend: ConcurrencyBackend = RuntimeBackendAdapter.virtualThreads()
 }

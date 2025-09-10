@@ -15,6 +15,8 @@ import net.ghoula.eru.prelude.*
   */
 class PerformanceCharacteristicsSpec extends FunSuite {
 
+  given runtime: EruRuntime = EruRuntime.create()
+
   test("stack safety with deep flatMap chains") {
     def deepChain(n: Int, acc: Int = 0): Eru[Nothing, Int] = {
       if (n <= 0) Eru.succeed(acc)

@@ -1,16 +1,23 @@
 package net.ghoula.eru.internal
 
 import java.time.Duration
+import java.util.concurrent.ConcurrentLinkedQueue
 
 import net.ghoula.eru.*
+import net.ghoula.eru.prelude.*
 
 /** Adapter that wraps the new RuntimeBackend enum to implement the old ConcurrencyBackend
   * interface.
   *
   * This allows gradual migration from the old backend system to the new unified RuntimeBackend
   * without breaking existing code. Once all code is migrated, this adapter can be removed.
+  *
+  * Each adapter instance maintains its own rootFibers queue for true test isolation.
   */
 private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends ConcurrencyBackend {
+
+  // Instance-specific root fiber collection for auto-join cleanup
+  private val rootFibers: ConcurrentLinkedQueue[UnifiedFiber[?, ?]] = new ConcurrentLinkedQueue()
 
   val capabilities: BackendCapabilities = backend match {
     case RuntimeBackend.Synchronous =>
@@ -51,7 +58,7 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   }
 
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =
-    backend.fork(fa, observer)
+    backend.fork(fa, observer, Some(rootFibers))
 
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
     backend.race(fa, fb)
@@ -139,7 +146,7 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   }
 
   override def cleanup(): Unit = {
-    backend.cleanup()
+    backend.cleanup(Some(rootFibers))
   }
 }
 

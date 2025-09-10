@@ -15,6 +15,8 @@ import net.ghoula.eru.prelude.*
   */
 final class TimeoutRetrySpec extends FunSuite {
 
+  given runtime: EruRuntime = EruRuntime.create()
+
   /** Validates that timeoutTo preserves successful values or yields fallback values.
     *
     * Tests the timeout mechanism to ensure it either completes with the original computation result
@@ -40,6 +42,6 @@ final class TimeoutRetrySpec extends FunSuite {
       Eru.effect { attempts += 1; attempts }
         .flatMap(n => if (n < 3) Eru.fail("boom") else Eru.succeed(42))
     val retried = flaky.retryN(5)
-    assertEquals(retried.runExit(), Exit.Success(42))
+    assertEquals(retried.runExit(), Exit.Success(42), "Retry should succeed after 3 attempts")
   }
 }

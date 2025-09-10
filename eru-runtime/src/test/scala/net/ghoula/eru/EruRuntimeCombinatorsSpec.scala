@@ -12,7 +12,7 @@ import java.time.Duration
   * utilization while maintaining the performance characteristics expected from high-throughput
   * concurrent applications.
   */
-final class EruRuntimeCombinatorsSpec extends FunSuite {
+final class EruRuntimeCombinatorsSpec extends TestWithRuntime {
 
   test("zipPar success-success returns tuple") {
     val a = EruRuntime.sleep(Duration.ofMillis(10)).flatMap(_ => Eru.succeed(1))

@@ -5,17 +5,17 @@ import java.time.Duration
 /** Cross-platform runtime functions for concurrency, racing, timeouts, and retries.
   *
   * EruRuntime provides a complete set of concurrent operations that work consistently across both
-  * JVM and Scala Native platforms. The implementation automatically selects the appropriate backend
-  * based on the target platform, ensuring optimal performance while maintaining API compatibility
-  * and semantic consistency.
+  * JVM and Scala Native platforms. Each runtime instance is backed by a ConcurrencyBackend that
+  * provides the actual implementation, ensuring proper isolation and no global shared state.
   *
   * Platform-specific behavior:
   *   - JVM: Uses Virtual Threads for true concurrent execution with non-blocking operations
   *   - Native: Uses synchronous execution while preserving the same API and resource semantics
+  *
+  * @param backend
+  *   the concurrency backend to use for this runtime instance
   */
-object EruRuntime {
-
-  private val backend = PlatformBackend.backend
+final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 
   /** Launches an effect on a separate execution context and returns a fiber handle.
     *
@@ -309,38 +309,8 @@ object EruRuntime {
   )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
     backend.timeout(duration)(fa)
 
-  /** Retry policy for bounded retries with optional exponential backoff.
-    *
-    * Policies are deterministic and specify only the number of retries and, for backoff, the base
-    * delay used to compute per-attempt delays. Time computations are precise and derived from the
-    * attempt index `i` starting at 0 for the first retry.
-    *
-    * @example
-    *   {{@ import java.time.Duration // Retry up to 5 times with no delay between attempts val p1 =
-    *   Policy.Recurs(5)
-    *
-    * // Retry up to 3 times with exponential backoff starting at 10ms (10ms, 20ms, 40ms) val p2 =
-    * Policy.Exponential(Duration.ofMillis(10), 3)
-    * @}}
-    */
-  enum Policy {
-
-    /** Retries at most `n` times with no delay between retries.
-      * @param n
-      *   maximum number of retries (not counting the initial attempt). Negative values are treated
-      *   as 0.
-      */
-    case Recurs(n: Int)
-
-    /** Retries at most `maxRetries` times with exponential backoff delays `base * 2^i`.
-      * @param base
-      *   initial delay used for the first retry; subsequent retries double the delay
-      * @param maxRetries
-      *   maximum number of retries (not counting the initial attempt). Negative values are treated
-      *   as 0.
-      */
-    case Exponential(base: Duration, maxRetries: Int)
-  }
+  // Policy type alias for convenience
+  private type Policy = EruRuntime.Policy
 
   /** Retries on typed failure according to the provided policy. Defects (Throwables) are propagated
     * without retrying. If the typed error channel E happens to include Throwable, failures that are
@@ -600,4 +570,44 @@ object EruRuntime {
           }
         raceWithIndex(effects, 0)
     }
+
+  /** Cleans up this runtime instance.
+    *
+    * This should be called when the runtime is no longer needed to ensure all resources are
+    * properly released and any pending fibers are awaited.
+    */
+  def cleanup(): Unit = backend.cleanup()
+}
+
+/** Companion object providing factory methods for creating EruRuntime instances. */
+object EruRuntime {
+
+  /** Creates a new EruRuntime with the platform-appropriate backend.
+    *
+    * Each call creates a fresh runtime instance with its own fiber tracking, ensuring complete
+    * isolation from other runtime instances.
+    */
+  def create(): EruRuntime = {
+    val backend = PlatformBackend.backend
+    new EruRuntime(backend)
+  }
+
+  /** Creates a new EruRuntime with a specific backend.
+    *
+    * This is primarily for testing or when you need explicit control over the backend
+    * implementation.
+    */
+  def withBackend(backend: internal.ConcurrencyBackend): EruRuntime = {
+    new EruRuntime(backend)
+  }
+
+  /** Retry policy for bounded retries with optional exponential backoff. */
+  enum Policy {
+
+    /** Retries at most `n` times with no delay between retries. */
+    case Recurs(n: Int)
+
+    /** Retries at most `maxRetries` times with exponential backoff delays `base * 2^i`. */
+    case Exponential(base: Duration, maxRetries: Int)
+  }
 }

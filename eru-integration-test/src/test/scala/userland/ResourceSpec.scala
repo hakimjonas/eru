@@ -13,6 +13,8 @@ import net.ghoula.eru.prelude.*
   */
 final class ResourceSpec extends FunSuite {
 
+  given runtime: EruRuntime = EruRuntime.create()
+
   /** Validates that bracket operations ensure proper cleanup in both success and failure cases.
     *
     * Tests the bracket resource management pattern by verifying that release functions are called

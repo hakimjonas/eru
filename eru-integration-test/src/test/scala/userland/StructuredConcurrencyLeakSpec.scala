@@ -27,10 +27,10 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     val childAttemptedCompletion = new AtomicBoolean(false)
 
     val parentComputation = for {
-      _ <- EruRuntime.fork {
+      _ <- runtime.fork {
         for {
           _ <- Eru.effect { childStarted.countDown() }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- runtime.sleep(Duration.ofSeconds(10))
           _ <- Eru.effect { childAttemptedCompletion.set(true) }
         } yield "child-done"
       }
@@ -58,10 +58,10 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     val childAttemptedCompletion = new AtomicBoolean(false)
 
     val parentComputation = for {
-      _ <- EruRuntime.fork {
+      _ <- runtime.fork {
         for {
           _ <- Eru.effect { childStarted.countDown() }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- runtime.sleep(Duration.ofSeconds(10))
           _ <- Eru.effect { childAttemptedCompletion.set(true) }
         } yield "child-done"
       }
@@ -90,14 +90,14 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
 
     def makeChild(i: Int) = for {
       _ <- Eru.effect { childrenStarted.countDown() }
-      _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+      _ <- runtime.sleep(Duration.ofSeconds(10))
       _ <- Eru.effect { childrenAttemptedCompletion(i).set(true) }
     } yield s"child-$i-done"
 
     val parentComputation = for {
-      _ <- EruRuntime.fork(makeChild(0))
-      _ <- EruRuntime.fork(makeChild(1))
-      _ <- EruRuntime.fork(makeChild(2))
+      _ <- runtime.fork(makeChild(0))
+      _ <- runtime.fork(makeChild(1))
+      _ <- runtime.fork(makeChild(2))
       _ <- Eru.effect { childrenStarted.await(2, TimeUnit.SECONDS) }
       result <- Eru.succeed("parent-completed")
     } yield result
@@ -126,22 +126,22 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     val outerAttemptedWork = new AtomicBoolean(false)
 
     val parentComputation = for {
-      _ <- EruRuntime.fork { // Outer fiber
+      _ <- runtime.fork { // Outer fiber
         for {
-          _ <- EruRuntime.fork { // Middle fiber
+          _ <- runtime.fork { // Middle fiber
             for {
-              _ <- EruRuntime.fork {
+              _ <- runtime.fork {
                 for {
                   _ <- Eru.effect { nestedStarted.countDown() }
-                  _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+                  _ <- runtime.sleep(Duration.ofSeconds(10))
                   _ <- Eru.effect { nestedAttemptedWork.set(true) }
                 } yield "nested-done"
               }
-              _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+              _ <- runtime.sleep(Duration.ofSeconds(10))
               _ <- Eru.effect { middleAttemptedWork.set(true) }
             } yield "middle-done"
           }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- runtime.sleep(Duration.ofSeconds(10))
           _ <- Eru.effect { outerAttemptedWork.set(true) }
         } yield "outer-done"
       }
@@ -172,10 +172,10 @@ class StructuredConcurrencyLeakSpec extends FunSuite {
     val childCompleted = new AtomicBoolean(false)
 
     val parentComputation = for {
-      _ <- EruRuntime.fork {
+      _ <- runtime.fork {
         (for {
           _ <- Eru.effect { childStarted.countDown() }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- runtime.sleep(Duration.ofSeconds(10))
           _ <- Eru.effect { childCompleted.set(true) }
         } yield "child-done").ensure(Eru.effect {
           finalizerRan.set(true)

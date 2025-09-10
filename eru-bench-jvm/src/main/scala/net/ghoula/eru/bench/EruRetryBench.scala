@@ -31,6 +31,8 @@ import net.ghoula.eru.prelude.*
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 class EruRetryBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   @Param(Array("0", "1", "3", "5", "10"))
   var maxRetriesStr: String = "3"

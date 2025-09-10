@@ -15,6 +15,8 @@ import net.ghoula.eru.prelude.*
   */
 final class EndToEndSpec extends FunSuite {
 
+  given runtime: EruRuntime = EruRuntime.create()
+
   /** Validates comprehensive end-to-end composition of all Eru features.
     *
     * Tests a complex workflow that combines concurrency, state management, retry logic, timeouts,

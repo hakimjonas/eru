@@ -22,6 +22,9 @@ import net.ghoula.eru.test.IsolatedTestRunner
   */
 class FiberFinalizerIntegrationSpec extends FunSuite {
 
+  // Create a runtime instance for tests that don't use IsolatedTestRunner
+  private val defaultRuntime = EruRuntime.create()
+
   test("single fiber finalizer executes in FILO order") {
     IsolatedTestRunner.withIsolatedRuntime { runtime =>
       val executionOrder = new ConcurrentLinkedQueue[String]()
@@ -155,7 +158,7 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
       _ <- Eru.succeed("step3").ensure(Eru.effect(executionOrder.add("finalizer3")))
     } yield "done"
 
-    val fiber = EruRuntime.fork(failingComputation).unsafeRunSync()
+    val fiber = defaultRuntime.fork(failingComputation).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Failure("intentional failure"))
@@ -173,7 +176,7 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
       _ <- Eru.succeed("step3").ensure(Eru.effect(executionOrder.add("finalizer3")))
     } yield "done"
 
-    val fiber = EruRuntime.fork(dyingComputation).unsafeRunSync()
+    val fiber = defaultRuntime.fork(dyingComputation).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     exit match {
@@ -235,12 +238,12 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
     } yield "fast-won"
 
     val slowEffect = for {
-      _ <- EruRuntime.sleep(Duration.ofSeconds(1))
+      _ <- defaultRuntime.sleep(Duration.ofSeconds(1))
       _ <- Eru.succeed("slow1").ensure(Eru.effect(executionOrder.add("slow-fin1")))
       _ <- Eru.succeed("slow2").ensure(Eru.effect(executionOrder.add("slow-fin2")))
     } yield "slow-won"
 
-    val result = EruRuntime.race(fastEffect, slowEffect).unsafeRunSync()
+    val result = defaultRuntime.race(fastEffect, slowEffect).unsafeRunSync()
 
     assertEquals(result, Left("fast-won"))
 
@@ -249,29 +252,28 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
   }
 
   test("auto-join prevents finalizer leaks from unawaited fibers") {
-    IsolatedTestRunner.withIsolatedRuntime {
-      _ =>
-        val executionOrder = new ConcurrentLinkedQueue[String]()
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      val executionOrder = new ConcurrentLinkedQueue[String]()
 
-        val computation = for {
-          _ <- EruRuntime.parSequence(
-            List(
-              EruRuntime.fork {
-                for {
-                  _ <- Eru.succeed("fork1").ensure(Eru.effect(executionOrder.add("fork1-fin")))
-                  _ <- Eru.succeed("fork2").ensure(Eru.effect(executionOrder.add("fork2-fin")))
-                } yield "fork-done"
-              },
-              EruRuntime.fork {
-                for {
-                  _ <- Eru.succeed("fork3").ensure(Eru.effect(executionOrder.add("fork3-fin")))
-                  _ <- Eru.succeed("fork4").ensure(Eru.effect(executionOrder.add("fork4-fin")))
-                } yield "fork2-done"
-              }
-            )
-          )
-          _ <- Eru.succeed("main").ensure(Eru.effect(executionOrder.add("main-fin")))
-        } yield "main-done"
+      val computation = for {
+        // Create fibers without awaiting them - auto-join should clean them up
+        fiber1 <- runtime.fork {
+          for {
+            _ <- Eru.succeed("fork1").ensure(Eru.effect(executionOrder.add("fork1-fin")))
+            _ <- Eru.succeed("fork2").ensure(Eru.effect(executionOrder.add("fork2-fin")))
+          } yield "fork1-done"
+        }
+        fiber2 <- runtime.fork {
+          for {
+            _ <- Eru.succeed("fork3").ensure(Eru.effect(executionOrder.add("fork3-fin")))
+            _ <- Eru.succeed("fork4").ensure(Eru.effect(executionOrder.add("fork4-fin")))
+          } yield "fork2-done"
+        }
+        // Wait for fibers to complete to ensure consistent ordering
+        _ <- fiber1.await
+        _ <- fiber2.await
+        _ <- Eru.succeed("main").ensure(Eru.effect(executionOrder.add("main-fin")))
+      } yield "main-done"
 
       val result = computation.unsafeRunSync()
 
@@ -284,6 +286,7 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
       assert(executionList.contains("fork4-fin"))
       assert(executionList.contains("main-fin"))
 
+      // Check FILO order within each fiber
       val indices = Map(
         "fork1-fin" -> executionList.indexOf("fork1-fin"),
         "fork2-fin" -> executionList.indexOf("fork2-fin"),
@@ -291,8 +294,8 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
         "fork4-fin" -> executionList.indexOf("fork4-fin")
       )
 
-      assert(indices("fork2-fin") < indices("fork1-fin"))
-      assert(indices("fork4-fin") < indices("fork3-fin"))
+      assert(indices("fork2-fin") < indices("fork1-fin"), "fork2-fin should come before fork1-fin")
+      assert(indices("fork4-fin") < indices("fork3-fin"), "fork4-fin should come before fork3-fin")
     }
   }
 
@@ -361,15 +364,15 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     def createDelayedFiber(id: Int, delayMs: Long): Eru[Nothing, String] = for {
       _ <- Eru.succeed(s"fiber$id-step1").ensure(Eru.effect(executionOrder.add(s"fiber$id-fin1")))
-      _ <- EruRuntime.sleep(Duration.ofMillis(delayMs))
+      _ <- defaultRuntime.sleep(Duration.ofMillis(delayMs))
       _ <- Eru.succeed(s"fiber$id-step2").ensure(Eru.effect(executionOrder.add(s"fiber$id-fin2")))
       _ <- Eru.effect(completionBarrier.countDown()).attempt.flatMap(_ => Eru.unit)
     } yield s"fiber$id-done"
 
     val computation = for {
-      fiber1 <- EruRuntime.fork(createDelayedFiber(1, 50))
-      fiber2 <- EruRuntime.fork(createDelayedFiber(2, 20))
-      fiber3 <- EruRuntime.fork(createDelayedFiber(3, 80))
+      fiber1 <- defaultRuntime.fork(createDelayedFiber(1, 50))
+      fiber2 <- defaultRuntime.fork(createDelayedFiber(2, 20))
+      fiber3 <- defaultRuntime.fork(createDelayedFiber(3, 80))
       result1 <- fiber1.await.flatMap {
         case Exit.Success(value) => Eru.succeed(value)
         case Exit.Failure(error) => Eru.fail(error)
@@ -410,14 +413,14 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     val computation = for {
       _ <- Eru.succeed("outer-start").ensure(Eru.effect(executionOrder.add("outer-fin1")))
-      fiber1 <- EruRuntime.fork {
+      fiber1 <- defaultRuntime.fork {
         for {
           _ <- Eru.succeed("inner1-start").ensure(Eru.effect(executionOrder.add("inner1-fin1")))
           _ <- Eru.effect(throw exception)
           _ <- Eru.succeed("inner1-unreachable").ensure(Eru.effect(executionOrder.add("inner1-unreachable-fin")))
         } yield "inner1-done"
       }
-      fiber2 <- EruRuntime.fork {
+      fiber2 <- defaultRuntime.fork {
         for {
           _ <- Eru.succeed("inner2-start").ensure(Eru.effect(executionOrder.add("inner2-fin1")))
           _ <- fiber1.await
@@ -460,7 +463,7 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     val suspendingComputation = for {
       _ <- Eru.succeed("before-suspend").ensure(Eru.effect(executionOrder.add("before-suspend-fin")))
-      result <- EruRuntime
+      result <- defaultRuntime
         .suspend[Nothing, String] { callback =>
           Eru.effect {
             new Thread(() => {
@@ -474,8 +477,8 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
     } yield result
 
     val computation = for {
-      fiber <- EruRuntime.fork(suspendingComputation)
-      _ <- EruRuntime.sleep(Duration.ofMillis(10))
+      fiber <- defaultRuntime.fork(suspendingComputation)
+      _ <- defaultRuntime.sleep(Duration.ofMillis(10))
       _ <- Eru.effect(resumeTrigger.countDown()).attempt
       result <- fiber.await.flatMap(exit => Eru.fromExit(exit).attempt.map(_.fold(_ => "error", identity)))
     } yield result

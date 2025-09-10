@@ -36,7 +36,7 @@ extension [E, A](effects: List[Eru[E, A]]) {
   * cancellation cascades, and resource cleanup under pressure. All tests ensure proper resource
   * safety and finalizer execution order guarantees.
   */
-final class ConcurrencyStressSpec extends FunSuite {
+final class ConcurrencyStressSpec extends TestWithRuntime {
 
   /** Validates high-load fiber creation and completion under stress.
     *
@@ -54,7 +54,7 @@ final class ConcurrencyStressSpec extends FunSuite {
       }
     }
 
-    val completed = EruRuntime.parSequence(effects.toList).unsafeRunSync()
+    val completed = runtime.parSequence(effects.toList).unsafeRunSync()
     assertEquals(completed.sorted, (1 to fiberCount).toList)
     assertEquals(completedCounter.get(), fiberCount)
   }
@@ -67,11 +67,11 @@ final class ConcurrencyStressSpec extends FunSuite {
   test("nested zipPar operations stress test") {
     def createNestedZipPar(depth: Int, baseValue: Int): Eru[Throwable, Int] = {
       if (depth == 0) {
-        EruRuntime.sleep(Duration.ofMillis(1)).map(_ => baseValue)
+        runtime.sleep(Duration.ofMillis(1)).map(_ => baseValue)
       } else {
         val left = createNestedZipPar(depth - 1, baseValue * 2)
         val right = createNestedZipPar(depth - 1, baseValue * 2 + 1)
-        EruRuntime.zipPar(left, right).map { case (l, r) => l + r }
+        runtime.zipPar(left, right).map { case (l, r) => l + r }
       }
     }
 
@@ -88,14 +88,14 @@ final class ConcurrencyStressSpec extends FunSuite {
     val contestants = 50
     val results = (1 to contestants).map { i =>
       val delay = (i % 10) + 1
-      EruRuntime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
+      runtime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
     }
 
     @tailrec
     def raceAll(effects: List[Eru[Throwable, Int]]): Eru[Throwable, Int] = effects match {
       case single :: Nil => single
       case first :: second :: rest =>
-        val winner = EruRuntime.race(first, second).map {
+        val winner = runtime.race(first, second).map {
           case Left(value) => value
           case Right(value) => value
         }
@@ -118,7 +118,7 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     def createCancellableEffect(id: Int): Eru[String | Throwable, Int] = {
       Eru.effect(started.incrementAndGet()).flatMap { _ =>
-        EruRuntime.sleep(Duration.ofMillis(200)).flatMap { _ =>
+        runtime.sleep(Duration.ofMillis(200)).flatMap { _ =>
           completed.incrementAndGet()
           Eru.succeed(id)
         }
@@ -126,16 +126,16 @@ final class ConcurrencyStressSpec extends FunSuite {
     }
 
     val fastFail: Eru[String | Throwable, Int] =
-      EruRuntime.sleep(Duration.ofMillis(20)).flatMap(_ => Eru.fail("fast failure"))
+      runtime.sleep(Duration.ofMillis(20)).flatMap(_ => Eru.fail("fast failure"))
 
     val slowEffect = createCancellableEffect(1)
 
-    val result = EruRuntime
+    val result = runtime
       .race(fastFail, slowEffect)
       .attempt
       .unsafeRunSync()
 
-    EruRuntime.sleep(Duration.ofMillis(50)).unsafeRunSync()
+    runtime.sleep(Duration.ofMillis(50)).unsafeRunSync()
 
     result match {
       case Result.Failure("fast failure") =>
@@ -190,10 +190,10 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     val timers = (1 to timerCount).map { i =>
       val delay = (i % 10) + 1
-      EruRuntime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
+      runtime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
     }
 
-    val results = timers.map(timer => EruRuntime.fork(timer))
+    val results = timers.map(timer => runtime.fork(timer))
     val completed = results
       .map(_.flatMap(_.await).flatMap {
         case Exit.Success(value) => Eru.succeed(value)
@@ -218,8 +218,8 @@ final class ConcurrencyStressSpec extends FunSuite {
     val sequentialCount = 10
 
     val concurrentOps = (1 to concurrentCount).map { i =>
-      EruRuntime.fork {
-        EruRuntime.sleep(Duration.ofMillis(2)).map(_ => s"concurrent-$i")
+      runtime.fork {
+        runtime.sleep(Duration.ofMillis(2)).map(_ => s"concurrent-$i")
       }.flatMap(_.await).flatMap {
         case Exit.Success(value) => Eru.succeed(value)
         case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Concurrent op failed with error: $error"))
@@ -232,7 +232,7 @@ final class ConcurrencyStressSpec extends FunSuite {
       if (remaining <= 0) {
         Eru.succeed(acc.reverse)
       } else {
-        EruRuntime.sleep(Duration.ofMillis(1)).flatMap { _ =>
+        runtime.sleep(Duration.ofMillis(1)).flatMap { _ =>
           createSequential(remaining - 1, s"sequential-$remaining" :: acc)
         }
       }
@@ -240,7 +240,7 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     val sequential = createSequential(sequentialCount, Nil)
 
-    val combined = EruRuntime
+    val combined = runtime
       .zipPar(
         concurrentOps.toList.sequence,
         sequential
@@ -279,9 +279,9 @@ final class ConcurrencyStressSpec extends FunSuite {
     }
 
     val effects = (1 to fiberCount).map(createEffectWithFinalizers)
-    val fibers = effects.map(EruRuntime.fork).toList
-    val allFibers = EruRuntime.parSequence(fibers).unsafeRunSync()
-    val results = EruRuntime.parSequence(allFibers.map(_.await)).unsafeRunSync()
+    val fibers = effects.map(runtime.fork).toList
+    val allFibers = runtime.parSequence(fibers).unsafeRunSync()
+    val results = runtime.parSequence(allFibers.map(_.await)).unsafeRunSync()
 
     val successCount = results.count {
       case Exit.Success(_) => true
@@ -309,12 +309,12 @@ final class ConcurrencyStressSpec extends FunSuite {
 
     val fastEffects = (1 to fastCount).map { i =>
       val effect = Eru.succeed(s"fast-$i")
-      EruRuntime.timeout(Duration.ofMillis(1000))(effect)
+      runtime.timeout(Duration.ofMillis(1000))(effect)
     }
 
     val slowEffects = (1 to slowCount).map { i =>
-      val effect = EruRuntime.sleep(Duration.ofMillis(2000)).map(_ => s"slow-$i")
-      EruRuntime.timeout(Duration.ofMillis(10))(effect)
+      val effect = runtime.sleep(Duration.ofMillis(2000)).map(_ => s"slow-$i")
+      runtime.timeout(Duration.ofMillis(10))(effect)
     }
 
     val allEffects = fastEffects ++ slowEffects

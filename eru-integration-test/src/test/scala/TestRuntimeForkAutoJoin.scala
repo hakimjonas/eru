@@ -53,13 +53,13 @@ class TestRuntimeForkAutoJoin extends FunSuite {
     }
 
     // Create a proper parent-child fiber relationship where both are VTOnlyBackend fibers
-    val rootComputation = EruRuntime.forkWithObserver(
+    val rootComputation = runtime.forkWithObserver(
       for {
         // This is now the "parent" fiber running on VTOnlyBackend
-        _ <- EruRuntime.forkWithObserver(
+        _ <- runtime.forkWithObserver(
           (for {
             _ <- Eru.effect { childStarted.countDown() }
-            _ <- EruRuntime.sleep(Duration.ofMillis(100))
+            _ <- runtime.sleep(Duration.ofMillis(100))
             _ <- Eru.effect { childCompleted.set(true) }
           } yield "child-done").ensure(Eru.effect {
             finalizerRan.set(true)
@@ -106,10 +106,10 @@ class TestRuntimeForkAutoJoin extends FunSuite {
     val finalizerRan = new AtomicBoolean(false)
 
     val computation = for {
-      fiber <- EruRuntime.fork {
+      fiber <- runtime.fork {
         (for {
           _ <- Eru.effect { childStarted.countDown() }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- runtime.sleep(Duration.ofSeconds(10))
         } yield "child-done").ensure(Eru.effect {
           finalizerRan.set(true)
           println("EXPLICIT INTERRUPT FINALIZER EXECUTED")
@@ -141,10 +141,10 @@ class TestRuntimeForkAutoJoin extends FunSuite {
     val childCompleted = new AtomicBoolean(false)
 
     val parentComputation = for {
-      _ <- EruRuntime.fork {
+      _ <- runtime.fork {
         for {
           _ <- Eru.effect { childStarted.countDown() }
-          _ <- EruRuntime.sleep(Duration.ofSeconds(10))
+          _ <- runtime.sleep(Duration.ofSeconds(10))
           _ <- Eru.effect { childCompleted.set(true) }
         } yield "child-done"
       }

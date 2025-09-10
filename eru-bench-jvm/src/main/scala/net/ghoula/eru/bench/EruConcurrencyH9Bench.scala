@@ -53,6 +53,8 @@ extension [E, A](effects: List[Eru[E, A]]) {
 @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 2, timeUnit = TimeUnit.SECONDS)
 class EruConcurrencyH9Bench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   private var quickEffect: Eru[Nothing, Int] = uninitialized
   private var mediumEffect: Eru[Nothing, Int] = uninitialized
@@ -60,26 +62,26 @@ class EruConcurrencyH9Bench {
   @Setup(Level.Iteration)
   def setup(): Unit = {
     quickEffect = Eru.succeed(42)
-    mediumEffect = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 100)
+    mediumEffect = runtime.sleep(Duration.ofMillis(1)).map(_ => 100)
   }
 
   @Benchmark
   def zipParTrueConcurrent(h: Blackhole): Unit = {
-    val left = EruRuntime.sleep(Duration.ofMillis(2)).map(_ => 1)
-    val right = EruRuntime.sleep(Duration.ofMillis(2)).map(_ => 2)
-    h.consume(EruRuntime.zipPar(left, right).unsafeRunSync(): AnyRef)
+    val left = runtime.sleep(Duration.ofMillis(2)).map(_ => 1)
+    val right = runtime.sleep(Duration.ofMillis(2)).map(_ => 2)
+    h.consume(runtime.zipPar(left, right).unsafeRunSync(): AnyRef)
   }
 
   @Benchmark
   def raceTrueConcurrent(h: Blackhole): Unit = {
-    val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "fast")
-    val slow = EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "slow")
-    h.consume(EruRuntime.race(fast, slow).unsafeRunSync(): AnyRef)
+    val fast = runtime.sleep(Duration.ofMillis(1)).map(_ => "fast")
+    val slow = runtime.sleep(Duration.ofMillis(10)).map(_ => "slow")
+    h.consume(runtime.race(fast, slow).unsafeRunSync(): AnyRef)
   }
 
   @Benchmark
   def forkAwaitVirtualThread(h: Blackhole): Unit = {
-    val fiber = EruRuntime.fork(mediumEffect).unsafeRunSync()
+    val fiber = runtime.fork(mediumEffect).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
     h.consume(exit: AnyRef)
   }
@@ -91,7 +93,7 @@ class EruConcurrencyH9Bench {
     */
   @Benchmark
   def suspendAsyncBoundary(h: Blackhole): Unit = {
-    val result = EruRuntime
+    val result = runtime
       .suspend[Throwable, String] { callback =>
         val future = new java.util.concurrent.CompletableFuture[String]()
         future.whenComplete { (value, throwable) =>
@@ -115,7 +117,7 @@ class EruConcurrencyH9Bench {
     */
   @Benchmark
   def nonBlockingTimers(h: Blackhole): Unit = {
-    val timer = EruRuntime.sleep(Duration.ofMillis(1))
+    val timer = runtime.sleep(Duration.ofMillis(1))
     timer.unsafeRunSync()
     h.consume(scala.runtime.BoxedUnit.UNIT: AnyRef)
   }
@@ -127,8 +129,8 @@ class EruConcurrencyH9Bench {
     */
   @Benchmark
   def timeoutConcurrent(h: Blackhole): Unit = {
-    val fast = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => "completed")
-    val result = EruRuntime.timeout(Duration.ofMillis(10))(fast).attempt.unsafeRunSync()
+    val fast = runtime.sleep(Duration.ofMillis(1)).map(_ => "completed")
+    val result = runtime.timeout(Duration.ofMillis(10))(fast).attempt.unsafeRunSync()
     h.consume(result: AnyRef)
   }
 
@@ -140,7 +142,7 @@ class EruConcurrencyH9Bench {
   @Benchmark
   def highConcurrencyFibers(h: Blackhole): Unit = {
     val fibers = (1 to 50).map { i =>
-      EruRuntime.fork(Eru.succeed(i))
+      runtime.fork(Eru.succeed(i))
     }
     val results = fibers.map(_.flatMap(_.await)).toList.sequence.unsafeRunSync()
     h.consume(results: AnyRef)
@@ -153,9 +155,9 @@ class EruConcurrencyH9Bench {
     */
   @Benchmark
   def nestedZipParConcurrent(h: Blackhole): Unit = {
-    val inner1 = EruRuntime.zipPar(quickEffect, quickEffect)
-    val inner2 = EruRuntime.zipPar(quickEffect, quickEffect)
-    val outer = EruRuntime.zipPar(inner1, inner2)
+    val inner1 = runtime.zipPar(quickEffect, quickEffect)
+    val inner2 = runtime.zipPar(quickEffect, quickEffect)
+    val outer = runtime.zipPar(inner1, inner2)
     h.consume(outer.unsafeRunSync(): AnyRef)
   }
 
@@ -168,7 +170,7 @@ class EruConcurrencyH9Bench {
   def resourceCleanupConcurrent(h: Blackhole): Unit = {
     var cleanupCount = 0
     val resourceEffect = quickEffect.ensure(Eru.effect { cleanupCount += 1 })
-    val concurrent = (1 to 20).map(_ => EruRuntime.fork(resourceEffect))
+    val concurrent = (1 to 20).map(_ => runtime.fork(resourceEffect))
     val results = concurrent.map(_.flatMap(_.await)).toList.sequence.unsafeRunSync()
     h.consume((results, cleanupCount): AnyRef)
   }
@@ -181,8 +183,8 @@ class EruConcurrencyH9Bench {
   @Benchmark
   def cancellationPerformance(h: Blackhole): Unit = {
     val fastFail = Eru.fail("immediate failure")
-    val slowSuccess = EruRuntime.sleep(Duration.ofMillis(10)).map(_ => "slow success")
-    val result = EruRuntime.zipPar(fastFail, slowSuccess).attempt.unsafeRunSync()
+    val slowSuccess = runtime.sleep(Duration.ofMillis(10)).map(_ => "slow success")
+    val result = runtime.zipPar(fastFail, slowSuccess).attempt.unsafeRunSync()
     h.consume(result: AnyRef)
   }
 
@@ -194,8 +196,8 @@ class EruConcurrencyH9Bench {
   @Benchmark
   def mixedSyncAsyncWorkload(h: Blackhole): Unit = {
     val syncWork = Eru.succeed(1).map(_ * 2).map(_ + 3)
-    val asyncWork = EruRuntime.sleep(Duration.ofMillis(1)).map(_ => 42)
-    val combined = EruRuntime.zipPar(syncWork, asyncWork)
+    val asyncWork = runtime.sleep(Duration.ofMillis(1)).map(_ => 42)
+    val combined = runtime.zipPar(syncWork, asyncWork)
     h.consume(combined.unsafeRunSync(): AnyRef)
   }
 }

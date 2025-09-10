@@ -17,7 +17,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * error conditions, and integration scenarios while maintaining Eru's correctness guarantees
   * including proper finalizer execution and resource safety.
   */
-final class SuspendSpec extends FunSuite {
+final class SuspendSpec extends TestWithRuntime {
 
   private val isolatedRuntime = IsolatedTestRunner.createIsolatedRuntime()
 
@@ -237,7 +237,7 @@ final class SuspendSpec extends FunSuite {
   test("suspend with finalizers executes cleanup on success") {
     var finalizerExecuted = false
 
-    val effect = EruRuntime
+    val effect = runtime
       .suspend[String, Int] { callback =>
         callback(Right(42))
         Eru.unit
@@ -257,7 +257,7 @@ final class SuspendSpec extends FunSuite {
   test("suspend with finalizers executes cleanup on failure") {
     var finalizerExecuted = false
 
-    val effect = EruRuntime
+    val effect = runtime
       .suspend[String, Int] { callback =>
         callback(Left("error"))
         Eru.unit
@@ -279,7 +279,7 @@ final class SuspendSpec extends FunSuite {
   test("suspend with nested finalizers maintains FILO execution order") {
     var executionOrder: List[String] = Nil
 
-    val effect = EruRuntime
+    val effect = runtime
       .suspend[String, Int] { callback =>
         callback(Right(42))
         Eru.unit
@@ -331,7 +331,7 @@ final class SuspendSpec extends FunSuite {
       }
     }
 
-    val completed = results.map(_.unsafeRunSync()).toList
+    val completed: List[Int] = results.map(_.unsafeRunSync()).toList
     assertEquals(completed.sorted, (1 to iterations).toList)
   }
 }

@@ -17,7 +17,7 @@ import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.TimeUnit
 
-import net.ghoula.eru.CorePrelude.*
+import net.ghoula.eru.prelude.*
 
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
@@ -35,6 +35,8 @@ import net.ghoula.eru.CorePrelude.*
 @Warmup(iterations = 10, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 15, time = 3, timeUnit = TimeUnit.SECONDS)
 class EruMapFlatMapBench {
+  private val runtime = EruRuntime.create()
+  implicit val implicitRuntime: EruRuntime = runtime
 
   @Param(Array("10", "100", "1000"))
   var depthStr: String = "10"
