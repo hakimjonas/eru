@@ -68,6 +68,12 @@ object prelude {
   /** Type alias for the runtime Semaphore, re-exposed for discoverability. */
   type Semaphore = net.ghoula.eru.Semaphore
 
+  /** Type alias for the runtime Queue, re-exposed for discoverability.
+    * @tparam A
+    *   element type stored in the queue
+    */
+  type Queue[A] = net.ghoula.eru.Queue[A]
+
   /** Type alias for runtime fibers, re-exposed for discoverability.
     * @tparam E
     *   typed error of the fiber

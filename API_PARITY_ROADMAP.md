@@ -240,10 +240,11 @@ This roadmap addresses the comprehensive API gaps identified between Eru and mod
 
 ## Success Metrics
 
-### ✅ Immediate (Phase 1-2) - ACHIEVED
+### ✅ Immediate (Phase 1-2) - ACHIEVED  
 - [x] **Benchmark performance gap closed** - Eru maintains 1.45x performance lead over ZIO ✅
-- [x] **Critical API gaps addressed** - Core collection operations now available ✅  
+- [x] **Critical API gaps addressed** - Core collection and utility operations complete ✅  
 - [x] **Collection operation performance exceeds alternatives** - 1.45x faster than ZIO, 17x faster than CE ✅
+- [x] **Essential utilities implemented** - All conditional, looping, tap, and filtering operations ✅
 
 ### Medium Term (Phase 3-4)
 - [ ] Complete concurrency primitive coverage

@@ -171,6 +171,28 @@ object RuntimeExtensions {
       *   an effect that produces the Semaphore
       */
     def semaphore(n: Long): Eru[Nothing, Semaphore] = Semaphore.make(n)
+
+    /** Creates a bounded queue with the specified capacity.
+      *
+      * @param capacity
+      *   the maximum number of elements the queue can hold
+      * @tparam A
+      *   the element type
+      * @return
+      *   an effect that yields a new bounded queue
+      */
+    def queue[A](capacity: Int)(using runtime: EruRuntime): Eru[Nothing, Queue[A]] =
+      Queue.bounded[A](capacity)
+
+    /** Creates an unbounded queue.
+      *
+      * @tparam A
+      *   the element type
+      * @return
+      *   an effect that yields a new unbounded queue
+      */
+    def unboundedQueue[A](using runtime: EruRuntime): Eru[Nothing, Queue[A]] =
+      Queue.unbounded[A]
   }
 
   /** Static utility methods from EruRuntime exposed for direct access. */

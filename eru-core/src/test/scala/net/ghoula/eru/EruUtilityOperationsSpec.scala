@@ -1,6 +1,6 @@
 package net.ghoula.eru
 
-class Phase2OperationsSpec extends munit.FunSuite {
+class EruUtilityOperationsSpec extends munit.FunSuite {
 
   // =============================================================================
   // Conditional Construction Tests
