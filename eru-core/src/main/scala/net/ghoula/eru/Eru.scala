@@ -220,6 +220,51 @@ enum Eru[+E, +A] {
     */
   @inline final def attempt: Eru[Nothing, Result[E, A]] = Attempt(this)
 
+  /** Executes a side effect on the success value without changing the result.
+    *
+    * Tap operations are useful for logging, debugging, or other side effects that should not affect
+    * the main computation flow.
+    *
+    * @param f
+    *   the side effect to execute on successful values
+    * @tparam E1
+    *   the error type (contravariant)
+    * @return
+    *   an effect that yields the same result but executes the side effect on success
+    */
+  final def tap[E1 >: E](f: A => Eru[E1, Unit]): Eru[E1, A] =
+    flatMap(a => f(a).map(_ => a))
+
+  /** Executes a side effect on the error value without changing the result.
+    *
+    * @param f
+    *   the side effect to execute on error values
+    * @return
+    *   an effect that yields the same result but executes the side effect on failure
+    */
+  final def tapError(f: E => Eru[Nothing, Unit]): Eru[E, A] =
+    this.attempt.flatMap {
+      case Result.Success(value) => Eru.succeed(value)
+      case Result.Failure(error) => f(error).flatMap(_ => Eru.fail(error))
+    }
+
+  /** Executes side effects on both success and error values without changing the result.
+    *
+    * @param onError
+    *   the side effect to execute on error values
+    * @param onSuccess
+    *   the side effect to execute on success values
+    * @tparam E1
+    *   the error type (contravariant)
+    * @return
+    *   an effect that yields the same result but executes appropriate side effects
+    */
+  final def tapBoth[E1 >: E](onError: E => Eru[Nothing, Unit], onSuccess: A => Eru[E1, Unit]): Eru[E1, A] =
+    this.attempt.flatMap {
+      case Result.Success(value) => onSuccess(value).map(_ => value)
+      case Result.Failure(error) => onError(error).flatMap(_ => Eru.fail(error))
+    }
+
   /** Ensures that the provided finalizer runs after this computation, regardless of success or
     * failure.
     *
@@ -651,6 +696,177 @@ object Eru {
         loop(tail).flatMap(acc => f(head, acc))
     }
     loop(as.toList)
+  }
+
+  /** Conditionally executes an effect when the condition is true.
+    *
+    * @param condition
+    *   the boolean condition to evaluate
+    * @param effect
+    *   the effect to execute when condition is true
+    * @tparam E
+    *   the error type
+    * @return
+    *   an effect that executes the given effect if condition is true, otherwise succeeds with Unit
+    */
+  def when[E](condition: Boolean)(effect: Eru[E, Unit]): Eru[E, Unit] =
+    if (condition) effect else unit
+
+  /** Conditionally executes an effect when the condition is false.
+    *
+    * @param condition
+    *   the boolean condition to evaluate
+    * @param effect
+    *   the effect to execute when condition is false
+    * @tparam E
+    *   the error type
+    * @return
+    *   an effect that executes the given effect if condition is false, otherwise succeeds with Unit
+    */
+  def unless[E](condition: Boolean)(effect: Eru[E, Unit]): Eru[E, Unit] =
+    if (condition) unit else effect
+
+  /** Conditionally returns one of two values based on a boolean condition.
+    *
+    * @param condition
+    *   the boolean condition to evaluate
+    * @param onTrue
+    *   the value to return when condition is true
+    * @param onFalse
+    *   the value to return when condition is false
+    * @tparam A
+    *   the result type
+    * @return
+    *   an effect that succeeds with onTrue if condition is true, otherwise onFalse
+    */
+  def cond[A](condition: Boolean, onTrue: A, onFalse: A): Eru[Nothing, A] =
+    if (condition) succeed(onTrue) else succeed(onFalse)
+
+  /** Iterates an effect starting with an initial value until a predicate is satisfied.
+    *
+    * @param initial
+    *   the initial value to start iteration with
+    * @param f
+    *   the function to apply in each iteration
+    * @param predicate
+    *   the predicate to check for termination (checked on the result)
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the value type
+    * @return
+    *   an effect that yields the final value when predicate is satisfied
+    */
+  def iterate[E, A](initial: A)(f: A => Eru[E, A])(predicate: A => Boolean): Eru[E, A] = {
+    def loop(current: A): Eru[E, A] =
+      if (predicate(current)) succeed(current)
+      else f(current).flatMap(loop)
+    loop(initial)
+  }
+
+  /** Repeats an effect forever, never returning normally.
+    *
+    * @param effect
+    *   the effect to repeat infinitely
+    * @tparam E
+    *   the error type
+    * @return
+    *   an effect that never completes normally
+    */
+  def forever[E](effect: Eru[E, Unit]): Eru[E, Nothing] = {
+    def loop: Eru[E, Nothing] = effect.flatMap(_ => loop)
+    loop
+  }
+
+  /** Repeats an effect a specified number of times.
+    *
+    * @param n
+    *   the number of times to repeat the effect
+    * @param effect
+    *   the effect to repeat
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the result type
+    * @return
+    *   an effect that succeeds with Unit after n repetitions
+    */
+  def repeatN[E, A](n: Int)(effect: Eru[E, A]): Eru[E, Unit] = {
+    def loop(remaining: Int): Eru[E, Unit] =
+      if (remaining <= 0) unit
+      else effect.flatMap(_ => loop(remaining - 1))
+    loop(n)
+  }
+
+  /** Repeats an effect until a predicate is satisfied on the result.
+    *
+    * @param effect
+    *   the effect to repeat
+    * @param predicate
+    *   the predicate to check for termination
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the result type
+    * @return
+    *   an effect that yields the final result when predicate is satisfied
+    */
+  def repeatUntil[E, A](effect: Eru[E, A])(predicate: A => Boolean): Eru[E, A] = {
+    def loop: Eru[E, A] = effect.flatMap { result =>
+      if (predicate(result)) succeed(result) else loop
+    }
+    loop
+  }
+
+  /** Filters effects in a collection, collecting only successful results that satisfy a predicate.
+    *
+    * @param as
+    *   the collection of effects to filter
+    * @param predicate
+    *   the predicate to apply to successful results
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the element type
+    * @return
+    *   an effect that yields a list of values that satisfy the predicate
+    */
+  def filter[E, A](as: Iterable[Eru[E, A]])(predicate: A => Boolean): Eru[E, List[A]] = {
+    def loop(remaining: List[Eru[E, A]], acc: List[A]): Eru[E, List[A]] = remaining match {
+      case Nil => succeed(acc.reverse)
+      case head :: tail =>
+        head.flatMap { value =>
+          if (predicate(value)) loop(tail, value :: acc)
+          else loop(tail, acc)
+        }
+    }
+    loop(as.toList, Nil)
+  }
+
+  /** Partitions a collection by applying an effectful predicate to each element.
+    *
+    * @param as
+    *   the collection to partition
+    * @param f
+    *   the effectful predicate function
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the element type
+    * @return
+    *   an effect that yields a pair of lists: (satisfied, not satisfied)
+    */
+  def partition[E, A](as: Iterable[A])(f: A => Eru[E, Boolean]): Eru[E, (List[A], List[A])] = {
+    def loop(remaining: List[A], trueAcc: List[A], falseAcc: List[A]): Eru[E, (List[A], List[A])] =
+      remaining match {
+        case Nil => succeed((trueAcc.reverse, falseAcc.reverse))
+        case head :: tail =>
+          f(head).flatMap { result =>
+            if (result) loop(tail, head :: trueAcc, falseAcc)
+            else loop(tail, trueAcc, head :: falseAcc)
+          }
+      }
+    loop(as.toList, Nil, Nil)
   }
 
   /** A successful `Eru` containing `Unit`. */

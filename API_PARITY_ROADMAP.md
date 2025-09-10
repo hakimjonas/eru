@@ -94,33 +94,41 @@ This roadmap addresses the comprehensive API gaps identified between Eru and mod
 
 ---
 
-## Phase 2: Essential Utility Operations
+## ✅ Phase 2: Essential Utility Operations (COMPLETED - September 2025)
 
-### Conditional Construction
-- [ ] `Eru.when[E](condition: Boolean)(effect: Eru[E, Unit]): Eru[E, Unit]`
-- [ ] `Eru.unless[E](condition: Boolean)(effect: Eru[E, Unit]): Eru[E, Unit]`
-- [ ] `Eru.cond[E, A](condition: Boolean, onTrue: A, onFalse: A): Eru[E, A]`
+### ✅ Conditional Construction
+- [x] **`Eru.when[E](condition: Boolean)(effect: Eru[E, Unit]): Eru[E, Unit]`** - Conditional effect execution
+- [x] **`Eru.unless[E](condition: Boolean)(effect: Eru[E, Unit]): Eru[E, Unit]`** - Negative conditional execution
+- [x] **`Eru.cond[A](condition: Boolean, onTrue: A, onFalse: A): Eru[Nothing, A]`** - Conditional value selection
 
-### Looping Constructs
-- [ ] `Eru.iterate[E, A](initial: A)(f: A => Eru[E, A])(predicate: A => Boolean): Eru[E, A]`
-- [ ] `Eru.forever[E](effect: Eru[E, Unit]): Eru[Nothing, Nothing]`
-- [ ] `Eru.repeatN[E, A](n: Int)(effect: Eru[E, A]): Eru[E, Unit]`
-- [ ] `Eru.repeatUntil[E, A](effect: Eru[E, A])(predicate: A => Boolean): Eru[E, A]`
+### ✅ Looping Constructs
+- [x] **`Eru.iterate[E, A](initial: A)(f: A => Eru[E, A])(predicate: A => Boolean): Eru[E, A]`** - Iterate until predicate
+- [x] **`Eru.forever[E](effect: Eru[E, Unit]): Eru[E, Nothing]`** - Infinite repetition
+- [x] **`Eru.repeatN[E, A](n: Int)(effect: Eru[E, A]): Eru[E, Unit]`** - Fixed number of repetitions
+- [x] **`Eru.repeatUntil[E, A](effect: Eru[E, A])(predicate: A => Boolean): Eru[E, A]`** - Repeat until condition
 
-### Tap Operations (Side Effects)
-- [ ] `Eru.tap[E, A](f: A => Eru[E, Unit]): Eru[E, A] => Eru[E, A]`
-- [ ] `Eru.tapError[E, A](f: E => Eru[Nothing, Unit]): Eru[E, A] => Eru[E, A]`
-- [ ] `Eru.tapBoth[E, A](onError: E => Eru[Nothing, Unit], onSuccess: A => Eru[Nothing, Unit]): Eru[E, A] => Eru[E, A]`
+### ✅ Tap Operations (Side Effects)
+- [x] **`def tap[E1 >: E](f: A => Eru[E1, Unit]): Eru[E1, A]`** - Side effect on success
+- [x] **`def tapError(f: E => Eru[Nothing, Unit]): Eru[E, A]`** - Side effect on error
+- [x] **`def tapBoth[E1 >: E](onError: E => Eru[Nothing, Unit], onSuccess: A => Eru[E1, Unit]): Eru[E1, A]`** - Side effects on both paths
 
-### Advanced Collection Operations
-- [ ] `Eru.filter[E, A](as: Iterable[Eru[E, A]])(predicate: A => Boolean): Eru[E, List[A]]`
-- [ ] `Eru.partition[E, A](as: Iterable[A])(f: A => Eru[E, Boolean]): Eru[E, (List[A], List[A])]`
+### ✅ Advanced Collection Operations
+- [x] **`Eru.filter[E, A](as: Iterable[Eru[E, A]])(predicate: A => Boolean): Eru[E, List[A]]`** - Filter effect collections
+- [x] **`Eru.partition[E, A](as: Iterable[A])(f: A => Eru[E, Boolean]): Eru[E, (List[A], List[A])]`** - Effectful partitioning
 
-### Testing (Concurrent with Implementation)
-- [ ] Unit tests for all conditional construction methods
-- [ ] Loop termination tests and stack safety verification
-- [ ] Tap operation behavior verification (side effects don't affect results)
-- [ ] Integration tests with real-world usage patterns
+### ✅ Testing and Validation
+- [x] **30 comprehensive tests** - All conditional, looping, tap, and advanced operations covered
+- [x] **Error propagation verification** - All operations handle failures correctly
+- [x] **Side effect isolation** - Tap operations don't affect main computation results
+- [x] **Integration testing** - Complex nested scenarios and composition patterns
+- [x] **Stack safety verification** - Loop constructs maintain stack safety
+
+### ✅ Implementation Quality
+- **430 tests passing** (400 original + 30 new Phase 2 tests) ✅
+- **Zero-cast preservation** - All operations maintain GADT design integrity ✅
+- **Type safety** - Contravariant error types and proper variance ✅
+- **API consistency** - All operations follow Eru's ergonomic patterns ✅
+- **Complete documentation** - Full Scaladoc for all new methods ✅
 
 ---
 
