@@ -212,8 +212,15 @@ class EruRuntimeExtensionsSpec extends TestWithRuntime {
 
   test("forkWithObserver emits lifecycle events") {
     class TestObserver extends EruObserver {
-      val events = ListBuffer.empty[EruEvent]
-      def onEvent(event: EruEvent): Unit = events += event
+      val events = java.util.concurrent.ConcurrentLinkedQueue[EruEvent]()
+      val completedSignal = java.util.concurrent.CountDownLatch(1)
+      def onEvent(event: EruEvent): Unit = {
+        events.offer(event)
+        event match {
+          case _: EruEvent.FiberCompleted => completedSignal.countDown()
+          case _ => ()
+        }
+      }
     }
 
     val observer = new TestObserver
@@ -227,7 +234,12 @@ class EruRuntimeExtensionsSpec extends TestWithRuntime {
       case other => fail(s"Expected Success, got $other")
     }
 
-    val eventTypes = observer.events.map(_.getClass.getSimpleName).toList
+    // Wait for the FiberCompleted event to be recorded
+    assert(observer.completedSignal.await(1, java.util.concurrent.TimeUnit.SECONDS), 
+           "FiberCompleted event should be recorded within 1 second")
+
+    import scala.jdk.CollectionConverters.*
+    val eventTypes = observer.events.asScala.toList.map(_.getClass.getSimpleName)
     assert(eventTypes.contains("FiberStarted"))
     assert(eventTypes.contains("FiberCompleted"))
   }

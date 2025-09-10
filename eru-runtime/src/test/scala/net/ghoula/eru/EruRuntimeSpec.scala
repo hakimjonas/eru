@@ -55,13 +55,26 @@ class EruRuntimeSpec extends TestWithRuntime {
 
   test("forkWithObserver emits FiberStarted and FiberCompleted") {
     class Obs extends EruObserver {
-      val buf: ListBuffer[EruEvent] = scala.collection.mutable.ListBuffer.empty[EruEvent]
-      def onEvent(event: EruEvent): Unit = buf += event
+      val buf = java.util.concurrent.ConcurrentLinkedQueue[EruEvent]()
+      val completedSignal = java.util.concurrent.CountDownLatch(1)
+      def onEvent(event: EruEvent): Unit = {
+        buf.offer(event)
+        event match {
+          case _: EruEvent.FiberCompleted => completedSignal.countDown()
+          case _ => ()
+        }
+      }
     }
     val obs = new Obs
     val fiber = Eru.succeed(5).forkWithObserver(obs).unsafeRunSync()
     fiber.await.unsafeRunSync()
-    val evs = obs.buf.toList
+    
+    // Wait for the FiberCompleted event to be recorded
+    assert(obs.completedSignal.await(1, java.util.concurrent.TimeUnit.SECONDS), 
+           "FiberCompleted event should be recorded within 1 second")
+    
+    import scala.jdk.CollectionConverters.*
+    val evs = obs.buf.asScala.toList
     assert(evs.nonEmpty)
     val (fidStarted, fidCompleted) = evs match {
       case EruEvent.FiberStarted(fid) :: EruEvent.FiberCompleted(fid2, exit) :: _ =>
