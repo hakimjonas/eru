@@ -58,12 +58,12 @@ class EruResourceSpec extends FunSuite {
     * cleanup sequence for resource hierarchies.
     */
   test("ensure finalizers run in FILO order when nested") {
-    val order = scala.collection.mutable.ListBuffer.empty[String]
-    val f1 = Eru.effect { order += "f1"; () }
-    val f2 = Eru.effect { order += "f2"; () }
+    var order = List.empty[String]
+    val f1 = Eru.effect { order = "f1" :: order; () }
+    val f2 = Eru.effect { order = "f2" :: order; () }
     val prog = Eru.succeed(1).ensure(f1).ensure(f2)
     assertEquals(prog.unsafeRunSync(), 1)
-    assertEquals(order.toList, List("f2", "f1"))
+    assertEquals(order.reverse, List("f2", "f1"))
   }
 
   /** Validates that bracket releases resources exactly once on both success and failure.
@@ -123,16 +123,15 @@ class EruResourceSpec extends FunSuite {
   }
 
   test("nested ensures across multiple depths follow FILO ordering") {
-    import scala.collection.mutable.ListBuffer
-    val order = ListBuffer.empty[Int]
+    var order = List.empty[Int]
     val depth = 10
     val base: Eru[Nothing, Unit] = Eru.unit
     val prog = (1 to depth).foldLeft(base) { (acc, i) =>
-      val fin = Eru.effect { order += i; () }
+      val fin = Eru.effect { order = i :: order; () }
       acc.ensure(fin)
     }
     prog.unsafeRunSync()
-    assertEquals(order.toList, (1 to depth).reverse.toList)
+    assertEquals(order.reverse, (1 to depth).reverse.toList)
   }
 
 }

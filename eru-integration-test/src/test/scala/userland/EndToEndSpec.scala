@@ -21,9 +21,9 @@ final class EndToEndSpec extends FunSuite {
     * resource safety, and observability in realistic application scenarios.
     */
   test("end-to-end composition across concurrency, state, retry, timeout, ensure, observer") {
-    val events = scala.collection.mutable.ArrayBuffer.empty[EruObserver.EruEvent]
+    val events = java.util.concurrent.ConcurrentLinkedQueue[EruObserver.EruEvent]()
     val observer = new EruObserver {
-      def onEvent(e: EruObserver.EruEvent): Unit = events += e
+      def onEvent(e: EruObserver.EruEvent): Unit = events.offer(e)
     }
 
     val program = for {

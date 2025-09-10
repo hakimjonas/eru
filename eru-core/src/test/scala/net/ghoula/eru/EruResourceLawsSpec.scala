@@ -82,14 +82,14 @@ class EruResourceLawsSpec extends FunSuite {
     var i = 0
     while (i < samples) {
       val depth = 1 + rng.nextInt(maxDepth + 1)
-      val order = scala.collection.mutable.ListBuffer.empty[Int]
+      var order = List.empty[Int]
       val base: Eru[Nothing, Unit] = Eru.unit
       val prog = (1 to depth).foldLeft(base) { (acc, k) =>
-        val fin = Eru.effect { order += k; () }
+        val fin = Eru.effect { order = k :: order; () }
         acc.ensure(fin)
       }
       prog.unsafeRunSync()
-      assertEquals(order.toList, (1 to depth).reverse.toList)
+      assertEquals(order.reverse, (1 to depth).reverse.toList)
       i += 1
     }
   }

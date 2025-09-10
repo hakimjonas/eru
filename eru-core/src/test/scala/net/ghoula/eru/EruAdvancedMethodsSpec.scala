@@ -161,25 +161,25 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
   }
 
   test("ensure with multiple finalizers executes all in reverse order") {
-    val executionOrder = scala.collection.mutable.ListBuffer.empty[String]
+    var executionOrder = List.empty[String]
 
     val eru = Eru
       .succeed(42)
       .ensure {
-        executionOrder += "first"
+        executionOrder = "first" :: executionOrder
         Eru.unit
       }
       .ensure {
-        executionOrder += "second"
+        executionOrder = "second" :: executionOrder
         Eru.unit
       }
       .ensure {
-        executionOrder += "third"
+        executionOrder = "third" :: executionOrder
         Eru.unit
       }
 
     eru.unsafeRunSync()
-    assertEquals(executionOrder.toList, List("third", "second", "first"))
+    assertEquals(executionOrder.reverse, List("third", "second", "first"))
   }
 
   test("ensure with nested computations") {
@@ -318,16 +318,16 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
   }
 
   test("bracket with complex resource patterns") {
-    val acquired = scala.collection.mutable.ListBuffer.empty[String]
-    val released = scala.collection.mutable.ListBuffer.empty[String]
+    var acquired = List.empty[String]
+    var released = List.empty[String]
 
     def acquireResource(name: String) = Eru.effect {
-      acquired += name
+      acquired = name :: acquired
       name
     }
 
     def releaseResource(name: String) = Eru.effect {
-      released += name
+      released = name :: released
       ()
     }
 
@@ -345,9 +345,9 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
 
     val result = computation.unsafeRunSync()
     assertEquals(result, "resource1-resource2")
-    assertEquals(acquired.toList, List("resource1", "resource2"))
+    assertEquals(acquired.reverse, List("resource1", "resource2"))
     assertEquals(
-      released.toList,
+      released.reverse,
       List("resource1", "resource2")
     )
   }

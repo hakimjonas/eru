@@ -2,8 +2,6 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
-import scala.collection.mutable.ListBuffer
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive test suite for the EruObserver system and event emission.
@@ -16,8 +14,9 @@ import net.ghoula.eru.CorePrelude.*
 class EruObserverSpec extends FunSuite {
 
   private class CollectingObserver extends EruObserver {
-    val events: ListBuffer[EruEvent] = ListBuffer.empty
-    def onEvent(event: EruEvent): Unit = events += event
+    private var _events: List[EruEvent] = Nil
+    def events: List[EruEvent] = _events.reverse
+    def onEvent(event: EruEvent): Unit = _events = event :: _events
   }
 
   /** Validates that unsafeRunSyncWith emits ProgramStart and ProgramEnd Success events.

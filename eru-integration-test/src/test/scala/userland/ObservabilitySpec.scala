@@ -21,13 +21,13 @@ final class ObservabilitySpec extends FunSuite {
     * in the correct order for successful computation execution.
     */
   test("observer sees ProgramStart, Step, and ProgramEnd(Success)") {
-    val events = scala.collection.mutable.ListBuffer.empty[EruEvent]
-    val obs: EruObserver = new EruObserver { def onEvent(e: EruEvent): Unit = events += e }
+    var events = List.empty[EruEvent]
+    val obs: EruObserver = new EruObserver { def onEvent(e: EruEvent): Unit = events = e :: events }
 
     val value = TestRuntime.runIsolatedWith(Eru.succeed(123).debug("step-1"), obs)
 
     assertEquals(value, 123)
-    val xs = events.toList
+    val xs = events.reverse
     xs match {
       case EruEvent
             .ProgramStart(scopeId) :: EruEvent.Step(scopeId2, label) :: EruEvent.ProgramEnd(scopeId3, outcome) :: Nil =>
@@ -77,7 +77,6 @@ final class ObservabilitySpec extends FunSuite {
     val fiber = TestRuntime.runIsolated(runtime.fork(Eru.succeed(10)))
     val exit = fiber.await.runIsolatedExit
 
-    // The outer exit wraps the inner exit
     val result = exit match {
       case Exit.Success(innerExit) =>
         innerExit match {

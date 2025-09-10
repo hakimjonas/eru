@@ -2,8 +2,6 @@ package net.ghoula.eru.trace
 
 import munit.FunSuite
 
-import scala.collection.mutable.ListBuffer
-
 import net.ghoula.eru.CorePrelude.*
 import net.ghoula.eru.trace.EruTrace.Span
 
@@ -213,10 +211,11 @@ final class EruTraceSpec extends FunSuite {
   test("traced extension method creates spans") {
 
     class TestObserver extends TracingEruObserver {
-      val spans: ListBuffer[Span] = ListBuffer.empty[Span]
+      private var _spans: List[Span] = Nil
+      def spans: List[Span] = _spans.reverse
 
       def onSpanCompleted(span: Span): Unit = {
-        spans += span
+        _spans = span :: _spans
       }
     }
 
@@ -329,15 +328,17 @@ final class EruTraceSpec extends FunSuite {
     */
   test("TracingEruObserver handles different event types") {
     class TestTracingObserver extends TracingEruObserver {
-      val spans: ListBuffer[Span] = ListBuffer.empty[EruTrace.Span]
-      val otherEvents: ListBuffer[EruEvent] = ListBuffer.empty[EruEvent]
+      private var _spans: List[EruTrace.Span] = Nil
+      private var _otherEvents: List[EruEvent] = Nil
+      def spans: List[EruTrace.Span] = _spans.reverse
+      def otherEvents: List[EruEvent] = _otherEvents.reverse
 
       def onSpanCompleted(span: EruTrace.Span): Unit = {
-        spans += span
+        _spans = span :: _spans
       }
 
       override def onOtherEvent(event: EruEvent): Unit = {
-        otherEvents += event
+        _otherEvents = event :: _otherEvents
       }
     }
 

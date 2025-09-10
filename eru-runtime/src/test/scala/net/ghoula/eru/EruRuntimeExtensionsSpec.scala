@@ -2,7 +2,6 @@ package net.ghoula.eru
 
 import munit.FunSuite
 import java.time.Duration
-import scala.collection.mutable.ListBuffer
 
 /** Test suite for Eru runtime extension methods and enhanced functionality.
   *
@@ -112,24 +111,24 @@ class EruRuntimeExtensionsSpec extends TestWithRuntime {
   }
 
   test("zipPar extension runs effects in parallel and combines results") {
-    val executionOrder = scala.collection.mutable.ListBuffer.empty[String]
-    val lock = new Object
+    val executionOrder = java.util.concurrent.ConcurrentLinkedQueue[String]()
     
     val left = Eru.succeed(10).map { x => 
-      lock.synchronized { executionOrder += "left-start" }
+      executionOrder.offer("left-start")
       (1 to 10000).sum
-      lock.synchronized { executionOrder += "left-end" }
+      executionOrder.offer("left-end")
       x + 5
     }
     val right = Eru.succeed(20).map { x => 
-      lock.synchronized { executionOrder += "right-start" }
+      executionOrder.offer("right-start")
       (1 to 10000).sum
-      lock.synchronized { executionOrder += "right-end" }
+      executionOrder.offer("right-end")
       x * 2
     }
 
     val result = left.zipPar(right).unsafeRunSync()
-    val order = lock.synchronized { executionOrder.toList }
+    import scala.jdk.CollectionConverters.*
+    val order = executionOrder.asScala.toList
 
     assertEquals(result, (15, 40))
     val starts = order.filter(_.endsWith("-start"))

@@ -245,20 +245,20 @@ class FiberPropertySpec extends TestWithRuntime {
     * through the fork/await mechanism.
     */
   test("fork does not affect external side effects ordering within a computation") {
-    import scala.collection.mutable
-    val events = mutable.ListBuffer.empty[String]
+    val events = java.util.concurrent.ConcurrentLinkedQueue[String]()
 
     val computation = for {
-      _ <- Eru.effect(events += "step1")
-      _ <- Eru.effect(events += "step2")
-      _ <- Eru.effect(events += "step3")
+      _ <- Eru.effect(events.offer("step1"))
+      _ <- Eru.effect(events.offer("step2"))
+      _ <- Eru.effect(events.offer("step3"))
     } yield "done"
 
     val fiber = runtime.fork(computation).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Success("done"))
-    assertEquals(events.toList, List("step1", "step2", "step3"))
+    import scala.jdk.CollectionConverters.*
+    assertEquals(events.asScala.toList, List("step1", "step2", "step3"))
   }
 
   /** Validates that multiple fork/await operations maintain independence.
@@ -267,18 +267,17 @@ class FiberPropertySpec extends TestWithRuntime {
     * side effects, ensuring proper isolation.
     */
   test("multiple fork/await operations maintain independence") {
-    import scala.collection.mutable
-    val events1 = mutable.ListBuffer.empty[String]
-    val events2 = mutable.ListBuffer.empty[String]
+    val events1 = java.util.concurrent.ConcurrentLinkedQueue[String]()
+    val events2 = java.util.concurrent.ConcurrentLinkedQueue[String]()
 
     val computation1 = for {
-      _ <- Eru.effect(events1 += "comp1-step1")
-      _ <- Eru.effect(events1 += "comp1-step2")
+      _ <- Eru.effect(events1.offer("comp1-step1"))
+      _ <- Eru.effect(events1.offer("comp1-step2"))
     } yield "comp1-done"
 
     val computation2 = for {
-      _ <- Eru.effect(events2 += "comp2-step1")
-      _ <- Eru.effect(events2 += "comp2-step2")
+      _ <- Eru.effect(events2.offer("comp2-step1"))
+      _ <- Eru.effect(events2.offer("comp2-step2"))
     } yield "comp2-done"
 
     val parallelExecution = for {
@@ -294,8 +293,9 @@ class FiberPropertySpec extends TestWithRuntime {
 
     assertEquals(result1, "comp1-done")
     assertEquals(result2, "comp2-done")
-    assertEquals(events1.toList, List("comp1-step1", "comp1-step2"))
-    assertEquals(events2.toList, List("comp2-step1", "comp2-step2"))
+    import scala.jdk.CollectionConverters.*
+    assertEquals(events1.asScala.toList, List("comp1-step1", "comp1-step2"))
+    assertEquals(events2.asScala.toList, List("comp2-step1", "comp2-step2"))
   }
 
   /** Validates the fiber identity property for pure computations.

@@ -2,8 +2,6 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
-import scala.collection.mutable.ListBuffer
-
 /** Comprehensive test suite for the EruRuntime execution engine.
   *
   * Validates the core runtime functionality including fiber execution, concurrency primitives,
@@ -69,7 +67,6 @@ class EruRuntimeSpec extends TestWithRuntime {
     val fiber = Eru.succeed(5).forkWithObserver(obs).unsafeRunSync()
     fiber.await.unsafeRunSync()
     
-    // Wait for the FiberCompleted event to be recorded
     assert(obs.completedSignal.await(1, java.util.concurrent.TimeUnit.SECONDS), 
            "FiberCompleted event should be recorded within 1 second")
     

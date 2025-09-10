@@ -2,8 +2,6 @@ package net.ghoula.eru
 
 import munit.FunSuite
 
-import scala.collection.mutable.ListBuffer
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Test suite for advanced resource safety extensions and edge cases.
@@ -16,22 +14,22 @@ import net.ghoula.eru.CorePrelude.*
 class EruResourceSafetyExtensionsSpec extends FunSuite {
 
   test("ensureAll runs multiple finalizers in FILO order") {
-    val order = ListBuffer.empty[String]
-    val f1 = Eru.effect { order += "f1"; () }
-    val f2 = Eru.effect { order += "f2"; () }
-    val f3 = Eru.effect { order += "f3"; () }
+    var order = List.empty[String]
+    val f1 = Eru.effect { order = "f1" :: order; () }
+    val f2 = Eru.effect { order = "f2" :: order; () }
+    val f3 = Eru.effect { order = "f3" :: order; () }
 
     val program = Eru.succeed(42).ensureAll(f1, f2, f3)
     val result = program.unsafeRunSync()
 
     assertEquals(result, 42)
-    assertEquals(order.toList, List("f3", "f2", "f1"))
+    assertEquals(order.reverse, List("f3", "f2", "f1"))
   }
 
   test("ensureAll runs finalizers even on failure") {
-    val order = ListBuffer.empty[String]
-    val f1 = Eru.effect { order += "f1"; () }
-    val f2 = Eru.effect { order += "f2"; () }
+    var order = List.empty[String]
+    val f1 = Eru.effect { order = "f1" :: order; () }
+    val f2 = Eru.effect { order = "f2" :: order; () }
 
     val program: Eru[String, Int] = Eru.fail("boom").ensureAll(f1, f2)
     val ex = intercept[EruException[String]] {
@@ -39,7 +37,7 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     }
 
     assertEquals(ex.error, "boom")
-    assertEquals(order.toList, List("f2", "f1"))
+    assertEquals(order.reverse, List("f2", "f1"))
   }
 
   test("autoCleanup calls cleanup function on success value") {
@@ -190,11 +188,11 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
   }
 
   test("complex resource safety scenario with multiple patterns") {
-    val log = ListBuffer.empty[String]
+    var log = List.empty[String]
 
     class TestResource(val name: String) extends AutoCloseable {
-      log += s"$name created"
-      def close(): Unit = log += s"$name closed"
+      log = s"$name created" :: log
+      def close(): Unit = log = s"$name closed" :: log
     }
 
     val program = for {
@@ -204,42 +202,39 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
         .succeed(resource)
         .autoClose
         .ensureAll(
-          Eru.effect { log += "finalizer1" },
-          Eru.effect { log += "finalizer2" }
+          Eru.effect { log = "finalizer1" :: log },
+          Eru.effect { log = "finalizer2" :: log }
         )
         .useScoped(r => Eru.succeed(r.name.toUpperCase)) { r =>
-          Eru.effect { log += s"custom cleanup for ${r.name}" }
+          Eru.effect { log = s"custom cleanup for ${r.name}" :: log }
         }
     } yield result
 
     val result = program.unsafeRunSync()
     assertEquals(result, "MAIN")
-
-    // Check that all cleanup operations happened
-    val logList = log.toList
-    assert(logList.contains("main created"))
-    assert(logList.contains("main closed"))
-    assert(logList.contains("finalizer1"))
-    assert(logList.contains("finalizer2"))
-    assert(logList.contains("custom cleanup for main"))
+    assert(log.contains("main created"))
+    assert(log.contains("main closed"))
+    assert(log.contains("finalizer1"))
+    assert(log.contains("finalizer2"))
+    assert(log.contains("custom cleanup for main"))
   }
 
   test("nested resource patterns work correctly") {
-    val cleanupOrder = ListBuffer.empty[String]
+    var cleanupOrder = List.empty[String]
 
     val program = Eru
       .succeed("outer")
-      .autoCleanup(v => Eru.effect { cleanupOrder += s"cleanup-$v" })
+      .autoCleanup(v => Eru.effect { cleanupOrder = s"cleanup-$v" :: cleanupOrder })
       .flatMap(outer =>
         Eru
           .succeed("inner")
-          .autoCleanup(v => Eru.effect { cleanupOrder += s"cleanup-$v" })
+          .autoCleanup(v => Eru.effect { cleanupOrder = s"cleanup-$v" :: cleanupOrder })
           .map(inner => s"$outer-$inner")
       )
 
     val result = program.unsafeRunSync()
     assertEquals(result, "outer-inner")
-    assertEquals(cleanupOrder.toList, List("cleanup-inner", "cleanup-outer"))
+    assertEquals(cleanupOrder.reverse, List("cleanup-inner", "cleanup-outer"))
   }
 
   test("concurrent resource cleanup maintains FILO order under resource contention") {
@@ -309,24 +304,24 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
   }
 
   test("resource acquisition and release with interleaved failures") {
-    val acquisitionOrder = ListBuffer.empty[String]
-    val releaseOrder = ListBuffer.empty[String]
+    var acquisitionOrder = List.empty[String]
+    var releaseOrder = List.empty[String]
 
     def acquireResource(id: String, shouldFail: Boolean): Eru[String, String] = {
       if (shouldFail) {
         Eru.fail(s"Failed to acquire $id")
       } else {
         Eru.effect {
-          acquisitionOrder += s"acquired-$id"
+          acquisitionOrder = s"acquired-$id" :: acquisitionOrder
           id
         }.mapError(_.getMessage)
       }
     }
 
     val program = acquireResource("r1", false)
-      .bracket(r => Eru.effect { releaseOrder += s"released-$r" }) { r1 =>
+      .bracket(r => Eru.effect { releaseOrder = s"released-$r" :: releaseOrder }) { r1 =>
         acquireResource("r2", true)
-          .bracket(r => Eru.effect { releaseOrder += s"released-$r" }) { r2 =>
+          .bracket(r => Eru.effect { releaseOrder = s"released-$r" :: releaseOrder }) { r2 =>
             Eru.succeed(s"used-$r1-$r2")
           }
       }
@@ -336,7 +331,7 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
     }
 
     assertEquals(ex.error, "Failed to acquire r2")
-    assertEquals(acquisitionOrder.toList, List("acquired-r1"))
-    assertEquals(releaseOrder.toList, List("released-r1"))
+    assertEquals(acquisitionOrder.reverse, List("acquired-r1"))
+    assertEquals(releaseOrder.reverse, List("released-r1"))
   }
 }
