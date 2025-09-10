@@ -161,7 +161,7 @@ object RuntimeExtensions {
       * @return
       *   an effect that produces the Deferred
       */
-    def deferred[A]: Eru[Nothing, Deferred[A]] = Deferred.make[A]
+    def deferred[A](using runtime: EruRuntime): Eru[Nothing, Deferred[A]] = Deferred.make[A]
 
     /** Creates a new Semaphore initialized with `n` permits.
       *

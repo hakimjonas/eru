@@ -99,7 +99,7 @@ class CompetitiveRaceBench {
   @Benchmark
   def eruRaceAll(): String = {
     val effects = (0 until effectCount).map { i =>
-      val delay = if (i == 1) 1 else 10 + i * 5 // Effect at index 1 wins with 1ms delay
+      val delay = if (i == 1) 1 else 10 + i * 5
       runtime.sleep(Duration.ofMillis(delay)).map(_ => s"effect-$i")
     }.toList
 
@@ -118,7 +118,7 @@ class CompetitiveRaceBench {
   @Benchmark
   def zioRaceAll(): String = {
     val effects = (0 until effectCount).map { i =>
-      val delay = if (i == 1) 1 else 10 + i * 5 // Effect at index 1 wins with 1ms delay
+      val delay = if (i == 1) 1 else 10 + i * 5
       ZIO.sleep(java.time.Duration.ofMillis(delay)).as(s"effect-$i")
     }.toList
 

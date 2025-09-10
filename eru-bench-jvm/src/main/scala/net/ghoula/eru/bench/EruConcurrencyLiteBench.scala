@@ -73,7 +73,7 @@ class EruConcurrencyLiteBench {
     val p = for {
       d <- Eru.deferred[Int]
       _ <- d.complete(42)
-      v <- d.poll.map(_.getOrElse(0))
+      v <- d.await
     } yield v
     h.consume(java.lang.Integer.valueOf(p.unsafeRunSync()))
   }

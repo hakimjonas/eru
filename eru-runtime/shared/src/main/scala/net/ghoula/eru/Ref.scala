@@ -63,10 +63,10 @@ object Ref {
 
     def get: Eru[Nothing, A] = Eru.succeed(state.get())
 
-    def set(a: A): Eru[Nothing, Unit] = Eru.effect { state.set(a); () }.attempt.map(_ => ())
+    def set(a: A): Eru[Nothing, Unit] = Eru.succeed { state.set(a); () }
 
     def update(f: A => A): Eru[Nothing, A] =
-      Eru.effect {
+      Eru.succeed {
         @annotation.tailrec
         def loop(): A = {
           val current = state.get()
@@ -75,13 +75,10 @@ object Ref {
           else loop()
         }
         loop()
-      }.attempt.map({
-        case Result.Success(v) => v
-        case Result.Failure(_) => state.get() // This should never happen, but provides fallback
-      })
+      }
 
     def modify[B](f: A => (A, B)): Eru[Nothing, B] =
-      Eru.effect {
+      Eru.succeed {
         @annotation.tailrec
         def loop(): B = {
           val current = state.get()
@@ -90,9 +87,6 @@ object Ref {
           else loop()
         }
         loop()
-      }.attempt.map({
-        case Result.Success(v) => v
-        case Result.Failure(_) => f(state.get())._2 // This should never happen, but provides fallback
-      })
+      }
   }
 }

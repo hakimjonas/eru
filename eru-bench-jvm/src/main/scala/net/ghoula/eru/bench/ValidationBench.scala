@@ -93,8 +93,8 @@ class ValidationBench {
   def constantFoldingControl(h: Blackhole): Unit = {
     // Use System.nanoTime() to prevent constant folding
     val dynamic = (System.nanoTime() % 100).toInt
-    val zero = dynamic - dynamic // Dynamic zero
-    val one = (dynamic / dynamic) // Dynamic one
+    val zero = dynamic - dynamic
+    val one = (dynamic / dynamic)
 
     val result1 = Eru.succeed(42).map(_ + zero).map(x => x).unsafeRunSync()
     val result2 = Eru.succeed(10).map(_ * one).map(_ + zero).unsafeRunSync()

@@ -55,7 +55,7 @@ final class ConcurrencySpec extends FunSuite {
       d <- Eru.deferred[Int]
       f <- Eru.succeed(42).fork
       _ <- d.complete(99)
-      v <- d.poll.map(_.getOrElse(-1))
+      v <- d.await
       x <- f.await.flatMap {
         case Exit.Success(a) => Eru.succeed(a)
         case _ => Eru.succeed(-1)

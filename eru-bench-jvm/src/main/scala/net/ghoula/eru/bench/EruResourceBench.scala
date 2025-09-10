@@ -53,7 +53,7 @@ class EruResourceBench {
       case _ => Eru.succeed(42)
     }
 
-    val finalizer: Eru[Any, Unit] = Eru.unit // small, non-failing finalizer
+    val finalizer: Eru[Any, Unit] = Eru.unit
 
     // Build K ensures around the base program
     ensuredProg = (0 until k).foldLeft(base) { (acc, _) => acc.ensure(finalizer) }

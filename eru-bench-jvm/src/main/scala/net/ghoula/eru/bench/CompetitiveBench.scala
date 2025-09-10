@@ -633,7 +633,7 @@ class CompetitiveBench {
 
     Unsafe.unsafe { implicit unsafe =>
       _root_.zio.Runtime.default.unsafe.run(timedOut).getOrThrowFiberFailure() match {
-        case None => true // None indicates timeout
+        case None => true
         case Some(_) => false
       }
     }
