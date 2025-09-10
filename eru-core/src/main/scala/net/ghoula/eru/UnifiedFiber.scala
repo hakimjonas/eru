@@ -3,16 +3,10 @@ package net.ghoula.eru
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 
-/** Unified fiber implementation using Scala 3 enums for clean state management.
+/** Fiber state machine with two possible states: completed or active.
   *
-  * Provides a single, efficient fiber abstraction that can represent both completed and active
-  * states using a type-safe enum-based state machine.
-  *
-  * The design follows Eru's Four Pillars:
-  *   - Correctness: Type-safe state transitions with impossible states ruled out
-  *   - Ergonomics: Clean pattern matching and intuitive API
-  *   - Guided Correctness: State machine prevents incorrect usage
-  *   - Observability: Clear state visibility for debugging
+  * Completed fibers have a known result, while active fibers are currently executing and can be
+  * awaited or interrupted.
   */
 enum UnifiedFiberState[+E, +A] {
 
@@ -24,9 +18,6 @@ enum UnifiedFiberState[+E, +A] {
   case Completed(exit: Exit[E, A])
 
   /** A fiber that is currently executing on a thread.
-    *
-    * Note: AtomicReference is invariant, so we need to declare E and A explicitly for this case to
-    * handle variance properly.
     *
     * @param latch
     *   coordination primitive for await operations
@@ -42,20 +33,16 @@ enum UnifiedFiberState[+E, +A] {
   ) extends UnifiedFiberState[E, A]
 }
 
-/** Unified fiber implementation that handles both completed and active fibers.
-  *
-  * Provides a single, clean abstraction using Scala 3 enums for state management. It supports both
-  * immediate (completed) fibers and asynchronous (active) fibers with proper await and interrupt
-  * semantics.
+/** A fiber that can be in either completed or active state.
   *
   * @tparam E
-  *   the error type of the fiber's computation (covariant)
+  *   the error type of the fiber's computation
   * @tparam A
-  *   the success type of the fiber's computation (covariant)
+  *   the success type of the fiber's computation
   * @param id
   *   the unique identifier of this fiber
   * @param state
-  *   the current state of the fiber (completed or active)
+  *   the current state of the fiber
   */
 final class UnifiedFiber[+E, +A](
   val id: FiberId,
@@ -81,7 +68,6 @@ final class UnifiedFiber[+E, +A](
       }.attempt.map {
         case Result.Success(exit) => exit
         case Result.Failure(t) =>
-          // If we were interrupted while waiting, check if result is available
           Option(exitRef.get()).getOrElse(Exit.Die(t))
       }
   }
@@ -170,14 +156,12 @@ object UnifiedFiber {
   def complete[E, A](fiber: UnifiedFiber[E, A], exit: Exit[E, A]): Unit = {
     fiber.state match {
       case UnifiedFiberState.Active(latch, exitRef, _) =>
-        // The exitRef was created with the same types when the fiber was created
         exitRef match {
           case ref: AtomicReference[Exit[E, A]] @unchecked =>
             ref.set(exit)
             latch.countDown()
         }
       case UnifiedFiberState.Completed(_) =>
-        // Already completed, nothing to do
         ()
     }
   }
@@ -197,7 +181,6 @@ object UnifiedFiber {
       case UnifiedFiberState.Active(_, _, threadRef) =>
         threadRef.set(Some(thread))
       case UnifiedFiberState.Completed(_) =>
-        // Already completed, nothing to do
         ()
     }
   }

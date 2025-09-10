@@ -9,9 +9,7 @@ import net.ghoula.eru.prelude.*
 /** Comprehensive end-to-end integration test suite for complete Eru workflows.
   *
   * Validates complex compositions of all Eru features including concurrency, resource management,
-  * error handling, observability, and runtime operations in realistic application scenarios. These
-  * tests ensure that the entire effect system works cohesively and maintains all correctness,
-  * performance, and safety guarantees when features are composed in production-like usage patterns.
+  * error handling, observability, and runtime operations in realistic application scenarios.
   */
 final class EndToEndSpec extends FunSuite {
 
@@ -20,8 +18,7 @@ final class EndToEndSpec extends FunSuite {
   /** Validates comprehensive end-to-end composition of all Eru features.
     *
     * Tests a complex workflow that combines concurrency, state management, retry logic, timeouts,
-    * resource safety, and observability to ensure all features work together cohesively in
-    * realistic application scenarios.
+    * resource safety, and observability in realistic application scenarios.
     */
   test("end-to-end composition across concurrency, state, retry, timeout, ensure, observer") {
     val events = scala.collection.mutable.ArrayBuffer.empty[EruObserver.EruEvent]

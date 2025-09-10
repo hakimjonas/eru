@@ -15,70 +15,40 @@ package net.ghoula.eru
   */
 enum Exit[+E, +A] {
 
-  /** Represents successful effect completion containing the produced value.
-    *
-    * This outcome indicates that the effect executed successfully without errors or interruption,
-    * producing a value of type A. Success represents the ideal execution path where all operations
-    * completed as expected.
+  /** Successful completion with a value.
     *
     * @param value
-    *   the value produced by the successful effect execution
+    *   the value produced by the effect
     */
   case Success(value: A)
 
-  /** Represents an effect failure with a typed, domain-specific error.
-    *
-    * This outcome indicates that the effect failed through Eru's typed error channel, representing
-    * expected domain errors that are part of normal business logic. These errors are typically
-    * recoverable and should be handled as part of the application's error handling strategy.
+  /** Failure with a typed error.
     *
     * @param error
-    *   the typed domain error that caused the effect to fail
+    *   the error that caused the failure
     */
   case Failure(error: E)
 
-  /** Represents unexpected effect failure due to a system defect.
-    *
-    * This outcome indicates that the effect failed due to an unexpected Throwable, representing an
-    * unexpected or unrecoverable error (a "defect" in the program's logic), as opposed to a typed
-    * error handled in Exit.Failure. These are typically programming errors, system failures, or
-    * other exceptional conditions that require immediate attention.
+  /** Failure due to an unexpected throwable.
     *
     * @param throwable
-    *   the unexpected Throwable that caused the effect to fail
+    *   the throwable that caused the failure
     */
   case Die(throwable: Throwable)
 
-  /** Represents effect-termination due to cooperative interruption.
-    *
-    * This outcome indicates that the effect was terminated due to an interruption request, such as
-    * cancellation, timeout, or structured concurrency requirements. Interruption is cooperative and
-    * allows for proper resource cleanup and graceful shutdown. When a fiber is interrupted, its
-    * finalizers are still guaranteed to be executed before the fiber terminates.
+  /** Termination due to interruption.
     *
     * @param fiberId
-    *   the identifier of the fiber that was interrupted
+    *   the identifier of the interrupted fiber
     * @param cause
-    *   the structured reason for the interruption
+    *   the reason for the interruption
     */
   case Interrupt(fiberId: FiberId, cause: InterruptCause)
 }
 
-/** A unique identifier for fibers in Eru's asynchronous runtime.
+/** A unique identifier for fibers.
   *
-  * FiberId provides a lightweight, unique identifier for each fiber in the system, enabling
-  * tracking, correlation, and management of concurrent execution. The identifier is modeled as an
-  * opaque type to ensure domain integrity, prevent misuse, and provide future-proofing across
-  * different platforms and runtime implementations.
-  *
-  * Fiber identifiers are essential for:
-  *   - Correlating events and operations across fiber boundaries
-  *   - Implementing structured concurrency and parent-child relationships
-  *   - Providing observability and debugging support for concurrent programs
-  *   - Managing fiber lifecycle and resource cleanup
-  *
-  * The current implementation uses monotonic Long values to ensure uniqueness within the process
-  * lifetime while maintaining high performance for ID generation.
+  * Uses monotonic Long values to ensure uniqueness within the process lifetime.
   *
   * @example
   *   {{{
@@ -94,24 +64,15 @@ enum Exit[+E, +A] {
   */
 opaque type FiberId = Long
 
-/** Factory and utilities for FiberId generation and management.
-  *
-  * This object provides the primary interface for creating new fiber identifiers and will be
-  * extended with additional utilities for fiber management in future versions of the runtime.
+/** Factory for creating fiber identifiers.
   */
 object FiberId {
   private val next = new java.util.concurrent.atomic.AtomicLong(1L)
 
-  /** Generates a fresh, unique FiberId for a new fiber.
-    *
-    * This method creates a unique identifier using a monotonic counter, ensuring that each fiber
-    * receives a distinct identifier within the process lifetime.
-    *
-    * '''Performance:''' ID generation is designed to be very fast with minimal allocation, suitable
-    * for high-throughput fiber creation scenarios.
+  /** Creates a new unique fiber identifier.
     *
     * @return
-    *   a new, unique FiberId for fiber identification and tracking
+    *   a new FiberId
     *
     * @example
     *   {{{

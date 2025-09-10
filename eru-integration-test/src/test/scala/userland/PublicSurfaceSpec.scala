@@ -8,8 +8,7 @@ import net.ghoula.eru.prelude.*
   *
   * Validates that all essential Eru functionality is properly exposed through the public API and
   * that the prelude import provides access to core operations without additional imports. These
-  * tests serve as both API validation and documentation of the intended user experience, ensuring
-  * that the public surface supports the Radical Ergonomics pillar of the Eru framework.
+  * tests serve as both API validation and documentation of the intended user experience.
   */
 final class PublicSurfaceSpec extends FunSuite {
 
@@ -18,7 +17,7 @@ final class PublicSurfaceSpec extends FunSuite {
   /** Validates that the prelude import provides access to core Eru functionality.
     *
     * Tests that essential Eru constructors and combinators are accessible through the prelude
-    * import without requiring additional imports, supporting the Radical Ergonomics principle.
+    * import without requiring additional imports.
     */
   test("prelude provides core constructors and combinators") {
     val e = Eru.succeed(42).map(_ + 1).flatMap(n => Eru.succeed(n * 2))

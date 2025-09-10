@@ -8,10 +8,8 @@ import munit.FunSuite
   * fresh runtime for each test suite.
   */
 trait TestWithRuntime extends FunSuite {
-  // Create a fresh runtime for this test suite
   given runtime: EruRuntime = EruRuntime.create()
 
-  // Clean up after all tests
   override def afterAll(): Unit = {
     runtime.cleanup()
     super.afterAll()

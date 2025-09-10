@@ -1,50 +1,27 @@
 package net.ghoula.eru
 
-/** Package-private contract for asynchronous fiber execution.
-  *
-  * This provides a clean boundary between the core interpreter and runtime scheduler, enabling the
-  * interpreter to delegate fork operations to true asynchronous execution while preserving proper
-  * finalizer semantics and module boundaries.
-  *
-  * This contract is the key to achieving correct FILO finalizer ordering in concurrent scenarios by
-  * allowing the parent fiber to continue execution while children run asynchronously.
+/** Contract for asynchronous fiber execution.
   */
 private[eru] trait AsyncScheduler {
 
-  /** Schedule a computation for asynchronous execution and return a suspending fiber.
-    *
-    * This is the core contract that enables true concurrency. The scheduler should:
-    *   1. Start executing the computation asynchronously (e.g., on a virtual thread)
-    *   2. Return a fiber handle immediately without blocking
-    *   3. Ensure proper finalizer collection and integration
+  /** Schedules a computation for asynchronous execution.
     *
     * @param computation
     *   the effect to execute asynchronously
     * @param observer
     *   optional observer for fiber lifecycle events
-    * @tparam E
-    *   the error type of the computation
-    * @tparam A
-    *   the success type of the computation
     * @return
-    *   a fiber that represents the asynchronous computation
+    *   a fiber representing the asynchronous computation
     */
   def scheduleAsync[E, A](
     computation: Eru[E, A],
     observer: Option[EruObserver]
   ): AsyncFiber[E, A]
 
-  /** Execute a computation with finalizer collection.
-    *
-    * This enables backends to properly integrate with the interpreter's finalizer system by
-    * executing computations and capturing both results and finalizers.
+  /** Executes a computation and collects finalizers.
     *
     * @param computation
     *   the effect to execute
-    * @tparam E
-    *   the error type of the computation
-    * @tparam A
-    *   the success type of the computation
     * @return
     *   tuple of (exit result, collected finalizers)
     */

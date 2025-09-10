@@ -12,17 +12,15 @@ private class InterruptedWithFinalizers(
   val finalizers: List[() => Eru[Nothing, Unit]]
 ) extends InterruptedException(cause.toString)
 
-/** A data type representing a pure, lazy, and composable computation that can produce a value of
-  * type `A` or fail with an error of type `E`.
+/** A computation that can succeed with a value of type `A` or fail with an error of type `E`.
   *
-  * `Eru[E, A]` is the heart of the Eru effect system, embodying the core principles of correctness,
-  * ergonomics, and composability. It provides a pure, immutable description of computations that
-  * can be composed and executed safely.
+  * Computations are lazy and immutable descriptions that can be composed with combinators like
+  * `map`, `flatMap`, and `recover`. They are executed using runtime methods.
   *
   * @tparam E
-  *   the type of the error value (covariant)
+  *   the type of the error value
   * @tparam A
-  *   the type of the success value (covariant)
+  *   the type of the success value
   */
 enum Eru[+E, +A] {
 

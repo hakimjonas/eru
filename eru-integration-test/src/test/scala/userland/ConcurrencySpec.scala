@@ -8,8 +8,7 @@ import net.ghoula.eru.prelude.*
   *
   * Validates race conditions, parallel execution, resource coordination through Deferred and Ref
   * primitives, and proper cancellation semantics. All tests use deterministic synchronization
-  * mechanisms rather than timing assumptions to ensure reliability and adherence to the Four
-  * Pillars principles.
+  * mechanisms rather than timing assumptions to ensure reliability.
   */
 final class ConcurrencySpec extends FunSuite {
 

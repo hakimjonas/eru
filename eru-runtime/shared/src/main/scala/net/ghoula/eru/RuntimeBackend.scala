@@ -21,17 +21,14 @@ private object StructuredConcurrency {
     try {
       action(newScope)
     } finally {
-      // Interrupt and await all child fibers before exiting scope (ensures finalizers execute)
       var child = Option(newScope.childFibers.poll())
       while (child.nonEmpty) {
         val fiber = child.get
         try {
-          // Send interrupt signal
           fiber.interrupt(InterruptCause.ParentTerminated(FiberId.fresh(), Exit.Success(()))).attempt.unsafeRunSync()
-          // Wait for fiber to complete (allows finalizers to execute)
           fiber.await.attempt.unsafeRunSync()
         } catch {
-          case _: Exception => () // Continue cleanup even if fiber fails
+          case _: Exception => ()
         }
         child = Option(newScope.childFibers.poll())
       }
@@ -44,8 +41,8 @@ private object StructuredConcurrency {
       case Some(scope) => scope.childFibers.offer(fiber)
       case None =>
         rootFibers match {
-          case Some(queue) => queue.offer(fiber) // Add to root collection for auto-join
-          case None => () // No root tracking - fiber will be orphaned (production behavior)
+          case Some(queue) => queue.offer(fiber)
+          case None => ()
         }
     }
   }
@@ -53,7 +50,6 @@ private object StructuredConcurrency {
   def cleanupRootFibers(rootFibers: Option[ConcurrentLinkedQueue[UnifiedFiber[?, ?]]]): Unit = {
     rootFibers match {
       case Some(queue) =>
-        // Collect all fibers first to avoid timing races
         val fibersToCleanup = scala.collection.mutable.ListBuffer.empty[UnifiedFiber[?, ?]]
         var fiber = Option(queue.poll())
         while (fiber.nonEmpty) {
@@ -61,16 +57,14 @@ private object StructuredConcurrency {
           fiber = Option(queue.poll())
         }
 
-        // Now await all fibers in a deterministic order
         fibersToCleanup.foreach { fiberToCleanup =>
           try {
-            // Wait for fiber to complete naturally (auto-join)
             fiberToCleanup.await.attempt.unsafeRunSync()
           } catch {
-            case _: Exception => () // Continue cleanup even if fiber fails
+            case _: Exception => ()
           }
         }
-      case None => () // No cleanup needed
+      case None => ()
     }
   }
 }
@@ -124,17 +118,15 @@ enum RuntimeBackend {
           val (exit, finalizers) = Eru.executeWithFinalizers(fa)
           observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
 
-          // Execute finalizers directly - they are already in FILO order from executeWithFinalizers
           finalizers.foreach { finalizer =>
             try finalizer().unsafeRunSync()
-            catch case _: Exception => () // Swallow finalizer errors
+            catch case _: Exception => ()
           }
 
           UnifiedFiber.completed(id, exit): Fiber[E, A]
         }.attempt.map {
           case Result.Success(fiber) => fiber
           case Result.Failure(t) =>
-            // Create a failed fiber as fallback
             val id = FiberId.fresh()
             val exit = Exit.Die(t)
             observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
@@ -146,7 +138,6 @@ enum RuntimeBackend {
           val id = FiberId.fresh()
           val fiber = UnifiedFiber.active[E, A](id)
 
-          // Add this fiber as a child of the current scope
           StructuredConcurrency.addChildFiber(fiber, rootFibers)
 
           observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
@@ -154,26 +145,23 @@ enum RuntimeBackend {
           Thread.startVirtualThread { () =>
             UnifiedFiber.setThread(fiber, Thread.currentThread())
 
-            // Execute with structured concurrency scope
             StructuredConcurrency.withNewScope { _ =>
               val (exit, finalizers) = Eru.executeWithFinalizers(fa)
 
-              // Execute finalizers directly - they are already in FILO order from executeWithFinalizers
               finalizers.foreach { finalizer =>
                 try finalizer().unsafeRunSync()
-                catch case _: Exception => () // Swallow finalizer errors
+                catch case _: Exception => ()
               }
 
               UnifiedFiber.complete(fiber, exit)
               observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-            } // Child fibers are automatically interrupted here
+            }
           }
 
           fiber: Fiber[E, A]
         }.attempt.map {
           case Result.Success(fiber) => fiber
           case Result.Failure(t) =>
-            // Create a failed fiber as fallback
             val id = FiberId.fresh()
             val exit = Exit.Die(t)
             observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
@@ -193,7 +181,6 @@ enum RuntimeBackend {
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
     this match {
       case Synchronous =>
-        // Sequential execution - first computation always "wins"
         fa.map(Left.apply)
 
       case VirtualThreads =>
@@ -318,7 +305,6 @@ enum RuntimeBackend {
     * according to structured concurrency semantics.
     */
   def cleanup(rootFibers: Option[ConcurrentLinkedQueue[UnifiedFiber[?, ?]]] = None): Unit = {
-    // Clean up any unawaited root-level fibers (auto-join behavior)
     StructuredConcurrency.cleanupRootFibers(rootFibers)
   }
 }

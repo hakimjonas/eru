@@ -8,23 +8,11 @@ package net.ghoula.eru
   */
 object EruObserver {
 
-  /** A no-op observer that discards all events.
-    *
-    * This is useful when an observer is required by an API but the caller does not wish to record
-    * or emit any events. It has near-zero overhead.
-    *
-    * @return
-    *   an observer that ignores all events
+  /** An observer that discards all events.
     */
   def noop: EruObserver = new EruObserver { def onEvent(event: EruEvent): Unit = () }
 
-  /** A console observer that prints events to standard output.
-    *
-    * This helper is intended for quick diagnostics and examples. For production use, prefer a
-    * structured observer that forwards to logging/metrics/tracing backends.
-    *
-    * @return
-    *   an observer that prints human-readable events to standard output
+  /** An observer that prints events to standard output.
     */
   def console: EruObserver = new EruObserver {
     def onEvent(event: EruEvent): Unit = {
@@ -32,18 +20,9 @@ object EruObserver {
     }
   }
 
-  /** A stable identifier for a single program execution scope.
+  /** Unique identifier for a program execution scope.
     *
-    * ScopeId provides a unique identifier that tracks the execution boundary of Eru programs. Each
-    * ScopeId typically corresponds to one program run and is used to correlate events during that
-    * run.
-    *
-    * ScopeIds are generated using a monotonic counter to ensure uniqueness within the process
-    * lifetime. They provide a lightweight mechanism for correlating events across the execution of
-    * a program, useful for debugging and performance analysis.
-    *
-    * Thread-safety: ScopeId generation is thread-safe, using atomic operations to ensure unique
-    * identifiers are produced even in highly concurrent environments.
+    * Generated using a monotonic counter to ensure uniqueness within the process lifetime.
     *
     * @example
     *   {{{
@@ -56,32 +35,20 @@ object EruObserver {
   object ScopeId {
     private val next = new java.util.concurrent.atomic.AtomicLong(1L)
 
-    /** Generates a fresh ScopeId for a new execution scope.
-      *
-      * This method creates a unique identifier for tracking program execution. Each call returns a
-      * monotonically increasing value, ensuring uniqueness within the process lifetime.
+    /** Creates a new unique scope identifier.
       *
       * @return
-      *   a new, unique ScopeId for program execution tracking
+      *   a new ScopeId
       */
     def fresh(): ScopeId = next.getAndIncrement()
   }
 
-  /** Structured outcome representing the final result of program execution.
+  /** The outcome of program execution.
     *
-    * Outcome provides a comprehensive classification of how an Eru program terminates, enabling
-    * observers to implement appropriate handling strategies for different failure modes. This
-    * classification aligns with Eru's principled approach to error handling by distinguishing
-    * between recoverable domain errors and unexpected system failures.
-    *
-    * The three outcome types correspond to Eru's error model:
-    *   - '''Success:''' Normal program completion with a produced value
-    *   - '''TypedFailure:''' Expected domain error handled through Eru's typed error channel
-    *   - '''Defect:''' Unexpected system failure (Throwable) indicating a programming error
-    *
-    * This structured approach enables observers to implement different strategies for different
-    * failure modes, such as alerting for defects while treating typed failures as normal business
-    * logic outcomes.
+    * Three possible outcomes:
+    *   - Success: Normal completion with a value
+    *   - TypedFailure: Expected domain error
+    *   - Defect: Unexpected system failure
     *
     * @example
     *   {{{

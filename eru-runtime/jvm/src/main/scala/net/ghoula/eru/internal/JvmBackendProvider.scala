@@ -10,6 +10,5 @@ package net.ghoula.eru.internal
   * code has proper auto-join cleanup support while maintaining isolation from tests.
   */
 private[eru] final class JvmBackendProvider extends BackendProvider {
-  // Singleton backend instance with its own fiber tracking
   val backend: ConcurrencyBackend = RuntimeBackendAdapter.virtualThreads()
 }

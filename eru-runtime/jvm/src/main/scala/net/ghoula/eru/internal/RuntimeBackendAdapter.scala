@@ -15,7 +15,6 @@ import net.ghoula.eru.prelude.*
   */
 private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends ConcurrencyBackend {
 
-  // Instance-specific root fiber collection for auto-join cleanup
   private val rootFibers: ConcurrentLinkedQueue[UnifiedFiber[?, ?]] = new ConcurrentLinkedQueue()
 
   val capabilities: BackendCapabilities = backend match {
@@ -34,23 +33,21 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   }
 
   def computeExit[E, A](fa: Eru[E, A], fiberId: FiberId): Exit[E, A] = {
-    val _ = fiberId // Ignore the fiberId parameter for now
+    val _ = fiberId
     backend match {
       case RuntimeBackend.Synchronous =>
         val (exit, finalizers) = Eru.executeWithFinalizers(fa)
-        // Execute finalizers directly - they are already in FILO order from executeWithFinalizers
         finalizers.foreach { finalizer =>
           try finalizer().unsafeRunSync()
-          catch case _: Exception => () // Swallow finalizer errors
+          catch case _: Exception => ()
         }
         exit
 
       case RuntimeBackend.VirtualThreads =>
         val (exit, finalizers) = Eru.executeWithFinalizers(fa)
-        // Execute finalizers directly - they are already in FILO order from executeWithFinalizers
         finalizers.foreach { finalizer =>
           try finalizer().unsafeRunSync()
-          catch case _: Exception => () // Swallow finalizer errors
+          catch case _: Exception => ()
         }
         exit
     }
@@ -89,10 +86,8 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   def handleSuspend[E, A](
     register: (Either[E, A] => Unit) => Eru[Nothing, Unit]
   ): Eru[Nothing, Either[E | Throwable, A]] = {
-    // For now, delegate to VTOnlyBackend-style implementation
     backend match {
       case RuntimeBackend.Synchronous =>
-        // Simple sync implementation - not supported
         Eru.succeed(Left(new UnsupportedOperationException("Suspend not supported in synchronous mode")))
 
       case RuntimeBackend.VirtualThreads =>

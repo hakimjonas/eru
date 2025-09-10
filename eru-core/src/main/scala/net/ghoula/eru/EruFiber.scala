@@ -1,34 +1,17 @@
 package net.ghoula.eru
 
-/** A pure, immutable handle to a fiber computation.
-  *
-  * `EruFiber[E, A]` is an immutable and pure description of a concurrent computation, not a running
-  * process itself. It represents a handle to a computation that executes on a logical fiber and
-  * provides operations for awaiting the fiber's completion and managing its lifecycle.
-  *
-  * Key characteristics:
-  *   - Pure and immutable: contains no mutable state or side effects
-  *   - Type-safe: preserves the error type E and success type A of the underlying computation
-  *   - Cross-platform: works consistently on both JVM and Scala Native
-  *   - Resource-safe: supports proper cleanup semantics with automatic finalizer execution
-  *   - Observable: integrates with the Eru observability system
+/** A handle to a fiber computation.
   *
   * @tparam E
-  *   the error type of the fiber's computation (covariant)
+  *   the error type of the fiber's computation
   * @tparam A
-  *   the success type of the fiber's computation (covariant)
-  *
-  * Fiber characteristics:
-  *   - Auto-join semantics prevent resource leakage from unawaited fibers
-  *   - Multiple await operations are safe and always return the same result
-  *   - Supports cooperative interruption for graceful fiber termination
-  *
+  *   the success type of the fiber's computation
   * @param id
   *   the unique identifier of this fiber
   * @param exit
   *   the completion result of the fiber computation
   * @param finalizers
-  *   the accumulated finalizers from fiber execution in FILO order
+  *   the accumulated finalizers from fiber execution
   */
 final class EruFiber[+E, +A](
   val id: FiberId,
@@ -36,17 +19,10 @@ final class EruFiber[+E, +A](
   private[eru] val finalizers: List[() => Eru[Nothing, Unit]]
 ) extends Fiber[E, A] {
 
-  /** Creates an Eru effect that awaits this fiber's completion.
-    *
-    * This operation waits for the fiber to complete and returns its Exit outcome. The await
-    * operation properly merges the fiber's finalizers with the current execution context to
-    * maintain FILO finalizer semantics across fiber boundaries.
-    *
-    * The await will only ever return once - subsequent calls to await on the same fiber will return
-    * the same Exit value immediately without re-executing any logic.
+  /** Awaits this fiber's completion.
     *
     * @return
-    *   an Eru effect that yields the fiber's exit result and merges finalizers when executed
+    *   an effect that yields the fiber's exit result
     */
   def await: Eru[Nothing, Exit[E, A]] =
     Eru.await(this).attempt.map {
@@ -55,17 +31,12 @@ final class EruFiber[+E, +A](
         throw new IllegalStateException("Fiber await failed unexpectedly")
     }
 
-  /** Creates an Eru effect that interrupts this fiber with the specified cause.
-    *
-    * The returned effect describes the intent to interrupt this fiber. When executed, it will
-    * signal the fiber to stop its current computation and begin cleanup. Interrupting a fiber is
-    * also a descriptive action - the interruption will be processed cooperatively by the fiber at
-    * its next safe interruption point.
+  /** Interrupts this fiber with the specified cause.
     *
     * @param cause
     *   the reason for interrupting this fiber
     * @return
-    *   an Eru effect that interrupts this fiber when executed
+    *   an effect that interrupts this fiber
     */
   def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = {
     val _ = cause

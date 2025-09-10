@@ -2,38 +2,19 @@ package net.ghoula.eru
 
 import java.time.Duration
 
-/** Cross-platform runtime functions for concurrency, racing, timeouts, and retries.
-  *
-  * EruRuntime provides a complete set of concurrent operations that work consistently across both
-  * JVM and Scala Native platforms. Each runtime instance is backed by a ConcurrencyBackend that
-  * provides the actual implementation, ensuring proper isolation and no global shared state.
-  *
-  * Platform-specific behavior:
-  *   - JVM: Uses Virtual Threads for true concurrent execution with non-blocking operations
-  *   - Native: Uses synchronous execution while preserving the same API and resource semantics
+/** Runtime for executing concurrent operations.
   *
   * @param backend
-  *   the concurrency backend to use for this runtime instance
+  *   the concurrency backend to use
   */
 final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 
-  /** Launches an effect on a separate execution context and returns a fiber handle.
-    *
-    * The effect executes according to the platform's concurrency capabilities:
-    *   - JVM: The effect runs asynchronously on its own Virtual Thread
-    *   - Native: The effect executes synchronously but maintains the same API
-    *
-    * The returned fiber provides await and interrupt capabilities, enabling structured concurrency
-    * patterns where parent effects can control and coordinate child computations.
+  /** Launches an effect and returns a fiber handle.
     *
     * @param fa
-    *   the effect to execute asynchronously
-    * @tparam E
-    *   the error type of the forked computation
-    * @tparam A
-    *   the success type of the forked computation
+    *   the effect to execute
     * @return
-    *   an effect yielding a fiber handle for the launched computation
+    *   an effect yielding a fiber handle
     *
     * @example
     *   {{{
@@ -51,26 +32,14 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
   def fork[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, None)
 
-  /** Launches an effect with observer integration for fiber lifecycle tracking.
-    *
-    * This variant of fork includes an observer that receives structured events during the fiber's
-    * execution lifecycle. Events include FiberStarted when the fiber begins execution and
-    * FiberCompleted with the final exit state when the fiber terminates.
-    *
-    * The observer integration enables comprehensive monitoring, debugging, and tracing of
-    * concurrent operations without affecting the computation semantics or performance
-    * characteristics.
+  /** Launches an effect with an observer for lifecycle events.
     *
     * @param fa
-    *   the effect to execute asynchronously
+    *   the effect to execute
     * @param observer
-    *   the observer to receive fiber lifecycle events
-    * @tparam E
-    *   the error type of the forked computation
-    * @tparam A
-    *   the success type of the forked computation
+    *   the observer to receive fiber events
     * @return
-    *   an effect yielding a fiber handle for the launched computation
+    *   an effect yielding a fiber handle
     *
     * @example
     *   {{{

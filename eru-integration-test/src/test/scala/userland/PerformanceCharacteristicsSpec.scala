@@ -9,9 +9,7 @@ import net.ghoula.eru.prelude.*
 /** Performance characteristics validation for the Eru effect system.
   *
   * Tests that verify expected performance characteristics including stack safety, memory
-  * efficiency, and execution speed under various load conditions. These tests ensure that the
-  * effect system maintains its performance guarantees and helps detect performance regressions
-  * across different usage patterns.
+  * efficiency, and execution speed under various load conditions.
   */
 class PerformanceCharacteristicsSpec extends FunSuite {
 

@@ -1,9 +1,6 @@
 package net.ghoula.eru
 
-/** Represents the execution state of a fiber.
-  *
-  * FiberState tracks the current execution status of a fiber throughout its lifecycle, enabling
-  * proper coordination and structured concurrency semantics.
+/** The execution state of a fiber.
   */
 enum FiberState {
 
@@ -20,21 +17,16 @@ enum FiberState {
   case Interrupted
 }
 
-/** Immutable context information for a fiber.
-  *
-  * FiberContext contains all the metadata and state information associated with a fiber, including
-  * its identity, current state, and parentage information for structured concurrency. This is a
-  * pure data structure that describes a fiber's context without containing the execution logic
-  * itself.
+/** Context information for a fiber.
   *
   * @param id
   *   the unique identifier for this fiber
   * @param state
   *   the current execution state of the fiber
   * @param parentId
-  *   the ID of the parent fiber, if any (for structured concurrency)
+  *   the ID of the parent fiber, if any
   * @param startTime
-  *   the timestamp when this fiber was created (in nanoseconds)
+  *   the timestamp when this fiber was created
   */
 final case class FiberContext(
   id: FiberId,

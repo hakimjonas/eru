@@ -1,23 +1,15 @@
 package net.ghoula.eru
 
-/** Internal utilities for reducing boilerplate in data classes.
-  *
-  * These utilities provide common functionality for implementing equals, hashCode, and toString
-  * methods across the Eru codebase, ensuring consistency and reducing duplication. They follow
-  * standard Java practices for hash code generation and provide clean string representations.
+/** Utilities for implementing equals, hashCode, and toString methods.
   */
 private[eru] object DataClassUtils {
 
-  /** Generates hash code for multiple values using the standard prime multiplier pattern.
-    *
-    * This method implements the standard approach for combining hash codes from multiple values,
-    * using a prime number (31) as the multiplier to reduce hash collisions. The implementation
-    * follows the pattern used by generated case classes in Scala.
+  /** Generates hash code for multiple values.
     *
     * @param values
     *   the values to include in the hash code calculation
     * @return
-    *   the combined hash code for all provided values
+    *   the combined hash code
     */
   def hashCodeFor(values: Any*): Int = {
     val prime = 31
@@ -30,14 +22,10 @@ private[eru] object DataClassUtils {
 
   /** Generates string representation in constructor format.
     *
-    * This method creates a string representation that mirrors constructor syntax, making debug
-    * output more readable and consistent across the codebase. The format matches what would be
-    * generated for case classes.
-    *
     * @param className
-    *   the name of the class being represented
+    *   the name of the class
     * @param values
-    *   the field values to include in the string representation
+    *   the field values
     * @return
     *   a formatted string in the form "ClassName(value1, value2, ...)"
     */
@@ -55,15 +43,7 @@ private[eru] object DataClassUtils {
   */
 object DomainTypes {
 
-  /** Represents a count of retry attempts with compile-time safety.
-    *
-    * AttemptCount ensures retry logic cannot accidentally use negative attempt counts, preventing
-    * common off-by-one errors and invalid retry states. The type enforces non-negative constraints
-    * at construction time, making it impossible to represent invalid attempt counts in the type
-    * system.
-    *
-    * This type is used throughout error handling and retry mechanisms to ensure correctness and
-    * provide clear semantic meaning in function signatures.
+  /** A non-negative count of retry attempts.
     *
     * @example
     *   {{{ val attempts = AttemptCount(3) val nextAttempt = attempts.increment if (attempts <
@@ -106,14 +86,7 @@ object DomainTypes {
     }
   }
 
-  /** Represents a jitter factor for exponential backoff with constrained range [0.0, 1.0].
-    *
-    * JitterFactor prevents invalid jitter values that could cause negative delays or excessive
-    * randomization. The constraint ensures jitter remains within reasonable bounds for backoff
-    * algorithms, preventing configuration errors that could lead to system instability.
-    *
-    * This type is essential for implementing robust retry policies that avoid thundering herd
-    * effects through controlled randomization.
+  /** A jitter factor constrained to the range [0.0, 1.0].
     *
     * @example
     *   {{{
@@ -146,14 +119,7 @@ object DomainTypes {
     }
   }
 
-  /** Represents a failure threshold for circuit breakers with compile-time safety.
-    *
-    * FailureThreshold ensures circuit breakers cannot be configured with invalid thresholds (zero
-    * or negative), preventing misconfigured circuit breakers that would never open or close
-    * properly. This type provides guarantees about circuit breaker behavior at compile time.
-    *
-    * Circuit breakers are critical for system resilience, and this type ensures they are configured
-    * correctly to provide meaningful protection against cascading failures.
+  /** A positive failure threshold for circuit breakers.
     *
     * @example
     *   {{{ val threshold = FailureThreshold(5) val breaker = new CircuitBreaker(threshold,

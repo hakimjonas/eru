@@ -1,15 +1,11 @@
 package net.ghoula.eru
 
-/** A data type representing the result of a computation that may either succeed with a value of
-  * type `A` or fail with an error of type `E`.
-  *
-  * `Result[E, A]` provides a pure, immutable representation of fallible computations. The type
-  * parameters are covariant to enable flexible subtyping relationships in common usage.
+/** The result of a computation that either succeeds with a value or fails with an error.
   *
   * @tparam E
-  *   the type of the error value (covariant)
+  *   the type of the error value
   * @tparam A
-  *   the type of the success value (covariant)
+  *   the type of the success value
   */
 enum Result[+E, +A] {
 
@@ -30,52 +26,32 @@ enum Result[+E, +A] {
 
 object Result {
 
-  /** Creates a successful `Result` containing the given value.
-    *
-    * This is the canonical way to construct a successful `Result`. The error type is inferred as
-    * `Nothing`, allowing the result to be compatible with any error type through covariance.
+  /** Creates a successful Result.
     *
     * @param value
-    *   the value to wrap in a successful `Result`
-    * @tparam A
-    *   the type of the success value
+    *   the value to wrap
     * @return
-    *   a `Result[Nothing, A]` representing success
+    *   a successful Result
     */
   def succeed[A](value: A): Result[Nothing, A] = Success(value)
 
-  /** Creates a failed `Result` containing the given error.
-    *
-    * This is the canonical way to construct a failed `Result`. The success type is inferred as
-    * `Nothing`, allowing the result to be compatible with any success type through covariance.
+  /** Creates a failed Result.
     *
     * @param error
-    *   the error to wrap in a failed `Result`
-    * @tparam E
-    *   the type of the error value
+    *   the error to wrap
     * @return
-    *   a `Result[E, Nothing]` representing failure
+    *   a failed Result
     */
   def fail[E](error: E): Result[E, Nothing] = Failure(error)
 
-  /** Transforms a `Result` into a value of type `B` by applying one of two functions.
-    *
-    * This is the catamorphism for `Result`, providing a way to extract values from both success and
-    * failure cases in a type-safe manner. This method consolidates the common pattern of matching
-    * on `Result` cases found throughout the codebase.
+  /** Transforms a Result by applying one of two functions.
     *
     * @param result
-    *   the `Result` to transform
+    *   the Result to transform
     * @param ifFailure
-    *   the function to apply if the `Result` is a failure
+    *   function to apply if the Result is a failure
     * @param ifSuccess
-    *   the function to apply if the `Result` is a success
-    * @tparam E
-    *   the type of the error value
-    * @tparam A
-    *   the type of the success value
-    * @tparam B
-    *   the type of the result value
+    *   function to apply if the Result is a success
     * @return
     *   the result of applying the appropriate function
     */
