@@ -13,11 +13,9 @@ private[eru] object DataClassUtils {
     */
   def hashCodeFor(values: Any*): Int = {
     val prime = 31
-    var result = 1
-    values.foreach { value =>
-      result = prime * result + value.hashCode()
+    values.foldLeft(1) { (result, value) =>
+      prime * result + value.hashCode()
     }
-    result
   }
 
   /** Generates string representation in constructor format.

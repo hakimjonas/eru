@@ -345,13 +345,17 @@ object ErrorHandling {
 
     /** Helper method to atomically update circuit breaker state using compare-and-set. */
     private def updateStateAtomically(stateUpdater: CircuitBreakerState => CircuitBreakerState): Unit = {
-      var currentState = atomicState.get()
-      var newState = stateUpdater(currentState)
+      @annotation.tailrec
+      def tryUpdate(): Unit = {
+        val currentState = atomicState.get()
+        val newState = stateUpdater(currentState)
 
-      while (!atomicState.compareAndSet(currentState, newState)) {
-        currentState = atomicState.get()
-        newState = stateUpdater(currentState)
+        if (!atomicState.compareAndSet(currentState, newState)) {
+          tryUpdate()
+        }
       }
+
+      tryUpdate()
     }
 
     private def onSuccess(): Unit = {
@@ -523,30 +527,28 @@ object ErrorHandling {
   }
 
   /** Fluent builder for CircuitBreaker configuration. */
-  final class CircuitBreakerBuilder {
-    private var failureThreshold: FailureThreshold = FailureThreshold(5)
-    private var recoveryTimeout: Duration = Duration.ofSeconds(30)
-    private var successThreshold: Int = 1
+  final case class CircuitBreakerBuilder(
+    private val failureThreshold: FailureThreshold = FailureThreshold(5),
+    private val recoveryTimeout: Duration = Duration.ofSeconds(30),
+    private val successThreshold: Int = 1
+  ) {
 
     /** Sets the failure threshold that triggers circuit breaker to open. */
     def withFailureThreshold(threshold: Int): CircuitBreakerBuilder = {
       require(threshold > 0, "Failure threshold must be positive")
-      this.failureThreshold = FailureThreshold(threshold)
-      this
+      copy(failureThreshold = FailureThreshold(threshold))
     }
 
     /** Sets the recovery timeout before attempting to close the circuit. */
     def withRecoveryTimeout(timeout: Duration): CircuitBreakerBuilder = {
       require(!timeout.isNegative, "Recovery timeout cannot be negative")
-      this.recoveryTimeout = timeout
-      this
+      copy(recoveryTimeout = timeout)
     }
 
     /** Sets the number of successful calls required to close the circuit from half-open state. */
     def withSuccessThreshold(threshold: Int): CircuitBreakerBuilder = {
       require(threshold > 0, "Success threshold must be positive")
-      this.successThreshold = threshold
-      this
+      copy(successThreshold = threshold)
     }
 
     /** Builds the configured CircuitBreaker instance. */
@@ -557,7 +559,7 @@ object ErrorHandling {
   object CircuitBreaker {
 
     /** Creates a new fluent builder for CircuitBreaker configuration. */
-    def builder: CircuitBreakerBuilder = new CircuitBreakerBuilder()
+    def builder: CircuitBreakerBuilder = CircuitBreakerBuilder()
 
     /** Creates a CircuitBreaker with default configuration. */
     def default: CircuitBreaker =

@@ -66,16 +66,16 @@ private[eru] trait AsyncFiber[+E, +A] extends Fiber[E, A] {
   *
   * This provides a clean way for the interpreter to access the scheduler without creating circular
   * dependencies or violating privacy boundaries.
+  *
+  * Note: Currently always returns None as no scheduler is registered in practice. The interpreter
+  * falls back to synchronous execution which maintains correctness while preserving immutability.
   */
 private[eru] object AsyncScheduler {
 
-  @volatile private var currentScheduler: Option[AsyncScheduler] = None
-
-  /** Set the current scheduler (called by runtime initialization). */
-  def setScheduler(scheduler: AsyncScheduler): Unit = {
-    currentScheduler = Some(scheduler)
-  }
-
-  /** Get the current scheduler for use by the interpreter. */
-  def get: Option[AsyncScheduler] = currentScheduler
+  /** Get the current scheduler for use by the interpreter.
+    *
+    * Currently always returns None as async scheduling is handled at the runtime level rather than
+    * through global registration. This maintains immutability in the core.
+    */
+  def get: Option[AsyncScheduler] = None
 }
