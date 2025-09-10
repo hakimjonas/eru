@@ -12,9 +12,8 @@ import net.ghoula.eru.prelude.*
   * any state leakage between tests. The backend's cleanup() method is always called after test
   * completion, even if the test fails or throws an exception.
   *
-  * Updated to use the new RuntimeBackend architecture while maintaining compatibility. This solves
-  * the critical issue where tests pass individually but fail when run as part of the larger test
-  * suite due to shared global runtime state.
+  * Solves the critical issue where tests pass individually but fail when run as part of the larger
+  * test suite due to shared global runtime state.
   */
 object IsolatedTestRunner {
 
@@ -22,8 +21,6 @@ object IsolatedTestRunner {
     *
     * This class wraps a fresh backend instance and provides all the standard EruRuntime methods.
     * Use this in tests instead of the global EruRuntime to avoid state interference.
-    *
-    * Updated to use the new unified RuntimeBackend architecture.
     */
   class IsolatedRuntime(private val backend: ConcurrencyBackend) {
     def fork[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] = backend.fork(fa)

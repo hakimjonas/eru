@@ -5,9 +5,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 /** Unified fiber implementation using Scala 3 enums for clean state management.
   *
-  * This replaces all previous fiber implementations (EruFiber, VTFiber, AsyncFiber, etc.) with a
-  * single, simple fiber that can represent both completed and active states using a clean
-  * enum-based state machine.
+  * Provides a single, efficient fiber abstraction that can represent both completed and active
+  * states using a type-safe enum-based state machine.
   *
   * The design follows Eru's Four Pillars:
   *   - Correctness: Type-safe state transitions with impossible states ruled out
@@ -45,9 +44,9 @@ enum UnifiedFiberState[+E, +A] {
 
 /** Unified fiber implementation that handles both completed and active fibers.
   *
-  * This class unifies all previous fiber implementations into a single, clean abstraction using
-  * Scala 3 enums for state management. It supports both immediate (completed) fibers and
-  * asynchronous (active) fibers with proper await and interrupt semantics.
+  * Provides a single, clean abstraction using Scala 3 enums for state management. It supports both
+  * immediate (completed) fibers and asynchronous (active) fibers with proper await and interrupt
+  * semantics.
   *
   * @tparam E
   *   the error type of the fiber's computation (covariant)

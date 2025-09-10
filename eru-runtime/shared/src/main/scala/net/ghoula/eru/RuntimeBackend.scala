@@ -75,13 +75,12 @@ private object StructuredConcurrency {
   }
 }
 
-/** Simplified runtime backend using Scala 3 enums.
+/** Runtime backend implementation using Scala 3 enums.
   *
-  * This replaces the complex ConcurrencyBackend hierarchy with a simple enum that clearly
-  * represents the two execution modes: synchronous and virtual threads. The enum includes behavior
-  * directly, eliminating multiple abstraction layers.
+  * Provides two execution modes: synchronous for single-threaded environments and virtual threads
+  * for concurrent scenarios. The enum includes behavior directly for optimal performance.
   *
-  * Implements structured concurrency with proper child fiber cleanup.
+  * Implements structured concurrency with proper child fiber cleanup and auto-join semantics.
   */
 enum RuntimeBackend {
 
@@ -128,13 +127,7 @@ enum RuntimeBackend {
           // Execute finalizers directly - they are already in FILO order from executeWithFinalizers
           finalizers.foreach { finalizer =>
             try finalizer().unsafeRunSync()
-            catch {
-              case ex: Exception =>
-                println(s"FINALIZER EXCEPTION: $ex")
-                ex.printStackTrace()
-                // Still swallow to prevent breaking fiber completion
-                ()
-            }
+            catch case _: Exception => () // Swallow finalizer errors
           }
 
           UnifiedFiber.completed(id, exit): Fiber[E, A]
@@ -168,13 +161,7 @@ enum RuntimeBackend {
               // Execute finalizers directly - they are already in FILO order from executeWithFinalizers
               finalizers.foreach { finalizer =>
                 try finalizer().unsafeRunSync()
-                catch {
-                  case ex: Exception =>
-                    println(s"FINALIZER EXCEPTION: $ex")
-                    ex.printStackTrace()
-                    // Still swallow to prevent breaking fiber completion
-                    ()
-                }
+                catch case _: Exception => () // Swallow finalizer errors
               }
 
               UnifiedFiber.complete(fiber, exit)

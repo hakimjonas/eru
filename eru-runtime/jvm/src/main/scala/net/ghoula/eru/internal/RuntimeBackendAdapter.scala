@@ -6,13 +6,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
 
-/** Adapter that wraps the new RuntimeBackend enum to implement the old ConcurrencyBackend
-  * interface.
+/** Internal adapter providing legacy ConcurrencyBackend interface compatibility.
   *
-  * This allows gradual migration from the old backend system to the new unified RuntimeBackend
-  * without breaking existing code. Once all code is migrated, this adapter can be removed.
+  * This adapter bridges the unified RuntimeBackend implementation with the legacy interface,
+  * maintaining backward compatibility while providing modern structured concurrency features.
   *
-  * Each adapter instance maintains its own rootFibers queue for true test isolation.
+  * Each adapter instance maintains its own root fiber collection for proper test isolation.
   */
 private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends ConcurrencyBackend {
 
