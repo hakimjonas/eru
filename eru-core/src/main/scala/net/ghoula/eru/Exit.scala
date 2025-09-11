@@ -67,13 +67,23 @@ opaque type FiberId = Long
 /** Factory for creating fiber identifiers.
   */
 object FiberId {
-  // Use process-unique starting point to avoid conflicts between multiple Eru instances
+  /** Robust process-unique ID generation.
+    *
+    * Layout: [0][15-bit processId][48-bit timestamp/counter]
+    * - Bit 63: Always 0 (ensures positive Long)
+    * - Bits 62-48: Process identifier (15 bits = 32K unique processes)
+    * - Bits 47-0: Timestamp-based counter (281 trillion unique IDs per process)
+    */
   private val processUniqueStart = {
-    val processId =
-      java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0x7fffL // Use only 15 bits to ensure positive
-    val nanoTime = System.nanoTime() & 0xffffffffffffL
-    val rawStart = (processId.toLong << 48) | (nanoTime & 0xffffL)
-    if (rawStart > 0) rawStart else rawStart & 0x7fffffffffffffffL // Force positive by clearing sign bit
+    val ProcessIdBits = 15
+    val ProcessIdMask = (1L << ProcessIdBits) - 1 // 0x7FFF
+    val TimestampMask = (1L << 48) - 1 // 48-bit mask
+    
+    val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode.toLong & ProcessIdMask
+    val timestamp = System.nanoTime() & TimestampMask
+    
+    // Combine: sign bit (0) + processId (15 bits) + timestamp (48 bits)
+    (processId << 48) | timestamp
   }
   private val next = new java.util.concurrent.atomic.AtomicLong(processUniqueStart)
 

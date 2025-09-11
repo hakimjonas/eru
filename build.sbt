@@ -108,21 +108,11 @@ lazy val root = (project in file("."))
     }
   )
   .settings(
-    // Performance benchmarking commands
-    addCommandAlias("bench", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 .*"),
-    addCommandAlias("benchBaseline", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 .*BaselineBench.*"),
-    addCommandAlias("benchValidation", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 .*ValidationBench.*"),
-    addCommandAlias(
-      "benchCore",
-      "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 .*EruMapFlatMapBench.* .*EruRuntimeBench.*"
-    ),
-    addCommandAlias("benchWithGC", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 -prof gc"),
-    addCommandAlias("benchWithStack", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 -prof stack"),
-    addCommandAlias(
-      "benchWithPerfasm",
-      "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 -prof perfasm .*BaselineBench.*"
-    ),
-    addCommandAlias("benchValidationSuite", "benchBaseline; benchValidation; benchCore"),
+    // Fair benchmark system commands (use ./run-fair-benchmarks.sh for full system)
+    addCommandAlias("benchCore", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*CoreOperationsBench.*"),
+    addCommandAlias("benchState", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*StateManagementBench.*"),
+    addCommandAlias("benchConcurrency", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*ConcurrencyBench.*"),
+    addCommandAlias("benchWithGC", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 -prof gc"),
 
     // Build and format commands
     addCommandAlias("prepare", "scalafmtAll; scalafmtSbt; scalafixAll; Test/compile"),

@@ -108,8 +108,10 @@ sbt eruIntegrationTest/test # Integration tests (JVM only)
 
 ### Benchmarking
 ```bash
-sbt bench             # Full benchmark suite (JVM only)
-sbt benchCore         # Core performance benchmarks
+# Fair benchmark system - comprehensive cross-framework comparison
+./run-fair-benchmarks.sh all      # Complete suite (Eru vs ZIO vs Cats Effect)
+./run-fair-benchmarks.sh core     # Core operations category
+./run-fair-benchmarks.sh concurrency resources  # Specific areas
 ```
 
 ## License

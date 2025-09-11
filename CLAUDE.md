@@ -21,10 +21,15 @@ sbt eruIntegrationTest/test # Integration tests (JVM only)
 
 ### Performance Benchmarking
 ```bash
-sbt bench             # Full benchmark suite
-sbt benchCore         # Core performance benchmarks
-sbt benchValidation   # Validation benchmarks
-sbt benchWithGC       # Benchmarks with GC profiling
+# Fair benchmark system (recommended)
+./run-fair-benchmarks.sh all      # Full comprehensive suite (~27min)
+./run-fair-benchmarks.sh core     # Core operations only (~2min)
+./run-fair-benchmarks.sh errors state  # Multiple categories
+./run-fair-benchmarks.sh concurrency --quick  # Quick concurrency test
+
+# Individual benchmark debugging
+sbt "eruBenchJVM/Jmh/run CoreOperationsBench.eruSucceed"  # Single method
+sbt "eruBenchJVM/Jmh/run -prof gc *StateManagementBench*"  # With profiler
 ```
 
 ### Code Quality
