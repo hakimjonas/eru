@@ -7,15 +7,14 @@ import zio.ZIO
 import net.ghoula.eru.prelude.*
 
 /** Category 5: Concurrency & Parallelism Benchmarks
-  * 
+  *
   * Tests concurrent and parallel execution patterns:
-  * - Race operations with multiple contestants
-  * - Fork/await basic patterns
-  * - Parallel composition (zipPar)
-  * - Concurrent effect coordination
-  * 
-  * Expected runtime: ~5 minutes
-  * Coverage: Concurrent execution and parallel computation primitives
+  *   - Race operations with multiple contestants
+  *   - Fork/await basic patterns
+  *   - Parallel composition (zipPar)
+  *   - Concurrent effect coordination
+  *
+  * Expected runtime: ~5 minutes Coverage: Concurrent execution and parallel computation primitives
   */
 class ConcurrencyBench extends FairBenchmarkBase {
 
@@ -26,7 +25,7 @@ class ConcurrencyBench extends FairBenchmarkBase {
   @Benchmark
   def eruRaceBasic(): String = runEru {
     val fast = Eru.succeed("fast")
-    val slow = Eru.succeed("slow") 
+    val slow = Eru.succeed("slow")
     fast.race(slow).map {
       case Left(result) => result
       case Right(result) => result

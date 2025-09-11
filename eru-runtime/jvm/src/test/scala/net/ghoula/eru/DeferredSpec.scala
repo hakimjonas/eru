@@ -3,6 +3,7 @@ package net.ghoula.eru
 import munit.FunSuite
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTest
 
 /** Test suite for Deferred concurrent primitive functionality.
   *
@@ -70,6 +71,30 @@ final class DeferredSpec extends TestWithRuntime {
     waitingFibers.foreach { fiber =>
       val exit = fiber.await.unsafeRunSync()
       assertEquals(exit, Exit.Success(99))
+    }
+  }
+
+  test("await blocks until completion and returns the value - TestClock version (deterministic fiber coordination)") {
+    EruTest.withTestClock { clock =>
+      given runtime: EruRuntime = EruTest.testRuntime(clock)
+      val d = Deferred.make[Int].unsafeRunSync()
+
+      // Fork a fiber that completes the deferred after a delay (TestClock: instant execution)
+      val completingFiber = runtime.fork {
+        runtime.sleep(java.time.Duration.ofMillis(10)).flatMap { _ =>
+          d.complete(42)
+        }
+      }.unsafeRunSync()
+
+      // Await should block until completion (TestClock: deterministic coordination)
+      val value = d.await.unsafeRunSync()
+      assertEquals(value, 42)
+
+      // Verify the completing fiber succeeded
+      val completed = completingFiber.await.unsafeRunSync()
+      assertEquals(completed, Exit.Success(true))
+
+      println("TestClock Deferred: deterministic fiber coordination without 10ms wall-clock delay")
     }
   }
 }

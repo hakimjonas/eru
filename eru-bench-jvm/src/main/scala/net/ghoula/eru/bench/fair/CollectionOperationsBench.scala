@@ -8,19 +8,18 @@ import zio.ZIO
 import net.ghoula.eru.prelude.*
 
 /** Category 8: Collection Operations Benchmarks
-  * 
+  *
   * Tests collection-based effect operations:
-  * - Sequential collection processing (traverse, sequence)
-  * - Parallel collection processing (parTraverse, parSequence)
-  * - Collection folding operations
-  * - Batch effect execution patterns
-  * 
-  * Expected runtime: ~4 minutes
-  * Coverage: Collection-oriented effect composition and execution
+  *   - Sequential collection processing (traverse, sequence)
+  *   - Parallel collection processing (parTraverse, parSequence)
+  *   - Collection folding operations
+  *   - Batch effect execution patterns
+  *
+  * Expected runtime: ~4 minutes Coverage: Collection-oriented effect composition and execution
   */
 class CollectionOperationsBench extends FairBenchmarkBase {
 
-  private final val COLLECTION_SIZE = 20
+  private val COLLECTION_SIZE = 20
 
   // =============================================================================
   // Sequential Collection Processing
@@ -119,7 +118,7 @@ class CollectionOperationsBench extends FairBenchmarkBase {
   @Benchmark
   def eruFoldLeft(): Int = runEru {
     val items = (1 to COLLECTION_SIZE).toList
-    Eru.foldLeft(items)(0) { (acc, item) => 
+    Eru.foldLeft(items)(0) { (acc, item) =>
       Eru.succeed(acc + item)
     }
   }
@@ -199,7 +198,7 @@ class CollectionOperationsBench extends FairBenchmarkBase {
     for {
       // Sequential processing
       doubled <- Eru.foreach(items)(x => Eru.succeed(x * 2))
-      // Sequential aggregation (parallel will be added in Phase 5)  
+      // Sequential aggregation (parallel will be added in Phase 5)
       results <- Eru.collectAll(doubled.map(Eru.succeed(_)))
       // Final reduction
       sum <- Eru.succeed(results.sum)

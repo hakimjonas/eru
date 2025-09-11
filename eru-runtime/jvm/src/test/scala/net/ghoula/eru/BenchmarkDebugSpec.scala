@@ -1,15 +1,16 @@
 package net.ghoula.eru
 
 import munit.FunSuite
+
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
 
 /** Debug test that exactly replicates the benchmark class structure. */
 class BenchmarkDebugSpec extends FunSuite {
-  
+
   private val runtime = EruRuntime.create()
   given EruRuntime = runtime
-  
+
   val contention = 1
   val operations = 100
 
@@ -33,7 +34,7 @@ class BenchmarkDebugSpec extends FunSuite {
 
       program.unsafeRunSync()
     }
-    
+
     // Test multiple iterations like JMH would
     println("Running 10 iterations...")
     for (i <- 1 to 10) {
@@ -44,10 +45,10 @@ class BenchmarkDebugSpec extends FunSuite {
       println(s"$result (${elapsed}ms)")
       assertEquals(result, operations)
     }
-    
+
     runtime.cleanup()
   }
-  
+
   test("benchmark pattern with explicit runtime usage") {
     def eruDeferredBasicExplicit(): Int = {
       val program = for {
@@ -67,7 +68,7 @@ class BenchmarkDebugSpec extends FunSuite {
 
       program.unsafeRunSync()
     }
-    
+
     println("Running explicit runtime test...")
     for (i <- 1 to 5) {
       print(s"Iteration $i: ")
@@ -77,7 +78,7 @@ class BenchmarkDebugSpec extends FunSuite {
       println(s"$result (${elapsed}ms)")
       assertEquals(result, operations)
     }
-    
+
     runtime.cleanup()
   }
 }

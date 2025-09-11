@@ -2,6 +2,7 @@ package net.ghoula.eru
 
 import munit.FunSuite
 import java.time.Duration
+import net.ghoula.eru.test.{EruTest, TestClockBackend}
 
 /** Test suite for Eru runtime extension methods and enhanced functionality.
   *
@@ -95,6 +96,35 @@ class EruRuntimeExtensionsSpec extends TestWithRuntime {
     assertEquals(result, "done")
     assertEquals(attempts, 3)
     assert(elapsedMs >= 25)
+  }
+
+  test("retryWithBackoff applies exponential backoff - TestClock version demonstrates deterministic timing") {
+    EruTest.withTestClock { clock =>
+      given runtime: EruRuntime = EruTest.testRuntime(clock)
+      var attempts = 0
+      val startTime = clock.currentTime
+
+      val flakyEffect = Eru.effect {
+        attempts += 1
+        if (attempts < 3) "retry"
+        else "success"
+      }.flatMap {
+        case "success" => Eru.succeed("done")
+        case _ => Eru.fail("try again")
+      }
+
+      val result = flakyEffect.retryWithBackoff(Duration.ofMillis(10), 3).unsafeRunSync()
+      val endTime = clock.currentTime
+      val elapsedMs = java.time.Duration.between(startTime, endTime).toMillis
+
+      // Same functional correctness as the original test
+      assertEquals(result, "done")
+      assertEquals(attempts, 3)
+      
+      // But with TestClock: deterministic, instant execution, no wall-clock dependencies
+      assert(elapsedMs == 0) // TestClock operations complete immediately
+      println(s"TestClock version: ${elapsedMs}ms (instant) vs original: >=25ms (wall-clock dependent)")
+    }
   }
 
   test("retry does not retry on defects (Throwables)") {

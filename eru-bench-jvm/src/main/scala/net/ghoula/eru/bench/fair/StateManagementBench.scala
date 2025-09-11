@@ -8,15 +8,14 @@ import zio.ZIO
 import net.ghoula.eru.prelude.*
 
 /** Category 3: State Management Benchmarks
-  * 
+  *
   * Tests concurrent state management operations:
-  * - Ref creation and basic operations
-  * - Atomic updates and modifications
-  * - State transformation patterns
-  * - Sequential state access patterns
-  * 
-  * Expected runtime: ~3 minutes
-  * Coverage: Concurrent state primitives and atomic operations
+  *   - Ref creation and basic operations
+  *   - Atomic updates and modifications
+  *   - State transformation patterns
+  *   - Sequential state access patterns
+  *
+  * Expected runtime: ~3 minutes Coverage: Concurrent state primitives and atomic operations
   */
 class StateManagementBench extends FairBenchmarkBase {
 

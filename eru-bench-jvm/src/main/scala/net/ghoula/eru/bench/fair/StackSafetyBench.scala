@@ -7,20 +7,19 @@ import zio.ZIO
 import net.ghoula.eru.prelude.*
 
 /** Category 7: Stack Safety & Deep Chains Benchmarks
-  * 
+  *
   * Tests stack safety and performance with deep effect chains:
-  * - Deep flatMap chain execution
-  * - Deep map chain execution  
-  * - Nested composition performance
-  * - Stack safety under load
-  * 
-  * Expected runtime: ~3 minutes
-  * Coverage: Stack safety guarantees and deep computation performance
+  *   - Deep flatMap chain execution
+  *   - Deep map chain execution
+  *   - Nested composition performance
+  *   - Stack safety under load
+  *
+  * Expected runtime: ~3 minutes Coverage: Stack safety guarantees and deep computation performance
   */
 class StackSafetyBench extends FairBenchmarkBase {
 
   // Use smaller depth for fair comparison to avoid timeouts
-  private final val DEEP_CHAIN_DEPTH = 100
+  private val DEEP_CHAIN_DEPTH = 100
 
   // =============================================================================
   // Deep FlatMap Chains
@@ -171,7 +170,7 @@ class StackSafetyBench extends FairBenchmarkBase {
         } yield result
       }
     }
-    
+
     buildNested(TEST_ITERATIONS) // Use smaller depth
   }
 
@@ -187,7 +186,7 @@ class StackSafetyBench extends FairBenchmarkBase {
         } yield result
       }
     }
-    
+
     buildNested(TEST_ITERATIONS) // Use smaller depth
   }
 
@@ -203,7 +202,7 @@ class StackSafetyBench extends FairBenchmarkBase {
         } yield result
       }
     }
-    
+
     buildNested(TEST_ITERATIONS) // Use smaller depth
   }
 }

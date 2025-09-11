@@ -1,0 +1,33 @@
+  test("timer scheduling under load - TestClock version") {
+    EruTest.withTestClock { clock =>
+      given runtime: EruRuntime = EruTest.testRuntime(clock)
+      val timerCount = 100
+      val startTime = clock.currentTime
+
+      val timers = (1 to timerCount).map { i =>
+        val delay = (i % 10) + 1
+        runtime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
+      }
+
+      val results = timers.map(timer => runtime.fork(timer))
+      val completed = results
+        .map(_.flatMap(_.await).flatMap {
+          case Exit.Success(value) => Eru.succeed(value)
+          case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Timer failed with error: $error"))
+          case Exit.Die(t) => Eru.fail(new RuntimeException("Timer died", t))
+          case Exit.Interrupt(_, _) => Eru.fail(new RuntimeException("Timer was interrupted"))
+        })
+        .toList
+        .sequence
+        .unsafeRunSync()
+      
+      val endTime = clock.currentTime
+      val elapsedMs = java.time.Duration.between(startTime, endTime).toMillis
+
+      assertEquals(completed.sorted, (1 to timerCount).toList)
+      // With TestClock: instant execution, no 643ms wait
+      assert(elapsedMs < 50) // Should complete almost instantly
+      // All 100 timers complete successfully without timing races
+      println(s"TestClock version completed in ${elapsedMs}ms vs original ~643ms")
+    }
+  }

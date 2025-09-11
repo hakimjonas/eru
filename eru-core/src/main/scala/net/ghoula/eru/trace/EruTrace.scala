@@ -24,22 +24,23 @@ object EruTrace {
   opaque type SpanId = Long
 
   object SpanId {
+
     /** Robust process-unique ID generation for SpanId.
       *
       * Layout: [0][15-bit processId][48-bit timestamp/counter]
-      * - Bit 63: Always 0 (ensures positive Long)
-      * - Bits 62-48: Process identifier (15 bits = 32K unique processes)
-      * - Bits 47-0: Timestamp-based counter with SpanId offset (0x1000)
+      *   - Bit 63: Always 0 (ensures positive Long)
+      *   - Bits 62-48: Process identifier (15 bits = 32K unique processes)
+      *   - Bits 47-0: Timestamp-based counter with SpanId offset (0x1000)
       */
     private val processUniqueStart = {
       val ProcessIdBits = 15
       val ProcessIdMask = (1L << ProcessIdBits) - 1 // 0x7FFF
       val TimestampMask = (1L << 48) - 1 // 48-bit mask
       val SpanIdOffset = 0x1000L // Unique offset for SpanId namespace
-      
+
       val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode.toLong & ProcessIdMask
       val timestamp = ((System.nanoTime() >> 16) & TimestampMask) | SpanIdOffset
-      
+
       // Combine: sign bit (0) + processId (15 bits) + timestamp (48 bits)
       (processId << 48) | timestamp
     }
@@ -56,22 +57,23 @@ object EruTrace {
   opaque type TraceId = Long
 
   object TraceId {
+
     /** Robust process-unique ID generation for TraceId.
       *
       * Layout: [0][15-bit processId][48-bit timestamp/counter]
-      * - Bit 63: Always 0 (ensures positive Long)
-      * - Bits 62-48: Process identifier (15 bits = 32K unique processes)
-      * - Bits 47-0: Timestamp-based counter with TraceId offset (0x2000)
+      *   - Bit 63: Always 0 (ensures positive Long)
+      *   - Bits 62-48: Process identifier (15 bits = 32K unique processes)
+      *   - Bits 47-0: Timestamp-based counter with TraceId offset (0x2000)
       */
     private val processUniqueStart = {
       val ProcessIdBits = 15
       val ProcessIdMask = (1L << ProcessIdBits) - 1 // 0x7FFF
       val TimestampMask = (1L << 48) - 1 // 48-bit mask
       val TraceIdOffset = 0x2000L // Unique offset for TraceId namespace
-      
+
       val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode.toLong & ProcessIdMask
       val timestamp = ((System.nanoTime() >> 20) & TimestampMask) | TraceIdOffset
-      
+
       // Combine: sign bit (0) + processId (15 bits) + timestamp (48 bits)
       (processId << 48) | timestamp
     }

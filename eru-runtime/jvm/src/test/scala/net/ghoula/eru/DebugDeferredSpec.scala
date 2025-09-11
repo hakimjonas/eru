@@ -1,6 +1,7 @@
 package net.ghoula.eru
 
 import munit.FunSuite
+
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
 
@@ -10,13 +11,13 @@ class DebugDeferredSpec extends FunSuite {
   test("simple deferred complete/await should work") {
     val runtime = EruRuntime.create()
     given EruRuntime = runtime
-    
+
     val simpleTest = for {
       deferred <- Eru.deferred[Int]
       _ <- deferred.complete(42)
       result <- deferred.await
     } yield result
-    
+
     val result = simpleTest.unsafeRunSync()
     assertEquals(result, 42)
     runtime.cleanup()
@@ -25,7 +26,7 @@ class DebugDeferredSpec extends FunSuite {
   test("deferred with fork/await pattern should work") {
     val runtime = EruRuntime.create()
     given EruRuntime = runtime
-    
+
     val complexTest = for {
       deferred <- Eru.deferred[Int]
       waiterFiber <- runtime.fork(deferred.await)
@@ -40,7 +41,7 @@ class DebugDeferredSpec extends FunSuite {
         case Exit.Interrupt(_, _) => throw new Exception("Waiter was interrupted")
       }
     } yield result
-    
+
     val result = complexTest.unsafeRunSync()
     assertEquals(result, 100)
     runtime.cleanup()
@@ -49,9 +50,9 @@ class DebugDeferredSpec extends FunSuite {
   test("benchmark pattern reproduction") {
     val runtime = EruRuntime.create()
     given EruRuntime = runtime
-    
+
     val operations = 10
-    
+
     val benchmarkTest = for {
       deferred <- Eru.deferred[Int]
       waiterFiber <- runtime.fork(deferred.await)
@@ -67,7 +68,7 @@ class DebugDeferredSpec extends FunSuite {
         case _ => 0
       }
     } yield result
-    
+
     val result = benchmarkTest.unsafeRunSync()
     assertEquals(result, operations)
     runtime.cleanup()

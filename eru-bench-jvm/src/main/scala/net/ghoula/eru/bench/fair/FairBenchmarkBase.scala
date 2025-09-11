@@ -11,13 +11,13 @@ import net.ghoula.eru.EruRuntime
 import net.ghoula.eru.prelude.*
 
 /** Base class for all fair benchmark categories.
-  * 
-  * Provides consistent setup and configuration across all benchmark categories.
-  * Each category inherits from this to ensure:
-  * - Consistent timing and measurement settings
-  * - Shared runtime setup
-  * - Standard JSON output format
-  * - Fair comparison methodology
+  *
+  * Provides consistent setup and configuration across all benchmark categories. Each category
+  * inherits from this to ensure:
+  *   - Consistent timing and measurement settings
+  *   - Shared runtime setup
+  *   - Standard JSON output format
+  *   - Fair comparison methodology
   */
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.Throughput))
@@ -26,27 +26,27 @@ import net.ghoula.eru.prelude.*
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(value = 1) // Single fork for consistency
 abstract class FairBenchmarkBase {
-  
+
   // Shared runtime setup for all benchmarks
-  protected val runtime = EruRuntime.create()
+  protected val runtime: EruRuntime = EruRuntime.create()
   implicit protected val implicitRuntime: EruRuntime = runtime
-  
+
   // Standard test values used across benchmarks for consistency
-  protected final val TEST_VALUE = 42
-  protected final val TEST_STRING = "benchmark"
-  protected final val TEST_ITERATIONS = 10
-  protected final val TEST_ERROR = "test-error"
-  
+  protected val TEST_VALUE = 42
+  protected val TEST_STRING = "benchmark"
+  protected val TEST_ITERATIONS = 10
+  protected val TEST_ERROR = "test-error"
+
   /** Helper for running Eru effects */
-  protected final def runEru[A](effect: Eru[?, A]): A = effect.unsafeRunSync()
-  
+  protected def runEru[A](effect: Eru[?, A]): A = effect.unsafeRunSync()
+
   /** Helper for running ZIO effects */
-  protected final def runZio[A](effect: zio.ZIO[Any, ?, A]): A = {
+  protected def runZio[A](effect: zio.ZIO[Any, ?, A]): A = {
     Unsafe.unsafe { implicit unsafe =>
       _root_.zio.Runtime.default.unsafe.run(effect).getOrThrowFiberFailure()
     }
   }
-  
+
   /** Helper for running Cats Effect IO */
-  protected final def runIO[A](effect: IO[A]): A = effect.unsafeRunSync()
+  protected def runIO[A](effect: IO[A]): A = effect.unsafeRunSync()
 }

@@ -7,15 +7,14 @@ import zio.ZIO
 import net.ghoula.eru.prelude.*
 
 /** Category 1: Core Operations Benchmarks
-  * 
+  *
   * Tests fundamental effect system operations:
-  * - Basic effect creation (succeed, pure)
-  * - Effect composition (flatMap, map) 
-  * - Effect chaining and transformation
-  * - Sequential execution patterns
-  * 
-  * Expected runtime: ~2 minutes
-  * Coverage: The most basic building blocks of effect systems
+  *   - Basic effect creation (succeed, pure)
+  *   - Effect composition (flatMap, map)
+  *   - Effect chaining and transformation
+  *   - Sequential execution patterns
+  *
+  * Expected runtime: ~2 minutes Coverage: The most basic building blocks of effect systems
   */
 class CoreOperationsBench extends FairBenchmarkBase {
 
@@ -26,7 +25,7 @@ class CoreOperationsBench extends FairBenchmarkBase {
   @Benchmark
   def eruSucceed(): Int = runEru(Eru.succeed(TEST_VALUE))
 
-  @Benchmark  
+  @Benchmark
   def zioSucceed(): Int = runZio(ZIO.succeed(TEST_VALUE))
 
   @Benchmark
@@ -46,7 +45,7 @@ class CoreOperationsBench extends FairBenchmarkBase {
   def ioMap(): Int = runIO(IO.pure(21).map(_ * 2))
 
   // =============================================================================
-  // Single FlatMap Operation  
+  // Single FlatMap Operation
   // =============================================================================
 
   @Benchmark
@@ -66,7 +65,7 @@ class CoreOperationsBench extends FairBenchmarkBase {
   def eruChain(): Int = runEru {
     for {
       a <- Eru.succeed(10)
-      b <- Eru.succeed(20) 
+      b <- Eru.succeed(20)
       c <- Eru.succeed(12)
       result <- Eru.succeed(a + b + c)
     } yield result
@@ -77,7 +76,7 @@ class CoreOperationsBench extends FairBenchmarkBase {
     for {
       a <- ZIO.succeed(10)
       b <- ZIO.succeed(20)
-      c <- ZIO.succeed(12) 
+      c <- ZIO.succeed(12)
       result <- ZIO.succeed(a + b + c)
     } yield result
   }

@@ -5,6 +5,7 @@ import munit.FunSuite
 import java.time.Duration
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTest
 
 /** Comprehensive end-to-end integration test suite for complete Eru workflows.
   *
@@ -39,5 +40,32 @@ final class EndToEndSpec extends FunSuite {
 
     val result = program.runWith(observer)
     assert(result >= 3)
+  }
+
+  test("end-to-end composition - TestClock version (deterministic timing for retry/timeout logic)") {
+    EruTest.withTestClock { clock =>
+      given runtime: EruRuntime = EruTest.testRuntime(clock)
+
+      val events = java.util.concurrent.ConcurrentLinkedQueue[EruObserver.EruEvent]()
+      val observer = new EruObserver {
+        def onEvent(e: EruObserver.EruEvent): Unit = events.offer(e)
+      }
+
+      val program = for {
+        ref <- Eru.ref(List.empty[Int])
+        _ <- Eru.succeed(1).flatMap(n => ref.update(n :: _)).fork
+        _ <- Eru.succeed(2).flatMap(n => ref.update(n :: _)).fork
+        _ <- runtime.sleep(Duration.ofMillis(10)) // Use TestClock sleep for determinism
+        l <- ref.get
+        ok <- Eru.succeed(l.sum).retryWithBackoff(Duration.ofMillis(10), maxRetries = 2)
+        out <- Eru.succeed(ok).timeoutTo(Duration.ofSeconds(1), -1)
+        _ <- Eru.succeed(()).ensure(Eru.effect(()))
+      } yield out
+
+      val result = program.runWith(observer)
+      assert(result >= 3)
+
+      println("TestClock end-to-end: instant execution vs original with sleep(10ms) + retryWithBackoff")
+    }
   }
 }

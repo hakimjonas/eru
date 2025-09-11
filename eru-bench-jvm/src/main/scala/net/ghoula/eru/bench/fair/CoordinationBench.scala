@@ -7,15 +7,14 @@ import zio.ZIO
 import net.ghoula.eru.prelude.*
 
 /** Category 4: Coordination Primitives Benchmarks
-  * 
+  *
   * Tests concurrent coordination mechanisms:
-  * - Deferred/Promise operations
-  * - Semaphore operations
-  * - Basic synchronization patterns
-  * - Producer/consumer coordination
-  * 
-  * Expected runtime: ~4 minutes
-  * Coverage: Inter-fiber coordination and synchronization
+  *   - Deferred/Promise operations
+  *   - Semaphore operations
+  *   - Basic synchronization patterns
+  *   - Producer/consumer coordination
+  *
+  * Expected runtime: ~4 minutes Coverage: Inter-fiber coordination and synchronization
   */
 class CoordinationBench extends FairBenchmarkBase {
 
@@ -58,7 +57,7 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruMultipleDeferred(): Int = runEru {
     for {
       d1 <- Eru.deferred[Int]
-      d2 <- Eru.deferred[Int] 
+      d2 <- Eru.deferred[Int]
       d3 <- Eru.deferred[Int]
       _ <- d1.complete(10)
       _ <- d2.complete(20)
@@ -111,7 +110,8 @@ class CoordinationBench extends FairBenchmarkBase {
     for {
       sem <- Eru.semaphore(1)
       ref <- Eru.ref(0)
-      result <- sem.withPermit(ref.update(_ + TEST_VALUE).flatMap(_ => ref.get))
+      result <- sem
+        .withPermit(ref.update(_ + TEST_VALUE).flatMap(_ => ref.get))
         .map(_.getOrElse(0))
     } yield result
   }

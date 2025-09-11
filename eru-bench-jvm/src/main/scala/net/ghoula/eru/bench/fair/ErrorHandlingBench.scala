@@ -7,15 +7,14 @@ import zio.ZIO
 import net.ghoula.eru.prelude.*
 
 /** Category 2: Error Handling Benchmarks
-  * 
+  *
   * Tests error handling and recovery operations:
-  * - Error creation and propagation
-  * - Error recovery and transformation
-  * - Attempt/either conversion patterns
-  * - Error handling in chains
-  * 
-  * Expected runtime: ~2 minutes  
-  * Coverage: Error management across different failure scenarios
+  *   - Error creation and propagation
+  *   - Error recovery and transformation
+  *   - Attempt/either conversion patterns
+  *   - Error handling in chains
+  *
+  * Expected runtime: ~2 minutes Coverage: Error management across different failure scenarios
   */
 class ErrorHandlingBench extends FairBenchmarkBase {
 
@@ -59,7 +58,7 @@ class ErrorHandlingBench extends FairBenchmarkBase {
     }
   }
 
-  @Benchmark  
+  @Benchmark
   def zioSuccessfulEither(): Int = runZio {
     ZIO.succeed(TEST_VALUE).as(TEST_VALUE)
   }
@@ -126,11 +125,11 @@ class ErrorHandlingBench extends FairBenchmarkBase {
       case Result.Failure(_) => 10
     }
     val effect2 = Eru.fail("error2").attempt.map {
-      case Result.Success(v) => v  
+      case Result.Success(v) => v
       case Result.Failure(_) => 20
     }
     val effect3 = Eru.succeed(12)
-    
+
     for {
       a <- effect1
       b <- effect2
@@ -150,7 +149,7 @@ class ErrorHandlingBench extends FairBenchmarkBase {
       case Left(_) => 20
     }
     val effect3 = ZIO.succeed(12)
-    
+
     for {
       a <- effect1
       b <- effect2
@@ -170,7 +169,7 @@ class ErrorHandlingBench extends FairBenchmarkBase {
       case Left(_) => 20
     }
     val effect3 = IO.pure(12)
-    
+
     for {
       a <- effect1
       b <- effect2

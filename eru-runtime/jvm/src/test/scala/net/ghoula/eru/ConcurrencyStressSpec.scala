@@ -8,6 +8,7 @@ import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTest
 
 /** Stress test suite for JVM concurrency and fiber management under high load.
   *
@@ -206,6 +207,41 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
       .unsafeRunSync()
 
     assertEquals(completed.sorted, (1 to timerCount).toList)
+  }
+
+  test("timer scheduling under load - TestClock version (deterministic and instant)") {
+    EruTest.withTestClock { clock =>
+      given runtime: EruRuntime = EruTest.testRuntime(clock)
+      val timerCount = 100
+      val startTime = clock.currentTime
+
+      val timers = (1 to timerCount).map { i =>
+        val delay = (i % 10) + 1
+        runtime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
+      }
+
+      val results = timers.map(timer => runtime.fork(timer))
+      val completed = results
+        .map(_.flatMap(_.await).flatMap {
+          case Exit.Success(value) => Eru.succeed(value)
+          case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Timer failed with error: $error"))
+          case Exit.Die(t) => Eru.fail(new RuntimeException("Timer died", t))
+          case Exit.Interrupt(_, _) => Eru.fail(new RuntimeException("Timer was interrupted"))
+        })
+        .toList
+        .sequence
+        .unsafeRunSync()
+
+      val endTime = clock.currentTime
+      val elapsedMs = java.time.Duration.between(startTime, endTime).toMillis
+
+      // Same correctness verification as original
+      assertEquals(completed.sorted, (1 to timerCount).toList)
+
+      // But with TestClock: instant, deterministic execution
+      assert(elapsedMs < 10) // Should complete almost instantly vs original ~643ms
+      println(s"TestClock timer test: ${elapsedMs}ms vs original: ~643ms")
+    }
   }
 
   /** Validates mixed concurrent and sequential operations under stress.
