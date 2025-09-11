@@ -83,10 +83,10 @@ final class SuspendSpec extends TestWithRuntime {
       Eru.unit
     }
 
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      future.complete("async result")
-    })
+    // Use CompletableFuture's delayed execution instead of Thread.sleep
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => future.complete("async result"))
 
     val result = suspendEffect.unsafeRunSync()
     assertEquals(result, "async result")
@@ -110,10 +110,11 @@ final class SuspendSpec extends TestWithRuntime {
       Eru.unit
     }
 
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      future.completeExceptionally(new RuntimeException("async error"))
-    })
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => {
+        future.completeExceptionally(new RuntimeException("async error"))
+      })
 
     val result = suspendEffect.attempt.unsafeRunSync()
     result match {
@@ -139,10 +140,11 @@ final class SuspendSpec extends TestWithRuntime {
       Eru.unit
     }
 
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      promise.success(123)
-    })
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => {
+        promise.success(123)
+      })
 
     val result = suspendEffect.unsafeRunSync()
     assertEquals(result, 123)
@@ -165,10 +167,11 @@ final class SuspendSpec extends TestWithRuntime {
       Eru.unit
     }
 
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      promise.failure(new IllegalArgumentException("future failed"))
-    })
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => {
+        promise.failure(new IllegalArgumentException("future failed"))
+      })
 
     val result = suspendEffect.attempt.unsafeRunSync()
     result match {
@@ -202,10 +205,11 @@ final class SuspendSpec extends TestWithRuntime {
       Eru.unit
     }
 
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      future.complete("first result")
-    })
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => {
+        future.complete("first result")
+      })
 
     val result = suspendEffect.unsafeRunSync()
     assertEquals(result, "first result")
@@ -300,7 +304,7 @@ final class SuspendSpec extends TestWithRuntime {
   test("suspend with timeout integration works correctly") {
     val longRunning = LocalEruRuntime.suspend[String, Int] { callback =>
       java.util.concurrent.CompletableFuture.runAsync(() => {
-        Thread.sleep(100)
+        Thread.sleep(30)
         callback(Right(42))
       })
       Eru.unit

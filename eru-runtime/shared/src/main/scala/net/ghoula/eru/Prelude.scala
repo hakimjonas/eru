@@ -74,6 +74,26 @@ object prelude {
     */
   type Queue[A] = net.ghoula.eru.Queue[A]
 
+  /** Type alias for the runtime Hub, re-exposed for discoverability.
+    * @tparam A
+    *   message type published through the hub
+    */
+  type Hub[A] = net.ghoula.eru.Hub[A]
+
+  /** Type alias for the runtime Promise, re-exposed for discoverability.
+    * @tparam E
+    *   error type for failures
+    * @tparam A
+    *   value type for successful completion
+    */
+  type Promise[E, A] = net.ghoula.eru.Promise[E, A]
+
+  /** Type alias for the runtime CountDownLatch, re-exposed for discoverability. */
+  type CountDownLatch = net.ghoula.eru.CountDownLatch
+
+  /** Type alias for the runtime CyclicBarrier, re-exposed for discoverability. */
+  type CyclicBarrier = net.ghoula.eru.CyclicBarrier
+
   /** Type alias for runtime fibers, re-exposed for discoverability.
     * @tparam E
     *   typed error of the fiber

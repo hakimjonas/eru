@@ -118,7 +118,7 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
 
     def createCancellableEffect(id: Int): Eru[String | Throwable, Int] = {
       Eru.effect(started.incrementAndGet()).flatMap { _ =>
-        runtime.sleep(Duration.ofMillis(200)).flatMap { _ =>
+        runtime.sleep(Duration.ofMillis(50)).flatMap { _ =>
           completed.incrementAndGet()
           Eru.succeed(id)
         }
@@ -135,7 +135,7 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
       .attempt
       .unsafeRunSync()
 
-    runtime.sleep(Duration.ofMillis(50)).unsafeRunSync()
+    runtime.sleep(Duration.ofMillis(10)).unsafeRunSync()
 
     result match {
       case Result.Failure("fast failure") =>
@@ -309,11 +309,11 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
 
     val fastEffects = (1 to fastCount).map { i =>
       val effect = Eru.succeed(s"fast-$i")
-      runtime.timeout(Duration.ofMillis(1000))(effect)
+      runtime.timeout(Duration.ofMillis(100))(effect)
     }
 
     val slowEffects = (1 to slowCount).map { i =>
-      val effect = runtime.sleep(Duration.ofMillis(2000)).map(_ => s"slow-$i")
+      val effect = runtime.sleep(Duration.ofMillis(200)).map(_ => s"slow-$i")
       runtime.timeout(Duration.ofMillis(10))(effect)
     }
 

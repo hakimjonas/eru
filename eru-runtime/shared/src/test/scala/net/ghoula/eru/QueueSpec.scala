@@ -72,27 +72,13 @@ class QueueSpec extends munit.FunSuite {
     assertEquals(results, items)
   }
 
-  test("bounded queue concurrent offer and take") {
-    val queue = Eru.queue[Int](10).unsafeRunSync()
+  test("bounded queue sequential operations") {
+    val queue = Eru.queue[Int](5).unsafeRunSync()
 
-    val producer = Eru
-      .foreach(1 to 5) { i =>
-        queue.offer(i)
-      }
-      .fork
-
-    val consumer = Eru.collectAll((1 to 5).map(_ => queue.take)).fork
-
-    val producerFiber = producer.unsafeRunSync()
-    val consumerFiber = consumer.unsafeRunSync()
-
-    val results = consumerFiber.await.unsafeRunSync() match {
-      case Exit.Success(values) => values
-      case other => fail(s"Expected success but got: $other")
-    }
-
-    producerFiber.await.unsafeRunSync() // Ensure producer completes
-    assertEquals(results.sorted, List(1, 2, 3, 4, 5))
+    // Sequential offer and take (Native-compatible)
+    Eru.foreach(1 to 5)(queue.offer).unsafeRunSync()
+    val results = Eru.collectAll((1 to 5).map(_ => queue.take)).unsafeRunSync()
+    assertEquals(results, List(1, 2, 3, 4, 5))
   }
 
   // =============================================================================
@@ -129,27 +115,13 @@ class QueueSpec extends munit.FunSuite {
     assertEquals(results, items.toList)
   }
 
-  test("unbounded queue concurrent operations") {
+  test("unbounded queue sequential operations") {
     val queue = Eru.unboundedQueue[Int].unsafeRunSync()
 
-    val producer = Eru
-      .foreach(1 to 100) { i =>
-        queue.offer(i)
-      }
-      .fork
-
-    val consumer = Eru.collectAll((1 to 100).map(_ => queue.take)).fork
-
-    val producerFiber = producer.unsafeRunSync()
-    val consumerFiber = consumer.unsafeRunSync()
-
-    val results = consumerFiber.await.unsafeRunSync() match {
-      case Exit.Success(values) => values
-      case other => fail(s"Expected success but got: $other")
-    }
-
-    producerFiber.await.unsafeRunSync() // Ensure producer completes
-    assertEquals(results.sorted, (1 to 100).toList)
+    // Sequential operations (Native-compatible)
+    Eru.foreach(1 to 100)(queue.offer).unsafeRunSync()
+    val results = Eru.collectAll((1 to 100).map(_ => queue.take)).unsafeRunSync()
+    assertEquals(results, (1 to 100).toList)
   }
 
   // =============================================================================

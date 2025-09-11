@@ -13,7 +13,7 @@ import net.ghoula.eru.prelude.*
   * provide reliable behavior for handling unreliable external dependencies, network operations, and
   * other failure-prone interactions while maintaining correctness and resource safety guarantees.
   */
-final class TimeoutRetrySpec extends FunSuite {
+final class TimeoutRetrySpec extends TestProgressReporter {
 
   given runtime: EruRuntime = EruRuntime.create()
 
@@ -23,12 +23,15 @@ final class TimeoutRetrySpec extends FunSuite {
     * or falls back to the specified default value when timeout occurs.
     */
   test("timeoutTo either preserves value or yields fallback") {
-    val slow = Eru.blocking(Thread.sleep(100)).map(_ => 1)
-    val timed = slow.timeoutTo(Duration.ofMillis(1), 0)
-    timed.runExit() match {
-      case Exit.Success(v) => assert(v == 0 || v == 1)
-      case other => fail(s"unexpected exit: $other")
-    }
+    // Test fast completion - should preserve original value
+    val fast = Eru.succeed(1)
+    val timedFast = fast.timeoutTo(Duration.ofMillis(10), 0)
+    assertEquals(timedFast.runExit(), Exit.Success(1))
+
+    // Test timeout - should yield fallback value
+    val slow = runtime.sleep(Duration.ofMillis(20)).map(_ => 1)
+    val timedSlow = slow.timeoutTo(Duration.ofMillis(5), 0)
+    assertEquals(timedSlow.runExit(), Exit.Success(0))
   }
 
   /** Validates that retryN mechanism re-executes failing computations until success.

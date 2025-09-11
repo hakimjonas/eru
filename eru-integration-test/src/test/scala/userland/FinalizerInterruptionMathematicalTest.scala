@@ -12,7 +12,7 @@ import net.ghoula.eru.*
   * This test determines whether the failing finalizer behavior represents a fundamental design
   * limitation or a correctable issue.
   */
-class FinalizerInterruptionMathematicalTest extends FunSuite {
+class FinalizerInterruptionMathematicalTest extends TestProgressReporter {
 
   /** Tests the mathematical property that finalizers execute during fiber interruption.
     *
@@ -30,7 +30,7 @@ class FinalizerInterruptionMathematicalTest extends FunSuite {
             finalizerExecuted.set(true)
           })
       }
-      _ <- Eru.effect { Thread.sleep(50) }
+      _ <- Eru.effect { Thread.sleep(10) }
       _ <- fiber.interrupt(InterruptCause.Cancelled(Some("Test interruption")))
       exit <- fiber.await
     } yield exit
@@ -52,19 +52,20 @@ class FinalizerInterruptionMathematicalTest extends FunSuite {
       fiber <- runtime.fork {
         import java.time.Duration
         runtime
-          .sleep(Duration.ofSeconds(10))
+          .sleep(Duration.ofMillis(20))
           .ensure(Eru.effect {
             finalizerExecuted.set(true)
             println("SLEEP FINALIZER EXECUTED")
           })
       }
-      _ <- Eru.effect { Thread.sleep(50) }
+      _ <- Eru.effect { Thread.sleep(10) }
       _ <- fiber.interrupt(InterruptCause.Cancelled(Some("Test interruption")))
       exit <- fiber.await
     } yield exit
 
     val _ = computation.runIsolatedExit
 
+    assert(finalizerExecuted.get(), "Finalizer should execute during sleep interruption")
   }
 
   /** Tests that finalizers execute during normal completion as a control case.

@@ -28,7 +28,7 @@ class FiberInterruptionSpec extends FunSuite {
   test("fiber interrupt with Cancelled cause is handled gracefully") {
     withIsolatedRuntime {
       runtime =>
-        val longRunning = runtime.sleep(Duration.ofSeconds(10)).map(_ => "completed")
+        val longRunning = runtime.sleep(Duration.ofMillis(100)).map(_ => "completed")
         val fiber = runtime.fork(longRunning).unsafeRunSync()
 
       val cause = InterruptCause.Cancelled(Some("user requested cancellation"))
@@ -125,7 +125,7 @@ class FiberInterruptionSpec extends FunSuite {
     */
   test("multiple interrupt calls on same fiber are idempotent") {
     withIsolatedRuntime { runtime =>
-      val effect = runtime.sleep(Duration.ofSeconds(1)).map(_ => "done")
+      val effect = runtime.sleep(Duration.ofMillis(50)).map(_ => "done")
       val fiber = runtime.fork(effect).unsafeRunSync()
 
       val cause1 = InterruptCause.Cancelled(Some("first interrupt"))

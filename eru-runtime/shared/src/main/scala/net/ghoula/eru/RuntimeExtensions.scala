@@ -193,6 +193,60 @@ object RuntimeExtensions {
       */
     def unboundedQueue[A](using runtime: EruRuntime): Eru[Nothing, Queue[A]] =
       Queue.unbounded[A]
+
+    /** Creates a bounded hub with the specified capacity per subscriber.
+      *
+      * @param capacity
+      *   the maximum number of messages each subscriber queue can hold
+      * @tparam A
+      *   the message type
+      * @return
+      *   an effect that yields a new bounded hub
+      */
+    def hub[A](capacity: Int)(using runtime: EruRuntime): Eru[Nothing, Hub[A]] =
+      Hub.bounded[A](capacity)
+
+    /** Creates an unbounded hub.
+      *
+      * @tparam A
+      *   the message type
+      * @return
+      *   an effect that yields a new unbounded hub
+      */
+    def unboundedHub[A](using runtime: EruRuntime): Eru[Nothing, Hub[A]] =
+      Hub.unbounded[A]
+
+    /** Creates a new promise that can be completed with either success or failure.
+      *
+      * @tparam E
+      *   the error type
+      * @tparam A
+      *   the success value type
+      * @return
+      *   an effect that yields a new promise
+      */
+    def promise[E, A](using runtime: EruRuntime): Eru[Nothing, Promise[E, A]] =
+      Promise.make[E, A]
+
+    /** Creates a new countdown latch initialized with the given count.
+      *
+      * @param count
+      *   the initial count value, must be non-negative
+      * @return
+      *   an effect that yields a new countdown latch
+      */
+    def countDownLatch(count: Int)(using runtime: EruRuntime): Eru[Nothing, CountDownLatch] =
+      CountDownLatch.make(count)
+
+    /** Creates a new cyclic barrier for the given number of parties.
+      *
+      * @param parties
+      *   the number of parties required to trip the barrier, must be positive
+      * @return
+      *   an effect that yields a new cyclic barrier
+      */
+    def cyclicBarrier(parties: Int)(using runtime: EruRuntime): Eru[Nothing, CyclicBarrier] =
+      CyclicBarrier.make(parties)
   }
 
   /** Static utility methods from EruRuntime exposed for direct access. */
