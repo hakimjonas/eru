@@ -292,4 +292,150 @@ object RuntimeExtensions {
     */
   def raceAll[E, A](effects: List[Eru[E, A]])(using runtime: EruRuntime): Eru[E | Throwable, (A, Int)] =
     runtime.raceAll(effects)
+
+  /** Executes effects derived from a collection of inputs in parallel with bounded concurrency.
+    *
+    * This operation provides resource-controlled parallel execution by limiting the number of
+    * concurrent fibers to the specified degree. This is essential for scenarios involving external
+    * resources (databases, APIs, file systems) where unbounded parallelism could cause resource
+    * exhaustion.
+    *
+    * @param n
+    *   maximum number of concurrent fibers (must be positive)
+    * @param inputs
+    *   the collection of inputs to process
+    * @param f
+    *   function to transform each input into an effect
+    * @return
+    *   an effect yielding the list of results in input order
+    *
+    * @example
+    *   {{{
+    * import net.ghoula.eru.prelude.*
+    *
+    * given runtime: EruRuntime = EruRuntime.create()
+    *
+    * // Process API calls with bounded concurrency
+    * val userIds = (1 to 1000).toList
+    * val profiles = Eru.foreachParN(10, userIds) { id =>
+    *   fetchUserProfile(id) // Max 10 concurrent API calls
+    * }
+    *   }}}
+    */
+  def foreachParN[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B])(using
+    runtime: EruRuntime
+  ): Eru[E | Throwable, List[B]] =
+    runtime.foreachParN(n, inputs)(f)
+
+  /** Executes effects derived from a collection of inputs in parallel with bounded concurrency,
+    * discarding results.
+    *
+    * This operation provides resource-controlled parallel execution by limiting the number of
+    * concurrent fibers to the specified degree. All results are discarded, making this optimal for
+    * side-effecting operations where only completion matters.
+    *
+    * @param n
+    *   maximum number of concurrent fibers (must be positive)
+    * @param inputs
+    *   the collection of inputs to process
+    * @param f
+    *   function to transform each input into an effect
+    * @return
+    *   an effect that succeeds with Unit when all operations complete
+    *
+    * @example
+    *   {{{
+    * import net.ghoula.eru.prelude.*
+    *
+    * given runtime: EruRuntime = EruRuntime.create()
+    *
+    * // Send notifications with bounded concurrency
+    * val recipients = getEmailList()
+    * Eru.foreachParNDiscard(5, recipients) { email =>
+    *   sendNotification(email) // Max 5 concurrent sends
+    * }
+    *   }}}
+    */
+  def foreachParNDiscard[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B])(using
+    runtime: EruRuntime
+  ): Eru[E | Throwable, Unit] =
+    runtime.foreachParNDiscard(n, inputs)(f)
+
+  /** Validates multiple effects in parallel, accumulating all errors if any occur.
+    *
+    * This operation executes all effects concurrently and collects results. If all effects succeed,
+    * returns the list of success values. If any effects fail, returns all accumulated errors. This
+    * is particularly useful for domain validation where you want to report all validation failures
+    * at once rather than stopping at the first error.
+    *
+    * @param effects
+    *   the effects to validate in parallel
+    * @return
+    *   either all accumulated errors or all success values
+    *
+    * @example
+    *   {{{
+    * import net.ghoula.eru.prelude.*
+    *
+    * given runtime: EruRuntime = EruRuntime.create()
+    *
+    * // Validate user input fields in parallel
+    * val validations = List(
+    *   validateEmail(user.email),
+    *   validateAge(user.age),
+    *   validatePassword(user.password)
+    * )
+    *
+    * validatePar(validations).flatMap {
+    *   case Left(errors) =>
+    *     // Report all validation errors at once
+    *     Eru.fail(ValidationErrors(errors))
+    *   case Right(validatedFields) =>
+    *     // All fields valid, create user
+    *     Eru.succeed(User(validatedFields))
+    * }
+    *   }}}
+    */
+  def validatePar[E, A](effects: List[Eru[E, A]])(using runtime: EruRuntime): Eru[Throwable, Either[List[E], List[A]]] =
+    runtime.validatePar(effects)
+
+  /** Validates effects in parallel and returns either the first error encountered or all successes.
+    *
+    * This operation executes all effects concurrently but follows fail-fast semantics. If any
+    * effect fails, the first error is returned. If all effects succeed, all success values are
+    * returned. This is useful when you need parallel execution for performance but want to stop
+    * processing on the first validation failure.
+    *
+    * @param effects
+    *   the effects to validate in parallel
+    * @return
+    *   either the first error or all success values
+    *
+    * @example
+    *   {{{
+    * import net.ghoula.eru.prelude.*
+    *
+    * given runtime: EruRuntime = EruRuntime.create()
+    *
+    * // Validate dependencies in parallel, fail fast on any error
+    * val dependencyChecks = List(
+    *   checkDatabaseConnection(),
+    *   checkRedisConnection(),
+    *   checkExternalApiHealth()
+    * )
+    *
+    * validateFirst(dependencyChecks).flatMap {
+    *   case Left(error) =>
+    *     // First dependency failure, stop immediately
+    *     Eru.fail(ServiceUnavailable(error))
+    *   case Right(healthChecks) =>
+    *     // All dependencies healthy
+    *     Eru.succeed(HealthStatus.AllGood)
+    * }
+    *   }}}
+    */
+  def validateFirst[E, A](effects: List[Eru[E, A]])(using
+    runtime: EruRuntime
+  ): Eru[Throwable, Either[E | Throwable, List[A]]] =
+    runtime.validateFirst(effects)
 }

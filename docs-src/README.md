@@ -10,13 +10,13 @@ This project is guided by a strong philosophical vision for what a modern effect
 
 **Current Development Status (September 2025)**: Eru has achieved complete cross-platform implementation with full concurrency support on JVM and synchronous execution on Native.
 
-- **Correctness Foundation**: 214/214 tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
+- **Correctness Foundation**: 576+ tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
 
 - **Cross-Platform Support**:
     - **JVM**: Full support with true concurrency via Java Virtual Threads (JDK 21+)
     - **Scala Native**: Complete synchronous runtime with identical API surface
 
-- **Concurrency Runtime**: Production-ready concurrent operations including fork, race, zipPar, timeouts, and structured concurrency patterns. Virtual Threads provide lightweight, high-performance concurrency on JVM.
+- **Concurrency Runtime**: Production-ready concurrent operations including fork, race, zipPar, timeouts, structured concurrency patterns, optimized coordination primitives (Ref, Semaphore, Deferred), degree-limited parallel execution, and error accumulation patterns for domain validation.
 
 - **Performance**: Exceptional performance characteristics with optimized execution paths and minimal allocation overhead. Benchmarks show competitive performance with existing effect systems.
 

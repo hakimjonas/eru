@@ -185,4 +185,27 @@ val items = List("item1", "item2", "item3")
 val processed = EruRuntime.parTraverse(items)(processItem)
 ```
 
+### Resource-Controlled Processing
+```scala
+val manyItems = (1 to 1000).toList
+
+// Process with limited parallelism to avoid resource exhaustion
+val controlled = EruRuntime.foreachParN(10, manyItems)(processItem)
+```
+
+### Validation Patterns
+```scala
+val validations = List(
+  validateEmail("user@example.com"),
+  validateAge(25),
+  validateUsername("john_doe")
+)
+
+// Collect ALL validation errors (error accumulation)
+val allErrors = EruRuntime.validatePar(validations)
+
+// Stop at first validation error (fail-fast)
+val firstError = EruRuntime.validateFirst(validations)
+```
+
 Eru makes it easy to build robust, concurrent applications while maintaining type safety and cross-platform compatibility.

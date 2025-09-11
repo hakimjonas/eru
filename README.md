@@ -8,15 +8,15 @@ This project is guided by a strong philosophical vision for what a modern effect
 
 ## Status
 
-**Current Development Status (September 2025)**: Eru has achieved complete cross-platform implementation with exceptional performance optimizations and full concurrency support.
+**Current Development Status (September 2025)**: Eru has achieved complete cross-platform implementation with exceptional performance optimizations, full concurrency support, and comprehensive testing infrastructure.
 
-- **Correctness Foundation**: 383/383 tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
+- **Correctness Foundation**: 576+ tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
 
 - **Cross-Platform Support**: 
   - **JVM**: Full support with true concurrency via Java Virtual Threads (JDK 21+)
   - **Scala Native**: Complete synchronous runtime with identical API surface
 
-- **Concurrency Runtime**: Production-ready concurrent operations including fork, race, zipPar, timeouts, structured concurrency patterns, and optimized coordination primitives (Ref, Semaphore, Deferred).
+- **Concurrency Runtime**: Production-ready concurrent operations including fork, race, zipPar, timeouts, structured concurrency patterns, optimized coordination primitives (Ref, Semaphore, Deferred), degree-limited parallel execution, and error accumulation patterns for domain validation.
 
 - **Exceptional Performance**: Industry-leading performance with significant optimizations:
   - **Ref operations**: 36,000+ ops/ms (407x faster than Cats Effect, 5.4x faster than ZIO)
@@ -101,8 +101,16 @@ sbt test             # Run unit tests only
 
 ### Platform-Specific Testing
 ```bash
-sbt eruCoreJVM/test       # JVM tests for core module
-sbt eruCoreNative/test    # Native tests for core module
+# Targeted test commands for CI optimization
+sbt testJVM              # Run all JVM tests (core + runtime)
+sbt testNative           # Run all Native tests (core + runtime)
+sbt testIntegration      # Run integration tests (JVM only)
+sbt testQuick            # Run JVM tests excluding slow tests
+sbt testSlow             # Run only slow/stress tests
+
+# Individual module testing
+sbt eruCoreJVM/test      # JVM tests for core module
+sbt eruCoreNative/test   # Native tests for core module
 sbt eruIntegrationTest/test # Integration tests (JVM only)
 ```
 

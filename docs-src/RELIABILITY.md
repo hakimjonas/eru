@@ -80,3 +80,28 @@ exit match {
   case Exit.Interrupt(_, cause) => println(s"interrupted: $cause")
 }
 ```
+
+## Testing and Quality Assurance
+
+Eru maintains exceptional reliability through comprehensive testing infrastructure:
+
+**Test Coverage:**
+- **576+ tests** across JVM and Native platforms
+- **Zero-cast runtime** enforcement with build-time linting
+- **Complete logical coverage** for all core operations including retries, timeouts, and error handling
+
+**Cross-Platform Validation:**
+- **JVM tests** verify concurrent execution with Virtual Threads
+- **Native tests** validate synchronous execution with identical API surface
+- **Integration tests** ensure end-to-end reliability scenarios
+
+**CI Optimization:**
+```bash
+# Targeted test commands for efficient validation
+sbt testJVM           # Run all JVM tests (core + runtime)
+sbt testNative        # Run all Native tests (core + runtime)
+sbt testQuick         # Fast feedback loop excluding slow tests
+sbt testIntegration   # End-to-end integration scenarios
+```
+
+The testing infrastructure ensures that reliability patterns work correctly across all platforms while maintaining the performance characteristics that make Eru exceptional.

@@ -540,6 +540,237 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
         raceWithIndex(effects, 0)
     }
 
+  /** Executes effects derived from a collection of inputs in parallel with bounded concurrency.
+    *
+    * This operation processes inputs in batches, limiting the number of concurrent fibers to the
+    * specified degree. This provides resource control for large datasets while still gaining
+    * parallel execution benefits.
+    *
+    * Each batch of up to `n` effects executes in parallel, and batches are processed sequentially
+    * to maintain the concurrency bound. Results are collected in input order.
+    *
+    * @param n
+    *   maximum number of concurrent fibers (must be positive)
+    * @param inputs
+    *   the collection of inputs to process
+    * @param f
+    *   function to transform each input into an effect
+    * @tparam A
+    *   the type of input elements
+    * @tparam E
+    *   the typed error that effects may produce
+    * @tparam B
+    *   the success type that effects produce
+    * @return
+    *   an effect yielding the list of results in input order
+    *
+    * @example
+    *   {{{
+    * // Process URLs with max 3 concurrent requests
+    * val urls = (1 to 100).map(i => s"api/item/$i").toList
+    *
+    * val results = runtime.foreachParN(3, urls) { url =>
+    *   fetchFromApi(url) // Only 3 concurrent requests at a time
+    * }
+    *   }}}
+    */
+  def foreachParN[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] = {
+    require(n > 0, s"Parallelism degree must be positive, got: $n")
+
+    val inputList = inputs.toList
+    if (inputList.isEmpty) {
+      Eru.succeed(Nil)
+    } else {
+
+      def processBatch(batch: List[A]): Eru[E | Throwable, List[B]] = {
+        val effects = batch.map(f)
+        parSequence(effects)
+      }
+
+      def processAllBatches(batches: List[List[A]]): Eru[E | Throwable, List[B]] = {
+        batches match {
+          case Nil => Eru.succeed(Nil)
+          case head :: tail =>
+            for {
+              headResults <- processBatch(head)
+              tailResults <- processAllBatches(tail)
+            } yield headResults ++ tailResults
+        }
+      }
+
+      val batches = inputList.grouped(n).toList
+      processAllBatches(batches)
+    }
+  }
+
+  /** Executes effects derived from a collection of inputs in parallel with bounded concurrency,
+    * discarding results.
+    *
+    * This operation processes inputs in batches, limiting the number of concurrent fibers to the
+    * specified degree. This provides resource control for large datasets while still gaining
+    * parallel execution benefits. All results are discarded.
+    *
+    * Each batch of up to `n` effects executes in parallel, and batches are processed sequentially
+    * to maintain the concurrency bound.
+    *
+    * @param n
+    *   maximum number of concurrent fibers (must be positive)
+    * @param inputs
+    *   the collection of inputs to process
+    * @param f
+    *   function to transform each input into an effect
+    * @tparam A
+    *   the type of input elements
+    * @tparam E
+    *   the typed error that effects may produce
+    * @tparam B
+    *   the success type that effects produce (discarded)
+    * @return
+    *   an effect that succeeds with Unit when all operations complete
+    *
+    * @example
+    *   {{{
+    * // Send notifications with max 5 concurrent sends
+    * val userIds = (1 to 1000).toList
+    *
+    * runtime.foreachParNDiscard(5, userIds) { userId =>
+    *   sendNotification(userId) // Only 5 concurrent sends at a time
+    * }
+    *   }}}
+    */
+  def foreachParNDiscard[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B]): Eru[E | Throwable, Unit] =
+    foreachParN(n, inputs)(f).map(_ => ())
+
+  /** Validates multiple effects in parallel, accumulating all errors if any occur.
+    *
+    * This operation executes all effects concurrently and collects results. If all effects succeed,
+    * returns the list of success values. If any effects fail, returns all accumulated errors. This
+    * is particularly useful for domain validation where you want to report all validation failures
+    * at once rather than stopping at the first error.
+    *
+    * @param effects
+    *   the effects to validate in parallel
+    * @tparam E
+    *   the error type for validation failures
+    * @tparam A
+    *   the success type for valid results
+    * @return
+    *   either all accumulated errors or all success values
+    *
+    * @example
+    *   {{{
+    * // Validate user input fields in parallel
+    * val validations = List(
+    *   validateEmail(user.email),
+    *   validateAge(user.age),
+    *   validatePassword(user.password)
+    * )
+    *
+    * runtime.validatePar(validations).flatMap {
+    *   case Left(errors) =>
+    *     // Report all validation errors at once
+    *     Eru.fail(ValidationErrors(errors))
+    *   case Right(validatedFields) =>
+    *     // All fields valid, create user
+    *     Eru.succeed(User(validatedFields))
+    * }
+    *   }}}
+    */
+  def validatePar[E, A](effects: List[Eru[E, A]]): Eru[Throwable, Either[List[E], List[A]]] =
+    effects match {
+      case Nil => Eru.succeed(Right(List.empty[A]))
+      case _ =>
+        def forkAll(remaining: List[Eru[E, A]], acc: List[Fiber[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
+          remaining match {
+            case Nil => Eru.succeed(acc.reverse)
+            case head :: tail =>
+              fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
+          }
+
+        def awaitAll(fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
+          fibers match {
+            case Nil => Eru.succeed(Nil)
+            case head :: tail =>
+              for {
+                exit <- head.await
+                rest <- awaitAll(tail)
+              } yield exit :: rest
+          }
+
+        def processExits(exits: List[Exit[E, A]]): Eru[Throwable, Either[List[E], List[A]]] = {
+          // Check for interruptions first
+          exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
+            case Some((fiberId, cause)) =>
+              Eru.interruptibleBlocking {
+                throw new InterruptedException(s"ValidatePar interrupted due to fiber $fiberId: $cause")
+              }
+            case None =>
+              // Collect all errors and successes
+              val errors = exits.collect { case Exit.Failure(error) => error }
+              val defects = exits.collect { case Exit.Die(throwable) => throwable }
+
+              // If there are defects, propagate the first one
+              defects.headOption match {
+                case Some(throwable) => Eru.effect(throw throwable)
+                case None =>
+                  if (errors.nonEmpty) {
+                    Eru.succeed(Left(errors))
+                  } else {
+                    val results = exits.collect { case Exit.Success(value) => value }
+                    Eru.succeed(Right(results))
+                  }
+              }
+          }
+        }
+
+        for {
+          fibers <- forkAll(effects, Nil)
+          exits <- awaitAll(fibers)
+          result <- processExits(exits)
+        } yield result
+    }
+
+  /** Validates effects in parallel and returns either the first error encountered or all successes.
+    *
+    * This operation executes all effects concurrently but follows fail-fast semantics. If any
+    * effect fails, the first error is returned. If all effects succeed, all success values are
+    * returned. This is useful when you need parallel execution for performance but want to stop
+    * processing on the first validation failure.
+    *
+    * @param effects
+    *   the effects to validate in parallel
+    * @tparam E
+    *   the error type for validation failures
+    * @tparam A
+    *   the success type for valid results
+    * @return
+    *   either the first error or all success values
+    *
+    * @example
+    *   {{{
+    * // Validate dependencies in parallel, fail fast on any error
+    * val dependencyChecks = List(
+    *   checkDatabaseConnection(),
+    *   checkRedisConnection(),
+    *   checkExternalApiHealth()
+    * )
+    *
+    * runtime.validateFirst(dependencyChecks).flatMap {
+    *   case Left(error) =>
+    *     // First dependency failure, stop immediately
+    *     Eru.fail(ServiceUnavailable(error))
+    *   case Right(healthChecks) =>
+    *     // All dependencies healthy
+    *     Eru.succeed(HealthStatus.AllGood)
+    * }
+    *   }}}
+    */
+  def validateFirst[E, A](effects: List[Eru[E, A]]): Eru[Throwable, Either[E | Throwable, List[A]]] =
+    parSequence(effects).attempt.map {
+      case Result.Success(results) => Right(results)
+      case Result.Failure(error) => Left(error)
+    }
+
   /** Cleans up this runtime instance.
     *
     * This should be called when the runtime is no longer needed to ensure all resources are

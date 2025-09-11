@@ -69,6 +69,10 @@ object EruRuntime {
   def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]]
   def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]]
   
+  // Degree-limited parallel operations
+  def foreachParN[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]]
+  def foreachParNDiscard[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B]): Eru[E | Throwable, Unit]
+  
   // Racing
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]]
   def raceAll[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)]
@@ -80,6 +84,10 @@ object EruRuntime {
   
   // Async boundaries
   def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E | Throwable, A]
+  
+  // Validation patterns
+  def validatePar[E, A](effects: List[Eru[E, A]]): Eru[Throwable, Either[List[E], List[A]]]
+  def validateFirst[E, A](effects: List[Eru[E, A]]): Eru[Throwable, Either[E | Throwable, List[A]]]
 }
 ```
 
@@ -193,6 +201,14 @@ def timeoutTo[A1 >: A](duration: java.time.Duration, fallback: A1): Eru[E, A1]
 // Retry extensions
 def retryN(n: Int): Eru[E, A]
 def retryWithBackoff(base: Duration, maxRetries: Int): Eru[E, A]
+
+// Degree-limited parallel extensions
+def foreachParN[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]]
+def foreachParNDiscard[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B]): Eru[E | Throwable, Unit]
+
+// Validation patterns
+def validatePar[E, A](effects: List[Eru[E, A]]): Eru[Throwable, Either[List[E], List[A]]]
+def validateFirst[E, A](effects: List[Eru[E, A]]): Eru[Throwable, Either[E | Throwable, List[A]]]
 
 // Runner conveniences  
 def runExit(): Exit[E, A]

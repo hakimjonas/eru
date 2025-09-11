@@ -120,7 +120,14 @@ lazy val root = (project in file("."))
       "check",
       "scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
     ),
-    addCommandAlias("testAll", "test; eruIntegrationTest/test"),
+
+    // Targeted test commands for CI optimization
+    addCommandAlias("testJVM", "eruCoreJVM/test; eruRuntimeJVM/test"),
+    addCommandAlias("testNative", "eruCoreNative/test; eruRuntimeNative/test"),
+    addCommandAlias("testIntegration", "eruIntegrationTest/test"),
+    addCommandAlias("testQuick", "eruCoreJVM/test; eruRuntimeJVM/testOnly * -- --exclude-tags=slow"),
+    addCommandAlias("testSlow", "eruRuntimeJVM/testOnly * -- --include-tags=slow"),
+    addCommandAlias("testAll", "testJVM; testNative; testIntegration"),
 
     // Documentation commands
     addCommandAlias("docs", "docs/mdoc"),

@@ -128,6 +128,29 @@ val enrichedUsers = EruRuntime.parTraverse(userIds) { userId =>
 }
 ```
 
+### Resource-Controlled Parallel Execution
+
+When processing large collections, you may want to limit the degree of parallelism to prevent resource exhaustion:
+
+```scala
+val manyUserIds = (1 to 10000).map(i => s"user$i").toList
+
+// Process users with controlled parallelism (max 10 concurrent)
+val controlledProcessing = EruRuntime.foreachParN(10, manyUserIds) { userId =>
+  fetchAndProcessUser(userId)
+}
+
+// Process and discard results (for side effects only)
+val sideEffectProcessing = EruRuntime.foreachParNDiscard(5, manyUserIds) { userId =>
+  sendNotification(userId)
+}
+```
+
+**Benefits of Degree-Limited Parallelism:**
+- **Resource Protection**: Prevents overwhelming database connections, API rate limits, or memory
+- **Predictable Performance**: Maintains consistent resource usage under load
+- **Error Isolation**: Limits the blast radius of concurrent failures
+
 ## Timeouts and Cancellation
 
 ### Operation Timeouts
@@ -270,6 +293,40 @@ val faultTolerant = EruRuntime.parSequence(
 ).map { results =>
   val (successes, failures) = results.partitionMap(identity)
   (successes, failures)
+}
+```
+
+### Validation Patterns
+
+For domain validation scenarios where you need flexible error handling strategies:
+
+```scala
+val validationInputs = List(
+  validateEmail(user.email),
+  validateAge(user.age),
+  validateUsername(user.username)
+)
+
+// Error accumulation: Collect ALL validation errors
+val accumulateErrors = EruRuntime.validatePar(validationInputs)
+accumulateErrors.unsafeRunSync() match {
+  case Left(allErrors) => 
+    // Show user all validation problems at once
+    displayValidationErrors(allErrors)
+  case Right(validatedFields) => 
+    // All validations passed
+    proceedWithValidUser(validatedFields)
+}
+
+// Fail-fast: Stop at first validation error
+val failFast = EruRuntime.validateFirst(validationInputs)
+failFast.unsafeRunSync() match {
+  case Left(firstError) => 
+    // Show user the first validation error only
+    displaySingleError(firstError)
+  case Right(validatedFields) => 
+    // All validations passed
+    proceedWithValidUser(validatedFields)
 }
 ```
 

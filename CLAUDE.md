@@ -14,6 +14,14 @@ sbt test             # Run unit tests only
 
 ### Platform-Specific Testing
 ```bash
+# Targeted test commands for CI optimization
+sbt testJVM              # Run all JVM tests (core + runtime)
+sbt testNative           # Run all Native tests (core + runtime)
+sbt testIntegration      # Run integration tests (JVM only)
+sbt testQuick            # Run JVM tests excluding slow tests
+sbt testSlow             # Run only slow/stress tests
+
+# Individual module testing
 sbt eruCoreJVM/test       # JVM tests for core module
 sbt eruCoreNative/test    # Native tests for core module  
 sbt eruIntegrationTest/test # Integration tests (JVM only)
