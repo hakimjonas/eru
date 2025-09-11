@@ -69,9 +69,11 @@ opaque type FiberId = Long
 object FiberId {
   // Use process-unique starting point to avoid conflicts between multiple Eru instances
   private val processUniqueStart = {
-    val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
+    val processId =
+      java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0x7fffL // Use only 15 bits to ensure positive
     val nanoTime = System.nanoTime() & 0xffffffffffffL
-    (processId.toLong << 48) | (nanoTime & 0xffffL)
+    val rawStart = (processId.toLong << 48) | (nanoTime & 0xffffL)
+    if (rawStart > 0) rawStart else rawStart & 0x7fffffffffffffffL // Force positive by clearing sign bit
   }
   private val next = new java.util.concurrent.atomic.AtomicLong(processUniqueStart)
 

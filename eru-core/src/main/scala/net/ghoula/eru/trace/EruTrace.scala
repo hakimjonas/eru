@@ -26,9 +26,11 @@ object EruTrace {
   object SpanId {
     // Use process-unique starting point to avoid conflicts between multiple Eru instances
     private val processUniqueStart = {
-      val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
+      val processId =
+        java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0x7fffL // Use only 15 bits to ensure positive
       val nanoTime = (System.nanoTime() >> 16) & 0xffffffffffffL
-      (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x1000L // Offset for SpanId
+      val rawStart = (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x1000L // Offset for SpanId
+      if (rawStart > 0) rawStart else rawStart & 0x7fffffffffffffffL // Force positive by clearing sign bit
     }
     private val counter = new AtomicLong(processUniqueStart)
 
@@ -45,9 +47,11 @@ object EruTrace {
   object TraceId {
     // Use process-unique starting point to avoid conflicts between multiple Eru instances
     private val processUniqueStart = {
-      val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
+      val processId =
+        java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0x7fffL // Use only 15 bits to ensure positive
       val nanoTime = (System.nanoTime() >> 20) & 0xffffffffffffL
-      (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x2000L // Offset for TraceId
+      val rawStart = (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x2000L // Offset for TraceId
+      if (rawStart > 0) rawStart else rawStart & 0x7fffffffffffffffL // Force positive by clearing sign bit
     }
     private val counter = new AtomicLong(processUniqueStart)
 

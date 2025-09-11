@@ -1,4 +1,4 @@
- not# Eru 1.0.0 Release Refinements
+# Eru 1.0.0 Release Refinements
 
 This document contains a curated list of recommended refinements to bring the Eru codebase to a polished, production-ready 1.0.0 state. The suggestions are minor and focus on improving documentation, clarity, and maintainability in line with the project's manifesto.
 
