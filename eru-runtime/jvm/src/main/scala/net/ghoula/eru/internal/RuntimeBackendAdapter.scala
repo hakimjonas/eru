@@ -17,6 +17,9 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
 
   private val rootFibers: ConcurrentLinkedQueue[UnifiedFiber[?, ?]] = new ConcurrentLinkedQueue()
 
+  // Lazy instance-local executor to avoid shared thread pool contention between multiple Eru applications
+  private lazy val privateExecutor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()
+
   val capabilities: BackendCapabilities = backend match {
     case RuntimeBackend.Synchronous =>
       new BackendCapabilities(
@@ -118,7 +121,7 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
                   }
               }
             },
-            java.util.concurrent.ForkJoinPool.commonPool()
+            privateExecutor
           )
 
           try {
@@ -141,6 +144,8 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
 
   override def cleanup(): Unit = {
     backend.cleanup(Some(rootFibers))
+    // Note: Don't eagerly close privateExecutor as it may still have pending tasks
+    // The lazy executor will be cleaned up by GC when the adapter is collected
   }
 }
 

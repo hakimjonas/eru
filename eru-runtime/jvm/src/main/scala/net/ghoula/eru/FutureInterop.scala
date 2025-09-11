@@ -40,11 +40,8 @@ object FutureInterop {
     *   Eru[Nothing, Future[A]] which yields a Future that evaluates the effect
     */
   def toFuture[A](fa: Eru[Throwable, A]): Eru[Nothing, Future[A]] =
-    Eru.effect {
-      import scala.concurrent.ExecutionContext.Implicits.global
-      Future(fa.unsafeRunSync())
-    }.attempt.map {
-      case Result.Success(fut) => fut
-      case Result.Failure(t) => Future.failed(t)
+    fa.attempt.map {
+      case Result.Success(value) => Future.successful(value)
+      case Result.Failure(error) => Future.failed(error)
     }
 }

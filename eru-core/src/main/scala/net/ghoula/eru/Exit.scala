@@ -67,7 +67,13 @@ opaque type FiberId = Long
 /** Factory for creating fiber identifiers.
   */
 object FiberId {
-  private val next = new java.util.concurrent.atomic.AtomicLong(1L)
+  // Use process-unique starting point to avoid conflicts between multiple Eru instances
+  private val processUniqueStart = {
+    val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
+    val nanoTime = System.nanoTime() & 0xffffffffffffL
+    (processId.toLong << 48) | (nanoTime & 0xffffL)
+  }
+  private val next = new java.util.concurrent.atomic.AtomicLong(processUniqueStart)
 
   /** Creates a new unique fiber identifier.
     *

@@ -33,7 +33,13 @@ object EruObserver {
   opaque type ScopeId = Long
 
   object ScopeId {
-    private val next = new java.util.concurrent.atomic.AtomicLong(1L)
+    // Use process-unique starting point to avoid conflicts between multiple Eru instances
+    private val processUniqueStart = {
+      val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
+      val nanoTime = (System.nanoTime() >> 24) & 0xffffffffffffL
+      (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x3000L // Offset for ScopeId
+    }
+    private val next = new java.util.concurrent.atomic.AtomicLong(processUniqueStart)
 
     /** Creates a new unique scope identifier.
       *

@@ -24,7 +24,13 @@ object EruTrace {
   opaque type SpanId = Long
 
   object SpanId {
-    private val counter = new AtomicLong(1L)
+    // Use process-unique starting point to avoid conflicts between multiple Eru instances
+    private val processUniqueStart = {
+      val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
+      val nanoTime = (System.nanoTime() >> 16) & 0xffffffffffffL
+      (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x1000L // Offset for SpanId
+    }
+    private val counter = new AtomicLong(processUniqueStart)
 
     def fresh(): SpanId = counter.getAndIncrement()
 
@@ -37,7 +43,13 @@ object EruTrace {
   opaque type TraceId = Long
 
   object TraceId {
-    private val counter = new AtomicLong(1L)
+    // Use process-unique starting point to avoid conflicts between multiple Eru instances
+    private val processUniqueStart = {
+      val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
+      val nanoTime = (System.nanoTime() >> 20) & 0xffffffffffffL
+      (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x2000L // Offset for TraceId
+    }
+    private val counter = new AtomicLong(processUniqueStart)
 
     def fresh(): TraceId = counter.getAndIncrement()
 
