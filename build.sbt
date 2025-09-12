@@ -52,6 +52,7 @@ lazy val root = (project in file("."))
     eruRuntimeJVM,
     eruRuntimeNative,
     eruBenchJVM,
+    eruBenchMatrix,
     eruIntegrationTest,
     docs
   )
@@ -113,6 +114,13 @@ lazy val root = (project in file("."))
     addCommandAlias("benchState", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*StateManagementBench.*"),
     addCommandAlias("benchConcurrency", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*ConcurrencyBench.*"),
     addCommandAlias("benchWithGC", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 -prof gc"),
+
+    // Matrix benchmark system commands
+    addCommandAlias("benchMatrix", "eruBenchMatrix/Jmh/run"),
+    addCommandAlias("benchConcurrencyMatrix", "eruBenchMatrix/Jmh/run .*ConcurrencyScalingBench.*"),
+    addCommandAlias("benchDepthMatrix", "eruBenchMatrix/Jmh/run .*DepthScalingBench.*"),
+    addCommandAlias("benchDataMatrix", "eruBenchMatrix/Jmh/run .*DataSizeScalingBench.*"),
+    addCommandAlias("benchMatrixWithGC", "eruBenchMatrix/Jmh/run -prof gc"),
 
     // Build and format commands
     addCommandAlias("prepare", "scalafmtAll; scalafmtSbt; scalafixAll; Test/compile"),
@@ -220,6 +228,26 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
       "org.typelevel" %% "cats-effect" % "3.6.3"
     ),
     // JMH settings
+    Jmh / sourceDirectory := (Compile / sourceDirectory).value,
+    Jmh / classDirectory := (Compile / classDirectory).value,
+    Jmh / dependencyClasspath := (Compile / dependencyClasspath).value,
+    Jmh / compile := (Jmh / compile).dependsOn(Compile / compile).value,
+    Jmh / run := (Jmh / run).dependsOn(Jmh / compile).evaluated
+  )
+
+// ===== Matrix Benchmarks (JVM only) =====
+lazy val eruBenchMatrix = (project in file("eru-bench-matrix"))
+  .enablePlugins(JmhPlugin)
+  .dependsOn(eruCoreJVM, eruRuntimeJVM)
+  .settings(commonSettings)
+  .settings(
+    name := "eru-bench-matrix",
+    publish / skip := true,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio" % "2.1.21",
+      "org.typelevel" %% "cats-effect" % "3.6.3"
+    ),
+    // JMH settings for matrix benchmarks
     Jmh / sourceDirectory := (Compile / sourceDirectory).value,
     Jmh / classDirectory := (Compile / classDirectory).value,
     Jmh / dependencyClasspath := (Compile / dependencyClasspath).value,

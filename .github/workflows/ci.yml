@@ -125,3 +125,46 @@ jobs:
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }} # Sonatype password/token
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Token for creating GitHub release
         run: sbt +publishSigned sonatypeCentralUpload
+
+  # SNAPSHOT publishing job: Publishes SNAPSHOT versions on pushes to main branch
+  publish-snapshot:
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'SNAPSHOT') # Only on main with SNAPSHOT in commit
+    needs: build # Depends on the build job succeeding
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for dynver
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'sbt'
+
+      - name: Set up sbt launcher
+        uses: sbt/setup-sbt@v1
+
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.PGP_SECRET }}
+          passphrase: ${{ secrets.PGP_PASSPHRASE }}
+
+      - name: Publish SNAPSHOT to Sonatype
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+        run: |
+          echo "Publishing SNAPSHOT version..."
+          sbt +publishSigned
+          echo "SNAPSHOT published successfully!"

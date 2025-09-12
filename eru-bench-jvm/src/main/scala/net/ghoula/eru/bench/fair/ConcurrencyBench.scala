@@ -1,6 +1,7 @@
 package net.ghoula.eru.bench.fair
 
 import cats.effect.IO
+import cats.syntax.all.*
 import org.openjdk.jmh.annotations.*
 import zio.ZIO
 
@@ -178,7 +179,8 @@ class ConcurrencyBench extends FairBenchmarkBase {
   def ioComplexParallel(): Int = runIO {
     val effects = (1 to TEST_ITERATIONS).map(i => IO.pure(i))
     val combined = effects.foldLeft(IO.pure(0)) { (acc, eff) =>
-      (acc, eff).parTupled.map { case (sum, value) => sum + value }
+      // Use parMapN to match the zipPar semantics of Eru/ZIO
+      (acc, eff).parMapN((sum, value) => sum + value)
     }
     combined
   }

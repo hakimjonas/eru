@@ -60,7 +60,7 @@ class ErrorHandlingBench extends FairBenchmarkBase {
 
   @Benchmark
   def zioSuccessfulEither(): Int = runZio {
-    ZIO.succeed(TEST_VALUE).as(TEST_VALUE)
+    ZIO.succeed(TEST_VALUE).map(identity)
   }
 
   @Benchmark

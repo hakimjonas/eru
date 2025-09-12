@@ -72,8 +72,8 @@ class CollectionOperationsBench extends FairBenchmarkBase {
   @Benchmark
   def eruParSequence(): List[Int] = runEru {
     val effects = (1 to COLLECTION_SIZE).map(Eru.succeed(_)).toList
-    // Use sequential for now since parSequence doesn't exist yet
-    Eru.collectAll(effects)
+    // Use runtime parSequence for parallel execution
+    runtime.parSequence(effects)
   }
 
   @Benchmark
@@ -95,8 +95,8 @@ class CollectionOperationsBench extends FairBenchmarkBase {
   @Benchmark
   def eruParTraverse(): List[Int] = runEru {
     val items = (1 to COLLECTION_SIZE).toList
-    // Use sequential for now since parForeach doesn't exist yet
-    Eru.foreach(items)(x => Eru.succeed(x * 2))
+    // Use runtime parTraverse for parallel execution
+    runtime.parTraverse(items)(x => Eru.succeed(x * 2))
   }
 
   @Benchmark
@@ -198,8 +198,8 @@ class CollectionOperationsBench extends FairBenchmarkBase {
     for {
       // Sequential processing
       doubled <- Eru.foreach(items)(x => Eru.succeed(x * 2))
-      // Sequential aggregation (parallel will be added in Phase 5)
-      results <- Eru.collectAll(doubled.map(Eru.succeed(_)))
+      // Parallel aggregation using runtime parSequence
+      results <- runtime.parSequence(doubled.map(Eru.succeed(_)))
       // Final reduction
       sum <- Eru.succeed(results.sum)
     } yield sum
