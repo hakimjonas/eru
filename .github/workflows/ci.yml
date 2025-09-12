@@ -54,7 +54,7 @@ jobs:
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
       - name: Run benchmarks (smoke test)
-        run: sbt "eruBenchJVM/Jmh/run -i 1 -wi 1 -f1 -t1 .*BaselineBench.*"
+        run: sbt "eruBenchJVM/Jmh/run -i 2 -wi 1 -f1 -t1 net.ghoula.eru.bench.fair.CoreOperationsBench"
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
