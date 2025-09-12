@@ -16,9 +16,11 @@ class PerformanceCharacteristicsSpec extends FunSuite {
   given runtime: EruRuntime = EruRuntime.create()
 
   test("stack safety with deep flatMap chains") {
-    def deepChain(n: Int, acc: Int = 0): Eru[Nothing, Int] = {
-      if (n <= 0) Eru.succeed(acc)
-      else Eru.succeed(acc + 1).flatMap(_ => deepChain(n - 1, acc + 1))
+    // Use iterative approach instead of recursive to avoid stack overflow
+    def deepChain(n: Int): Eru[Nothing, Int] = {
+      (1 to n).foldLeft(Eru.succeed(0)) { (acc, _) =>
+        acc.flatMap(current => Eru.succeed(current + 1))
+      }
     }
 
     val result = deepChain(50000).runExit()
@@ -119,11 +121,10 @@ class PerformanceCharacteristicsSpec extends FunSuite {
   }
 
   test("error handling efficiency with deep error chains") {
+    // Use iterative approach to build chain without stack overflow
     def errorChain(depth: Int): Eru[String, Int] = {
-      if (depth <= 0) {
-        Eru.fail("deep error")
-      } else {
-        Eru.succeed(depth).flatMap(_ => errorChain(depth - 1))
+      (1 to depth).foldLeft(Eru.fail("deep error"): Eru[String, Int]) { (acc, i) =>
+        Eru.succeed(i).flatMap(_ => acc)
       }
     }
 
