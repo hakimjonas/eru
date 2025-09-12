@@ -27,6 +27,20 @@ sbt eruCoreNative/test    # Native tests for core module
 sbt eruIntegrationTest/test # Integration tests (JVM only)
 ```
 
+### Optimized Testing Commands
+```bash
+# FASTEST: Eliminates redundant compilation and "stalling" during native builds
+sbt testAllOptimized      # Compile all code first, then run tests by platform
+sbt testAllVerbose        # Shows all compilation phases explicitly  
+sbt testAllOptimizedVerbose # Verbose version with full compilation visibility
+
+# How it works:
+# - Pre-compiles ALL test sources (JVM + Native) in parallel (~20-30s)
+# - Runs native tests with no compilation overhead (~1s)
+# - Runs JVM tests with no compilation overhead (~30s)
+# - Runs integration tests (~5s)
+```
+
 ### Performance Benchmarking
 ```bash
 # Fair benchmark system (recommended)
