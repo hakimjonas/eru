@@ -273,7 +273,7 @@ lazy val eruIntegrationTest = (project in file("eru-integration-test"))
     name := "eru-integration-test",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "munit" % "1.1.1" % Test
+      "org.scalameta" %% "munit" % "1.2.0" % Test
     ),
     Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
   )
