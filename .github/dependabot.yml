@@ -1,19 +1,5 @@
 version: 2
 updates:
-  # Enable version updates for sbt
-  - package-ecosystem: "sbt"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    commit-message:
-      prefix: "deps"
-      include: "scope"
-    labels:
-      - "dependencies"
-    reviewers:
-      - "hakimjonas"
-    
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
