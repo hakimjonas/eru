@@ -56,6 +56,7 @@ lazy val root = (project in file("."))
     eruIntegrationTest,
     docs
   )
+  .settings(commonSettings)
   .settings(
     name := "eru-root",
     publish / skip := true,

@@ -7,10 +7,10 @@ import zio.ZIO
 import net.ghoula.eru.prelude.*
 
 /** Concurrency Scaling Matrix Benchmarks
-  * 
+  *
   * Tests performance scaling across different concurrency parameters:
   *   - Thread count scaling (1, 2, 4, 8, 16 threads)
-  *   - Fiber count scaling (10, 100, 1K fibers)  
+  *   - Fiber count scaling (10, 100, 1K fibers)
   *   - Concurrency level scaling (100, 1K, 10K concurrent operations)
   *   - Different workload patterns (CPU-bound, IO-bound, mixed)
   *
@@ -33,12 +33,12 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
       fibers <- parSequence(effects)
       results <- parSequence(fibers.map(_.await.map {
         case Exit.Success(value) => value
-        case other => throw new RuntimeException(s"Unexpected exit: $other")  
+        case other => throw new RuntimeException(s"Unexpected exit: $other")
       }))
     } yield results
   }
 
-  @Benchmark  
+  @Benchmark
   def zioForkAwaitScaling(): List[Int] = runZio {
     val effects = generateTestCollection(i => generateZioWorkload(i).fork)
     for {
@@ -54,10 +54,12 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
   def ioForkAwaitScaling(): List[Int] = runIO {
     val effects = generateTestCollection(i => generateIOWorkload(i).start)
     for {
-      fibers <- effects.parSequence  
-      results <- fibers.map(_.joinWithNever.map {
-        case value => value
-      }).parSequence
+      fibers <- effects.parSequence
+      results <- fibers
+        .map(_.joinWithNever.map { case value =>
+          value
+        })
+        .parSequence
     } yield results
   }
 
@@ -77,21 +79,21 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
     executeParallelZio(effects)
   }
 
-  @Benchmark  
+  @Benchmark
   def ioParallelScaling(): List[Int] = runIO {
     val effects = generateTestCollection(i => generateIOWorkload(i))
     executeParallelIO(effects)
   }
 
   // =============================================================================
-  // Race Operation Scaling Tests  
+  // Race Operation Scaling Tests
   // =============================================================================
 
   @Benchmark
   def eruRaceScaling(): Int = runEru {
     val contestants = generateTestCollection(i => generateWorkload(i).map(_ => i))
     contestants match {
-      case head :: tail => 
+      case head :: tail =>
         tail.foldLeft(head) { (winner, contestant) =>
           winner.race(contestant).map {
             case Left(value) => value
@@ -109,7 +111,7 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
       case head :: tail =>
         tail.foldLeft(head) { (winner, contestant) =>
           winner.raceEither(contestant).map {
-            case Left(value) => value  
+            case Left(value) => value
             case Right(value) => value
           }
         }
@@ -125,7 +127,7 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
         tail.foldLeft(head) { (winner, contestant) =>
           IO.race(winner, contestant).map {
             case Left(value) => value
-            case Right(value) => value  
+            case Right(value) => value
           }
         }
       case Nil => IO.pure(0)
@@ -140,9 +142,7 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
   def eruConcurrentStateScaling(): Int = runEru {
     for {
       ref <- Eru.ref(0)
-      fiberEffects = generateTestCollection(i => 
-        ref.update(_ + i).fork
-      )
+      fiberEffects = generateTestCollection(i => ref.update(_ + i).fork)
       fibers <- parSequence(fiberEffects)
       _ <- parSequence(fibers.map(_.await))
       result <- ref.get
@@ -153,9 +153,7 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
   def zioConcurrentStateScaling(): Int = runZio {
     for {
       ref <- zio.Ref.make(0)
-      fibers <- ZIO.collectAllPar(generateTestCollection(i =>
-        ref.update(_ + i).fork
-      ))
+      fibers <- ZIO.collectAllPar(generateTestCollection(i => ref.update(_ + i).fork))
       _ <- ZIO.collectAllPar(fibers.map(_.await))
       result <- ref.get
     } yield result
@@ -165,9 +163,7 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
   def ioConcurrentStateScaling(): Int = runIO {
     for {
       ref <- IO.ref(0)
-      fibers <- generateTestCollection(i =>
-        ref.update(_ + i).start  
-      ).parSequence
+      fibers <- generateTestCollection(i => ref.update(_ + i).start).parSequence
       _ <- fibers.map(_.joinWithNever).parSequence
       result <- ref.get
     } yield result
@@ -189,7 +185,7 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
     } yield results.sum
   }
 
-  @Benchmark  
+  @Benchmark
   def zioMassiveFiberCreation(): Int = runZio {
     val effects = (1 to fiberCount).map(i => ZIO.succeed(i).fork).toList
     for {
@@ -203,7 +199,7 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
 
   @Benchmark
   def ioMassiveFiberCreation(): Int = runIO {
-    val effects = (1 to fiberCount).map(i => IO.pure(i).start).toList  
+    val effects = (1 to fiberCount).map(i => IO.pure(i).start).toList
     for {
       fibers <- effects.parSequence
       results <- fibers.map(_.joinWithNever).parSequence
@@ -216,41 +212,47 @@ class ConcurrencyScalingBench extends MatrixBenchmarkBase {
 
   /** Generate ZIO workload based on workloadType parameter */
   private def generateZioWorkload(input: Int): zio.ZIO[Any, Nothing, Int] = workloadType match {
-    case "cpu-bound" => ZIO.succeed {
-      var result = input
-      for (i <- 1 to 1000) {
-        result = (result * 31 + i) % 1000007
+    case "cpu-bound" =>
+      ZIO.succeed {
+        var result = input
+        for (i <- 1 to 1000) {
+          result = (result * 31 + i) % 1000007
+        }
+        result
       }
-      result
-    }
-    case "io-bound" => ZIO.succeed {
-      Thread.sleep(1)
-      input * 2
-    }
-    case "mixed" => ZIO.succeed {
-      val cpuResult = (input * 31) % 1000007
-      if (cpuResult % 10 == 0) Thread.sleep(1)
-      cpuResult  
-    }
+    case "io-bound" =>
+      ZIO.succeed {
+        Thread.sleep(1)
+        input * 2
+      }
+    case "mixed" =>
+      ZIO.succeed {
+        val cpuResult = (input * 31) % 1000007
+        if (cpuResult % 10 == 0) Thread.sleep(1)
+        cpuResult
+      }
   }
 
   /** Generate IO workload based on workloadType parameter */
   private def generateIOWorkload(input: Int): IO[Int] = workloadType match {
-    case "cpu-bound" => IO {
-      var result = input
-      for (i <- 1 to 1000) {
-        result = (result * 31 + i) % 1000007  
+    case "cpu-bound" =>
+      IO {
+        var result = input
+        for (i <- 1 to 1000) {
+          result = (result * 31 + i) % 1000007
+        }
+        result
       }
-      result
-    }
-    case "io-bound" => IO {
-      Thread.sleep(1)
-      input * 2
-    }
-    case "mixed" => IO {
-      val cpuResult = (input * 31) % 1000007
-      if (cpuResult % 10 == 0) Thread.sleep(1)
-      cpuResult
-    }
+    case "io-bound" =>
+      IO {
+        Thread.sleep(1)
+        input * 2
+      }
+    case "mixed" =>
+      IO {
+        val cpuResult = (input * 31) % 1000007
+        if (cpuResult % 10 == 0) Thread.sleep(1)
+        cpuResult
+      }
   }
 }

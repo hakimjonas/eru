@@ -9,7 +9,7 @@ import net.ghoula.eru.prelude.*
 
 @main def verifySnapshot(): Unit = {
   println("🔍 Verifying Eru SNAPSHOT accessibility...")
-  
+
   // Test basic functionality
   val test = for {
     _ <- Eru.effect(println("✅ Basic Eru.effect works"))
@@ -17,7 +17,7 @@ import net.ghoula.eru.prelude.*
     value <- ref.get
     _ <- Eru.effect(println(s"✅ Ref operations work: $value"))
   } yield value
-  
+
   val result = test.unsafeRunSync()
   println(s"✅ SNAPSHOT verification complete: $result")
   println("🚀 Ready for Valar integration!")

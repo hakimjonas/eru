@@ -36,7 +36,7 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
 
   @Benchmark
   def zioCollectionProcessingScaling(): List[Int] = runZio {
-    val collection = (1 to collectionSize).toList  
+    val collection = (1 to collectionSize).toList
     val effects = collection.map(i => generateZioWorkload(i))
     executeParallelZio(effects)
   }
@@ -55,34 +55,40 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
   @Benchmark
   def eruSequentialCollectionScaling(): List[Int] = runEru {
     val collection = (1 to collectionSize).toList
-    collection.foldLeft(Eru.succeed(List.empty[Int])) { (acc, item) =>
-      for {
-        list <- acc
-        processed <- generateWorkload(item)
-      } yield processed :: list
-    }.map(_.reverse)
+    collection
+      .foldLeft(Eru.succeed(List.empty[Int])) { (acc, item) =>
+        for {
+          list <- acc
+          processed <- generateWorkload(item)
+        } yield processed :: list
+      }
+      .map(_.reverse)
   }
 
   @Benchmark
   def zioSequentialCollectionScaling(): List[Int] = runZio {
     val collection = (1 to collectionSize).toList
-    collection.foldLeft(ZIO.succeed(List.empty[Int])) { (acc, item) =>
-      for {
-        list <- acc  
-        processed <- generateZioWorkload(item)
-      } yield processed :: list
-    }.map(_.reverse)
+    collection
+      .foldLeft(ZIO.succeed(List.empty[Int])) { (acc, item) =>
+        for {
+          list <- acc
+          processed <- generateZioWorkload(item)
+        } yield processed :: list
+      }
+      .map(_.reverse)
   }
 
   @Benchmark
   def ioSequentialCollectionScaling(): List[Int] = runIO {
     val collection = (1 to collectionSize).toList
-    collection.foldLeft(IO.pure(List.empty[Int])) { (acc, item) =>
-      for {
-        list <- acc
-        processed <- generateIOWorkload(item)
-      } yield processed :: list  
-    }.map(_.reverse)
+    collection
+      .foldLeft(IO.pure(List.empty[Int])) { (acc, item) =>
+        for {
+          list <- acc
+          processed <- generateIOWorkload(item)
+        } yield processed :: list
+      }
+      .map(_.reverse)
   }
 
   // =============================================================================
@@ -108,7 +114,7 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
     ZIO.succeed {
       val processed = new Array[Byte](data.length)
       for (i <- data.indices) {
-        processed(i) = ((data(i) + i) % 256).toByte  
+        processed(i) = ((data(i) + i) % 256).toByte
       }
       processed
     }
@@ -136,13 +142,13 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
       Eru.succeed {
         val size = dataSize match {
           case "small" => 1024
-          case "medium" => 10 * 1024  
+          case "medium" => 10 * 1024
           case "large" => 100 * 1024
         }
         new Array[Byte](size)
       }
     }.toList
-    
+
     executeParallelEru(effects)
   }
 
@@ -153,16 +159,16 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
         val size = dataSize match {
           case "small" => 1024
           case "medium" => 10 * 1024
-          case "large" => 100 * 1024  
+          case "large" => 100 * 1024
         }
         new Array[Byte](size)
       }
     }.toList
-    
+
     executeParallelZio(effects)
   }
 
-  @Benchmark  
+  @Benchmark
   def ioAllocationScaling(): List[Array[Byte]] = runIO {
     val effects = (1 to collectionSize).map { _ =>
       IO {
@@ -174,24 +180,24 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
         new Array[Byte](size)
       }
     }.toList
-    
+
     executeParallelIO(effects)
   }
 
   // =============================================================================
-  // Batch Processing Scaling Tests  
+  // Batch Processing Scaling Tests
   // =============================================================================
 
   @Benchmark
   def eruBatchProcessingScaling(): List[List[Int]] = runEru {
     val batchSize = collectionSize / 10 max 1
     val batches = (1 to collectionSize).grouped(batchSize).toList
-    
+
     val batchEffects = batches.map { batch =>
       val batchWork = batch.toList.map(i => generateWorkload(i))
       executeParallelEru(batchWork)
     }
-    
+
     executeParallelEru(batchEffects)
   }
 
@@ -199,25 +205,25 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
   def zioBatchProcessingScaling(): List[List[Int]] = runZio {
     val batchSize = collectionSize / 10 max 1
     val batches = (1 to collectionSize).grouped(batchSize).toList
-    
+
     val batchEffects = batches.map { batch =>
       val batchWork = batch.toList.map(i => generateZioWorkload(i))
       executeParallelZio(batchWork)
     }
-    
+
     executeParallelZio(batchEffects)
   }
 
   @Benchmark
   def ioBatchProcessingScaling(): List[List[Int]] = runIO {
-    val batchSize = collectionSize / 10 max 1  
+    val batchSize = collectionSize / 10 max 1
     val batches = (1 to collectionSize).grouped(batchSize).toList
-    
+
     val batchEffects = batches.map { batch =>
       val batchWork = batch.toList.map(i => generateIOWorkload(i))
       executeParallelIO(batchWork)
     }
-    
+
     executeParallelIO(batchEffects)
   }
 
@@ -262,7 +268,7 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
       ref <- IO.ref(new Array[Int](collectionSize))
       _ <- (1 to collectionSize).map { i =>
         ref.update { arr =>
-          val newArr = arr.clone()  
+          val newArr = arr.clone()
           if (i < newArr.length) newArr(i) = i
           newArr
         }
@@ -291,14 +297,14 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
     executeParallelEru(chunkEffects)
   }
 
-  @Benchmark  
+  @Benchmark
   def zioStreamProcessingScaling(): List[Int] = runZio {
     def processChunk(chunk: List[Int]): ZIO[Any, Nothing, Int] = {
       chunk.foldLeft(ZIO.succeed(0)) { (acc, item) =>
         for {
           sum <- acc
           processed <- generateZioWorkload(item)
-        } yield sum + processed  
+        } yield sum + processed
       }
     }
 
@@ -329,41 +335,47 @@ class DataSizeScalingBench extends MatrixBenchmarkBase {
 
   /** Generate ZIO workload based on workloadType parameter */
   private def generateZioWorkload(input: Int): ZIO[Any, Nothing, Int] = workloadType match {
-    case "cpu-bound" => ZIO.succeed {
-      var result = input
-      for (i <- 1 to 100) {  // Reduced iterations for data scaling tests
-        result = (result * 31 + i) % 1000007
+    case "cpu-bound" =>
+      ZIO.succeed {
+        var result = input
+        for (i <- 1 to 100) { // Reduced iterations for data scaling tests
+          result = (result * 31 + i) % 1000007
+        }
+        result
       }
-      result
-    }
-    case "io-bound" => ZIO.succeed {
-      Thread.sleep(1)
-      input * 2
-    }
-    case "mixed" => ZIO.succeed {
-      val cpuResult = (input * 31) % 1000007
-      if (cpuResult % 100 == 0) Thread.sleep(1)  
-      cpuResult
-    }
+    case "io-bound" =>
+      ZIO.succeed {
+        Thread.sleep(1)
+        input * 2
+      }
+    case "mixed" =>
+      ZIO.succeed {
+        val cpuResult = (input * 31) % 1000007
+        if (cpuResult % 100 == 0) Thread.sleep(1)
+        cpuResult
+      }
   }
 
-  /** Generate IO workload based on workloadType parameter */  
+  /** Generate IO workload based on workloadType parameter */
   private def generateIOWorkload(input: Int): IO[Int] = workloadType match {
-    case "cpu-bound" => IO {
-      var result = input
-      for (i <- 1 to 100) {
-        result = (result * 31 + i) % 1000007
+    case "cpu-bound" =>
+      IO {
+        var result = input
+        for (i <- 1 to 100) {
+          result = (result * 31 + i) % 1000007
+        }
+        result
       }
-      result
-    }
-    case "io-bound" => IO {
-      Thread.sleep(1)
-      input * 2
-    }
-    case "mixed" => IO {
-      val cpuResult = (input * 31) % 1000007
-      if (cpuResult % 100 == 0) Thread.sleep(1)
-      cpuResult
-    }
+    case "io-bound" =>
+      IO {
+        Thread.sleep(1)
+        input * 2
+      }
+    case "mixed" =>
+      IO {
+        val cpuResult = (input * 31) % 1000007
+        if (cpuResult % 100 == 0) Thread.sleep(1)
+        cpuResult
+      }
   }
 }
