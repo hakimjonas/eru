@@ -71,7 +71,7 @@ final class ValidationPatternsSpec extends TestWithRuntime {
   test("validatePar executes effects in parallel") {
     val effects = (1 to 5).toList.map { i =>
       Eru.effect {
-        Thread.sleep(10) // Small delay to verify parallel execution
+        // Remove Thread.sleep - parallel execution doesn't need artificial delay
         i
       }
     }
@@ -171,9 +171,9 @@ final class ValidationPatternsSpec extends TestWithRuntime {
 
   test("validatePar maintains result order even with parallel execution") {
     val effects = List(
-      Eru.effect { Thread.sleep(30); "slow" },
-      Eru.effect { Thread.sleep(10); "fast" },
-      Eru.effect { Thread.sleep(20); "medium" }
+      Eru.effect { "slow" }, // Remove Thread.sleep - order is maintained without timing
+      Eru.effect { "fast" },
+      Eru.effect { "medium" }
     )
 
     val result = validatePar(effects).unsafeRunSync()

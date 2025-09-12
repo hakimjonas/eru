@@ -304,8 +304,10 @@ final class SuspendSpec extends TestWithRuntime {
   test("suspend with timeout integration works correctly") {
     val longRunning = LocalEruRuntime.suspend[String, Int] { callback =>
       java.util.concurrent.CompletableFuture.runAsync(() => {
-        Thread.sleep(30)
-        callback(Right(42))
+        // Use CompletableFuture delay instead of Thread.sleep to avoid blocking thread pool
+        java.util.concurrent.CompletableFuture
+          .delayedExecutor(25, java.util.concurrent.TimeUnit.MILLISECONDS)
+          .execute(() => callback(Right(42)))
       })
       Eru.unit
     }
@@ -328,7 +330,8 @@ final class SuspendSpec extends TestWithRuntime {
     val results = (1 to iterations).map { i =>
       LocalEruRuntime.suspend[String, Int] { callback =>
         java.util.concurrent.CompletableFuture.runAsync(() => {
-          Thread.sleep(scala.util.Random.nextInt(5))
+          // Remove random Thread.sleep to avoid blocking thread pool
+          // The concurrency test doesn't need timing variation
           callback(Right(i))
         })
         Eru.unit

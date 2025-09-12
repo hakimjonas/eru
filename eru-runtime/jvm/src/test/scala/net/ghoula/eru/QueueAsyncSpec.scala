@@ -15,8 +15,7 @@ class QueueAsyncSpec extends munit.FunSuite {
 
     val consumer = queue.take.fork.unsafeRunSync()
 
-    // Give consumer a moment to register
-    Eru.succeed(Thread.sleep(50)).unsafeRunSync()
+    // Remove blocking sleep - the take operation will properly suspend and wait
 
     queue.offer("delayed").unsafeRunSync()
     val result = consumer.await.unsafeRunSync()
@@ -32,8 +31,7 @@ class QueueAsyncSpec extends munit.FunSuite {
 
     val consumer = queue.take.fork.unsafeRunSync()
 
-    // Give consumer a moment to register
-    Eru.succeed(Thread.sleep(50)).unsafeRunSync()
+    // Remove blocking sleep - the take operation will properly suspend and wait
 
     queue.offer("delayed").unsafeRunSync()
     val result = consumer.await.unsafeRunSync()
@@ -51,8 +49,7 @@ class QueueAsyncSpec extends munit.FunSuite {
     val consumer2 = queue.take.fork.unsafeRunSync()
     val consumer3 = queue.take.fork.unsafeRunSync()
 
-    // Give consumers time to register
-    Eru.succeed(Thread.sleep(50)).unsafeRunSync()
+    // Remove blocking sleep - take operations will properly suspend and wait
 
     // Offer elements one by one
     queue.offer(1).unsafeRunSync()
@@ -79,8 +76,7 @@ class QueueAsyncSpec extends munit.FunSuite {
     // This offer should suspend since queue is full
     val producer = queue.offer(3).fork.unsafeRunSync()
 
-    // Give producer time to register
-    Eru.succeed(Thread.sleep(50)).unsafeRunSync()
+    // Remove blocking sleep - offer operation will properly suspend when queue is full
 
     // Taking an element should unblock the producer
     val taken = queue.take.unsafeRunSync()

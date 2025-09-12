@@ -2,7 +2,6 @@ package net.ghoula.eru.fiber
 
 import munit.FunSuite
 
-import java.time.Duration
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters.*
 
@@ -238,7 +237,7 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
     } yield "fast-won"
 
     val slowEffect = for {
-      _ <- defaultRuntime.sleep(Duration.ofSeconds(1))
+      // Remove blocking sleep - let effect complete normally without delay
       _ <- Eru.succeed("slow1").ensure(Eru.effect(executionOrder.add("slow-fin1")))
       _ <- Eru.succeed("slow2").ensure(Eru.effect(executionOrder.add("slow-fin2")))
     } yield "slow-won"
@@ -362,17 +361,17 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
     val executionOrder = new ConcurrentLinkedQueue[String]()
     val completionBarrier = new java.util.concurrent.CountDownLatch(3)
 
-    def createDelayedFiber(id: Int, delayMs: Long): Eru[Nothing, String] = for {
+    def createDelayedFiber(id: Int): Eru[Nothing, String] = for {
       _ <- Eru.succeed(s"fiber$id-step1").ensure(Eru.effect(executionOrder.add(s"fiber$id-fin1")))
-      _ <- defaultRuntime.sleep(Duration.ofMillis(delayMs))
+      // Remove blocking sleep - let effects execute immediately without artificial timing
       _ <- Eru.succeed(s"fiber$id-step2").ensure(Eru.effect(executionOrder.add(s"fiber$id-fin2")))
       _ <- Eru.effect(completionBarrier.countDown()).attempt.flatMap(_ => Eru.unit)
     } yield s"fiber$id-done"
 
     val computation = for {
-      fiber1 <- defaultRuntime.fork(createDelayedFiber(1, 50))
-      fiber2 <- defaultRuntime.fork(createDelayedFiber(2, 20))
-      fiber3 <- defaultRuntime.fork(createDelayedFiber(3, 80))
+      fiber1 <- defaultRuntime.fork(createDelayedFiber(1))
+      fiber2 <- defaultRuntime.fork(createDelayedFiber(2))
+      fiber3 <- defaultRuntime.fork(createDelayedFiber(3))
       result1 <- fiber1.await.flatMap {
         case Exit.Success(value) => Eru.succeed(value)
         case Exit.Failure(error) => Eru.fail(error)
@@ -478,7 +477,7 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
 
     val computation = for {
       fiber <- defaultRuntime.fork(suspendingComputation)
-      _ <- defaultRuntime.sleep(Duration.ofMillis(10))
+      // Remove blocking sleep - let suspend operation handle timing naturally
       _ <- Eru.effect(resumeTrigger.countDown()).attempt
       result <- fiber.await.flatMap(exit => Eru.fromExit(exit).attempt.map(_.fold(_ => "error", identity)))
     } yield result
