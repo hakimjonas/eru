@@ -70,7 +70,10 @@ class ConcurrencyBench extends FairBenchmarkBase {
     for {
       fiber <- ZIO.succeed(TEST_VALUE).fork
       exit <- fiber.await
-      result <- ZIO.done(exit)
+      result <- exit match {
+        case zio.Exit.Success(value) => ZIO.succeed(value)
+        case zio.Exit.Failure(cause) => ZIO.failCause(cause)
+      }
     } yield result
   }
 
@@ -133,9 +136,18 @@ class ConcurrencyBench extends FairBenchmarkBase {
       exit1 <- fiber1.await
       exit2 <- fiber2.await
       exit3 <- fiber3.await
-      result1 <- ZIO.done(exit1)
-      result2 <- ZIO.done(exit2)
-      result3 <- ZIO.done(exit3)
+      result1 <- exit1 match {
+        case zio.Exit.Success(value) => ZIO.succeed(value)
+        case zio.Exit.Failure(cause) => ZIO.failCause(cause)
+      }
+      result2 <- exit2 match {
+        case zio.Exit.Success(value) => ZIO.succeed(value)
+        case zio.Exit.Failure(cause) => ZIO.failCause(cause)
+      }
+      result3 <- exit3 match {
+        case zio.Exit.Success(value) => ZIO.succeed(value)
+        case zio.Exit.Failure(cause) => ZIO.failCause(cause)
+      }
       total <- ZIO.succeed(result1 + result2 + result3)
     } yield total
   }
