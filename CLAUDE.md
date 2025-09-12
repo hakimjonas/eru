@@ -8,9 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 sbt prepare          # Format code, apply fixes, compile tests - run before commits
 sbt check            # Validate formatting, linting, documentation
-sbt testAll          # Run all tests including integration tests
+./run-all-tests.sh   # Run all tests in isolated JVM instances (recommended)
 sbt test             # Run unit tests only
 ```
+
+### Test Isolation (IMPORTANT)
+Due to resource contention between concurrent test suites, use the isolated test runner:
+- `./run-all-tests.sh` - Runs each test suite in separate JVM instances with timeouts
+- Prevents thread pool exhaustion and coordination deadlocks that cause hanging
+- Individual commands: `sbt testNative`, `sbt testJVM`, `sbt testIntegration`
 
 ### Platform-Specific Testing
 ```bash

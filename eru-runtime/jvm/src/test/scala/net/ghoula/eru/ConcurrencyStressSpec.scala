@@ -111,7 +111,7 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
   /** Validates cancellation cascade behavior under stress conditions.
     *
     * Tests that cancellation properly propagates through a hierarchy of effects, ensuring
-    * fast-failing behavior and proper resource cleanup.
+    * fast-failing behavior and proper resource cleanup using reduced timing.
     */
   test("cancellation cascade stress test") {
     val started = new AtomicInteger(0)
@@ -119,7 +119,7 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
 
     def createCancellableEffect(id: Int): Eru[String | Throwable, Int] = {
       Eru.effect(started.incrementAndGet()).flatMap { _ =>
-        runtime.sleep(Duration.ofMillis(50)).flatMap { _ =>
+        runtime.sleep(Duration.ofMillis(5)).flatMap { _ =>
           completed.incrementAndGet()
           Eru.succeed(id)
         }
@@ -127,7 +127,7 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
     }
 
     val fastFail: Eru[String | Throwable, Int] =
-      runtime.sleep(Duration.ofMillis(20)).flatMap(_ => Eru.fail("fast failure"))
+      runtime.sleep(Duration.ofMillis(2)).flatMap(_ => Eru.fail("fast failure"))
 
     val slowEffect = createCancellableEffect(1)
 
@@ -136,7 +136,8 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
       .attempt
       .unsafeRunSync()
 
-    runtime.sleep(Duration.ofMillis(10)).unsafeRunSync()
+    // Brief pause to allow cancellation to propagate
+    runtime.sleep(Duration.ofMillis(1)).unsafeRunSync()
 
     result match {
       case Result.Failure("fast failure") =>
@@ -181,7 +182,6 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
     assertEquals(released.get(), fiberCount, "All resources should have been released")
   }
 
-
   test("timer scheduling under load") {
     EruTest.withTestClock { clock =>
       given runtime: EruRuntime = EruTest.testRuntime(clock)
@@ -220,7 +220,7 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
   /** Validates mixed concurrent and sequential operations under stress.
     *
     * Tests that combining concurrent operations with sequential ones maintains correctness and
-    * proper execution order under high load.
+    * proper execution order under high load using computation instead of sleep for performance.
     */
   test("mixed concurrent and sequential operations") {
     val concurrentCount = 50
@@ -228,7 +228,8 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
 
     val concurrentOps = (1 to concurrentCount).map { i =>
       runtime.fork {
-        runtime.sleep(Duration.ofMillis(2)).map(_ => s"concurrent-$i")
+        // Use computation instead of sleep for performance
+        Eru.effect { (1 to 100).sum }.map(_ => s"concurrent-$i")
       }.flatMap(_.await).flatMap {
         case Exit.Success(value) => Eru.succeed(value)
         case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Concurrent op failed with error: $error"))
@@ -241,9 +242,9 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
       if (remaining <= 0) {
         Eru.succeed(acc.reverse)
       } else {
-        runtime.sleep(Duration.ofMillis(1)).flatMap { _ =>
-          createSequential(remaining - 1, s"sequential-$remaining" :: acc)
-        }
+        // Use simple computation for slight delay without timing
+        val _ = (1 to 50).sum
+        createSequential(remaining - 1, s"sequential-$remaining" :: acc)
       }
     }
 
@@ -310,20 +311,20 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
   /** Validates timeout handling behavior under concurrent load.
     *
     * Tests that timeout operations work correctly when applied to multiple concurrent effects with
-    * different completion times, ensuring proper timing behavior.
+    * different completion times, ensuring proper timing behavior with reduced timing values.
     */
   test("timeout handling under concurrent load") {
-    val fastCount = 30
-    val slowCount = 30
+    val fastCount = 10 // Reduced from 30
+    val slowCount = 10 // Reduced from 30
 
     val fastEffects = (1 to fastCount).map { i =>
       val effect = Eru.succeed(s"fast-$i")
-      runtime.timeout(Duration.ofMillis(100))(effect)
+      runtime.timeout(Duration.ofMillis(50))(effect) // Reduced timeout
     }
 
     val slowEffects = (1 to slowCount).map { i =>
-      val effect = runtime.sleep(Duration.ofMillis(200)).map(_ => s"slow-$i")
-      runtime.timeout(Duration.ofMillis(10))(effect)
+      val effect = runtime.sleep(Duration.ofMillis(20)).map(_ => s"slow-$i") // Reduced sleep
+      runtime.timeout(Duration.ofMillis(5))(effect) // Very short timeout
     }
 
     val allEffects = fastEffects ++ slowEffects

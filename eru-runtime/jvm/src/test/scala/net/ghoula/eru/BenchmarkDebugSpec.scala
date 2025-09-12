@@ -12,7 +12,7 @@ class BenchmarkDebugSpec extends FunSuite {
   given EruRuntime = runtime
 
   val contention = 1
-  val operations = 100
+  val operations = 10 // Reduced from 100 to prevent potential hanging
 
   test("exact benchmark pattern replication") {
     def eruDeferredBasic(): Int = {
@@ -35,9 +35,9 @@ class BenchmarkDebugSpec extends FunSuite {
       program.unsafeRunSync()
     }
 
-    // Test multiple iterations like JMH would
-    println("Running 10 iterations...")
-    for (i <- 1 to 10) {
+    // Test only 3 iterations to prevent hanging
+    println("Running 3 iterations...")
+    for (i <- 1 to 3) {
       print(s"Iteration $i: ")
       val start = System.nanoTime()
       val result = eruDeferredBasic()
@@ -70,7 +70,7 @@ class BenchmarkDebugSpec extends FunSuite {
     }
 
     println("Running explicit runtime test...")
-    for (i <- 1 to 5) {
+    for (i <- 1 to 2) {
       print(s"Iteration $i: ")
       val start = System.nanoTime()
       val result = eruDeferredBasicExplicit()

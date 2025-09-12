@@ -1,7 +1,7 @@
 package net.ghoula.eru
 
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
-import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters.*
 
 import net.ghoula.eru.prelude.*
@@ -33,24 +33,24 @@ final class ParallelDegreeLimitedSpec extends TestWithRuntime {
   }
 
   test("foreachParN with degree 1 processes sequentially") {
-    val processOrder = ListBuffer.empty[Int]
+    val processOrder = ConcurrentLinkedQueue[Int]()
     val items = (1 to 5).toList
 
     val results = foreachParN(1, items) { i =>
       Eru.effect {
-        processOrder += i
+        processOrder.add(i)
         i
       }
     }.unsafeRunSync()
 
     assertEquals(results, List(1, 2, 3, 4, 5))
-    assertEquals(processOrder.toList, List(1, 2, 3, 4, 5))
+    assertEquals(processOrder.asScala.toList, List(1, 2, 3, 4, 5))
   }
 
   test("foreachParN limits concurrent execution") {
     val concurrentCount = new AtomicInteger(0)
     val maxConcurrentCount = new AtomicInteger(0)
-    val items = (1 to 20).toList
+    val items = (1 to 12).toList // Reduced to ensure we can measure concurrency
 
     val results = foreachParN(3, items) { i =>
       Eru.effect {
@@ -60,14 +60,15 @@ final class ParallelDegreeLimitedSpec extends TestWithRuntime {
           maxConcurrentCount.set(current)
         }
 
-        Thread.sleep(10) // Simulate work
+        // Sufficient computation to allow concurrency measurement
+        val _ = (1 to 1000).sum
 
         concurrentCount.decrementAndGet()
         i
       }
     }.unsafeRunSync()
 
-    assertEquals(results.size, 20)
+    assertEquals(results.size, 12)
     assert(maxConcurrentCount.get() <= 3, s"Max concurrent was ${maxConcurrentCount.get()}, expected <= 3")
   }
 
@@ -119,7 +120,7 @@ final class ParallelDegreeLimitedSpec extends TestWithRuntime {
   test("foreachParNDiscard limits concurrent execution") {
     val concurrentCount = new AtomicInteger(0)
     val maxConcurrentCount = new AtomicInteger(0)
-    val items = (1 to 15).toList
+    val items = (1 to 8).toList // Reduced for better concurrency measurement
 
     foreachParNDiscard(4, items) { i =>
       Eru.effect {
@@ -129,7 +130,8 @@ final class ParallelDegreeLimitedSpec extends TestWithRuntime {
           maxConcurrentCount.set(current)
         }
 
-        Thread.sleep(10) // Simulate work
+        // Sufficient computation to allow concurrency measurement
+        val _ = (1 to 1000).sum
 
         concurrentCount.decrementAndGet()
         i

@@ -130,22 +130,15 @@ lazy val root = (project in file("."))
       "scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
     ),
 
-    // Targeted test commands for CI optimization
-    addCommandAlias("testJVM", "eruCoreJVM/test; eruRuntimeJVM/test"),
+    // Core test commands
     addCommandAlias("testNative", "eruCoreNative/test; eruRuntimeNative/test"),
     addCommandAlias("testIntegration", "eruIntegrationTest/test"),
-    addCommandAlias("testQuick", "eruCoreJVM/test; eruRuntimeJVM/testOnly * -- --exclude-tags=slow"),
-    addCommandAlias("testSlow", "eruRuntimeJVM/testOnly * -- --include-tags=slow"),
-    
-    // Optimized test command: compile all native code first, then test native, then JVM  
-    addCommandAlias("testAll", "eruCoreNative/Test/compile; eruRuntimeNative/Test/compile; testNative; testJVM; testIntegration"),
-    
-    // Alternative: compile everything upfront, then run all tests
-    addCommandAlias("testAllOptimized", "Test/compile; testNative; testJVM; testIntegration"),
-    
-    // Verbose versions that show all compilation phases explicitly
-    addCommandAlias("testAllVerbose", "eruCoreNative/Compile/compile; eruRuntimeNative/Compile/compile; eruCoreNative/Test/compile; eruRuntimeNative/Test/compile; testNative; testJVM; testIntegration"),
-    addCommandAlias("testAllOptimizedVerbose", "Compile/compile; Test/compile; testNative; testJVM; testIntegration"),
+
+    // JVM test command
+    addCommandAlias("testJVM", "eruCoreJVM/test; eruRuntimeJVM/test"),
+
+    // Isolated test runner (prevents resource contention)
+    // Use ./run-all-tests.sh instead of sbt testAll for reliable test execution
 
     // Documentation commands
     addCommandAlias("docs", "docs/mdoc"),

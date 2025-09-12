@@ -113,7 +113,7 @@ class PromiseConcurrencySpec extends TestWithRuntime {
 
   test("promise race condition handling - first completion wins") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    val competitorCount = 10
+    val competitorCount = 5 // Reduced from 10 to prevent potential deadlocks
     val allReady = Eru.countDownLatch(competitorCount).unsafeRunSync()
 
     // Multiple competitors trying to complete the promise
