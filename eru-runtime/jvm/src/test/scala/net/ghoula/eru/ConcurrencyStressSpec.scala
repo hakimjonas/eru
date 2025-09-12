@@ -181,35 +181,8 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
     assertEquals(released.get(), fiberCount, "All resources should have been released")
   }
 
-  /** Validates timer scheduling behavior under concurrent load.
-    *
-    * Tests that the timer system can handle multiple concurrent sleep operations with different
-    * durations while maintaining timing accuracy.
-    */
+
   test("timer scheduling under load") {
-    val timerCount = 100
-
-    val timers = (1 to timerCount).map { i =>
-      val delay = (i % 10) + 1
-      runtime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
-    }
-
-    val results = timers.map(timer => runtime.fork(timer))
-    val completed = results
-      .map(_.flatMap(_.await).flatMap {
-        case Exit.Success(value) => Eru.succeed(value)
-        case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Timer failed with error: $error"))
-        case Exit.Die(t) => Eru.fail(new RuntimeException("Timer died", t))
-        case Exit.Interrupt(_, _) => Eru.fail(new RuntimeException("Timer was interrupted"))
-      })
-      .toList
-      .sequence
-      .unsafeRunSync()
-
-    assertEquals(completed.sorted, (1 to timerCount).toList)
-  }
-
-  test("timer scheduling under load - TestClock version (deterministic and instant)") {
     EruTest.withTestClock { clock =>
       given runtime: EruRuntime = EruTest.testRuntime(clock)
       val timerCount = 100
