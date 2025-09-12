@@ -9,19 +9,35 @@ import scala.concurrent.Promise
 import scala.util.{Failure, Success}
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.IsolatedTestRunner
 
-/** Comprehensive test suite for H.9.4 async boundary support via EruRuntime.suspend.
+/** Comprehensive test suite for H.9.4 async boundary support via LocalEruRuntime.suspend.
   *
   * These tests validate that the suspend mechanism works correctly across different async patterns,
   * error conditions, and integration scenarios while maintaining Eru's correctness guarantees
   * including proper finalizer execution and resource safety.
   */
-final class SuspendSpec extends FunSuite {
+final class SuspendSpec extends TestWithRuntime {
 
+  private val isolatedRuntime = IsolatedTestRunner.createIsolatedRuntime()
+
+  private object LocalEruRuntime {
+    def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E | Throwable, A] =
+      isolatedRuntime.suspend(register)
+    def timeout[E, A](duration: Duration)(
+      effect: Eru[E, A]
+    ): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
+      isolatedRuntime.timeout(duration)(effect)
+  }
+
+  /** Validates that suspend with synchronous callback invocation succeeds immediately.
+    *
+    * Tests that when the callback is invoked synchronously during registration, the suspend
+    * operation completes immediately with the provided value.
+    */
   test("suspend with synchronous callback invocation succeeds immediately") {
-    val result = EruRuntime
+    val result = LocalEruRuntime
       .suspend[String, Int] { callback =>
-        // Invoke callback synchronously during registration
         callback(Right(42))
         Eru.unit
       }
@@ -30,10 +46,14 @@ final class SuspendSpec extends FunSuite {
     assertEquals(result, 42)
   }
 
+  /** Validates that suspend with synchronous error callback propagates failure correctly.
+    *
+    * Tests that when the callback is invoked synchronously with an error during registration, the
+    * suspend operation fails immediately with the provided error.
+    */
   test("suspend with synchronous error callback propagates failure correctly") {
-    val result = EruRuntime
+    val result = LocalEruRuntime
       .suspend[String, Int] { callback =>
-        // Invoke callback synchronously with error
         callback(Left("sync error"))
         Eru.unit
       }
@@ -46,11 +66,14 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend integrates correctly with CompletableFuture for async completion.
+    *
+    * Tests that suspend can properly handle asynchronous completion through CompletableFuture
+    * integration, ensuring the callback is invoked when the future completes.
+    */
   test("suspend with CompletableFuture integration handles async completion") {
     val future = new CompletableFuture[String]()
-
-    // Start the suspend operation
-    val suspendEffect = EruRuntime.suspend[Throwable, String] { callback =>
+    val suspendEffect = LocalEruRuntime.suspend[Throwable, String] { callback =>
       future.whenComplete { (value, throwable) =>
         Option(throwable) match {
           case Some(error) => callback(Left(error))
@@ -60,20 +83,24 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Complete the future asynchronously on another thread
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10) // Small delay to ensure async behavior
-      future.complete("async result")
-    })
+    // Use CompletableFuture's delayed execution instead of Thread.sleep
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => future.complete("async result"))
 
     val result = suspendEffect.unsafeRunSync()
     assertEquals(result, "async result")
   }
 
+  /** Validates that suspend properly propagates CompletableFuture exceptions.
+    *
+    * Tests that when a CompletableFuture completes exceptionally, the suspend operation correctly
+    * propagates the exception through the error callback.
+    */
   test("suspend with CompletableFuture exception handling propagates errors") {
     val future = new CompletableFuture[String]()
 
-    val suspendEffect = EruRuntime.suspend[Throwable, String] { callback =>
+    val suspendEffect = LocalEruRuntime.suspend[Throwable, String] { callback =>
       future.whenComplete { (value, throwable) =>
         Option(throwable) match {
           case Some(error) => callback(Left(error))
@@ -83,11 +110,11 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Complete the future with exception asynchronously
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      future.completeExceptionally(new RuntimeException("async error"))
-    })
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => {
+        future.completeExceptionally(new RuntimeException("async error"))
+      })
 
     val result = suspendEffect.attempt.unsafeRunSync()
     result match {
@@ -96,11 +123,16 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend integrates correctly with Scala Future for successful completion.
+    *
+    * Tests that suspend can properly handle Scala Future completion using Promise/Future
+    * integration, ensuring the callback is invoked when the future succeeds.
+    */
   test("suspend with Scala Future integration handles successful completion") {
     val promise = Promise[Int]()
     val future = promise.future
 
-    val suspendEffect = EruRuntime.suspend[Throwable, Int] { callback =>
+    val suspendEffect = LocalEruRuntime.suspend[Throwable, Int] { callback =>
       future.onComplete {
         case Success(value) => callback(Right(value))
         case Failure(error) => callback(Left(error))
@@ -108,21 +140,26 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Complete the promise asynchronously
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      promise.success(123)
-    })
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => {
+        promise.success(123)
+      })
 
     val result = suspendEffect.unsafeRunSync()
     assertEquals(result, 123)
   }
 
+  /** Validates that suspend properly propagates Scala Future failures.
+    *
+    * Tests that when a Scala Future fails, the suspend operation correctly propagates the failure
+    * through the error callback.
+    */
   test("suspend with Scala Future failure propagates exceptions correctly") {
     val promise = Promise[Int]()
     val future = promise.future
 
-    val suspendEffect = EruRuntime.suspend[Throwable, Int] { callback =>
+    val suspendEffect = LocalEruRuntime.suspend[Throwable, Int] { callback =>
       future.onComplete {
         case Success(value) => callback(Right(value))
         case Failure(error) => callback(Left(error))
@@ -130,11 +167,11 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Fail the promise asynchronously
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      promise.failure(new IllegalArgumentException("future failed"))
-    })
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => {
+        promise.failure(new IllegalArgumentException("future failed"))
+      })
 
     val result = suspendEffect.attempt.unsafeRunSync()
     result match {
@@ -143,11 +180,16 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend prevents multiple callback invocations through idempotency.
+    *
+    * Tests that only the first callback invocation is processed, and subsequent invocations are
+    * ignored to ensure consistent behavior.
+    */
   test("suspend prevents multiple callback invocations (idempotency)") {
     var callbackCount = 0
     val future = new CompletableFuture[String]()
 
-    val suspendEffect = EruRuntime.suspend[Throwable, String] { callback =>
+    val suspendEffect = LocalEruRuntime.suspend[Throwable, String] { callback =>
       future.whenComplete { (value, throwable) =>
         callbackCount += 1
         Option(throwable) match {
@@ -155,7 +197,6 @@ final class SuspendSpec extends FunSuite {
           case None => callback(Right(value))
         }
 
-        // Try to invoke callback again (should be ignored)
         Option(throwable) match {
           case Some(error) => callback(Left(error))
           case None => callback(Right("second call"))
@@ -164,19 +205,24 @@ final class SuspendSpec extends FunSuite {
       Eru.unit
     }
 
-    // Complete future and verify only first result is used
-    java.util.concurrent.CompletableFuture.runAsync(() => {
-      Thread.sleep(10)
-      future.complete("first result")
-    })
+    java.util.concurrent.CompletableFuture
+      .delayedExecutor(10, java.util.concurrent.TimeUnit.MILLISECONDS)
+      .execute(() => {
+        future.complete("first result")
+      })
 
     val result = suspendEffect.unsafeRunSync()
     assertEquals(result, "first result")
     assertEquals(callbackCount, 1)
   }
 
+  /** Validates that suspend properly handles registration failures.
+    *
+    * Tests that when the registration function throws an exception, the suspend operation correctly
+    * propagates the failure.
+    */
   test("suspend handles registration failure correctly") {
-    val suspendEffect = EruRuntime.suspend[String, Int] { _ =>
+    val suspendEffect = LocalEruRuntime.suspend[String, Int] { _ =>
       throw new RuntimeException("registration failed")
     }
 
@@ -187,10 +233,15 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend executes finalizers on successful completion.
+    *
+    * Tests that ensure finalizers are properly executed when a suspend operation completes
+    * successfully, maintaining resource safety guarantees.
+    */
   test("suspend with finalizers executes cleanup on success") {
     var finalizerExecuted = false
 
-    val effect = EruRuntime
+    val effect = runtime
       .suspend[String, Int] { callback =>
         callback(Right(42))
         Eru.unit
@@ -202,10 +253,15 @@ final class SuspendSpec extends FunSuite {
     assert(finalizerExecuted, "Finalizer should have been executed")
   }
 
+  /** Validates that suspend executes finalizers on failure.
+    *
+    * Tests that ensure finalizers are properly executed when a suspend operation fails, maintaining
+    * resource safety guarantees even in error conditions.
+    */
   test("suspend with finalizers executes cleanup on failure") {
     var finalizerExecuted = false
 
-    val effect = EruRuntime
+    val effect = runtime
       .suspend[String, Int] { callback =>
         callback(Left("error"))
         Eru.unit
@@ -219,10 +275,15 @@ final class SuspendSpec extends FunSuite {
     }
   }
 
+  /** Validates that suspend maintains FILO execution order for nested finalizers.
+    *
+    * Tests that multiple finalizers attached to a suspend operation execute in the correct
+    * First-In-Last-Out order for proper resource cleanup.
+    */
   test("suspend with nested finalizers maintains FILO execution order") {
     var executionOrder: List[String] = Nil
 
-    val effect = EruRuntime
+    val effect = runtime
       .suspend[String, Int] { callback =>
         callback(Right(42))
         Eru.unit
@@ -235,40 +296,49 @@ final class SuspendSpec extends FunSuite {
     assertEquals(executionOrder, List("outer", "inner"))
   }
 
+  /** Validates that suspend integrates correctly with timeout operations.
+    *
+    * Tests that suspend operations can be properly timed out when they exceed the specified
+    * duration, ensuring responsive behavior.
+    */
   test("suspend with timeout integration works correctly") {
-    val longRunning = EruRuntime.suspend[String, Int] { callback =>
-      // Simulate long async operation that never completes in time
+    val longRunning = LocalEruRuntime.suspend[String, Int] { callback =>
       java.util.concurrent.CompletableFuture.runAsync(() => {
-        Thread.sleep(100) // Longer than timeout
-        callback(Right(42))
+        // Use CompletableFuture delay instead of Thread.sleep to avoid blocking thread pool
+        java.util.concurrent.CompletableFuture
+          .delayedExecutor(25, java.util.concurrent.TimeUnit.MILLISECONDS)
+          .execute(() => callback(Right(42)))
       })
       Eru.unit
     }
 
-    val result = EruRuntime.timeout(Duration.ofMillis(20))(longRunning).attempt.unsafeRunSync()
+    val result = LocalEruRuntime.timeout(Duration.ofMillis(20))(longRunning).attempt.unsafeRunSync()
     result match {
       case Result.Failure(_: java.util.concurrent.TimeoutException) =>
-        // Expected timeout
         assert(true)
       case other => fail(s"Expected TimeoutException but got: $other")
     }
   }
 
+  /** Validates that suspend operations remain thread-safe under concurrent access.
+    *
+    * Tests that multiple suspend operations can execute concurrently without interference,
+    * maintaining correctness and thread safety.
+    */
   test("suspend with concurrent access remains thread-safe") {
     val iterations = 100
     val results = (1 to iterations).map { i =>
-      EruRuntime.suspend[String, Int] { callback =>
-        // Simulate concurrent async completion
+      LocalEruRuntime.suspend[String, Int] { callback =>
         java.util.concurrent.CompletableFuture.runAsync(() => {
-          Thread.sleep(scala.util.Random.nextInt(5)) // Random small delay
+          // Remove random Thread.sleep to avoid blocking thread pool
+          // The concurrency test doesn't need timing variation
           callback(Right(i))
         })
         Eru.unit
       }
     }
 
-    // Execute all suspend operations and collect results
-    val completed = results.map(_.unsafeRunSync()).toList
+    val completed: List[Int] = results.map(_.unsafeRunSync()).toList
     assertEquals(completed.sorted, (1 to iterations).toList)
   }
 }

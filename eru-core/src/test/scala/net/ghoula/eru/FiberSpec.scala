@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Test suite for the Fiber interface and core fiber operations.
+  *
+  * Validates the fundamental contracts of the Fiber trait including await operations, interruption
+  * behavior, and fiber identity management. Tests cover the core fiber abstraction that enables
+  * concurrent execution in the Eru effect system, ensuring proper lifecycle management and resource
+  * cleanup semantics.
+  */
 class FiberSpec extends FunSuite {
 
   private final class TestFiber[E, A](val id: FiberId, exit: Exit[E, A]) extends Fiber[E, A] {
@@ -15,25 +22,40 @@ class FiberSpec extends FunSuite {
     }
   }
 
+  /** Validates that await returns Exit.Success for successful fiber.
+    *
+    * Tests that fiber await operations correctly return success exits with proper value extraction
+    * and fiber ID preservation.
+    */
   test("await returns Exit.Success for successful fiber") {
     val fid = FiberId.fresh()
     val fib = new TestFiber[Nothing, Int](fid, Exit.Success(7))
     val out = fib.await.unsafeRunSync()
     out match {
       case Exit.Success(v) => assertEquals(v, 7)
-      case other => fail(s"expected Success, got $other")
+      case other => fail(s"Expected Success, got $other")
     }
     assertEquals(fib.id, fid)
   }
 
+  /** Validates that await returns Exit.Failure with typed error.
+    *
+    * Tests that fiber await operations correctly return failure exits with proper error
+    * preservation for typed failures.
+    */
   test("await returns Exit.Failure with typed error") {
     val fib = new TestFiber[String, Nothing](FiberId.fresh(), Exit.Failure("boom"))
     fib.await.unsafeRunSync() match {
       case Exit.Failure(e) => assertEquals(e, "boom")
-      case other => fail(s"expected Failure, got $other")
+      case other => fail(s"Expected Failure, got $other")
     }
   }
 
+  /** Validates that interrupt records cause and returns unit.
+    *
+    * Tests that fiber interruption correctly records the interrupt cause and returns a unit effect
+    * for completion tracking.
+    */
   test("interrupt records cause and returns unit") {
     val fib = new TestFiber[Nothing, Int](FiberId.fresh(), Exit.Success(1))
     fib.interrupt(InterruptCause.Cancelled()).unsafeRunSync()

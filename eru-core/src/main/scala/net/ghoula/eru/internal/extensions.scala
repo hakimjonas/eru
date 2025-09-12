@@ -3,7 +3,7 @@ package net.ghoula.eru.internal
 import java.time.{Duration, Instant}
 
 import net.ghoula.eru.EruObserver.EruEvent
-import net.ghoula.eru.{patterns, trace, DomainTypes, Eru, Result}
+import net.ghoula.eru.{DomainTypes, Eru, Result, patterns, trace}
 
 /** Consolidated extension methods for Eru.
   *

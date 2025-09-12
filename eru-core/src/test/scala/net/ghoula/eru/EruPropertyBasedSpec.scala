@@ -7,12 +7,12 @@ import org.scalacheck.Prop.forAll
 import net.ghoula.eru.CorePrelude.*
 import net.ghoula.eru.Result as EruResult
 
-/** Property-based testing specification for Eru effect system using munit-scalacheck.
+/** Property-based testing specification for Eru effect system behavior and invariants.
   *
-  * This specification leverages generative testing to verify algebraic properties and invariants
-  * across a wide range of inputs, providing mathematical rigor beyond example-based testing.
-  * Properties are verified using ScalaCheck generators with random inputs to ensure correctness
-  * holds universally.
+  * This specification leverages generative testing to verify behavioral properties, error handling,
+  * and combinator semantics across a wide range of inputs. Focuses on practical effect system
+  * behavior rather than mathematical laws (which are tested in EruMonadLawsSpec). Properties are
+  * verified using ScalaCheck generators with random inputs to ensure correctness holds universally.
   */
 class EruPropertyBasedSpec extends ScalaCheckSuite {
 
@@ -52,46 +52,6 @@ class EruPropertyBasedSpec extends ScalaCheckSuite {
       (x: Int) => Eru.effect(x + 10).mapError(_.getMessage)
     )
 
-  property("Functor law: fmap(id) = id") {
-    forAll(arbitraryEru) { eru =>
-      val result = eru.attempt.unsafeRunSync()
-      val mappedResult = eru.map(identity).attempt.unsafeRunSync()
-      result == mappedResult
-    }
-  }
-
-  property("Functor law: fmap(f . g) = fmap(f) . fmap(g)") {
-    forAll(arbitraryEru, pureIntFunctions, pureIntFunctions) { (eru, f, g) =>
-      val leftSide = eru.map(f.andThen(g)).attempt.unsafeRunSync()
-      val rightSide = eru.map(f).map(g).attempt.unsafeRunSync()
-      leftSide == rightSide
-    }
-  }
-
-  property("Monad law: left identity - pure(a) >>= f = f(a)") {
-    forAll(smallPositiveInts, eruContinuations) { (value, f) =>
-      val leftSide = Eru.succeed(value).flatMap(f).attempt.unsafeRunSync()
-      val rightSide = f(value).attempt.unsafeRunSync()
-      leftSide == rightSide
-    }
-  }
-
-  property("Monad law: right identity - m >>= pure = m") {
-    forAll(arbitraryEru) { eru =>
-      val leftSide = eru.flatMap(Eru.succeed).attempt.unsafeRunSync()
-      val rightSide = eru.attempt.unsafeRunSync()
-      leftSide == rightSide
-    }
-  }
-
-  property("Monad law: associativity - (m >>= f) >>= g = m >>= (\\x -> f x >>= g)") {
-    forAll(arbitraryEru, eruContinuations, eruContinuations) { (eru, f, g) =>
-      val leftSide = eru.flatMap(f).flatMap(g).attempt.unsafeRunSync()
-      val rightSide = eru.flatMap(x => f(x).flatMap(g)).attempt.unsafeRunSync()
-      leftSide == rightSide
-    }
-  }
-
   property("map preserves errors - failed effects remain failed after mapping") {
     forAll(failedEru, pureIntFunctions) { (failedEru, f) =>
       val originalResult = failedEru.attempt.unsafeRunSync()
@@ -120,7 +80,6 @@ class EruPropertyBasedSpec extends ScalaCheckSuite {
 
   property("attempt never fails at type level - always produces Result") {
     forAll(arbitraryEru) { eru =>
-      // attempt should never throw - it always succeeds with a Result
       val result = eru.attempt.unsafeRunSync()
       result match {
         case EruResult.Success(_) => true
@@ -189,7 +148,6 @@ class EruPropertyBasedSpec extends ScalaCheckSuite {
 
         recoveredResult == EruResult.Failure(actualError)
       } else {
-        // Skip this case when errors match
         true
       }
     }

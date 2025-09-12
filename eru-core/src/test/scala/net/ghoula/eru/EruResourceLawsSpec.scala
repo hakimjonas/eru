@@ -6,6 +6,13 @@ import scala.util.Random
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Verification of resource management laws and invariants in the Eru effect system.
+  *
+  * This specification ensures that resource management operations follow mathematical laws and
+  * maintain consistent behavior across different execution scenarios. Tests validate that bracket,
+  * ensure, and other resource operations maintain proper ordering, cleanup guarantees, and
+  * compositional properties essential for predictable resource lifecycle management.
+  */
 class EruResourceLawsSpec extends FunSuite {
 
   private val samples = 200
@@ -75,14 +82,14 @@ class EruResourceLawsSpec extends FunSuite {
     var i = 0
     while (i < samples) {
       val depth = 1 + rng.nextInt(maxDepth + 1)
-      val order = scala.collection.mutable.ListBuffer.empty[Int]
+      var order = List.empty[Int]
       val base: Eru[Nothing, Unit] = Eru.unit
       val prog = (1 to depth).foldLeft(base) { (acc, k) =>
-        val fin = Eru.effect { order += k; () }
+        val fin = Eru.effect { order = k :: order; () }
         acc.ensure(fin)
       }
       prog.unsafeRunSync()
-      assertEquals(order.toList, (1 to depth).reverse.toList)
+      assertEquals(order.reverse, (1 to depth).reverse.toList)
       i += 1
     }
   }

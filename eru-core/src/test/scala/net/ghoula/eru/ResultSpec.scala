@@ -4,8 +4,20 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Comprehensive test suite for the Result data type functionality.
+  *
+  * Validates all fundamental operations of Result[E, A] including construction, transformation,
+  * error handling, and pattern matching semantics. The Result type serves as the core value-level
+  * representation of computation outcomes in the Eru effect system, providing both success and
+  * failure modeling with complete type safety.
+  */
 class ResultSpec extends FunSuite {
 
+  /** Validates that Result.succeed creates a Success with the given value.
+    *
+    * Tests that the succeed constructor properly creates a Success variant containing the provided
+    * value with correct type and state.
+    */
   test("Result.succeed creates a Success with the given value") {
     val result = Result.succeed(42)
     assertEquals(result, Result.Success(42))
@@ -13,6 +25,11 @@ class ResultSpec extends FunSuite {
     assert(!result.isFailure)
   }
 
+  /** Validates that Result.fail creates a Failure with the given error.
+    *
+    * Tests that the fail constructor properly creates a Failure variant containing the provided
+    * error with correct type and state.
+    */
   test("Result.fail creates a Failure with the given error") {
     val result = Result.fail("error")
     assertEquals(result, Result.Failure("error"))
@@ -20,74 +37,139 @@ class ResultSpec extends FunSuite {
     assert(!result.isSuccess)
   }
 
+  /** Validates that map transforms Success values correctly.
+    *
+    * Tests that mapping over Success values applies the transformation function and produces a new
+    * Success with the transformed value.
+    */
   test("map transforms Success values") {
     val result = Result.succeed(5)
     val mapped = result.map(_ * 2)
     assertEquals(mapped, Result.Success(10))
   }
 
+  /** Validates that map preserves Failure values unchanged.
+    *
+    * Tests that mapping over Failure values leaves them unchanged, preserving the error without
+    * applying the transformation.
+    */
   test("map preserves Failure values unchanged") {
     val result = Result.fail("error")
     val mapped = result.map((x: Int) => x * 2)
     assertEquals(mapped, Result.Failure("error"))
   }
 
+  /** Validates that flatMap chains successful computations correctly.
+    *
+    * Tests that flatMap on Success values properly chains to the next computation and produces the
+    * expected result.
+    */
   test("flatMap chains successful computations") {
     val result = Result.succeed(5)
     val chained = result.flatMap(x => Result.succeed(x * 2))
     assertEquals(chained, Result.Success(10))
   }
 
+  /** Validates that flatMap propagates the first failure in a chain.
+    *
+    * Tests that when the first Result in a flatMap chain is a failure, the failure is propagated
+    * without executing the chaining function.
+    */
   test("flatMap chains and propagates first failure") {
     val result = Result.fail("first error")
     val chained = result.flatMap((x: Int) => Result.succeed(x * 2))
     assertEquals(chained, Result.Failure("first error"))
   }
 
+  /** Validates that flatMap propagates the second failure in a chain.
+    *
+    * Tests that when the chaining function in flatMap returns a failure, that failure is properly
+    * propagated as the result.
+    */
   test("flatMap chains and propagates second failure") {
     val result = Result.succeed(5)
     val chained = result.flatMap(_ => Result.fail("second error"))
     assertEquals(chained, Result.Failure("second error"))
   }
 
+  /** Validates that fold applies the success function to Success values.
+    *
+    * Tests that fold operations correctly apply the ifSuccess function when the Result is a Success
+    * variant.
+    */
   test("fold applies ifSuccess function to Success values") {
     val result = Result.succeed(5)
     val folded = result.fold(_ => "failure", x => s"success: $x")
     assertEquals(folded, "success: 5")
   }
 
+  /** Validates that fold applies the failure function to Failure values.
+    *
+    * Tests that fold operations correctly apply the ifFailure function when the Result is a Failure
+    * variant.
+    */
   test("fold applies ifFailure function to Failure values") {
     val result = Result.fail("error")
     val folded = result.fold(e => s"failure: $e", (x: Int) => s"success: $x")
     assertEquals(folded, "failure: error")
   }
 
+  /** Validates that isSuccess returns true for Success values.
+    *
+    * Tests that the isSuccess predicate correctly identifies Success variants and returns the
+    * appropriate boolean value.
+    */
   test("isSuccess returns true for Success") {
     val result = Result.succeed("value")
     assert(result.isSuccess)
   }
 
+  /** Validates that isSuccess returns false for Failure values.
+    *
+    * Tests that the isSuccess predicate correctly identifies Failure variants and returns the
+    * appropriate boolean value.
+    */
   test("isSuccess returns false for Failure") {
     val result = Result.fail("error")
     assert(!result.isSuccess)
   }
 
+  /** Validates that isFailure returns true for Failure values.
+    *
+    * Tests that the isFailure predicate correctly identifies Failure variants and returns the
+    * appropriate boolean value.
+    */
   test("isFailure returns true for Failure") {
     val result = Result.fail("error")
     assert(result.isFailure)
   }
 
+  /** Validates that isFailure returns false for Success values.
+    *
+    * Tests that the isFailure predicate correctly identifies Success variants and returns the
+    * appropriate boolean value.
+    */
   test("isFailure returns false for Success") {
     val result = Result.succeed("value")
     assert(!result.isFailure)
   }
 
+  /** Validates that Result is covariant in its error type parameter.
+    *
+    * Tests that Result[E, A] can be safely upcast to Result[F, A] when E <: F, demonstrating proper
+    * covariance in the error type.
+    */
   test("Result is covariant in error type") {
     val stringError: Result[String, Int] = Result.fail("error")
     val anyError: Result[Any, Int] = stringError
     assertEquals(anyError, Result.Failure("error"))
   }
 
+  /** Validates that Result is covariant in its success type parameter.
+    *
+    * Tests that Result[E, A] can be safely upcast to Result[E, B] when A <: B, demonstrating proper
+    * covariance in the success type.
+    */
   test("Result is covariant in success type") {
     val stringValue: Result[String, String] = Result.succeed("value")
     val anyValue: Result[String, Any] = stringValue

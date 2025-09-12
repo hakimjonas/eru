@@ -1,0 +1,40 @@
+# JVM Options for Eru Development
+# These settings optimize for development and testing performance
+
+# Heap Settings - Increased for stress tests
+-Xms4G
+-Xmx12G
+
+# Use G1 Garbage Collector (recommended for modern JVMs)
+-XX:+UseG1GC
+
+# G1 Tuning - Optimized for high-throughput testing
+-XX:G1HeapRegionSize=32m
+-XX:MaxGCPauseMillis=100
+-XX:G1MixedGCCountTarget=8
+-XX:G1HeapWastePercent=5
+
+# Unlock experimental options first
+-XX:+UnlockExperimentalVMOptions
+
+# Reduce GC overhead for development and testing
+-XX:NewRatio=2
+-XX:G1NewSizePercent=30
+-XX:G1MaxNewSizePercent=40
+
+# Enable string deduplication for memory efficiency
+-XX:+UseStringDeduplication
+
+# JIT Compiler optimizations  
+-XX:ReservedCodeCacheSize=256m
+-XX:InitialCodeCacheSize=64m
+
+# File encoding
+-Dfile.encoding=UTF-8
+
+# SBT specific
+-Dsbt.coursier.home=.coursier
+-Dsbt.ivy.home=.ivy2
+
+# Enable compressed OOPs for memory efficiency
+-XX:+UseCompressedOops

@@ -62,7 +62,7 @@ object Semaphore {
     def permitsAvailable: Eru[Nothing, Long] = Eru.succeed(permits.get())
 
     def tryAcquire: Eru[Nothing, Boolean] =
-      Eru.effect {
+      Eru.succeed {
         @annotation.tailrec
         def loop(): Boolean = {
           val current = permits.get()
@@ -72,15 +72,12 @@ object Semaphore {
           } else false
         }
         loop()
-      }.attempt.map {
-        case Result.Success(b) => b
-        case Result.Failure(_) => permits.get() > 0
       }
 
     def tryAcquireN(n: Long): Eru[Nothing, Boolean] =
       if (n <= 0) Eru.succeed(true)
       else
-        Eru.effect {
+        Eru.succeed {
           @annotation.tailrec
           def loop(): Boolean = {
             val current = permits.get()
@@ -90,17 +87,14 @@ object Semaphore {
             } else false
           }
           loop()
-        }.attempt.map {
-          case Result.Success(b) => b
-          case Result.Failure(_) => permits.get() >= n
         }
 
     def release: Eru[Nothing, Unit] =
-      Eru.effect { permits.getAndAdd(1) }.attempt.flatMap(_ => Eru.unit)
+      Eru.succeed { permits.getAndAdd(1); () }
 
     def releaseN(n: Long): Eru[Nothing, Unit] =
       if (n <= 0) Eru.unit
-      else Eru.effect { permits.getAndAdd(n) }.attempt.flatMap(_ => Eru.unit)
+      else Eru.effect { permits.getAndAdd(n); () }.attempt.map(_ => ())
 
     def withPermit[E, A](fa: => Eru[E, A]): Eru[E, Option[A]] =
       withPermits(1)(fa)

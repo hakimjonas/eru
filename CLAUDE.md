@@ -8,23 +8,56 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 sbt prepare          # Format code, apply fixes, compile tests - run before commits
 sbt check            # Validate formatting, linting, documentation
-sbt testAll          # Run all tests including integration tests
+./run-all-tests.sh   # Run all tests in isolated JVM instances (recommended)
 sbt test             # Run unit tests only
 ```
 
+### Test Isolation (IMPORTANT)
+Due to resource contention between concurrent test suites, use the isolated test runner:
+- `./run-all-tests.sh` - Runs each test suite in separate JVM instances with timeouts
+- Prevents thread pool exhaustion and coordination deadlocks that cause hanging
+- Individual commands: `sbt testNative`, `sbt testJVM`, `sbt testIntegration`
+
 ### Platform-Specific Testing
 ```bash
+# Targeted test commands for CI optimization
+sbt testJVM              # Run all JVM tests (core + runtime)
+sbt testNative           # Run all Native tests (core + runtime)
+sbt testIntegration      # Run integration tests (JVM only)
+sbt testQuick            # Run JVM tests excluding slow tests
+sbt testSlow             # Run only slow/stress tests
+
+# Individual module testing
 sbt eruCoreJVM/test       # JVM tests for core module
 sbt eruCoreNative/test    # Native tests for core module  
 sbt eruIntegrationTest/test # Integration tests (JVM only)
 ```
 
+### Optimized Testing Commands
+```bash
+# FASTEST: Eliminates redundant compilation and "stalling" during native builds
+sbt testAllOptimized      # Compile all code first, then run tests by platform
+sbt testAllVerbose        # Shows all compilation phases explicitly  
+sbt testAllOptimizedVerbose # Verbose version with full compilation visibility
+
+# How it works:
+# - Pre-compiles ALL test sources (JVM + Native) in parallel (~20-30s)
+# - Runs native tests with no compilation overhead (~1s)
+# - Runs JVM tests with no compilation overhead (~30s)
+# - Runs integration tests (~5s)
+```
+
 ### Performance Benchmarking
 ```bash
-sbt bench             # Full benchmark suite
-sbt benchCore         # Core performance benchmarks
-sbt benchValidation   # Validation benchmarks
-sbt benchWithGC       # Benchmarks with GC profiling
+# Fair benchmark system (recommended)
+./run-fair-benchmarks.sh all      # Full comprehensive suite (~27min)
+./run-fair-benchmarks.sh core     # Core operations only (~2min)
+./run-fair-benchmarks.sh errors state  # Multiple categories
+./run-fair-benchmarks.sh concurrency --quick  # Quick concurrency test
+
+# Individual benchmark debugging
+sbt "eruBenchJVM/Jmh/run CoreOperationsBench.eruSucceed"  # Single method
+sbt "eruBenchJVM/Jmh/run -prof gc *StateManagementBench*"  # With profiler
 ```
 
 ### Code Quality
@@ -32,6 +65,12 @@ sbt benchWithGC       # Benchmarks with GC profiling
 sbt scalafixAll       # Apply scalafix linting rules (very strict)
 sbt scalafmtAll       # Format all code (120 char width)
 sbt cleanAll          # Clean all target directories
+```
+
+### Documentation
+```bash
+sbt docs              # Validate documentation examples with mdoc
+sbt docsWatch         # Watch and validate documentation examples
 ```
 
 ## Architecture
@@ -84,3 +123,9 @@ Eru is a high-performance effect system built with modern Scala 3, organized as 
 
 ### Performance Expectations
 Eru achieves exceptional performance (4,756-160,143 ops/ms, 50-80x faster than Cats Effect). Maintain this performance standard when making changes.
+
+### JVM Configuration
+The repository includes optimized JVM settings in `.jvmopts` to prevent GC thrashing during development and testing:
+- Heap: 2GB initial, 8GB max
+- G1 Garbage Collector for low-latency performance
+- Optimized for high-throughput testing and benchmarking

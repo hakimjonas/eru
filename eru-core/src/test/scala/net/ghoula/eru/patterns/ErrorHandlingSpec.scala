@@ -6,6 +6,13 @@ import java.time.{Duration, Instant}
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Test suite for common error handling patterns in the Eru effect system.
+  *
+  * Validates best practices and common patterns for error handling including recovery strategies,
+  * error transformation, and conditional error handling. These tests demonstrate idiomatic
+  * approaches to error management that support the Guided Correctness pillar by making the correct
+  * error handling approach the most natural and ergonomic choice.
+  */
 class ErrorHandlingSpec extends FunSuite {
 
   test("RetryPolicy.conditional retries on matching errors") {
@@ -21,7 +28,7 @@ class ErrorHandlingSpec extends FunSuite {
     assert(policy.shouldRetry("retry-error", AttemptCount(0), context))
     assert(policy.shouldRetry("retry-again", AttemptCount(1), context))
     assert(!policy.shouldRetry("fatal-error", AttemptCount(0), context))
-    assert(!policy.shouldRetry("retry-error", AttemptCount(3), context)) // Max attempts reached
+    assert(!policy.shouldRetry("retry-error", AttemptCount(3), context))
   }
 
   test("RetryPolicy.conditional calculates exponential backoff") {
@@ -38,7 +45,6 @@ class ErrorHandlingSpec extends FunSuite {
     assertEquals(policy.delayFor(AttemptCount(2)), Duration.ofMillis(400))
     assertEquals(policy.delayFor(AttemptCount(3)), Duration.ofMillis(800))
 
-    // Should cap at maxDelay
     val longDelay = policy.delayFor(AttemptCount(10))
     assert(longDelay.toMillis <= 1000)
   }
@@ -52,10 +58,9 @@ class ErrorHandlingSpec extends FunSuite {
     )
 
     val delay1 = policy.delayFor(AttemptCount(1))
-    val _ = policy.delayFor(AttemptCount(1)) // Second delay for jitter comparison
+    val _ = policy.delayFor(AttemptCount(1))
 
-    // With jitter, delays should vary slightly
-    val baseExpected = 200L // 100 * 2^1
+    val baseExpected = 200L
     assert(delay1.toMillis >= (baseExpected * 0.9).toLong)
     assert(delay1.toMillis <= (baseExpected * 1.1).toLong)
   }
@@ -68,8 +73,8 @@ class ErrorHandlingSpec extends FunSuite {
     val recentContext = RetryContext(Instant.now().minusMillis(500), 10)
     val oldContext = RetryContext(Instant.now().minusSeconds(2), 10)
 
-    assert(policy.shouldRetry("error", AttemptCount(10), recentContext)) // Within time limit
-    assert(!policy.shouldRetry("error", AttemptCount(10), oldContext)) // Exceeded time limit
+    assert(policy.shouldRetry("error", AttemptCount(10), recentContext))
+    assert(!policy.shouldRetry("error", AttemptCount(10), oldContext))
   }
 
   test("RetryContext tracks errors and elapsed time") {
@@ -109,11 +114,9 @@ class ErrorHandlingSpec extends FunSuite {
       successThreshold = 1
     )
 
-    // First failure
     val _ = breaker.protect(Eru.fail("error1")).attempt.unsafeRunSync()
     assertEquals(breaker.currentState, CircuitState.Closed)
 
-    // Second failure - should open circuit
     val _ = breaker.protect(Eru.fail("error2")).attempt.unsafeRunSync()
     assertEquals(breaker.currentState, CircuitState.Open)
   }
@@ -122,18 +125,16 @@ class ErrorHandlingSpec extends FunSuite {
 
     val breaker = new CircuitBreaker(
       failureThreshold = FailureThreshold(1),
-      recoveryTimeout = Duration.ofSeconds(10), // Long timeout
+      recoveryTimeout = Duration.ofSeconds(10),
       successThreshold = 1
     )
 
-    // Cause failure to open circuit
     breaker.protect(Eru.fail("error")).attempt.unsafeRunSync()
     assertEquals(breaker.currentState, CircuitState.Open)
 
-    // Should fast-fail
     val result = breaker.protect(Eru.succeed(42)).attempt.unsafeRunSync()
     result match {
-      case Result.Failure(CircuitBreakerOpen(_)) => () // Expected
+      case Result.Failure(CircuitBreakerOpen(_)) => ()
       case other => fail(s"Expected CircuitBreakerOpen, got $other")
     }
   }
@@ -146,15 +147,12 @@ class ErrorHandlingSpec extends FunSuite {
       successThreshold = 1
     )
 
-    // One failure
     breaker.protect(Eru.fail("error")).attempt.unsafeRunSync()
     assertEquals(breaker.currentState, CircuitState.Closed)
 
-    // Success should reset failure count
     breaker.protect(Eru.succeed(42)).attempt.unsafeRunSync()
     assertEquals(breaker.currentState, CircuitState.Closed)
 
-    // Should take 3 more failures to open (not 2)
     breaker.protect(Eru.fail("error1")).attempt.unsafeRunSync()
     assertEquals(breaker.currentState, CircuitState.Closed)
     breaker.protect(Eru.fail("error2")).attempt.unsafeRunSync()
@@ -173,10 +171,10 @@ class ErrorHandlingSpec extends FunSuite {
     val acc2 = acc1.add("error1", AttemptCount(1)).add("error2", AttemptCount(2))
     assertEquals(acc2.errors.size, 2)
     assert(acc2.nonEmpty)
-    assertEquals(acc2.headOption, Some("error1")) // First error added
+    assertEquals(acc2.headOption, Some("error1"))
 
     val allErrors = acc2.allErrors
-    assertEquals(allErrors, List("error1", "error2")) // Chronological order
+    assertEquals(allErrors, List("error1", "error2"))
   }
 
   test("ErrorAccumulator combines with other accumulators") {
@@ -292,7 +290,7 @@ class ErrorHandlingSpec extends FunSuite {
   test("failAfter extension method placeholder works") {
     val effect = Eru.succeed(42)
     val result = effect.failAfter(Duration.ofSeconds(1), "timeout").unsafeRunSync()
-    assertEquals(result, 42) // Should work as placeholder
+    assertEquals(result, 42)
   }
 
   test("error handling extensions compose with other extensions") {

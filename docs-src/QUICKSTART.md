@@ -1,65 +1,211 @@
-# Eru Quickstart — Synchronous Core
+# Eru Quickstart
 
-This guide shows how to model and run effectful programs with Eru's synchronous core using pure, composable building blocks.
+This guide introduces you to Eru, a pure effect system for Scala 3 that provides powerful abstractions for building safe, concurrent, and cross-platform applications.
 
-## Key Ideas
+## Key Concepts
 
-- `Eru[E, A]` is a pure description of a program that may fail with a typed error E or succeed with A.
+- `Eru[E, A]` is a pure description of a computation that may fail with typed error `E` or succeed with value `A`
+- Construction is lazy and pure - no side effects occur until execution
+- Evaluation happens when you call runtime methods like `unsafeRunSync()`
+- Works identically across JVM (with concurrency) and Scala Native (synchronous)
 
-- Construction is pure and lazy. Evaluation happens only when you call an unsafe interpreter (e.g., `unsafeRunSync`).
+## Basic Usage
 
-- Composition is via `map`, `flatMap`, `zip`, and error handling methods.
-
-## Hello, Eru
+### Hello, Eru
 
 ```scala
 import net.ghoula.eru.prelude.*
 
-val program: Eru[Nothing, String] =
-  Eru.succeed("hello, eru")
+val program: Eru[Nothing, String] = 
+  Eru.succeed("Hello, Eru!")
 
 val result: String = program.unsafeRunSync()
 ```
 
-## Laziness and Effects
+### Suspending Effects
 
-Use `effect` to suspend side-effects. The provided thunk is evaluated only when the program is run.
+Use `Eru.effect` to suspend side effects. The computation is deferred until execution:
 
 ```scala
 var counter = 0
-val prog: Eru[Throwable, Int] = Eru.effect {
-  counter += 1
+
+val program: Eru[Throwable, Int] = Eru.effect {
+  counter += 1  // This only happens when the program runs
   42
 }
 
-// counter is still 0
-val value = prog.unsafeRunSync()
+// counter is still 0 here
+val value = program.unsafeRunSync() 
 // counter is now 1
 ```
 
-## Sequencing with map and flatMap
+### Sequencing Operations
 
-`flatMap` and `map` are used to chain operations. For chains of pure computations using `Eru.succeed`, Eru applies construction-time optimizations to reduce overhead, making pure functional composition highly efficient.
+Chain computations using `map` and `flatMap`. Eru optimizes pure chains for exceptional performance:
 
 ```scala
-val pureComputation: Eru[Nothing, Int] =
+val computation: Eru[Nothing, Int] =
   Eru.succeed(10)
-    .flatMap(x => Eru.succeed(x * 2)) // This chain is fused at construction
+    .flatMap(x => Eru.succeed(x * 2))  // Optimized at construction time
     .map(_ + 2)
 
-val result = pureComputation.unsafeRunSync() // 22
+val result = computation.unsafeRunSync() // 22
 ```
 
 ## Error Handling
 
-Use methods like `recover` and `attempt` to handle potential failures in a composable way.
+Eru provides comprehensive error handling with typed errors:
 
 ```scala
-val failed = Eru.fail("boom")
+val risky: Eru[String, Int] = Eru.fail("something went wrong")
 
-val recovered = failed.recover {
-  case "boom" => "recovered!"
+val recovered: Eru[Nothing, String] = risky.recover {
+  case "something went wrong" => "all better now!"
 }
 
-recovered.unsafeRunSync() // "recovered!"
+val safe: Eru[String, String] = risky.attempt.map {
+  case Result.Success(value) => s"Got: $value"
+  case Result.Failure(error) => s"Error: $error"
+}
 ```
+
+## Resource Management
+
+Eru ensures resources are properly cleaned up even in the presence of errors:
+
+```scala
+import java.nio.file.*
+
+val safeFileRead: Eru[Throwable, String] = 
+  Eru.effect {
+    // Acquire resource
+    Files.newBufferedReader(Paths.get("data.txt"))
+  }.bracket { reader =>
+    // Release resource (always called)
+    Eru.effect(reader.close())
+  } { reader =>
+    // Use resource safely
+    Eru.effect(reader.readLine())
+  }
+```
+
+## Cross-Platform Concurrency
+
+Eru provides the same API across platforms with different execution models:
+
+```scala
+// This code works identically on JVM and Native
+val concurrent: Eru[Nothing, (Int, String)] = for {
+  fiber1 <- Eru.succeed(42).fork        // JVM: async, Native: sync
+  fiber2 <- Eru.succeed("world").fork   // JVM: async, Native: sync  
+  result1 <- fiber1.await
+  result2 <- fiber2.await
+} yield (result1, result2)
+
+val (number, text) = concurrent.unsafeRunSync()
+```
+
+### Platform Differences
+
+- **JVM**: Uses Java Virtual Threads for true concurrency - fibers run in parallel
+- **Native**: Uses synchronous execution - fibers run sequentially but API remains identical
+
+## Parallel Operations
+
+Race multiple computations or run them in parallel:
+
+```scala
+import java.time.Duration
+
+// Race two computations
+val first: Eru[Nothing, String] = EruRuntime.race(
+  EruRuntime.sleep(Duration.ofMillis(100)).as("slow"),
+  EruRuntime.sleep(Duration.ofMillis(50)).as("fast")
+).map {
+  case Left(slow) => slow
+  case Right(fast) => fast  // This will win
+}
+
+// Run computations in parallel
+val parallel: Eru[Nothing, (String, Int)] = 
+  EruRuntime.zipPar(
+    Eru.succeed("hello"),
+    Eru.succeed(42)
+  )
+```
+
+## Observability
+
+Monitor program execution with observers:
+
+```scala
+val observer = new EruObserver {
+  def onEvent(event: EruObserver.EruEvent): Unit = event match {
+    case EruObserver.EruEvent.ProgramStart(scopeId) =>
+      println(s"Program started: $scopeId")
+    case EruObserver.EruEvent.ProgramEnd(scopeId, outcome) =>  
+      println(s"Program finished: $scopeId -> $outcome")
+    case other => 
+      println(s"Event: $other")
+  }
+}
+
+val result = myProgram.unsafeRunSyncWith(observer)
+```
+
+## What's Next
+
+- **[API Documentation](API.md)** - Complete reference for all Eru operations
+- **[Concurrency Guide](CONCURRENCY.md)** - Advanced fiber patterns and structured concurrency
+- **[Resource Management](RESOURCES.md)** - Safe resource handling patterns  
+- **[Observability](OBSERVER.md)** - Monitoring and debugging techniques
+
+## Common Patterns
+
+### Retries with Backoff
+```scala
+import java.time.Duration
+
+val resilient = riskyOperation.retryWithBackoff(
+  Duration.ofMillis(100), 
+  maxRetries = 3
+)
+```
+
+### Timeout Protection
+```scala
+val protected = longRunningOperation
+  .timeoutTo(Duration.ofSeconds(5), "Operation timed out")
+```
+
+### Parallel Processing
+```scala
+val items = List("item1", "item2", "item3")
+
+val processed = EruRuntime.parTraverse(items)(processItem)
+```
+
+### Resource-Controlled Processing
+```scala
+val manyItems = (1 to 1000).toList
+
+// Process with limited parallelism to avoid resource exhaustion
+val controlled = EruRuntime.foreachParN(10, manyItems)(processItem)
+```
+
+### Validation Patterns
+```scala
+val validations = List(
+  validateEmail("user@example.com"),
+  validateAge(25),
+  validateUsername("john_doe")
+)
+
+// Collect ALL validation errors (error accumulation)
+val allErrors = EruRuntime.validatePar(validations)
+
+// Stop at first validation error (fail-fast)
+val firstError = EruRuntime.validateFirst(validations)
+```
+
+Eru makes it easy to build robust, concurrent applications while maintaining type safety and cross-platform compatibility.

@@ -8,23 +8,11 @@ package net.ghoula.eru
   */
 object EruObserver {
 
-  /** A no-op observer that discards all events.
-    *
-    * This is useful when an observer is required by an API but the caller does not wish to record
-    * or emit any events. It has near-zero overhead.
-    *
-    * @return
-    *   an observer that ignores all events
+  /** An observer that discards all events.
     */
   def noop: EruObserver = new EruObserver { def onEvent(event: EruEvent): Unit = () }
 
-  /** A console observer that prints events to standard output.
-    *
-    * This helper is intended for quick diagnostics and examples. For production use, prefer a
-    * structured observer that forwards to logging/metrics/tracing backends.
-    *
-    * @return
-    *   an observer that prints human-readable events to standard output
+  /** An observer that prints events to standard output.
     */
   def console: EruObserver = new EruObserver {
     def onEvent(event: EruEvent): Unit = {
@@ -32,58 +20,41 @@ object EruObserver {
     }
   }
 
-  /** A stable identifier for a single program execution scope.
+  /** Unique identifier for a program execution scope.
     *
-    * ScopeId provides a unique identifier that tracks the execution boundary of Eru programs. Each
-    * ScopeId typically corresponds to one program run and is used to correlate events during that
-    * run.
-    *
-    * ScopeIds are generated using a monotonic counter to ensure uniqueness within the process
-    * lifetime. They provide a lightweight mechanism for correlating events across the execution of
-    * a program, useful for debugging and performance analysis.
-    *
-    * Thread-safety note: The current implementation uses an unsynchronized mutable counter. In
-    * concurrent environments this may lead to race conditions and duplicate IDs; future runtime
-    * revisions will address this with proper atomic operations.
+    * Generated using a monotonic counter to ensure uniqueness within the process lifetime.
     *
     * @example
     *   {{{
     * val scopeId = ScopeId.fresh()
     * logger.info(s"Starting execution with scope $scopeId")
-    * // Use scopeId for correlation across events
     *   }}}
     */
   opaque type ScopeId = Long
 
   object ScopeId {
-    private val next = new java.util.concurrent.atomic.AtomicLong(1L)
+    // Use process-unique starting point to avoid conflicts between multiple Eru instances
+    private val processUniqueStart = {
+      val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
+      val nanoTime = (System.nanoTime() >> 24) & 0xffffffffffffL
+      (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x3000L // Offset for ScopeId
+    }
+    private val next = new java.util.concurrent.atomic.AtomicLong(processUniqueStart)
 
-    /** Generates a fresh ScopeId for a new execution scope.
-      *
-      * This method creates a unique identifier for tracking program execution. Each call returns a
-      * monotonically increasing value, ensuring uniqueness within the process lifetime.
+    /** Creates a new unique scope identifier.
       *
       * @return
-      *   a new, unique ScopeId for program execution tracking
+      *   a new ScopeId
       */
     def fresh(): ScopeId = next.getAndIncrement()
   }
 
-  /** Structured outcome representing the final result of program execution.
+  /** The outcome of program execution.
     *
-    * Outcome provides a comprehensive classification of how an Eru program terminates, enabling
-    * observers to implement appropriate handling strategies for different failure modes. This
-    * classification aligns with Eru's principled approach to error handling by distinguishing
-    * between recoverable domain errors and unexpected system failures.
-    *
-    * The three outcome types correspond to Eru's error model:
-    *   - '''Success:''' Normal program completion with a produced value
-    *   - '''TypedFailure:''' Expected domain error handled through Eru's typed error channel
-    *   - '''Defect:''' Unexpected system failure (Throwable) indicating a programming error
-    *
-    * This structured approach enables observers to implement different strategies for different
-    * failure modes, such as alerting for defects while treating typed failures as normal business
-    * logic outcomes.
+    * Three possible outcomes:
+    *   - Success: Normal completion with a value
+    *   - TypedFailure: Expected domain error
+    *   - Defect: Unexpected system failure
     *
     * @example
     *   {{{
@@ -151,7 +122,6 @@ object EruObserver {
     *
     * @example
     *   {{{
-    * // Pattern matching on events for structured handling
     * def handleEvent(event: EruEvent): Unit = event match {
     *   case ProgramStart(scopeId) =>
     *     startTimer(scopeId)
@@ -180,6 +150,27 @@ object EruObserver {
     *
     *   case FiberInterrupted(fiberId, cause) =>
     *     fiberRegistry.interrupt(fiberId, cause)
+    *
+    *   case FiberForked(parentId, childId) =>
+    *     fiberRegistry.linkChild(parentId, childId)
+    *     logger.debug(s"Fiber $childId forked by parent $parentId")
+    *
+    *   case StructuredCleanupStarted(fiberId, childCount) =>
+    *     logger.info(s"Fiber $fiberId starting structured cleanup of $childCount children")
+    *     metrics.recordGauge("structured_concurrency.active_cleanups", 1)
+    *
+    *   case StructuredCleanupCompleted(fiberId, interruptedCount, completedCount) =>
+    *     logger.info(s"Fiber $fiberId completed cleanup: interrupted=$interruptedCount, completed=$completedCount")
+    *     metrics.recordGauge("structured_concurrency.active_cleanups", -1)
+    *
+    *   case ChildInterruptionRequested(parentId, childId, cause, wasRunning) =>
+    *     if (wasRunning) {
+    *       logger.debug(s"Parent $parentId interrupting running child $childId: $cause")
+    *       metrics.incrementCounter("structured_concurrency.child_interruptions")
+    *     } else {
+    *       logger.debug(s"Parent $parentId skipped interruption of completed child $childId")
+    *       metrics.incrementCounter("structured_concurrency.child_already_completed")
+    *     }
     *
     *   case TraceSpan(span) =>
     *     traceCollector.collect(span)
@@ -216,7 +207,8 @@ object EruObserver {
       *
       * This event provides visibility into the internal execution flow of Eru programs, enabling
       * detailed tracing and debugging. Steps are typically emitted at significant points during
-      * effect interpretation.
+      * effect interpretation. This event is intended for low-volume, human-readable debugging
+      * traces and should not be used for high-frequency, performance-critical metrics.
       *
       * @param scopeId
       *   the unique identifier for this program execution scope
@@ -261,6 +253,70 @@ object EruObserver {
       */
     case FiberInterrupted(fiberId: FiberId, cause: InterruptCause)
 
+    /** Signals the establishment of a parent-child fiber relationship.
+      *
+      * This event is emitted when a fiber is forked within another fiber's context, establishing a
+      * structured concurrency hierarchy. This enables tracking of parent-child relationships and
+      * understanding the scope boundaries for structured cleanup.
+      *
+      * @param parentId
+      *   the unique identifier of the parent fiber
+      * @param childId
+      *   the unique identifier of the child fiber that was forked
+      */
+    case FiberForked(parentId: FiberId, childId: FiberId)
+
+    /** Signals the beginning of structured cleanup for a fiber's children.
+      *
+      * This event is emitted when a fiber begins the structured cleanup process for its child
+      * fibers. This typically occurs when the parent fiber completes (successfully or with failure)
+      * and needs to ensure all children are properly interrupted and cleaned up according to
+      * structured concurrency semantics.
+      *
+      * @param fiberId
+      *   the unique identifier of the parent fiber initiating cleanup
+      * @param childCount
+      *   the number of child fibers that need to be cleaned up
+      */
+    case StructuredCleanupStarted(fiberId: FiberId, childCount: Int)
+
+    /** Signals the completion of structured cleanup for a fiber's children.
+      *
+      * This event is emitted when a fiber has successfully completed the structured cleanup process
+      * for all its child fibers. This ensures observers can track when structured concurrency
+      * guarantees have been properly enforced and all children have been cleaned up.
+      *
+      * @param fiberId
+      *   the unique identifier of the parent fiber that completed cleanup
+      * @param interruptedCount
+      *   the number of child fibers that were actively interrupted
+      * @param completedCount
+      *   the number of child fibers that had already completed
+      */
+    case StructuredCleanupCompleted(fiberId: FiberId, interruptedCount: Int, completedCount: Int)
+
+    /** Signals the interruption request sent to a child fiber during structured cleanup.
+      *
+      * This event is emitted when a parent fiber sends an interruption request to a child fiber as
+      * part of structured cleanup. This provides visibility into the structured concurrency process
+      * and helps debug timing issues or cleanup problems.
+      *
+      * @param parentId
+      *   the unique identifier of the parent fiber requesting interruption
+      * @param childId
+      *   the unique identifier of the child fiber being interrupted
+      * @param cause
+      *   the structured cause of the interruption request
+      * @param childWasRunning
+      *   whether the child fiber was still running when interruption was requested
+      */
+    case ChildInterruptionRequested(
+      parentId: FiberId,
+      childId: FiberId,
+      cause: InterruptCause,
+      childWasRunning: Boolean
+    )
+
     /** Signals the completion of a tracing span for performance analysis.
       *
       * This event is emitted when a tracing span completes, providing detailed timing and
@@ -296,7 +352,6 @@ object EruObserver {
     *
     * @example
     *   {{{
-    * // Production-ready observer with multiple backends
     * class CompositeObserver(
     *   logger: Logger,
     *   metrics: MetricsCollector,
@@ -305,26 +360,20 @@ object EruObserver {
     *
     *   def onEvent(event: EruEvent): Unit = {
     *     try {
-    *       // Log all events
     *       logEvent(event)
-    *
-    *       // Extract metrics
     *       collectMetrics(event)
-    *
-    *       // Forward tracing events
     *       event match {
     *         case TraceSpan(span) => tracer.recordSpan(span)
     *         case _ => ()
     *       }
     *     } catch {
     *       case NonFatal(e) =>
-    *         // Never let observer exceptions escape
     *         System.err.println(s"Observer error: $e")
     *     }
     *   }
     *
-    *   private def logEvent(event: EruEvent): Unit = // ...
-    *   private def collectMetrics(event: EruEvent): Unit = // ...
+    *   private def logEvent(event: EruEvent): Unit = ???
+    *   private def collectMetrics(event: EruEvent): Unit = ???
     * }
     *   }}}
     */
@@ -342,6 +391,153 @@ object EruObserver {
       *   the structured execution event to handle
       */
     def onEvent(event: EruEvent): Unit
+  }
+
+  /** Enhanced EruObserver that provides specialized handling for structured concurrency events.
+    *
+    * This trait provides a higher-level interface for observing structured concurrency patterns,
+    * making it easier to build observers that focus on fiber relationships and cleanup semantics.
+    * It follows Eru's Radical Ergonomics pillar by providing an intuitive API for common
+    * observability patterns.
+    *
+    * The default implementations are no-ops, allowing users to override only the events they care
+    * about. This makes it easy to create focused observers for specific use cases like debugging
+    * structured concurrency issues or monitoring fiber lifecycle patterns.
+    *
+    * @example
+    *   {{{
+    * class StructuredConcurrencyDebugObserver extends StructuredConcurrencyObserver {
+    *   override def onStructuredCleanupStarted(fiberId: FiberId, childCount: Int): Unit =
+    *     println(s"Starting cleanup of $childCount children for fiber $fiberId")
+    *
+    *   override def onChildInterruptionRequested(
+    *     parentId: FiberId, childId: FiberId, cause: InterruptCause, childWasRunning: Boolean
+    *   ): Unit =
+    *     if (childWasRunning) {
+    *       println(s"Interrupting running child $childId from parent $parentId: $cause")
+    *     } else {
+    *       println(s"Skipping already-completed child $childId from parent $parentId")
+    *     }
+    * }
+    *   }}}
+    */
+  trait StructuredConcurrencyObserver extends EruObserver {
+
+    /** Called when a parent-child fiber relationship is established.
+      *
+      * @param parentId
+      *   the unique identifier of the parent fiber
+      * @param childId
+      *   the unique identifier of the child fiber that was forked
+      */
+    def onFiberForked(parentId: FiberId, childId: FiberId): Unit = ()
+
+    /** Called when structured cleanup begins for a fiber's children.
+      *
+      * @param fiberId
+      *   the unique identifier of the parent fiber initiating cleanup
+      * @param childCount
+      *   the number of child fibers that need to be cleaned up
+      */
+    def onStructuredCleanupStarted(fiberId: FiberId, childCount: Int): Unit = ()
+
+    /** Called when structured cleanup completes for a fiber's children.
+      *
+      * @param fiberId
+      *   the unique identifier of the parent fiber that completed cleanup
+      * @param interruptedCount
+      *   the number of child fibers that were actively interrupted
+      * @param completedCount
+      *   the number of child fibers that had already completed
+      */
+    def onStructuredCleanupCompleted(fiberId: FiberId, interruptedCount: Int, completedCount: Int): Unit = ()
+
+    /** Called when a child interruption is requested during structured cleanup.
+      *
+      * @param parentId
+      *   the unique identifier of the parent fiber requesting interruption
+      * @param childId
+      *   the unique identifier of the child fiber being interrupted
+      * @param cause
+      *   the structured cause of the interruption request
+      * @param childWasRunning
+      *   whether the child fiber was still running when interruption was requested
+      */
+    def onChildInterruptionRequested(
+      parentId: FiberId,
+      childId: FiberId,
+      cause: InterruptCause,
+      childWasRunning: Boolean
+    ): Unit = ()
+
+    /** Called for fiber lifecycle events (started, completed, interrupted).
+      *
+      * @param event
+      *   the fiber lifecycle event
+      */
+    def onFiberLifecycle(event: EruEvent): Unit = ()
+
+    /** Called for program lifecycle events (started, ended, steps).
+      *
+      * @param event
+      *   the program lifecycle event
+      */
+    def onProgramLifecycle(event: EruEvent): Unit = ()
+
+    /** Called for tracing events.
+      *
+      * @param span
+      *   the completed tracing span
+      */
+    def onTracing(span: net.ghoula.eru.trace.EruTrace.Span): Unit = ()
+
+    override def onEvent(event: EruEvent): Unit = {
+      event match {
+        case EruEvent.FiberForked(parentId, childId) =>
+          onFiberForked(parentId, childId)
+        case EruEvent.StructuredCleanupStarted(fiberId, childCount) =>
+          onStructuredCleanupStarted(fiberId, childCount)
+        case EruEvent.StructuredCleanupCompleted(fiberId, interruptedCount, completedCount) =>
+          onStructuredCleanupCompleted(fiberId, interruptedCount, completedCount)
+        case EruEvent.ChildInterruptionRequested(parentId, childId, cause, wasRunning) =>
+          onChildInterruptionRequested(parentId, childId, cause, wasRunning)
+        case event @ (EruEvent.FiberStarted(_) | EruEvent.FiberCompleted(_, _) | EruEvent.FiberInterrupted(_, _)) =>
+          onFiberLifecycle(event)
+        case event @ (EruEvent.ProgramStart(_) | EruEvent.ProgramEnd(_, _) | EruEvent.Step(_, _)) =>
+          onProgramLifecycle(event)
+        case EruEvent.TraceSpan(span) =>
+          onTracing(span)
+      }
+    }
+  }
+
+  /** Enhanced EruObserver that can handle trace events.
+    *
+    * This trait provides a specialized interface for observing tracing events, making it easier to
+    * build observers that focus on performance analysis and distributed tracing integration.
+    */
+  trait TracingEruObserver extends EruObserver {
+
+    /** Called when a trace span completes.
+      *
+      * @param span
+      *   the completed tracing span with timing and metadata
+      */
+    def onSpanCompleted(span: net.ghoula.eru.trace.EruTrace.Span): Unit
+
+    override def onEvent(event: EruEvent): Unit = {
+      event match {
+        case EruEvent.TraceSpan(span) => onSpanCompleted(span)
+        case other => onOtherEvent(other)
+      }
+    }
+
+    /** Handle non-tracing events (can be overridden).
+      *
+      * @param event
+      *   the non-tracing event
+      */
+    def onOtherEvent(event: EruEvent): Unit = ()
   }
 }
 

@@ -41,8 +41,6 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
     (e: String) => s"ERROR[$e]"
   )
 
-  // ===== MAP_ERROR METHOD TESTS =====
-
   test("mapError transforms error values without affecting success") {
     val success: Eru[String, Int] = Eru.succeed(42)
     val mapped = success.mapError(_.toUpperCase)
@@ -86,15 +84,13 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
       e.toUpperCase
     }
 
-    // Success case - no side effect
     Eru.succeed(42).mapError(mapper).unsafeRunSync()
     assertEquals(sideEffectCount, 0)
 
-    // Failure case - side effect occurs
     try {
       Eru.fail("error").mapError(mapper).unsafeRunSync()
     } catch {
-      case _: EruException[String] => // Expected
+      case _: EruException[String] =>
     }
     assertEquals(sideEffectCount, 1)
   }
@@ -128,8 +124,6 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
     }
   }
 
-  // ===== ENSURE METHOD TESTS =====
-
   test("ensure executes finalizer after successful computation") {
     var finalizerExecuted = false
     val eru = Eru.succeed(42).ensure {
@@ -152,7 +146,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
     try {
       eru.unsafeRunSync()
     } catch {
-      case _: EruException[String] => // Expected
+      case _: EruException[String] =>
     }
     assert(finalizerExecuted, "Finalizer should execute after failure")
   }
@@ -162,13 +156,12 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
       Eru.effect(throw new RuntimeException("finalizer error"))
     }
 
-    // Main result should still be available despite finalizer failure
     val result = eru.unsafeRunSync()
     assertEquals(result, 42)
   }
 
   test("ensure with multiple finalizers executes all in reverse order") {
-    var executionOrder: List[String] = Nil
+    var executionOrder = List.empty[String]
 
     val eru = Eru
       .succeed(42)
@@ -186,8 +179,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
       }
 
     eru.unsafeRunSync()
-    // Finalizers execute in FILO order (last added, first executed)
-    assertEquals(executionOrder, List("first", "second", "third"))
+    assertEquals(executionOrder.reverse, List("third", "second", "first"))
   }
 
   test("ensure with nested computations") {
@@ -221,7 +213,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
       try {
         withFinalizer.unsafeRunSync()
       } catch {
-        case _: EruException[_] => // Expected for failures
+        case _: EruException[_] =>
       }
 
       finalizerExecuted
@@ -235,8 +227,6 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
       original == withFinalizer
     }
   }
-
-  // ===== BRACKET METHOD TESTS =====
 
   test("bracket executes use function with acquired resource") {
     val resource = "test-resource"
@@ -283,7 +273,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
     try {
       result.unsafeRunSync()
     } catch {
-      case _: EruException[String] => // Expected
+      case _: EruException[String] =>
     }
     assert(resourceReleased, "Resource should be released even when use fails")
   }
@@ -299,7 +289,6 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
         Eru.succeed(s"used-$res")
       }
 
-    // Use result should be preserved despite release failure
     val value = result.unsafeRunSync()
     assertEquals(value, "used-test-resource")
   }
@@ -321,7 +310,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
     try {
       result.unsafeRunSync()
     } catch {
-      case _: EruException[String] => // Expected
+      case _: EruException[String] =>
     }
 
     assert(!releaseCalled, "Release should not be called if acquire fails")
@@ -329,8 +318,8 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
   }
 
   test("bracket with complex resource patterns") {
-    var acquired: List[String] = Nil
-    var released: List[String] = Nil
+    var acquired = List.empty[String]
+    var released = List.empty[String]
 
     def acquireResource(name: String) = Eru.effect {
       acquired = name :: acquired
@@ -339,6 +328,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
 
     def releaseResource(name: String) = Eru.effect {
       released = name :: released
+      ()
     }
 
     val computation = for {
@@ -356,7 +346,10 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
     val result = computation.unsafeRunSync()
     assertEquals(result, "resource1-resource2")
     assertEquals(acquired.reverse, List("resource1", "resource2"))
-    assertEquals(released.reverse, List("resource1", "resource2")) // Same order as acquisition
+    assertEquals(
+      released.reverse,
+      List("resource1", "resource2")
+    )
   }
 
   property("bracket always releases acquired resources") {
@@ -376,7 +369,7 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
       try {
         result.unsafeRunSync()
       } catch {
-        case _: EruException[_] => // Expected for some cases
+        case _: EruException[_] =>
       }
 
       resourceReleased
@@ -395,8 +388,6 @@ class EruAdvancedMethodsSpec extends ScalaCheckSuite {
       result.unsafeRunSync() == expected
     }
   }
-
-  // ===== INTEGRATION TESTS =====
 
   test("mapError, ensure, and bracket work together") {
     var finalizerExecuted = false

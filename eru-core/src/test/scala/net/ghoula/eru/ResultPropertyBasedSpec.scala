@@ -235,7 +235,6 @@ class ResultPropertyBasedSpec extends ScalaCheckSuite {
 
   property("Result composition preserves algebraic laws") {
     forAll(arbitraryResults, resultContinuations) { (result, f) =>
-      // Test that map and flatMap composition follows expected laws
       val mapThenFlatMap = result.map(identity).flatMap(f)
       val directFlatMap = result.flatMap(f)
 

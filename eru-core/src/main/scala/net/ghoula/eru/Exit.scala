@@ -15,117 +15,104 @@ package net.ghoula.eru
   */
 enum Exit[+E, +A] {
 
-  /** Represents successful effect completion containing the produced value.
-    *
-    * This outcome indicates that the effect executed successfully without errors or interruption,
-    * producing a value of type A. Success represents the ideal execution path where all operations
-    * completed as expected.
+  /** Successful completion with a value.
     *
     * @param value
-    *   the value produced by the successful effect execution
+    *   the value produced by the effect
     */
   case Success(value: A)
 
-  /** Represents an effect failure with a typed, domain-specific error.
-    *
-    * This outcome indicates that the effect failed through Eru's typed error channel, representing
-    * expected domain errors that are part of normal business logic. These errors are typically
-    * recoverable and should be handled as part of the application's error handling strategy.
+  /** Failure with a typed error.
     *
     * @param error
-    *   the typed domain error that caused the effect to fail
+    *   the error that caused the failure
     */
   case Failure(error: E)
 
-  /** Represents unexpected effect failure due to a system defect.
-    *
-    * This outcome indicates that the effect failed due to an unexpected Throwable, representing a
-    * programming error, system failure, or other exceptional condition that was not expected.
-    * Defects typically require immediate attention and often indicate bugs in the application
-    * logic.
+  /** Failure due to an unexpected throwable.
     *
     * @param throwable
-    *   the unexpected Throwable that caused the effect to fail
+    *   the throwable that caused the failure
     */
   case Die(throwable: Throwable)
 
-  /** Represents effect-termination due to cooperative interruption.
-    *
-    * This outcome indicates that the effect was terminated due to an interruption request, such as
-    * cancellation, timeout, or structured concurrency requirements. Interruption is cooperative and
-    * allows for proper resource cleanup and graceful shutdown.
+  /** Termination due to interruption.
     *
     * @param fiberId
-    *   the identifier of the fiber that was interrupted
+    *   the identifier of the interrupted fiber
     * @param cause
-    *   the structured reason for the interruption
+    *   the reason for the interruption
     */
   case Interrupt(fiberId: FiberId, cause: InterruptCause)
 }
 
-/** A unique identifier for fibers in Eru's asynchronous runtime.
+/** A unique identifier for fibers.
   *
-  * FiberId provides a lightweight, unique identifier for each fiber in the system, enabling
-  * tracking, correlation, and management of concurrent execution. The identifier is modeled as an
-  * opaque type to ensure domain integrity, prevent misuse, and provide future-proofing across
-  * different platforms and runtime implementations.
-  *
-  * Fiber identifiers are essential for:
-  *   - Correlating events and operations across fiber boundaries
-  *   - Implementing structured concurrency and parent-child relationships
-  *   - Providing observability and debugging support for concurrent programs
-  *   - Managing fiber lifecycle and resource cleanup
-  *
-  * The current implementation uses monotonic Long values to ensure uniqueness within the process
-  * lifetime while maintaining high performance for ID generation.
+  * Uses monotonic Long values to ensure uniqueness within the process lifetime.
   *
   * @example
   *   {{{
-  * // Generate unique fiber identifiers
   * val fiberId1 = FiberId.fresh()
   * val fiberId2 = FiberId.fresh()
-  * assert(fiberId1 != fiberId2) // Always unique
+  * assert(fiberId1 != fiberId2)
   *
-  * // Use in fiber management
   * val fiberRegistry = mutable.Map[FiberId, FiberState]()
   * fiberRegistry(fiberId1) = FiberState.Running
   *
-  * // Correlation in logging
   * logger.info(s"Fiber $fiberId1 started processing request")
   *   }}}
   */
 opaque type FiberId = Long
 
-/** Factory and utilities for FiberId generation and management.
-  *
-  * This object provides the primary interface for creating new fiber identifiers and will be
-  * extended with additional utilities for fiber management in future versions of the runtime.
+/** Factory for creating fiber identifiers.
   */
 object FiberId {
-  private val next = new java.util.concurrent.atomic.AtomicLong(1L)
 
-  /** Generates a fresh, unique FiberId for a new fiber.
+  /** Robust process-unique ID generation.
     *
-    * This method creates a unique identifier using a monotonic counter, ensuring that each fiber
-    * receives a distinct identifier within the process lifetime.
-    *
-    * '''Performance:''' ID generation is designed to be very fast with minimal allocation, suitable
-    * for high-throughput fiber creation scenarios.
+    * Layout: [0][15-bit processId][48-bit timestamp/counter]
+    *   - Bit 63: Always 0 (ensures positive Long)
+    *   - Bits 62-48: Process identifier (15 bits = 32K unique processes)
+    *   - Bits 47-0: Timestamp-based counter (281 trillion unique IDs per process)
+    */
+  private val processUniqueStart = {
+    val ProcessIdBits = 15
+    val ProcessIdMask = (1L << ProcessIdBits) - 1 // 0x7FFF
+    val TimestampMask = (1L << 48) - 1 // 48-bit mask
+
+    val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode.toLong & ProcessIdMask
+    val timestamp = System.nanoTime() & TimestampMask
+
+    // Combine: sign bit (0) + processId (15 bits) + timestamp (48 bits)
+    (processId << 48) | timestamp
+  }
+  private val next = new java.util.concurrent.atomic.AtomicLong(processUniqueStart)
+
+  /** Creates a new unique fiber identifier.
     *
     * @return
-    *   a new, unique FiberId for fiber identification and tracking
+    *   a new FiberId
     *
     * @example
     *   {{{
-    * // Simple fiber ID generation
     * val newFiberId = FiberId.fresh()
     *
-    * // Bulk generation for fiber pools
     * val fiberIds = (1 to 1000).map(_ => FiberId.fresh())
-    * assert(fiberIds.distinct.size == 1000) // All unique
+    * assert(fiberIds.distinct.size == 1000)
     *   }}}
     */
   def fresh(): FiberId = next.getAndIncrement()
+
+  /** Extension methods for FiberId */
+  extension (id: FiberId) {
+
+    /** Returns the underlying Long value of this fiber ID.
+      *
+      * @return
+      *   the numeric representation of this fiber ID
+      */
+    def toLong: Long = id
+  }
 }
 
 /** Structured cause of fiber interruption with comprehensive diagnostic information.

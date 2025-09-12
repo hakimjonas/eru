@@ -1,44 +1,27 @@
 package net.ghoula.eru
 
 import java.time.Duration
-import scala.annotation.unused
 
-/** Minimal, type-safe runtime functions for concurrency, racing, timeouts, and retries.
+/** Runtime for executing concurrent operations.
   *
-  * This implementation avoids touching or subclassing the sealed Eru internals. It provides
-  * portable, correctness-first semantics that satisfy the public API surface and tests.
+  * @param backend
+  *   the concurrency backend to use
   */
-object EruRuntime {
+final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 
-  // Backend delegation layer (H9.2). Select per-platform backend via ServiceLoader.
-  private val backend = PlatformBackend.backend
-
-  /** Launches an effect on a separate execution context and returns a fiber handle.
-    *
-    * The effect executes asynchronously while the current execution continues. On the JVM with
-    * Virtual Threads backend, the effect runs on its own Virtual Thread. On sequential backends,
-    * the effect executes synchronously and the fiber is immediately completed.
-    *
-    * The returned fiber provides await and interrupt capabilities, enabling structured concurrency
-    * patterns where parent effects can control and coordinate child computations.
+  /** Launches an effect and returns a fiber handle.
     *
     * @param fa
-    *   the effect to execute asynchronously
-    * @tparam E
-    *   the error type of the forked computation
-    * @tparam A
-    *   the success type of the forked computation
+    *   the effect to execute
     * @return
-    *   an effect yielding a fiber handle for the launched computation
+    *   an effect yielding a fiber handle
     *
     * @example
     *   {{{
-    * // Fork a long-running computation
     * val fiber = EruRuntime.fork {
     *   EruRuntime.sleep(Duration.ofSeconds(1)).map(_ => "completed")
     * }.unsafeRunSync()
     *
-    * // Continue with other work, then await the result
     * val result = fiber.await.unsafeRunSync() match {
     *   case Exit.Success(value) => s"Got: $value"
     *   case Exit.Failure(error) => s"Failed: $error"
@@ -49,43 +32,28 @@ object EruRuntime {
   def fork[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, None)
 
-  /** Launches an effect with observer integration for fiber lifecycle tracking.
-    *
-    * This variant of fork includes an observer that receives structured events during the fiber's
-    * execution lifecycle. Events include FiberStarted when the fiber begins execution and
-    * FiberCompleted with the final exit state when the fiber terminates.
-    *
-    * The observer integration enables comprehensive monitoring, debugging, and tracing of
-    * concurrent operations without affecting the computation semantics or performance
-    * characteristics.
+  /** Launches an effect with an observer for lifecycle events.
     *
     * @param fa
-    *   the effect to execute asynchronously
+    *   the effect to execute
     * @param observer
-    *   the observer to receive fiber lifecycle events
-    * @tparam E
-    *   the error type of the forked computation
-    * @tparam A
-    *   the success type of the forked computation
+    *   the observer to receive fiber events
     * @return
-    *   an effect yielding a fiber handle for the launched computation
+    *   an effect yielding a fiber handle
     *
     * @example
     *   {{{
-    * // Create an observer to track fiber events
     * val events = scala.collection.mutable.ListBuffer.empty[EruObserver.EruEvent]
     * val observer = new EruObserver {
     *   def onEvent(event: EruObserver.EruEvent): Unit = events += event
     * }
     *
-    * // Fork with observation
     * val fiber = EruRuntime.forkWithObserver(
     *   EruRuntime.sleep(Duration.ofMillis(10)).map(_ => 42),
     *   observer
     * ).unsafeRunSync()
     *
     * val result = fiber.await.unsafeRunSync()
-    * // events now contains FiberStarted and FiberCompleted events
     *   }}}
     */
   def forkWithObserver[E, A](fa: Eru[E, A], observer: EruObserver): Eru[Nothing, Fiber[E, A]] =
@@ -93,16 +61,12 @@ object EruRuntime {
 
   /** Executes two effects in parallel and combines their results into a pair.
     *
-    * Both effects execute concurrently on separate execution contexts. On the JVM with Virtual
-    * Threads backend, each effect runs on its own Virtual Thread. The operation completes when both
-    * effects have finished successfully.
+    * Both effects execute concurrently and run to completion to ensure all resources are properly
+    * cleaned up. If either effect fails, the first error encountered is propagated after both
+    * effects have finished executing, guaranteeing that all finalizers run correctly.
     *
-    * '''Error Handling:''' If either effect fails, dies, or is interrupted, the other effect is
-    * cancelled immediately to prevent resource leaks and ensure structured concurrency. The first
-    * error encountered is propagated.
-    *
-    * '''Resource Safety:''' All finalizers execute correctly in FILO order even under concurrent
-    * failure scenarios, maintaining Eru's resource safety guarantees.
+    * This approach provides stronger structured concurrency guarantees than immediate cancellation
+    * by ensuring resource cleanup always completes, even under failure conditions.
     *
     * @param fa
     *   the first effect to execute
@@ -128,29 +92,53 @@ object EruRuntime {
     * val (result1, result2) = EruRuntime.zipPar(computation1, computation2).unsafeRunSync()
     * // Completes in ~100ms instead of ~200ms sequentially
     *
-    * // Error handling with automatic cancellation
+    * // Error handling with structured cleanup
     * val failing = Eru.effect(throw new RuntimeException("failed"))
-    * val slow = EruRuntime.sleep(Duration.ofSeconds(10)).map(_ => "slow")
+    * val withFinalizer = Eru.succeed("value").ensure(Eru.effect(println("cleanup")))
     *
-    * EruRuntime.zipPar(failing, slow).attempt.unsafeRunSync()
-    * // Fails immediately, slow computation is cancelled
+    * EruRuntime.zipPar(failing, withFinalizer).attempt.unsafeRunSync()
+    * // Prints "cleanup" - finalizers always execute
     *   }}}
     */
   def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, (A, B)] =
-    backend.zipPar(fa, fb)
+    for {
+      fiberA <- fork(fa)
+      fiberB <- fork(fb)
+      exitA <- fiberA.await
+      exitB <- fiberB.await
+      result <- (exitA, exitB) match {
+        // Both successful
+        case (Exit.Success(a), Exit.Success(b)) =>
+          Eru.succeed((a, b))
+
+        // One or both failed - propagate first failure
+        case (Exit.Failure(e), _) => Eru.fail(e)
+        case (_, Exit.Failure(e)) => Eru.fail(e)
+
+        // One or both died - propagate first defect
+        case (Exit.Die(t), _) => Eru.effect(throw t)
+        case (_, Exit.Die(t)) => Eru.effect(throw t)
+
+        // Both interrupted - zipPar should be interrupted
+        case (Exit.Interrupt(_, _), Exit.Interrupt(_, _)) =>
+          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: both fibers interrupted") }
+
+        // One interrupted, one successful - this is a cancellation race, treat as interrupted
+        case (Exit.Interrupt(_, _), Exit.Success(_)) =>
+          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber A interrupted") }
+        case (Exit.Success(_), Exit.Interrupt(_, _)) =>
+          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber B interrupted") }
+      }
+    } yield result
 
   /** Races two effects, returning the result of whichever completes first.
     *
-    * Both effects execute concurrently on separate execution contexts. The first effect to complete
-    * (successfully or with failure) wins the race, and the losing effect is cancelled immediately
-    * to prevent resource leaks and ensure structured concurrency.
+    * Races two effects and returns the result of whichever completes first. The loser is signaled
+    * to cancel and its finalizers are guaranteed to run, ensuring proper resource cleanup.
     *
-    * '''Non-Deterministic Behavior:''' Race semantics are intentionally non-deterministic - either
-    * effect may win depending on execution timing, system load, and scheduling decisions. This
-    * makes race suitable for timeout patterns and competitive computations.
-    *
-    * '''Cancellation:''' The losing effect is interrupted cooperatively, allowing finalizers to
-    * execute properly before termination. This maintains resource safety guarantees.
+    * Race semantics are intentionally non-deterministic - either effect may win depending on
+    * execution timing, system load, and scheduling decisions. This makes race suitable for timeout
+    * patterns and competitive computations.
     *
     * @param fa
     *   the first effect to race
@@ -188,7 +176,7 @@ object EruRuntime {
     * }
     *   }}}
     */
-  def race[E1, E2, A, B](fa: Eru[E1, A], @unused fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
+  def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
     backend.race(fa, fb)
 
   /** Suspends execution for the specified duration.
@@ -240,12 +228,13 @@ object EruRuntime {
   /** Races an effect against a timer, failing with TimeoutException if the timer wins.
     *
     * This operation implements timeout semantics by racing the provided effect against an internal
-    * timer. If the effect completes first, its result is returned. If the timer completes first,
-    * the effect is cancelled and a TimeoutException is thrown.
+    * timer. If the effect completes first, its result is returned. If the timer completes first, a
+    * TimeoutException is thrown. The timeout behavior delegates to the backend's race
+    * implementation for cancellation semantics.
     *
-    * '''Cancellation:''' When the timeout occurs, the target effect is interrupted cooperatively,
-    * allowing finalizers to execute properly before termination. This maintains resource safety
-    * even under timeout conditions.
+    * '''Backend Delegation:''' Cancellation behavior when timeout occurs varies by backend
+    * capability. Concurrent backends may attempt cooperative interruption of the timed-out effect,
+    * while sequential backends avoid executing the effect entirely after the timeout.
     *
     * '''Non-Blocking Implementation:''' On JVM Virtual Threads backends, both the effect and timer
     * execute efficiently without blocking carrier threads, enabling high concurrency.
@@ -289,38 +278,8 @@ object EruRuntime {
   )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
     backend.timeout(duration)(fa)
 
-  /** Retry policy for bounded retries with optional exponential backoff.
-    *
-    * Policies are deterministic and specify only the number of retries and, for backoff, the base
-    * delay used to compute per-attempt delays. Time computations are precise and derived from the
-    * attempt index `i` starting at 0 for the first retry.
-    *
-    * @example
-    *   {{@ import java.time.Duration // Retry up to 5 times with no delay between attempts val p1 =
-    *   Policy.Recurs(5)
-    *
-    * // Retry up to 3 times with exponential backoff starting at 10ms (10ms, 20ms, 40ms) val p2 =
-    * Policy.Exponential(Duration.ofMillis(10), 3)
-    * @}}
-    */
-  enum Policy {
-
-    /** Retries at most `n` times with no delay between retries.
-      * @param n
-      *   maximum number of retries (not counting the initial attempt). Negative values are treated
-      *   as 0.
-      */
-    case Recurs(n: Int)
-
-    /** Retries at most `maxRetries` times with exponential backoff delays `base * 2^i`.
-      * @param base
-      *   initial delay used for the first retry; subsequent retries double the delay
-      * @param maxRetries
-      *   maximum number of retries (not counting the initial attempt). Negative values are treated
-      *   as 0.
-      */
-    case Exponential(base: Duration, maxRetries: Int)
-  }
+  // Policy type alias for convenience
+  private type Policy = EruRuntime.Policy
 
   /** Retries on typed failure according to the provided policy. Defects (Throwables) are propagated
     * without retrying. If the typed error channel E happens to include Throwable, failures that are
@@ -398,9 +357,10 @@ object EruRuntime {
 
   /** Executes a collection of effects in parallel and returns their results in order.
     *
-    * This operation runs all effects concurrently and waits for all to complete before returning
-    * the results. If any effect fails, all other effects are cancelled immediately to ensure
-    * structured concurrency and prevent resource leaks.
+    * This operation forks all effects immediately and waits for all to complete before returning
+    * the results. All effects run to completion regardless of individual failures - if any effect
+    * fails, the operation still waits for all others to finish before returning the first error.
+    * This design ensures proper finalizer execution and structured concurrency semantics.
     *
     * '''Backend Adaptation:''' Behavior adapts to the concurrency backend. Virtual Threads backends
     * use lightweight VT spawning for optimal performance. Sequential backends fall back to
@@ -435,7 +395,57 @@ object EruRuntime {
     *   }}}
     */
   def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
-    backend.parSequence(effects)
+    effects match {
+      case Nil => Eru.succeed(List.empty[A])
+      case _ =>
+        def forkAll(remaining: List[Eru[E, A]], acc: List[Fiber[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
+          remaining match {
+            case Nil => Eru.succeed(acc.reverse)
+            case head :: tail =>
+              fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
+          }
+
+        def awaitAll(fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
+          fibers match {
+            case Nil => Eru.succeed(Nil)
+            case head :: tail =>
+              for {
+                exit <- head.await
+                rest <- awaitAll(tail)
+              } yield exit :: rest
+          }
+
+        def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
+          // Check for interruptions first - if any fiber was interrupted, interrupt this computation
+          exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
+            case Some((fiberId, cause)) =>
+              // Use interruptibleBlocking to trigger interruption through the interpreter
+              Eru.interruptibleBlocking {
+                throw new InterruptedException(s"ParSequence interrupted due to fiber $fiberId: $cause")
+              }
+            case None =>
+              // No interruptions, handle errors normally
+              val firstError = exits.collectFirst {
+                case Exit.Failure(error) => Left(error)
+                case Exit.Die(throwable) => Right(throwable)
+              }
+
+              firstError match {
+                case Some(Left(error)) => Eru.fail(error)
+                case Some(Right(throwable)) => Eru.effect(throw throwable)
+                case None =>
+                  val results = exits.collect { case Exit.Success(value) => value }
+                  Eru.succeed(results)
+              }
+          }
+        }
+
+        for {
+          fibers <- forkAll(effects, Nil)
+          exits <- awaitAll(fibers)
+          results <- processExits(exits)
+        } yield results
+    }
 
   /** Executes effects derived from a collection of inputs in parallel.
     *
@@ -476,22 +486,14 @@ object EruRuntime {
     *   }}}
     */
   def parTraverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] =
-    backend.parTraverse(inputs)(f)
+    parSequence(inputs.map(f))
 
-  /** Races multiple effects, returning the result of whichever completes first.
+  /** Races multiple effects and returns the result of the first one to complete, along with its
+    * original index.
     *
-    * All effects execute concurrently, and the first to complete (successfully or with failure)
-    * wins the race. All losing effects are cancelled immediately to prevent resource leaks. This is
-    * ideal for timeout patterns, competitive fetching, and resilience scenarios.
-    *
-    * '''Non-Deterministic Behavior:''' Race semantics are intentionally non-deterministic - any
-    * effect may win depending on execution timing, system load, and scheduling decisions.
-    *
-    * '''Cancellation:''' All losing effects are interrupted cooperatively, allowing finalizers to
-    * execute properly before termination. This maintains resource safety guarantees.
-    *
-    * '''Performance:''' On Virtual Threads backends, this operation spawns lightweight VTs for each
-    * effect and uses atomic coordination for optimal racing performance.
+    * This operation races all effects concurrently and returns both the winning result and the
+    * index of the effect that completed first. Race semantics are intentionally non-deterministic -
+    * any effect may win depending on execution timing and system conditions.
     *
     * @param effects
     *   the list of effects to race (must be non-empty)
@@ -519,10 +521,293 @@ object EruRuntime {
     *   }}}
     */
   def raceAll[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)] =
-    backend.raceAll(effects)
+    effects match {
+      case Nil =>
+        Eru.effect(throw new IllegalArgumentException("raceAll: empty list of effects"))
+      case single :: Nil =>
+        single.map(a => (a, 0))
+      case _ =>
+        def raceWithIndex(remaining: List[Eru[E, A]], currentIndex: Int): Eru[E | Throwable, (A, Int)] =
+          remaining match {
+            case Nil => Eru.effect(throw new IllegalStateException("raceAll: unexpected empty list"))
+            case single :: Nil => single.map(a => (a, currentIndex))
+            case current :: rest =>
+              race(current, raceWithIndex(rest, currentIndex + 1)).flatMap {
+                case Left(value) => Eru.succeed((value, currentIndex))
+                case Right((value, index)) => Eru.succeed((value, index))
+              }
+          }
+        raceWithIndex(effects, 0)
+    }
+
+  /** Executes effects derived from a collection of inputs in parallel with bounded concurrency.
+    *
+    * This operation processes inputs in batches, limiting the number of concurrent fibers to the
+    * specified degree. This provides resource control for large datasets while still gaining
+    * parallel execution benefits.
+    *
+    * Each batch of up to `n` effects executes in parallel, and batches are processed sequentially
+    * to maintain the concurrency bound. Results are collected in input order.
+    *
+    * @param n
+    *   maximum number of concurrent fibers (must be positive)
+    * @param inputs
+    *   the collection of inputs to process
+    * @param f
+    *   function to transform each input into an effect
+    * @tparam A
+    *   the type of input elements
+    * @tparam E
+    *   the typed error that effects may produce
+    * @tparam B
+    *   the success type that effects produce
+    * @return
+    *   an effect yielding the list of results in input order
+    *
+    * @example
+    *   {{{
+    * // Process URLs with max 3 concurrent requests
+    * val urls = (1 to 100).map(i => s"api/item/$i").toList
+    *
+    * val results = runtime.foreachParN(3, urls) { url =>
+    *   fetchFromApi(url) // Only 3 concurrent requests at a time
+    * }
+    *   }}}
+    */
+  def foreachParN[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B]): Eru[E | Throwable, List[B]] = {
+    require(n > 0, s"Parallelism degree must be positive, got: $n")
+
+    val inputList = inputs.toList
+    if (inputList.isEmpty) {
+      Eru.succeed(Nil)
+    } else {
+
+      def processBatch(batch: List[A]): Eru[E | Throwable, List[B]] = {
+        val effects = batch.map(f)
+        parSequence(effects)
+      }
+
+      def processAllBatches(batches: List[List[A]]): Eru[E | Throwable, List[B]] = {
+        batches match {
+          case Nil => Eru.succeed(Nil)
+          case head :: tail =>
+            for {
+              headResults <- processBatch(head)
+              tailResults <- processAllBatches(tail)
+            } yield headResults ++ tailResults
+        }
+      }
+
+      val batches = inputList.grouped(n).toList
+      processAllBatches(batches)
+    }
+  }
+
+  /** Executes effects derived from a collection of inputs in parallel with bounded concurrency,
+    * discarding results.
+    *
+    * This operation processes inputs in batches, limiting the number of concurrent fibers to the
+    * specified degree. This provides resource control for large datasets while still gaining
+    * parallel execution benefits. All results are discarded.
+    *
+    * Each batch of up to `n` effects executes in parallel, and batches are processed sequentially
+    * to maintain the concurrency bound.
+    *
+    * @param n
+    *   maximum number of concurrent fibers (must be positive)
+    * @param inputs
+    *   the collection of inputs to process
+    * @param f
+    *   function to transform each input into an effect
+    * @tparam A
+    *   the type of input elements
+    * @tparam E
+    *   the typed error that effects may produce
+    * @tparam B
+    *   the success type that effects produce (discarded)
+    * @return
+    *   an effect that succeeds with Unit when all operations complete
+    *
+    * @example
+    *   {{{
+    * // Send notifications with max 5 concurrent sends
+    * val userIds = (1 to 1000).toList
+    *
+    * runtime.foreachParNDiscard(5, userIds) { userId =>
+    *   sendNotification(userId) // Only 5 concurrent sends at a time
+    * }
+    *   }}}
+    */
+  def foreachParNDiscard[A, E, B](n: Int, inputs: Iterable[A])(f: A => Eru[E, B]): Eru[E | Throwable, Unit] =
+    foreachParN(n, inputs)(f).map(_ => ())
+
+  /** Validates multiple effects in parallel, accumulating all errors if any occur.
+    *
+    * This operation executes all effects concurrently and collects results. If all effects succeed,
+    * returns the list of success values. If any effects fail, returns all accumulated errors. This
+    * is particularly useful for domain validation where you want to report all validation failures
+    * at once rather than stopping at the first error.
+    *
+    * @param effects
+    *   the effects to validate in parallel
+    * @tparam E
+    *   the error type for validation failures
+    * @tparam A
+    *   the success type for valid results
+    * @return
+    *   either all accumulated errors or all success values
+    *
+    * @example
+    *   {{{
+    * // Validate user input fields in parallel
+    * val validations = List(
+    *   validateEmail(user.email),
+    *   validateAge(user.age),
+    *   validatePassword(user.password)
+    * )
+    *
+    * runtime.validatePar(validations).flatMap {
+    *   case Left(errors) =>
+    *     // Report all validation errors at once
+    *     Eru.fail(ValidationErrors(errors))
+    *   case Right(validatedFields) =>
+    *     // All fields valid, create user
+    *     Eru.succeed(User(validatedFields))
+    * }
+    *   }}}
+    */
+  def validatePar[E, A](effects: List[Eru[E, A]]): Eru[Throwable, Either[List[E], List[A]]] =
+    effects match {
+      case Nil => Eru.succeed(Right(List.empty[A]))
+      case _ =>
+        def forkAll(remaining: List[Eru[E, A]], acc: List[Fiber[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
+          remaining match {
+            case Nil => Eru.succeed(acc.reverse)
+            case head :: tail =>
+              fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
+          }
+
+        def awaitAll(fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
+          fibers match {
+            case Nil => Eru.succeed(Nil)
+            case head :: tail =>
+              for {
+                exit <- head.await
+                rest <- awaitAll(tail)
+              } yield exit :: rest
+          }
+
+        def processExits(exits: List[Exit[E, A]]): Eru[Throwable, Either[List[E], List[A]]] = {
+          // Check for interruptions first
+          exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
+            case Some((fiberId, cause)) =>
+              Eru.interruptibleBlocking {
+                throw new InterruptedException(s"ValidatePar interrupted due to fiber $fiberId: $cause")
+              }
+            case None =>
+              // Collect all errors and successes
+              val errors = exits.collect { case Exit.Failure(error) => error }
+              val defects = exits.collect { case Exit.Die(throwable) => throwable }
+
+              // If there are defects, propagate the first one
+              defects.headOption match {
+                case Some(throwable) => Eru.effect(throw throwable)
+                case None =>
+                  if (errors.nonEmpty) {
+                    Eru.succeed(Left(errors))
+                  } else {
+                    val results = exits.collect { case Exit.Success(value) => value }
+                    Eru.succeed(Right(results))
+                  }
+              }
+          }
+        }
+
+        for {
+          fibers <- forkAll(effects, Nil)
+          exits <- awaitAll(fibers)
+          result <- processExits(exits)
+        } yield result
+    }
+
+  /** Validates effects in parallel and returns either the first error encountered or all successes.
+    *
+    * This operation executes all effects concurrently but follows fail-fast semantics. If any
+    * effect fails, the first error is returned. If all effects succeed, all success values are
+    * returned. This is useful when you need parallel execution for performance but want to stop
+    * processing on the first validation failure.
+    *
+    * @param effects
+    *   the effects to validate in parallel
+    * @tparam E
+    *   the error type for validation failures
+    * @tparam A
+    *   the success type for valid results
+    * @return
+    *   either the first error or all success values
+    *
+    * @example
+    *   {{{
+    * // Validate dependencies in parallel, fail fast on any error
+    * val dependencyChecks = List(
+    *   checkDatabaseConnection(),
+    *   checkRedisConnection(),
+    *   checkExternalApiHealth()
+    * )
+    *
+    * runtime.validateFirst(dependencyChecks).flatMap {
+    *   case Left(error) =>
+    *     // First dependency failure, stop immediately
+    *     Eru.fail(ServiceUnavailable(error))
+    *   case Right(healthChecks) =>
+    *     // All dependencies healthy
+    *     Eru.succeed(HealthStatus.AllGood)
+    * }
+    *   }}}
+    */
+  def validateFirst[E, A](effects: List[Eru[E, A]]): Eru[Throwable, Either[E | Throwable, List[A]]] =
+    parSequence(effects).attempt.map {
+      case Result.Success(results) => Right(results)
+      case Result.Failure(error) => Left(error)
+    }
+
+  /** Cleans up this runtime instance.
+    *
+    * This should be called when the runtime is no longer needed to ensure all resources are
+    * properly released and any pending fibers are awaited.
+    */
+  def cleanup(): Unit = backend.cleanup()
 }
 
-private final class CompletedFiber[E, A](val id: FiberId, exit0: Exit[E, A]) extends Fiber[E, A] {
-  def await: Eru[Nothing, Exit[E, A]] = Eru.succeed(exit0)
-  def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = Eru.unit
+/** Companion object providing factory methods for creating EruRuntime instances. */
+object EruRuntime {
+
+  /** Creates a new EruRuntime with the platform-appropriate backend.
+    *
+    * Each call creates a fresh runtime instance with its own fiber tracking, ensuring complete
+    * isolation from other runtime instances.
+    */
+  def create(): EruRuntime = {
+    val backend = PlatformBackend.backend
+    new EruRuntime(backend)
+  }
+
+  /** Creates a new EruRuntime with a specific backend.
+    *
+    * This is primarily for testing or when you need explicit control over the backend
+    * implementation.
+    */
+  def withBackend(backend: internal.ConcurrencyBackend): EruRuntime = {
+    new EruRuntime(backend)
+  }
+
+  /** Retry policy for bounded retries with optional exponential backoff. */
+  enum Policy {
+
+    /** Retries at most `n` times with no delay between retries. */
+    case Recurs(n: Int)
+
+    /** Retries at most `maxRetries` times with exponential backoff delays `base * 2^i`. */
+    case Exponential(base: Duration, maxRetries: Int)
+  }
 }

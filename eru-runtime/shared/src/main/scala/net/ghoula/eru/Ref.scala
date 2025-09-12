@@ -61,17 +61,12 @@ object Ref {
   private final class RuntimeRef[A](init: A) extends Ref[A] {
     private val state = new java.util.concurrent.atomic.AtomicReference(init)
 
-    private def unwrapOr[T](r: Result[Throwable, T], fallback: => T): T = r match {
-      case Result.Success(v) => v
-      case Result.Failure(_) => fallback
-    }
+    def get: Eru[Nothing, A] = Eru.succeed(state.get())
 
-    def get: Eru[Nothing, A] = Eru.effect(state.get()).attempt.map(r => unwrapOr(r, state.get()))
-
-    def set(a: A): Eru[Nothing, Unit] = Eru.effect { state.set(a) }.attempt.flatMap(_ => Eru.unit)
+    def set(a: A): Eru[Nothing, Unit] = Eru.succeed { state.set(a); () }
 
     def update(f: A => A): Eru[Nothing, A] =
-      Eru.effect {
+      Eru.succeed {
         @annotation.tailrec
         def loop(): A = {
           val current = state.get()
@@ -80,10 +75,10 @@ object Ref {
           else loop()
         }
         loop()
-      }.attempt.map(r => unwrapOr(r, state.get()))
+      }
 
     def modify[B](f: A => (A, B)): Eru[Nothing, B] =
-      Eru.effect {
+      Eru.succeed {
         @annotation.tailrec
         def loop(): B = {
           val current = state.get()
@@ -92,6 +87,6 @@ object Ref {
           else loop()
         }
         loop()
-      }.attempt.map(r => unwrapOr(r, f(state.get())._2))
+      }
   }
 }

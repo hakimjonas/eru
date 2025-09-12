@@ -8,32 +8,45 @@ package net.ghoula.eru
   * users get a single, canonical import with no exposure of internal packages.
   *
   * @example
-  *   {{{ import net.ghoula.eru.prelude.* import java.time.Duration
+  *   {{{
+  * import net.ghoula.eru.prelude.*
+  * import java.time.Duration
   *
-  * // Core usage val hello: Eru[Nothing, String] = Eru.succeed("hello") val value: String =
-  * hello.unsafeRunSync()
+  * val hello: Eru[Nothing, String] = Eru.succeed("hello")
+  * val value: String = hello.unsafeRunSync()
   *
-  * // Constructors for runtime data types via Eru companion val refProg: Eru[Nothing, Ref[Int]] =
-  * Eru.ref(0) val defProg: Eru[Nothing, Deferred[String]] = Eru.deferred[String] val semProg:
-  * Eru[Nothing, Semaphore] = Eru.semaphore(2)
+  * val refProg: Eru[Nothing, Ref[Int]] = Eru.ref(0)
+  * val defProg: Eru[Nothing, Deferred[String]] = Eru.deferred[String]
+  * val semProg: Eru[Nothing, Semaphore] = Eru.semaphore(2)
   *
-  * // Concurrency and reliability extensions val a = Eru.succeed(1) val b = Eru.succeed(2) val par:
-  * Eru[Throwable, (Int, Int)] = a.zipPar(b) val raced: Eru[Throwable, Either[Int, Int]] = a.race(b)
-  * val timed: Eru[Throwable | java.util.concurrent.TimeoutException | Throwable, Int] = a.map(_ =>
-  * 42).timeout(Duration.ofMillis(50)) val fallback: Eru[Throwable, Int] = a.map(_ =>
-  * 42).timeoutTo(Duration.ofMillis(50), -1)
+  * val a = Eru.succeed(1)
+  * val b = Eru.succeed(2)
+  * val par: Eru[Throwable, (Int, Int)] = a.zipPar(b)
+  * val raced: Eru[Throwable, Either[Int, Int]] = a.race(b)
+  * val timed = a.map(_ => 42).timeout(Duration.ofMillis(50))
+  * val fallback: Eru[Throwable, Int] = a.map(_ => 42).timeoutTo(Duration.ofMillis(50), -1)
   *
-  * // Observability helpers through the same import class PrintingObserver extends EruObserver {
-  * def onEvent(e: EruEvent): Unit = println(e) } val observed: Int = Eru.succeed(123).runWith(new
-  * PrintingObserver)
+  * class PrintingObserver extends EruObserver {
+  *   def onEvent(e: EruEvent): Unit = println(e)
+  * }
+  * val observed: Int = Eru.succeed(123).runWith(new PrintingObserver)
   *
-  * // Exit inspection at the observable boundary val exit: Exit[Nothing, Int] =
-  * Eru.succeed(1).runExit() exit match { case Exit.Success(v) => println(s"ok=$v") case _ => () }
-  * }}
+  * val exit: Exit[Nothing, Int] = Eru.succeed(1).runExit()
+  * exit match {
+  *   case Exit.Success(v) => println(s"ok=$v")
+  *   case _ => ()
+  * }
+  *   }}}
   */
 object prelude {
   export net.ghoula.eru.CorePrelude.*
   export net.ghoula.eru.RuntimeExtensions.*
+
+  /** Exposes the EruRuntime companion object for runtime creation and Policy types. */
+  val EruRuntime = net.ghoula.eru.EruRuntime
+
+  /** Type alias for the runtime, re-exposed for discoverability. */
+  type EruRuntime = net.ghoula.eru.EruRuntime
 
   /** Exposes the EruObserver companion via the unified prelude so that observer helpers (e.g.,
     * noop, console) and event types are available from the same canonical import.
@@ -54,6 +67,32 @@ object prelude {
 
   /** Type alias for the runtime Semaphore, re-exposed for discoverability. */
   type Semaphore = net.ghoula.eru.Semaphore
+
+  /** Type alias for the runtime Queue, re-exposed for discoverability.
+    * @tparam A
+    *   element type stored in the queue
+    */
+  type Queue[A] = net.ghoula.eru.Queue[A]
+
+  /** Type alias for the runtime Hub, re-exposed for discoverability.
+    * @tparam A
+    *   message type published through the hub
+    */
+  type Hub[A] = net.ghoula.eru.Hub[A]
+
+  /** Type alias for the runtime Promise, re-exposed for discoverability.
+    * @tparam E
+    *   error type for failures
+    * @tparam A
+    *   value type for successful completion
+    */
+  type Promise[E, A] = net.ghoula.eru.Promise[E, A]
+
+  /** Type alias for the runtime CountDownLatch, re-exposed for discoverability. */
+  type CountDownLatch = net.ghoula.eru.CountDownLatch
+
+  /** Type alias for the runtime CyclicBarrier, re-exposed for discoverability. */
+  type CyclicBarrier = net.ghoula.eru.CyclicBarrier
 
   /** Type alias for runtime fibers, re-exposed for discoverability.
     * @tparam E

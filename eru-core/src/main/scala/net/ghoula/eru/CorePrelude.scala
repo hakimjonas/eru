@@ -11,8 +11,6 @@ package net.ghoula.eru
   */
 object CorePrelude {
 
-  // ===== CORE TYPES =====
-
   /** The core effect type representing a pure, lazy, composable computation. */
   type Eru[+E, +A] = net.ghoula.eru.Eru[E, A]
   val Eru = net.ghoula.eru.Eru
@@ -20,8 +18,6 @@ object CorePrelude {
   /** The foundational result type for fallible computations. */
   type Result[+E, +A] = net.ghoula.eru.Result[E, A]
   val Result = net.ghoula.eru.Result
-
-  // ===== CORE TYPE COMPANIONS AND FACTORY METHODS =====
 
   /** Export all factory methods from the Eru companion object.
     *
@@ -35,12 +31,8 @@ object CorePrelude {
     */
   export net.ghoula.eru.Result.{fail as resultFail, succeed as resultSucceed}
 
-  // ===== DOMAIN TYPES =====
-
   /** Export all domain types with compile-time safety constraints. */
   export net.ghoula.eru.DomainTypes.*
-
-  // ===== EXCEPTION TYPES =====
 
   /** The exception type for failed computations. */
   type EruException[E] = net.ghoula.eru.EruException[E]
@@ -48,27 +40,17 @@ object CorePrelude {
   /** Export the EruException companion object. */
   export net.ghoula.eru.EruException.*
 
-  // ===== OBSERVABILITY =====
-
   /** Export the EruObserver type and companion object, including EruEvent. */
   export net.ghoula.eru.EruObserver.*
-
-  // ===== EXIT AND TERMINATION =====
 
   /** Export all Exit types and companion methods. */
   export net.ghoula.eru.Exit
 
-  // ===== ERROR HANDLING PATTERNS =====
-
   /** Export error handling patterns and types. */
   export net.ghoula.eru.patterns.ErrorHandling.*
 
-  // ===== TRACING AND OBSERVABILITY =====
-
   /** Export all tracing types and functionality. */
   export net.ghoula.eru.trace.EruTrace.*
-
-  // ===== EXTENSION METHODS =====
 
   /** Export all extension methods through the unified PreludeApi facade. */
   export net.ghoula.eru.api.PreludeApi.*

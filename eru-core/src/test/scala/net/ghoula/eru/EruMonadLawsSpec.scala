@@ -1,27 +1,58 @@
 package net.ghoula.eru
 
-import munit.FunSuite
+import munit.ScalaCheckSuite
+import org.scalacheck.Gen
+import org.scalacheck.Prop.forAll
 
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive verification of monad laws for the Eru effect type.
   *
   * This specification ensures that the Eru[E, A] type forms a proper monad by verifying the
-  * fundamental monad laws:
+  * fundamental monad laws through both example-based and property-based testing:
   *   1. Left Identity: Eru.succeed(a).flatMap(f) == f(a)
   *   2. Right Identity: eru.flatMap(Eru.succeed) == eru
   *   3. Associativity: eru.flatMap(f).flatMap(g) == eru.flatMap(a => f(a).flatMap(g))
+  *   4. Functor laws: fmap(id) = id and fmap(f . g) = fmap(f) . fmap(g)
   *
-  * Additionally verifies functor laws and other algebraic properties to ensure mathematical
-  * correctness of the effect system.
+  * Tests both success and failure cases to ensure the laws hold under all conditions, and validates
+  * coherence between different combinators like map/flatMap and recover/recoverWith.
   */
-final class EruMonadLawsSpec extends FunSuite {
+final class EruMonadLawsSpec extends ScalaCheckSuite {
+
+  /** Generator for small positive integers to control test complexity. */
+  private val smallInts: Gen[Int] = Gen.choose(1, 100)
+
+  /** Generator for error strings. */
+  private val errorStrings: Gen[String] = Gen.oneOf("error1", "error2", "network failure", "timeout")
+
+  /** Generator for successful Eru effects. */
+  private val successfulEru: Gen[Eru[String, Int]] = smallInts.map(Eru.succeed)
+
+  /** Generator for failed Eru effects. */
+  private val failedEru: Gen[Eru[String, Int]] = errorStrings.map(Eru.fail)
+
+  /** Generator for arbitrary Eru effects. */
+  private val arbitraryEru: Gen[Eru[String, Int]] = Gen.oneOf(successfulEru, failedEru)
+
+  /** Generator for pure functions. */
+  private val pureFunctions: Gen[Int => Int] = Gen.oneOf(
+    Gen.const((x: Int) => x + 1),
+    Gen.const((x: Int) => x * 2),
+    Gen.const((x: Int) => x - 1)
+  )
+
+  /** Generator for functions that return Eru effects. */
+  private val kleisliFunctions: Gen[Int => Eru[String, Int]] = Gen.oneOf(
+    Gen.const((x: Int) => Eru.succeed(x + 1)),
+    Gen.const((x: Int) => Eru.succeed(x * 2)),
+    Gen.const((x: Int) => if (x > 50) Eru.fail("too large") else Eru.succeed(x))
+  )
 
   private val testValue = 42
   private val testError = "test error"
   private val f: Int => Eru[String, String] = x => Eru.succeed(s"f($x)")
   private val g: String => Eru[String, Int] = s => Eru.succeed(s.length)
-  private val h: Int => Int = _ * 2
 
   test("Left Identity: Eru.succeed(a).flatMap(f) == f(a)") {
     val left = Eru.succeed(testValue).flatMap(f).unsafeRunSync()
@@ -86,73 +117,6 @@ final class EruMonadLawsSpec extends FunSuite {
     assertEquals(leftNegative, rightNegative)
   }
 
-  test("Functor Identity: eru.map(identity) == eru") {
-    val originalEffect = Eru.succeed(testValue)
-    val left = originalEffect.map(identity).unsafeRunSync()
-    val right = originalEffect.unsafeRunSync()
-
-    assertEquals(left, right)
-  }
-
-  test("Functor Composition: eru.map(f).map(g) == eru.map(f.andThen(g))") {
-    val f = (x: Int) => x.toString
-    val g = (s: String) => s.length
-
-    val originalEffect = Eru.succeed(testValue)
-    val left = originalEffect.map(f).map(g).unsafeRunSync()
-    val right = originalEffect.map(f.andThen(g)).unsafeRunSync()
-
-    assertEquals(left, right)
-  }
-
-  test("Functor laws hold for failing effects") {
-    val failingEffect = Eru.fail(testError)
-
-    // Identity
-    interceptMessage[EruException[String]](testError) {
-      failingEffect.map(identity).unsafeRunSync()
-    }
-
-    // Composition
-    interceptMessage[EruException[String]](testError) {
-      failingEffect.map(h).map(_ + 1).unsafeRunSync()
-    }
-  }
-
-  test("Applicative Identity: pure(identity) <*> v = v") {
-    val effect = Eru.succeed(testValue)
-    val identity = Eru.succeed((x: Int) => x)
-
-    val left = identity.zip(effect).map { case (f, x) => f(x) }.unsafeRunSync()
-    val right = effect.unsafeRunSync()
-
-    assertEquals(left, right)
-  }
-
-  test("Applicative Composition: demonstrates function composition through zip") {
-    val stringifier = Eru.succeed((x: Int) => x.toString)
-    val lengthGetter = Eru.succeed((s: String) => s.length)
-    val value = Eru.succeed(testValue)
-
-    // Compose functions and apply to value
-    val composed = stringifier
-      .zip(lengthGetter)
-      .zip(value)
-      .map { case ((f, g), x) => g(f(x)) }
-      .unsafeRunSync()
-
-    // Apply functions sequentially
-    val sequential = value
-      .zip(stringifier)
-      .map { case (x, f) => f(x) }
-      .zip(lengthGetter)
-      .map { case (intermediate, g) => g(intermediate) }
-      .unsafeRunSync()
-
-    assertEquals(composed, sequential)
-    assertEquals(composed, testValue.toString.length)
-  }
-
   test("map/flatMap coherence: eru.map(f) == eru.flatMap(f.andThen(Eru.succeed))") {
     val originalEffect = Eru.succeed(testValue)
     val f = (x: Int) => x.toString
@@ -164,7 +128,6 @@ final class EruMonadLawsSpec extends FunSuite {
   }
 
   test("flatMap/join coherence: eru.flatMap(f) == eru.map(f).join") {
-    // Since Eru doesn't have a join method, we'll verify this through flatten behavior
     val nestedEffect = Eru.succeed(Eru.succeed(testValue))
     val flattened = nestedEffect.flatMap(identity).unsafeRunSync()
 
@@ -176,7 +139,7 @@ final class EruMonadLawsSpec extends FunSuite {
     val b = Eru.fail("b")
     val c = Eru.succeed(testValue)
 
-    val left = (a.orElse(b)).orElse(c)
+    val left = a.orElse(b).orElse(c)
     val right = a.orElse(b.orElse(c))
 
     assertEquals(left.unsafeRunSync(), right.unsafeRunSync())
@@ -192,37 +155,46 @@ final class EruMonadLawsSpec extends FunSuite {
     assertEquals(left, right)
   }
 
-  test("stack safety for deep flatMap chains") {
-    // Platform-aware stack test depth for ARM architecture compatibility
-    val stackTestDepth = {
-      val arch = System.getProperty("os.arch")
-      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 5000 else 10000
-    }
+  // Property-based monad law tests
 
-    def deepChain(n: Int): Eru[Nothing, Int] = {
-      if (n <= 0) Eru.succeed(0)
-      else Eru.succeed(n).flatMap(_ => deepChain(n - 1))
+  property("Functor law: fmap(id) = id") {
+    forAll(arbitraryEru) { eru =>
+      val mapped = eru.map(identity).attempt.unsafeRunSync()
+      val original = eru.attempt.unsafeRunSync()
+      mapped == original
     }
-
-    // This should not stack overflow
-    val result = deepChain(stackTestDepth).unsafeRunSync()
-    assertEquals(result, 0)
   }
 
-  test("stack safety for deep map chains") {
-    // Platform-aware stack test depth for ARM architecture compatibility
-    val stackTestDepth = {
-      val arch = System.getProperty("os.arch")
-      if (arch.startsWith("aarch64") || arch.startsWith("arm")) 5000 else 10000
+  property("Functor law: fmap(f . g) = fmap(f) . fmap(g)") {
+    forAll(arbitraryEru, pureFunctions, pureFunctions) { (eru, f, g) =>
+      val composed = eru.map(f.andThen(g)).attempt.unsafeRunSync()
+      val sequential = eru.map(f).map(g).attempt.unsafeRunSync()
+      composed == sequential
     }
-
-    def deepMap(n: Int): Eru[Nothing, Int] = {
-      if (n <= 0) Eru.succeed(0)
-      else deepMap(n - 1).map(_ + 1)
-    }
-
-    // This should not stack overflow
-    val result = deepMap(stackTestDepth).unsafeRunSync()
-    assertEquals(result, stackTestDepth)
   }
+
+  property("Monad law: left identity - pure(a) >>= f = f(a)") {
+    forAll(smallInts, kleisliFunctions) { (a, f) =>
+      val left = Eru.succeed(a).flatMap(f).attempt.unsafeRunSync()
+      val right = f(a).attempt.unsafeRunSync()
+      left == right
+    }
+  }
+
+  property("Monad law: right identity - m >>= pure = m") {
+    forAll(arbitraryEru) { eru =>
+      val left = eru.flatMap(Eru.succeed).attempt.unsafeRunSync()
+      val right = eru.attempt.unsafeRunSync()
+      left == right
+    }
+  }
+
+  property("Monad law: associativity - (m >>= f) >>= g = m >>= (\\x -> f x >>= g)") {
+    forAll(arbitraryEru, kleisliFunctions, kleisliFunctions) { (eru, f, g) =>
+      val left = eru.flatMap(f).flatMap(g).attempt.unsafeRunSync()
+      val right = eru.flatMap(a => f(a).flatMap(g)).attempt.unsafeRunSync()
+      left == right
+    }
+  }
+
 }

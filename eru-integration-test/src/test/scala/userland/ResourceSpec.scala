@@ -4,7 +4,22 @@ import munit.FunSuite
 
 import net.ghoula.eru.prelude.*
 
+/** Integration test suite for resource management in complex real-world scenarios.
+  *
+  * Validates resource safety operations including bracket, ensure, and finalizers in realistic
+  * usage patterns that combine resource management with concurrency, error handling, and other
+  * effect operations. These tests ensure that resource safety guarantees hold under complex
+  * compositions that reflect production application requirements.
+  */
 final class ResourceSpec extends FunSuite {
+
+  given runtime: EruRuntime = EruRuntime.create()
+
+  /** Validates that bracket operations ensure proper cleanup in both success and failure cases.
+    *
+    * Tests the bracket resource management pattern by verifying that release functions are called
+    * correctly whether the use function succeeds or fails, ensuring resource safety.
+    */
   test("bracket ensures cleanup on failure and success") {
     var cleaned = 0
     val acquire = Eru.succeed("res")
@@ -26,6 +41,11 @@ final class ResourceSpec extends FunSuite {
     assertEquals(cleaned, 2)
   }
 
+  /** Validates that ensure operations always execute cleanup code.
+    *
+    * Tests the ensure combinator by verifying that cleanup actions are executed even when the
+    * primary computation fails, providing resource safety guarantees.
+    */
   test("ensure always runs cleanup") {
     var ran = false
     val prog = Eru.fail("x").ensure(Eru.effect { ran = true; () })

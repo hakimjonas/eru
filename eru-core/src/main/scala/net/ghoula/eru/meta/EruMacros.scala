@@ -175,17 +175,21 @@ object EruMacros {
     }
 
     def isUsedInBody(symbol: Symbol, body: Term): Boolean = {
-      var found = false
-      object UsageChecker extends TreeTraverser {
-        override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
-          tree match {
-            case Ident(_) if tree.symbol == symbol => found = true
-            case _ => super.traverseTree(tree)(owner)
+      object FoundException extends Exception
+      try {
+        object UsageChecker extends TreeTraverser {
+          override def traverseTree(tree: Tree)(owner: Symbol): Unit = {
+            tree match {
+              case Ident(_) if tree.symbol == symbol => throw FoundException
+              case _ => super.traverseTree(tree)(owner)
+            }
           }
         }
+        UsageChecker.traverseTree(body)(Symbol.spliceOwner)
+        false
+      } catch {
+        case FoundException => true
       }
-      UsageChecker.traverseTree(body)(Symbol.spliceOwner)
-      found
     }
 
     def hasResourceAcquisition(term: Term): Boolean = {
@@ -429,9 +433,7 @@ object EruMacros {
   )(using q: Quotes): Expr[net.ghoula.eru.Eru[E, A]] = {
     import q.reflect.*
 
-    var optimizationsApplied = 0
-
-    def optimizeExpr(term: Term): Term = {
+    def optimizeExpr(term: Term): (Term, Int) = {
       term match {
         case Apply(
               Select(Apply(TypeApply(Select(Ident("Eru"), "succeed"), _), List(literal)), "map"),
@@ -442,12 +444,10 @@ object EruMacros {
               fun match {
                 case Select(Ident(_), "+") =>
                   report.info("Optimizing pure map chain with arithmetic operation", term.pos)
-                  optimizationsApplied += 1
-                  term
+                  (term, 1)
                 case Select(Ident(_), "*") =>
                   report.info("Optimizing pure multiplication in map chain", term.pos)
-                  optimizationsApplied += 1
-                  term
+                  (term, 1)
                 case _ => optimizeSubterms(term)
               }
             case _ => optimizeSubterms(term)
@@ -468,8 +468,8 @@ object EruMacros {
             "Deep flatMap nesting detected - consider using for-comprehension for better performance",
             term.pos
           )
-          optimizationsApplied += 1
-          optimizeSubterms(term)
+          val (optimizedTerm, subCount) = optimizeSubterms(term)
+          (optimizedTerm, 1 + subCount)
 
         case Apply(
               Select(Apply(Select(_, "attempt"), _), "flatMap"),
@@ -479,13 +479,13 @@ object EruMacros {
             "Detected attempt.flatMap(succeed) pattern - consider using recover for better performance",
             term.pos
           )
-          optimizationsApplied += 1
-          optimizeSubterms(term)
+          val (optimizedTerm, subCount) = optimizeSubterms(term)
+          (optimizedTerm, 1 + subCount)
 
         case Apply(Select(receiver, "map"), List(Lambda(List(param), Ident(paramName)))) if paramName == param.name =>
           report.info("Identity map detected - removing unnecessary operation", term.pos)
-          optimizationsApplied += 1
-          optimizeExpr(receiver)
+          val (optimizedReceiver, receiverCount) = optimizeExpr(receiver)
+          (optimizedReceiver, 1 + receiverCount)
 
         case Apply(TypeApply(Select(Ident("Eru"), "effect"), _), List(Lambda(_, body))) =>
           if (
@@ -500,13 +500,16 @@ object EruMacros {
       }
     }
 
-    def optimizeSubterms(term: Term): Term = {
+    def optimizeSubterms(term: Term): (Term, Int) = {
       term match {
         case Apply(fun, args) =>
-          Apply(optimizeExpr(fun), args.map(optimizeExpr))
+          val (optimizedFun, funCount) = optimizeExpr(fun)
+          val (optimizedArgs, argsCounts) = args.map(optimizeExpr).unzip
+          (Apply(optimizedFun, optimizedArgs), funCount + argsCounts.sum)
         case Select(qualifier, name) =>
-          Select.copy(term)(optimizeExpr(qualifier), name)
-        case _ => term
+          val (optimizedQualifier, qualifierCount) = optimizeExpr(qualifier)
+          (Select.copy(term)(optimizedQualifier, name), qualifierCount)
+        case _ => (term, 0)
       }
     }
 
@@ -559,7 +562,7 @@ object EruMacros {
       typeName.contains("AutoCloseable") || typeName.contains("Closeable")
     }
 
-    val optimizedTerm = optimizeExpr(expr.asTerm)
+    val (optimizedTerm, optimizationsApplied) = optimizeExpr(expr.asTerm)
 
     if (optimizationsApplied > 0) {
       report.info(s"Applied $optimizationsApplied compile-time optimizations", expr.asTerm.pos)

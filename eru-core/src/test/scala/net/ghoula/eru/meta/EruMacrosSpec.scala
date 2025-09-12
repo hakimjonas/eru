@@ -4,6 +4,13 @@ import munit.FunSuite
 
 import net.ghoula.eru.CorePrelude.*
 
+/** Test suite for Eru's macro-based compile-time optimizations and validations.
+  *
+  * Validates the behavior of compile-time macros including the validated macro that provides stack
+  * trace preservation and enhanced debugging capabilities. These tests ensure that macro-generated
+  * code maintains semantic equivalence with hand-written effects while providing additional
+  * development-time benefits and optimizations.
+  */
 class EruMacrosSpec extends FunSuite {
 
   test("validated macro preserves effect behavior for simple success case") {
@@ -123,7 +130,6 @@ class EruMacrosSpec extends FunSuite {
     val stringEffect: Eru[Nothing, String] = EruMacros.validated(Eru.succeed("hello"))
     val intEffect: Eru[String, Int] = EruMacros.validated(Eru.fail("error"))
 
-    // These should compile with correct types
     val stringResult = stringEffect.unsafeRunSync()
     assertEquals(stringResult, "hello")
 

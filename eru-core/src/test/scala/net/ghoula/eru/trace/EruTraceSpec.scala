@@ -2,13 +2,21 @@ package net.ghoula.eru.trace
 
 import munit.FunSuite
 
-import scala.collection.mutable.ListBuffer
-
 import net.ghoula.eru.CorePrelude.*
 import net.ghoula.eru.trace.EruTrace.Span
 
-class EruTraceSpec extends FunSuite {
+/** Test suite for the EruTrace functionality and tracing infrastructure.
+  *
+  * Validates span creation, trace propagation, observer integration, and the correctness of trace
+  * data collection across effect composition boundaries.
+  */
+final class EruTraceSpec extends FunSuite {
 
+  /** Validates that SpanId.fresh generates unique identifiers.
+    *
+    * Tests that each call to SpanId.fresh produces a unique identifier with positive value,
+    * ensuring proper span identification in tracing systems.
+    */
   test("SpanId.fresh generates unique identifiers") {
     val id1 = EruTrace.SpanId.fresh()
     val id2 = EruTrace.SpanId.fresh()
@@ -17,6 +25,11 @@ class EruTraceSpec extends FunSuite {
     assert(id2.toLong > 0)
   }
 
+  /** Validates that TraceId.fresh generates unique identifiers.
+    *
+    * Tests that each call to TraceId.fresh produces a unique identifier with positive value,
+    * ensuring proper trace identification across distributed systems.
+    */
   test("TraceId.fresh generates unique identifiers") {
     val id1 = EruTrace.TraceId.fresh()
     val id2 = EruTrace.TraceId.fresh()
@@ -25,6 +38,11 @@ class EruTraceSpec extends FunSuite {
     assert(id2.toLong > 0)
   }
 
+  /** Validates basic span creation and property access.
+    *
+    * Tests that spans are created with correct initial properties including IDs, operation name,
+    * status, and empty collections for tags and events.
+    */
   test("Span creation and modification") {
     import EruTrace.*
 
@@ -47,6 +65,11 @@ class EruTraceSpec extends FunSuite {
     assert(span.events.isEmpty)
   }
 
+  /** Validates span tag management functionality.
+    *
+    * Tests that tags can be added to spans individually and in batches, and that tag values are
+    * correctly stored and retrievable.
+    */
   test("Span with tags") {
     import EruTrace.*
 
@@ -65,6 +88,11 @@ class EruTraceSpec extends FunSuite {
     assertEquals(span.tags("key3"), "value3")
   }
 
+  /** Validates span event management functionality.
+    *
+    * Tests that events can be added to spans and that event data including timestamps, names, and
+    * attributes are correctly stored.
+    */
   test("Span with events") {
     import EruTrace.*
 
@@ -92,6 +120,11 @@ class EruTraceSpec extends FunSuite {
     assert(span.events.contains(event2))
   }
 
+  /** Validates span completion with status and timing.
+    *
+    * Tests that spans can be completed with a final status and that completion automatically sets
+    * end time and calculates duration.
+    */
   test("Span completion") {
     import EruTrace.*
 
@@ -109,6 +142,11 @@ class EruTraceSpec extends FunSuite {
     assert(completedSpan.duration.isDefined)
   }
 
+  /** Validates TraceContext creation and child span generation.
+    *
+    * Tests that trace contexts are properly initialized and can create child spans with correct
+    * hierarchy relationships and trace propagation.
+    */
   test("TraceContext creation and child spans") {
     import EruTrace.*
 
@@ -127,6 +165,11 @@ class EruTraceSpec extends FunSuite {
     assert(childSpan.parentSpanId.isEmpty)
   }
 
+  /** Validates TraceContext baggage management.
+    *
+    * Tests that baggage key-value pairs can be added to trace contexts for cross-cutting concerns
+    * and distributed tracing metadata.
+    */
   test("TraceContext with baggage") {
     import EruTrace.*
 
@@ -139,6 +182,11 @@ class EruTraceSpec extends FunSuite {
     assertEquals(context.baggage("request-id"), "req-789")
   }
 
+  /** Validates that nested child spans maintain proper hierarchy.
+    *
+    * Tests that parent-child relationships are correctly established when creating nested spans
+    * within a trace context.
+    */
   test("nested child spans maintain hierarchy") {
     import EruTrace.*
 
@@ -155,13 +203,19 @@ class EruTraceSpec extends FunSuite {
     assertEquals(span2.parentSpanId, Some(span1.spanId))
   }
 
+  /** Validates that traced extension method creates spans correctly.
+    *
+    * Tests that the traced extension method properly instruments effects with tracing while
+    * preserving computation results.
+    */
   test("traced extension method creates spans") {
 
     class TestObserver extends TracingEruObserver {
-      val spans: ListBuffer[Span] = ListBuffer.empty[Span]
+      private var _spans: List[Span] = Nil
+      def spans: List[Span] = _spans.reverse
 
       def onSpanCompleted(span: Span): Unit = {
-        spans += span
+        _spans = span :: _spans
       }
     }
 
@@ -170,11 +224,13 @@ class EruTraceSpec extends FunSuite {
 
     val result = effect.unsafeRunSyncWith(observer)
     assertEquals(result, 42)
-
-    // Note: The current implementation may not work perfectly with observer
-    // due to the way EmitTraceSpan is handled, but we test the basic functionality
   }
 
+  /** Validates that traced extension method accepts tags.
+    *
+    * Tests that the traced extension method can be configured with tags for enhanced observability
+    * metadata while preserving effect semantics.
+    */
   test("traced extension method with tags") {
     val effect = Eru
       .succeed("hello")
@@ -187,6 +243,11 @@ class EruTraceSpec extends FunSuite {
     assertEquals(result, "hello")
   }
 
+  /** Validates that traced extension method preserves error semantics.
+    *
+    * Tests that tracing instrumentation does not interfere with error propagation in failed
+    * effects.
+    */
   test("traced extension method preserves errors") {
     val effect = Eru.fail("boom").traced("failing-operation")
 
@@ -196,6 +257,11 @@ class EruTraceSpec extends FunSuite {
     assertEquals(exception.error, "boom")
   }
 
+  /** Validates that traced extension method works with complex effect chains.
+    *
+    * Tests that tracing can be applied to individual steps in monadic compositions while
+    * maintaining correct execution semantics.
+    */
   test("traced extension method works with complex chains") {
     val effect = for {
       a <- Eru.succeed(10).traced("step-1")
@@ -207,6 +273,11 @@ class EruTraceSpec extends FunSuite {
     assertEquals(result, 30)
   }
 
+  /** Validates that traceEvent extension method adds events to spans.
+    *
+    * Tests that trace events can be added to effect execution with custom attributes for detailed
+    * observability.
+    */
   test("traceEvent extension method works") {
     val effect = Eru
       .succeed(42)
@@ -218,6 +289,11 @@ class EruTraceSpec extends FunSuite {
     assertEquals(result, 84)
   }
 
+  /** Validates that withTraceBaggage extension method manages baggage.
+    *
+    * Tests that baggage can be added to trace contexts through extension methods while preserving
+    * effect execution.
+    */
   test("withTraceBaggage extension method works") {
     val effect = Eru
       .succeed("result")
@@ -228,6 +304,11 @@ class EruTraceSpec extends FunSuite {
     assertEquals(result, "result")
   }
 
+  /** Validates that tracing extensions compose with other effect extensions.
+    *
+    * Tests that tracing extensions can be combined with resource management and other effect
+    * extensions without conflicts.
+    */
   test("tracing extensions compose with other extensions") {
     val effect = Eru
       .succeed("resource")
@@ -240,29 +321,40 @@ class EruTraceSpec extends FunSuite {
     assertEquals(result, "resource")
   }
 
+  /** Validates that TracingEruObserver handles different event types correctly.
+    *
+    * Tests that the tracing observer properly dispatches span events and other EruEvent types to
+    * appropriate handlers.
+    */
   test("TracingEruObserver handles different event types") {
     class TestTracingObserver extends TracingEruObserver {
-      val spans: ListBuffer[Span] = ListBuffer.empty[EruTrace.Span]
-      val otherEvents: ListBuffer[EruEvent] = ListBuffer.empty[EruEvent]
+      private var _spans: List[EruTrace.Span] = Nil
+      private var _otherEvents: List[EruEvent] = Nil
+      def spans: List[EruTrace.Span] = _spans.reverse
+      def otherEvents: List[EruEvent] = _otherEvents.reverse
 
       def onSpanCompleted(span: EruTrace.Span): Unit = {
-        spans += span
+        _spans = span :: _spans
       }
 
       override def onOtherEvent(event: EruEvent): Unit = {
-        otherEvents += event
+        _otherEvents = event :: _otherEvents
       }
     }
 
     val observer = new TestTracingObserver
 
-    // Test that it's a proper EruObserver
     observer.onEvent(EruEvent.ProgramStart(ScopeId.fresh()))
 
     assertEquals(observer.spans.size, 0)
     assertEquals(observer.otherEvents.size, 1)
   }
 
+  /** Validates that startTrace creates root trace context correctly.
+    *
+    * Tests that starting a new trace creates a properly initialized root context with appropriate
+    * span and metadata.
+    */
   test("startTrace creates root trace context") {
     import EruTrace.*
 
@@ -275,14 +367,21 @@ class EruTraceSpec extends FunSuite {
     assert(rootSpan.parentSpanId.isEmpty)
   }
 
+  /** Validates that getCurrentContext returns appropriate value.
+    *
+    * Tests that the current trace context can be retrieved from the ambient tracing system.
+    */
   test("getCurrentContext returns None initially") {
     import EruTrace.*
 
-    // In a fresh test context, there should be no current context
     val _ = getCurrentContext
-    // Note: This might not work as expected due to ThreadLocal behavior in tests
   }
 
+  /** Validates that span status variants work correctly.
+    *
+    * Tests that all span status variants (InProgress, Success, Error, Cancelled) are properly
+    * constructed and pattern matched.
+    */
   test("span status variants work correctly") {
     import EruTrace.SpanStatus.*
 
@@ -295,7 +394,7 @@ class EruTraceSpec extends FunSuite {
     assertEquals(success, Success)
     error match {
       case Error(msg) => assertEquals(msg, "test error")
-      case _ => fail("Expected Error variant")
+      case _ => fail("Expected Error status variant")
     }
     assertEquals(cancelled, Cancelled)
   }

@@ -44,8 +44,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
       Gen.const(None)
     )
 
-  // ===== BLOCKING METHOD TESTS =====
-
+  /** Validates that Eru.blocking executes computation lazily.
+    *
+    * Tests that blocking computations are not executed immediately upon construction, maintaining
+    * lazy evaluation semantics.
+    */
   test("Eru.blocking executes computation lazily") {
     var executed = false
     val eru = Eru.blocking {
@@ -53,13 +56,18 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
       42
     }
 
-    assert(!executed, "Blocking computation should not execute immediately")
+    assert(!executed)
 
     val result = eru.unsafeRunSync()
     assertEquals(result, 42)
-    assert(executed, "Blocking computation should execute when run")
+    assert(executed)
   }
 
+  /** Validates that Eru.blocking captures exceptions as typed errors.
+    *
+    * Tests that exceptions thrown within blocking computations are properly captured and converted
+    * to typed Eru failures.
+    */
   test("Eru.blocking captures exceptions as typed errors") {
     val exception = new RuntimeException("blocking error")
     val eru = Eru.blocking {
@@ -69,10 +77,15 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     val result = eru.attempt.unsafeRunSync()
     result match {
       case Result.Failure(caught) => assertEquals(caught, exception)
-      case Result.Success(_) => fail("Should have captured exception")
+      case Result.Success(_) => fail("Expected exception to be captured")
     }
   }
 
+  /** Validates that Eru.blocking handles side effects correctly.
+    *
+    * Tests that blocking effects properly execute side effects each time they are run, maintaining
+    * referential transparency.
+    */
   test("Eru.blocking handles side effects correctly") {
     var counter = 0
     val eru = Eru.blocking {
@@ -80,12 +93,16 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
       counter
     }
 
-    // Multiple runs should execute the side effect each time
     assertEquals(eru.unsafeRunSync(), 1)
     assertEquals(eru.unsafeRunSync(), 2)
     assertEquals(eru.unsafeRunSync(), 3)
   }
 
+  /** Property test validating that Eru.blocking preserves successful computations.
+    *
+    * Verifies that successful blocking computations produce the expected results across a wide
+    * range of input values.
+    */
   property("Eru.blocking preserves successful computations") {
     forAll(smallInts) { value =>
       val eru = Eru.blocking(value)
@@ -93,6 +110,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
+  /** Property test validating that Eru.blocking is equivalent to Eru.effect for pure computations.
+    *
+    * Verifies that blocking and effect constructors produce identical results for computations
+    * without side effects.
+    */
   property("Eru.blocking is equivalent to Eru.effect for pure computations") {
     forAll(smallInts) { value =>
       val blocking = Eru.blocking(value).attempt.unsafeRunSync()
@@ -101,14 +123,22 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
-  // ===== FROM_EITHER METHOD TESTS =====
-
+  /** Validates that Eru.fromEither converts Right values to Success.
+    *
+    * Tests that Either Right values are properly converted to successful Eru effects with correct
+    * value preservation.
+    */
   test("Eru.fromEither converts Right values to Success") {
     val right = Right(42)
     val eru = Eru.fromEither(right)
     assertEquals(eru.unsafeRunSync(), 42)
   }
 
+  /** Validates that Eru.fromEither converts Left values to Failure.
+    *
+    * Tests that Either Left values are properly converted to failed Eru effects with correct error
+    * preservation.
+    */
   test("Eru.fromEither converts Left values to Failure") {
     val left = Left("error")
     val eru = Eru.fromEither(left)
@@ -118,6 +148,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
+  /** Validates that Eru.fromEither preserves error and success types.
+    *
+    * Tests that type information is correctly maintained when converting Either values to Eru
+    * effects.
+    */
   test("Eru.fromEither preserves error and success types") {
     val stringError: Either[String, Int] = Left("string error")
     val intSuccess: Either[String, Int] = Right(123)
@@ -131,6 +166,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
+  /** Property test validating that Eru.fromEither preserves Either semantics.
+    *
+    * Verifies that Either conversion maintains correct success/failure semantics across a wide
+    * range of Either values.
+    */
   property("Eru.fromEither preserves Either semantics") {
     forAll(arbitraryEithers) { either =>
       val eru = Eru.fromEither(either)
@@ -143,6 +183,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
+  /** Property test validating that Eru.fromEither round-trip with attempt preserves values.
+    *
+    * Verifies that converting Either to Eru and back via attempt produces the original Either
+    * value.
+    */
   property("Eru.fromEither round-trip with attempt preserves values") {
     forAll(arbitraryEithers) { either =>
       val eru = Eru.fromEither(either)
@@ -153,14 +198,22 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
-  // ===== FROM_TRY METHOD TESTS =====
-
+  /** Validates that Eru.fromTry converts Success values to Eru success.
+    *
+    * Tests that Try Success values are properly converted to successful Eru effects with correct
+    * value preservation.
+    */
   test("Eru.fromTry converts Success values to Eru success") {
     val success = Success(42)
     val eru = Eru.fromTry(success)
     assertEquals(eru.unsafeRunSync(), 42)
   }
 
+  /** Validates that Eru.fromTry converts Failure values to Eru failure.
+    *
+    * Tests that Try Failure values are properly converted to failed Eru effects with correct
+    * exception preservation.
+    */
   test("Eru.fromTry converts Failure values to Eru failure") {
     val exception = new RuntimeException("try error")
     val failure = Failure(exception)
@@ -169,10 +222,15 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     val result = eru.attempt.unsafeRunSync()
     result match {
       case Result.Failure(caught) => assertEquals(caught, exception)
-      case Result.Success(_) => fail("Should have captured exception from Try.Failure")
+      case Result.Success(_) => fail("Expected exception from Try.Failure")
     }
   }
 
+  /** Validates that Eru.fromTry evaluates Try lazily.
+    *
+    * Tests that Try values are not evaluated immediately upon fromTry construction, maintaining
+    * lazy evaluation semantics.
+    */
   test("Eru.fromTry evaluates Try lazily") {
     var evaluated = false
     val eru = Eru.fromTry {
@@ -180,13 +238,18 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
       Success(42)
     }
 
-    assert(!evaluated, "Try should not be evaluated immediately")
+    assert(!evaluated)
 
     val result = eru.unsafeRunSync()
     assertEquals(result, 42)
-    assert(evaluated, "Try should be evaluated when run")
+    assert(evaluated)
   }
 
+  /** Property test validating that Eru.fromTry preserves Try semantics.
+    *
+    * Verifies that Try conversion maintains correct success/failure semantics across a wide range
+    * of Try values.
+    */
   property("Eru.fromTry preserves Try semantics") {
     forAll(arbitraryTries) { tryValue =>
       val eru = Eru.fromTry(tryValue)
@@ -199,6 +262,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
+  /** Property test validating that Eru.fromTry is equivalent to Eru.effect for pure computations.
+    *
+    * Verifies that fromTry and effect constructors produce identical results for successful
+    * computations without side effects.
+    */
   property("Eru.fromTry is equivalent to Eru.effect for pure computations") {
     forAll(smallInts) { value =>
       val fromTry = Eru.fromTry(Success(value)).attempt.unsafeRunSync()
@@ -207,14 +275,22 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
-  // ===== FROM_OPTION METHOD TESTS =====
-
+  /** Validates that Eru.fromOption converts Some values to Success.
+    *
+    * Tests that Option Some values are properly converted to successful Eru effects with correct
+    * value preservation.
+    */
   test("Eru.fromOption converts Some values to Success") {
     val some = Some(42)
     val eru = Eru.fromOption(some, "not found")
     assertEquals(eru.unsafeRunSync(), 42)
   }
 
+  /** Validates that Eru.fromOption converts None to Failure with provided error.
+    *
+    * Tests that Option None values are properly converted to failed Eru effects using the provided
+    * error value.
+    */
   test("Eru.fromOption converts None to Failure with provided error") {
     val none = None
     val error = "option was empty"
@@ -225,6 +301,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
+  /** Validates that Eru.fromOption evaluates option and error lazily.
+    *
+    * Tests that both option and error parameters are evaluated lazily, with error evaluation only
+    * occurring when needed for None cases.
+    */
   test("Eru.fromOption evaluates option and error lazily") {
     var optionEvaluated = false
     var errorEvaluated = false
@@ -240,15 +321,20 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
       }
     )
 
-    assert(!optionEvaluated, "Option should not be evaluated immediately")
-    assert(!errorEvaluated, "Error should not be evaluated immediately")
+    assert(!optionEvaluated)
+    assert(!errorEvaluated)
 
     val result = eru.unsafeRunSync()
     assertEquals(result, 42)
-    assert(optionEvaluated, "Option should be evaluated when run")
-    assert(!errorEvaluated, "Error should not be evaluated for Some case")
+    assert(optionEvaluated)
+    assert(!errorEvaluated)
   }
 
+  /** Validates that Eru.fromOption evaluates error lazily only for None case.
+    *
+    * Tests that error parameter evaluation is deferred until actually needed when the Option is
+    * None.
+    */
   test("Eru.fromOption evaluates error lazily only for None case") {
     var errorEvaluated = false
 
@@ -264,9 +350,14 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
       eru.unsafeRunSync()
     }
 
-    assert(errorEvaluated, "Error should be evaluated for None case")
+    assert(errorEvaluated)
   }
 
+  /** Property test validating that Eru.fromOption preserves Option semantics.
+    *
+    * Verifies that Option conversion maintains correct Some/None semantics across a wide range of
+    * Option values.
+    */
   property("Eru.fromOption preserves Option semantics") {
     forAll(arbitraryOptions, errorStrings) { (option, error) =>
       val eru = Eru.fromOption(option, error)
@@ -279,6 +370,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
+  /** Property test validating that Eru.fromOption with Some is equivalent to Eru.succeed.
+    *
+    * Verifies that fromOption with Some values produces identical results to direct succeed
+    * construction.
+    */
   property("Eru.fromOption with Some is equivalent to Eru.succeed") {
     forAll(smallInts) { value =>
       val fromOption = Eru.fromOption(Some(value), "error").attempt.unsafeRunSync()
@@ -287,18 +383,29 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
-  // ===== UNIT METHOD TESTS =====
-
+  /** Validates that Eru.unit contains Unit value.
+    *
+    * Tests that the unit effect produces the Unit value when executed.
+    */
   test("Eru.unit contains Unit value") {
     val result = Eru.unit.unsafeRunSync()
     assertEquals(result, ())
   }
 
+  /** Validates that Eru.unit is a successful effect.
+    *
+    * Tests that the unit effect represents a successful computation with Unit result.
+    */
   test("Eru.unit is a successful effect") {
     val result = Eru.unit.attempt.unsafeRunSync()
     assertEquals(result, Result.Success(()))
   }
 
+  /** Validates that Eru.unit can be composed with other effects.
+    *
+    * Tests that the unit effect properly participates in monadic composition without affecting
+    * other computations.
+    */
   test("Eru.unit can be composed with other effects") {
     val composed = for {
       _ <- Eru.unit
@@ -309,12 +416,22 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     assertEquals(composed.unsafeRunSync(), 42)
   }
 
+  /** Validates that Eru.unit is equivalent to Eru.succeed(()).
+    *
+    * Tests that the unit effect produces the same result as explicitly succeeding with the Unit
+    * value.
+    */
   test("Eru.unit is equivalent to Eru.succeed(())") {
     val unit = Eru.unit.attempt.unsafeRunSync()
     val succeed = Eru.succeed(()).attempt.unsafeRunSync()
     assertEquals(unit, succeed)
   }
 
+  /** Property test validating that Eru.unit always succeeds with Unit.
+    *
+    * Verifies that the unit effect consistently produces successful results with the Unit value
+    * across all test executions.
+    */
   property("Eru.unit always succeeds with Unit") {
     forAll(Gen.const(())) { _ =>
       val result = Eru.unit.attempt.unsafeRunSync()
@@ -322,8 +439,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     }
   }
 
-  // ===== INTEGRATION TESTS =====
-
+  /** Validates that all companion methods compose correctly in for-comprehension.
+    *
+    * Tests that fromEither, fromTry, fromOption, blocking, and unit can all be composed together in
+    * monadic chains successfully.
+    */
   test("All companion methods compose correctly in for-comprehension") {
     val either: Either[String, Int] = Right(10)
     val tryValue = Success(5)
@@ -340,6 +460,11 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     assertEquals(composed.unsafeRunSync(), 18)
   }
 
+  /** Validates that all companion methods handle errors correctly in composition.
+    *
+    * Tests that error propagation works correctly when companion methods are composed together and
+    * one produces a failure.
+    */
   test("All companion methods handle errors correctly in composition") {
     val either: Either[String, Int] = Left("either error")
     val tryValue = Success(5)

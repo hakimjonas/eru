@@ -52,8 +52,11 @@ lazy val root = (project in file("."))
     eruRuntimeJVM,
     eruRuntimeNative,
     eruBenchJVM,
-    eruIntegrationTest
+    eruBenchMatrix,
+    eruIntegrationTest,
+    docs
   )
+  .settings(commonSettings)
   .settings(
     name := "eru-root",
     publish / skip := true,
@@ -107,29 +110,39 @@ lazy val root = (project in file("."))
     }
   )
   .settings(
-    // Performance benchmarking commands
-    addCommandAlias("bench", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 .*"),
-    addCommandAlias("benchBaseline", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 .*BaselineBench.*"),
-    addCommandAlias("benchValidation", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 .*ValidationBench.*"),
-    addCommandAlias(
-      "benchCore",
-      "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 .*EruMapFlatMapBench.* .*EruRuntimeBench.*"
-    ),
-    addCommandAlias("benchWithGC", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 -prof gc"),
-    addCommandAlias("benchWithStack", "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 -prof stack"),
-    addCommandAlias(
-      "benchWithPerfasm",
-      "eruBenchJVM/Jmh/run -i 10 -wi 5 -f1 -t1 -prof perfasm .*BaselineBench.*"
-    ),
-    addCommandAlias("benchValidationSuite", "benchBaseline; benchValidation; benchCore"),
+    // Fair benchmark system commands (use ./run-fair-benchmarks.sh for full system)
+    addCommandAlias("benchCore", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*CoreOperationsBench.*"),
+    addCommandAlias("benchState", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*StateManagementBench.*"),
+    addCommandAlias("benchConcurrency", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*ConcurrencyBench.*"),
+    addCommandAlias("benchWithGC", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 -prof gc"),
+
+    // Matrix benchmark system commands
+    addCommandAlias("benchMatrix", "eruBenchMatrix/Jmh/run"),
+    addCommandAlias("benchConcurrencyMatrix", "eruBenchMatrix/Jmh/run .*ConcurrencyScalingBench.*"),
+    addCommandAlias("benchDepthMatrix", "eruBenchMatrix/Jmh/run .*DepthScalingBench.*"),
+    addCommandAlias("benchDataMatrix", "eruBenchMatrix/Jmh/run .*DataSizeScalingBench.*"),
+    addCommandAlias("benchMatrixWithGC", "eruBenchMatrix/Jmh/run -prof gc"),
 
     // Build and format commands
-    addCommandAlias("prepare", "scalafixAll; scalafmtAll; scalafmtSbt; Test/compile"),
+    addCommandAlias("prepare", "scalafmtAll; scalafmtSbt; scalafixAll; Test/compile"),
     addCommandAlias(
       "check",
       "scalafixAll --check; scalafmtCheckAll; scalafmtSbtCheck"
     ),
-    addCommandAlias("testAll", "test; eruIntegrationTest/test")
+
+    // Core test commands
+    addCommandAlias("testNative", "eruCoreNative/test; eruRuntimeNative/test"),
+    addCommandAlias("testIntegration", "eruIntegrationTest/test"),
+
+    // JVM test command
+    addCommandAlias("testJVM", "eruCoreJVM/test; eruRuntimeJVM/test"),
+
+    // Isolated test runner (prevents resource contention)
+    // Use ./run-all-tests.sh instead of sbt testAll for reliable test execution
+
+    // Documentation commands
+    addCommandAlias("docs", "docs/mdoc"),
+    addCommandAlias("docsWatch", "docs/mdoc --watch")
   )
 
 // Custom clean task
@@ -164,7 +177,9 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
       c.withLTO(LTO.full)
         .withMode(Mode.releaseFast)
         .withGC(GC.immix)
-    }
+    },
+    // Make native compilation more visible
+    logLevel := Level.Info
   )
 
 lazy val eruCoreJVM = eruCore.jvm
@@ -198,7 +213,9 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
       c.withLTO(LTO.full)
         .withMode(Mode.releaseFast)
         .withGC(GC.immix)
-    }
+    },
+    // Make native compilation more visible
+    logLevel := Level.Info
   )
   .dependsOn(eruCore)
 
@@ -214,10 +231,30 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
     name := "eru-bench-jvm",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % "2.1.20",
+      "dev.zio" %% "zio" % "2.1.21",
       "org.typelevel" %% "cats-effect" % "3.6.3"
     ),
     // JMH settings
+    Jmh / sourceDirectory := (Compile / sourceDirectory).value,
+    Jmh / classDirectory := (Compile / classDirectory).value,
+    Jmh / dependencyClasspath := (Compile / dependencyClasspath).value,
+    Jmh / compile := (Jmh / compile).dependsOn(Compile / compile).value,
+    Jmh / run := (Jmh / run).dependsOn(Jmh / compile).evaluated
+  )
+
+// ===== Matrix Benchmarks (JVM only) =====
+lazy val eruBenchMatrix = (project in file("eru-bench-matrix"))
+  .enablePlugins(JmhPlugin)
+  .dependsOn(eruCoreJVM, eruRuntimeJVM)
+  .settings(commonSettings)
+  .settings(
+    name := "eru-bench-matrix",
+    publish / skip := true,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio" % "2.1.21",
+      "org.typelevel" %% "cats-effect" % "3.6.3"
+    ),
+    // JMH settings for matrix benchmarks
     Jmh / sourceDirectory := (Compile / sourceDirectory).value,
     Jmh / classDirectory := (Compile / classDirectory).value,
     Jmh / dependencyClasspath := (Compile / dependencyClasspath).value,
@@ -239,6 +276,22 @@ lazy val eruIntegrationTest = (project in file("eru-integration-test"))
       "org.scalameta" %% "munit" % "1.1.1" % Test
     ),
     Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
+  )
+
+// ===== Documentation Validation (mdoc) =====
+lazy val docs = project
+  .in(file("eru-docs"))
+  .enablePlugins(MdocPlugin)
+  .dependsOn(eruCoreJVM, eruRuntimeJVM)
+  .settings(
+    name := "eru-docs",
+    publish / skip := true,
+    mdocIn := file("docs-src"),
+    mdocOut := file("target/mdoc"),
+    mdocVariables := Map(
+      "VERSION" -> version.value,
+      "SCALA_VERSION" -> scalaVersion.value
+    )
   )
 
 // ===== Global Settings =====
