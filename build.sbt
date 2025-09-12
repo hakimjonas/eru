@@ -142,6 +142,10 @@ lazy val root = (project in file("."))
     
     // Alternative: compile everything upfront, then run all tests
     addCommandAlias("testAllOptimized", "Test/compile; testNative; testJVM; testIntegration"),
+    
+    // Verbose versions that show all compilation phases explicitly
+    addCommandAlias("testAllVerbose", "eruCoreNative/Compile/compile; eruRuntimeNative/Compile/compile; eruCoreNative/Test/compile; eruRuntimeNative/Test/compile; testNative; testJVM; testIntegration"),
+    addCommandAlias("testAllOptimizedVerbose", "Compile/compile; Test/compile; testNative; testJVM; testIntegration"),
 
     // Documentation commands
     addCommandAlias("docs", "docs/mdoc"),
@@ -180,7 +184,9 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
       c.withLTO(LTO.full)
         .withMode(Mode.releaseFast)
         .withGC(GC.immix)
-    }
+    },
+    // Make native compilation more visible
+    logLevel := Level.Info
   )
 
 lazy val eruCoreJVM = eruCore.jvm
@@ -214,7 +220,9 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
       c.withLTO(LTO.full)
         .withMode(Mode.releaseFast)
         .withGC(GC.immix)
-    }
+    },
+    // Make native compilation more visible
+    logLevel := Level.Info
   )
   .dependsOn(eruCore)
 
