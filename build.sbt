@@ -136,7 +136,12 @@ lazy val root = (project in file("."))
     addCommandAlias("testIntegration", "eruIntegrationTest/test"),
     addCommandAlias("testQuick", "eruCoreJVM/test; eruRuntimeJVM/testOnly * -- --exclude-tags=slow"),
     addCommandAlias("testSlow", "eruRuntimeJVM/testOnly * -- --include-tags=slow"),
-    addCommandAlias("testAll", "testJVM; testNative; testIntegration"),
+    
+    // Optimized test command: compile all native code first, then test native, then JVM  
+    addCommandAlias("testAll", "eruCoreNative/Test/compile; eruRuntimeNative/Test/compile; testNative; testJVM; testIntegration"),
+    
+    // Alternative: compile everything upfront, then run all tests
+    addCommandAlias("testAllOptimized", "Test/compile; testNative; testJVM; testIntegration"),
 
     // Documentation commands
     addCommandAlias("docs", "docs/mdoc"),
