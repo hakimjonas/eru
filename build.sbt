@@ -3,6 +3,7 @@ import xerial.sbt.Sonatype.{sonatypeCentralHost, sonatypeSettings}
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 import scalanativecrossproject.ScalaNativeCrossPlugin.autoImport.*
 import scala.scalanative.build.*
+import scala.sys.process.Process
 
 // ===== Build-wide Settings =====
 ThisBuild / organization := "net.ghoula"
@@ -54,7 +55,8 @@ lazy val root = (project in file("."))
     eruBenchJVM,
     eruBenchMatrix,
     eruIntegrationTest,
-    docs
+    docs,
+    site
   )
   .settings(commonSettings)
   .settings(
@@ -142,7 +144,10 @@ lazy val root = (project in file("."))
 
     // Documentation commands
     addCommandAlias("docs", "docs/mdoc"),
-    addCommandAlias("docsWatch", "docs/mdoc --watch")
+    addCommandAlias("docsWatch", "docs/mdoc --watch"),
+    addCommandAlias("docsSite", "site/makeSite"),
+    addCommandAlias("docsPublish", "site/ghpagesPushSite"),
+    addCommandAlias("docsApi", "site/unidoc")
   )
 
 // Custom clean task
@@ -291,6 +296,61 @@ lazy val docs = project
     mdocVariables := Map(
       "VERSION" -> version.value,
       "SCALA_VERSION" -> scalaVersion.value
+    )
+  )
+
+// ===== Site Generation & GitHub Pages =====
+lazy val site = project
+  .in(file("eru-site"))
+  .enablePlugins(SiteScaladocPlugin, GhpagesPlugin, ScalaUnidocPlugin)
+  .dependsOn(eruCoreJVM, eruRuntimeJVM)
+  .settings(
+    name := "eru-site",
+    publish / skip := true,
+    
+    // Unidoc settings for cross-platform ScalaDoc
+    ScalaUnidoc / unidoc / unidocProjectFilter := inProjects(eruCoreJVM, eruRuntimeJVM),
+    ScalaUnidoc / unidoc / scalacOptions ++= Seq(
+      "-groups",
+      "-doc-title", "Eru",
+      "-doc-version", version.value,
+      "-sourcepath", (ThisBuild / baseDirectory).value.getAbsolutePath,
+      "-doc-source-url", s"https://github.com/hakimjonas/eru/tree/v${version.value}€{FILE_PATH}.scala"
+    ),
+    
+    // Site structure
+    SiteScaladoc / siteSubdirName := s"api/${version.value}",
+    addMappingsToSiteDir(ScalaUnidoc / packageDoc / mappings, SiteScaladoc / siteSubdirName),
+    
+    // GitHub Pages settings
+    git.remoteRepo := "git@github.com:hakimjonas/eru.git",
+    ghpagesNoJekyll := true,
+    ghpagesBranch := "gh-pages",
+    
+    // Custom domain
+    ghpagesRepository := file("/tmp/gh-pages-eru"),
+    ghpagesPushSite := {
+      val repo = ghpagesRepository.value
+      val log = streams.value.log
+      
+      // Ensure repo exists
+      if (!repo.exists) {
+        log.info(s"Cloning gh-pages to ${repo}")
+        Process(Seq("git", "clone", "-b", "gh-pages", git.remoteRepo.value, repo.getAbsolutePath)).!
+      }
+      
+      // Create CNAME file for custom domain
+      val cnameFile = repo / "CNAME"
+      IO.write(cnameFile, "eru.ghoula.net")
+      
+      // Run default push
+      ghpagesPushSite.value
+    },
+    
+    // Site mappings for versioned docs
+    makeSite / mappings ++= Seq(
+      file("docs-src/MANIFESTO_DRAFT_V3.md") -> "vision.md",
+      file("README.md") -> "index.md"
     )
   )
 

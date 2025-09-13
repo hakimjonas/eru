@@ -71,7 +71,15 @@ sbt cleanAll          # Clean all target directories
 ```bash
 sbt docs              # Validate documentation examples with mdoc
 sbt docsWatch         # Watch and validate documentation examples
+sbt docsApi           # Generate cross-platform ScalaDoc API documentation
+sbt docsSite          # Generate complete site with versioned docs
+sbt docsPublish       # Publish to GitHub Pages at eru.ghoula.net
 ```
+
+**Local Preview:**
+- ScalaDoc API: `eru-site/target/scala-3.7.2/unidoc/index.html`
+- Complete site: `eru-site/target/site/index.md` (with `api/` subfolder)
+- mdoc output: `target/mdoc/` (validated markdown)
 
 ## Architecture
 
@@ -129,3 +137,30 @@ The repository includes optimized JVM settings in `.jvmopts` to prevent GC thras
 - Heap: 2GB initial, 8GB max
 - G1 Garbage Collector for low-latency performance
 - Optimized for high-throughput testing and benchmarking
+
+## CI/CD and Release Process
+
+### GitHub Actions Workflow
+The CI builds documentation and tests on every PR and push:
+- **Build step**: Runs tests, checks formatting, builds documentation site
+- **Release step**: Publishes to Sonatype and eru.ghoula.net (tags only)
+- **Snapshot step**: Publishes SNAPSHOT versions (main branch only)
+
+### Required GitHub Secrets
+For publishing to work, these secrets must be configured in repository settings:
+
+**GPG Signing:**
+- `PGP_SECRET`: GPG private key (base64 encoded)
+- `PGP_PASSPHRASE`: GPG key passphrase
+
+**Sonatype Publishing:**
+- `SONATYPE_USERNAME`: Sonatype Central username/token
+- `SONATYPE_PASSWORD`: Sonatype Central password/token
+
+**Documentation Publishing:**
+- `GH_PAGES_DEPLOY_KEY`: SSH private key for gh-pages deployment
+
+### Release Process
+1. Create and push a version tag: `git tag v1.0.0 && git push origin v1.0.0`
+2. CI automatically publishes to Sonatype Central and eru.ghoula.net
+3. Versioned documentation is available at `eru.ghoula.net/v1.0.0/` and `eru.ghoula.net/latest/`
