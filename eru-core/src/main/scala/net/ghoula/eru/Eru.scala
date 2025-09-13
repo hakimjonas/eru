@@ -117,6 +117,9 @@ enum Eru[+E, +A] {
   /** Chains another computation to be run after this one completes. This is the Monad `flatMap` (or
     * `bind`) operation.
     *
+    * ⚠️ **Stack Safety**: Eru provides stack-safe `flatMap` chains, but avoid Scala recursion when
+    * building these chains. Use iterative construction patterns instead.
+    *
     * @param f
     *   the function to apply to the success value, returning the next `Eru`.
     * @return
@@ -387,6 +390,20 @@ object Eru {
     Suspend(register)
 
   /** Creates an `Eru[Nothing, A]` that succeeds with the given pure value.
+    *
+    * ⚠️ **Stack Safety Note**: When building chains of computations, avoid recursive patterns. Use
+    * iterative builders instead:
+    *
+    * ```scala
+    * // ✅ Stack-safe approach:
+    * Eru.iterate(0)(current => Eru.succeed(current + 1))(_ >= n)
+    *
+    * // ❌ Problematic approach:
+    * def recursive(n: Int): Eru[Nothing, Int] =
+    *   if (n <= 0) Eru.succeed(0)
+    *   else Eru.succeed(n).flatMap(_ => recursive(n - 1))
+    * ```
+    *
     * @param value
     *   the value to wrap in a successful `Eru`.
     * @return
@@ -867,6 +884,106 @@ object Eru {
           }
       }
     loop(as.toList, Nil, Nil)
+  }
+
+  /** Repeats an effect exactly N times, starting from an initial value. This is a more constrained
+    * version of `iterate` that's useful when you know the exact number of iterations needed.
+    *
+    * @param start
+    *   the initial value
+    * @param n
+    *   the number of iterations (must be >= 0)
+    * @param step
+    *   the function to apply at each step
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the value type
+    * @return
+    *   an effect that yields the result after exactly n iterations
+    */
+  def iterateN[E, A](start: A, n: Int)(step: A => Eru[E, A]): Eru[String | E, A] = {
+    if (n < 0) {
+      fail(s"iterateN requires n >= 0, got: $n")
+    } else if (n == 0) {
+      succeed(start)
+    } else {
+      def loop(current: A, remaining: Int): Eru[E, A] =
+        if (remaining == 0) succeed(current)
+        else step(current).flatMap(next => loop(next, remaining - 1))
+      loop(start, n)
+    }
+  }
+
+  /** Builds a list by repeatedly applying a function until it returns None. This is similar to
+    * `List.unfold` but works with effects.
+    *
+    * @param seed
+    *   the initial value
+    * @param f
+    *   function that returns Some(element, nextSeed) to continue or None to stop
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the seed type
+    * @tparam B
+    *   the element type
+    * @return
+    *   an effect that yields the accumulated list
+    */
+  def unfold[E, A, B](seed: A)(f: A => Eru[E, Option[(B, A)]]): Eru[E, List[B]] = {
+    def loop(current: A, acc: List[B]): Eru[E, List[B]] =
+      f(current).flatMap {
+        case None => succeed(acc.reverse)
+        case Some((element, nextSeed)) => loop(nextSeed, element :: acc)
+      }
+    loop(seed, Nil)
+  }
+
+  /** Sequences a list of effects into a single effect that produces a list of results. All effects
+    * are executed sequentially in order.
+    *
+    * @param effects
+    *   the list of effects to sequence
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the result type
+    * @return
+    *   an effect that yields a list of all results
+    */
+  def sequence[E, A](effects: List[Eru[E, A]]): Eru[E, List[A]] = {
+    def loop(remaining: List[Eru[E, A]], acc: List[A]): Eru[E, List[A]] =
+      remaining match {
+        case Nil => succeed(acc.reverse)
+        case head :: tail => head.flatMap(result => loop(tail, result :: acc))
+      }
+    loop(effects, Nil)
+  }
+
+  /** Maps each element through an effectful function and sequences the results. This is equivalent
+    * to `sequence(inputs.map(f))` but more efficient.
+    *
+    * @param inputs
+    *   the list of inputs to process
+    * @param f
+    *   the effectful function to apply to each input
+    * @tparam A
+    *   the input type
+    * @tparam E
+    *   the error type
+    * @tparam B
+    *   the output type
+    * @return
+    *   an effect that yields a list of all results
+    */
+  def traverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]] = {
+    def loop(remaining: List[A], acc: List[B]): Eru[E, List[B]] =
+      remaining match {
+        case Nil => succeed(acc.reverse)
+        case head :: tail => f(head).flatMap(result => loop(tail, result :: acc))
+      }
+    loop(inputs, Nil)
   }
 
   /** A successful `Eru` containing `Unit`. */

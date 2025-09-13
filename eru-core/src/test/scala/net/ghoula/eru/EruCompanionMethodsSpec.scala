@@ -482,4 +482,269 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
       composed.unsafeRunSync()
     }
   }
+
+  // =======================================================================
+  // Tests for new iterative construction methods
+  // =======================================================================
+
+  /** Tests for Eru.iterateN method. */
+
+  test("Eru.iterateN with n=0 returns start value immediately") {
+    val result = Eru.iterateN(42, 0)(_ => Eru.succeed(99)).unsafeRunSync()
+    assertEquals(result, 42)
+  }
+
+  test("Eru.iterateN with n=1 executes step once") {
+    val result = Eru.iterateN(10, 1)(x => Eru.succeed(x * 2)).unsafeRunSync()
+    assertEquals(result, 20)
+  }
+
+  test("Eru.iterateN with negative n fails with descriptive error") {
+    val result = Eru.iterateN(0, -1)(_ => Eru.succeed(1)).attempt.unsafeRunSync()
+    result match {
+      case Result.Failure(error: String) =>
+        assert(error.contains("iterateN requires n >= 0"))
+        assert(error.contains("-1"))
+      case _ => fail(s"Expected String error, got $result")
+    }
+  }
+
+  test("Eru.iterateN executes exactly n iterations") {
+    // Pure test: verify the final result shows exactly n iterations occurred
+    val result = Eru.iterateN(0, 5)(current => Eru.succeed(current + 1)).unsafeRunSync()
+    assertEquals(result, 5)
+
+    // Also test with a computation that tracks progress via the value itself
+    val resultWithSum = Eru
+      .iterateN((0, 0), 5) { case (current, sum) =>
+        Eru.succeed((current + 1, sum + current + 1))
+      }
+      .unsafeRunSync()
+    assertEquals(resultWithSum._1, 5) // 5 iterations
+    assertEquals(resultWithSum._2, 15) // Sum: 1+2+3+4+5 = 15
+  }
+
+  test("Eru.iterateN handles large iteration counts without stack overflow") {
+    val result = Eru.iterateN(0, 10000)(current => Eru.succeed(current + 1)).unsafeRunSync()
+    assertEquals(result, 10000)
+  }
+
+  test("Eru.iterateN propagates step function errors") {
+    val result = Eru
+      .iterateN(0, 3) { current =>
+        if (current == 2) Eru.fail("step error") else Eru.succeed(current + 1)
+      }
+      .attempt
+      .unsafeRunSync()
+
+    result match {
+      case Result.Failure(error: String) => assertEquals(error, "step error")
+      case _ => fail(s"Expected error, got $result")
+    }
+  }
+
+  property("Eru.iterateN with n iterations produces correct final value") {
+    forAll(smallInts, Gen.choose(0, 100)) { (start, n) =>
+      val result = Eru.iterateN(start, n)(x => Eru.succeed(x + 1)).unsafeRunSync()
+      assertEquals(result, start + n)
+    }
+  }
+
+  /** Tests for Eru.unfold method. */
+
+  test("Eru.unfold generates empty list when starting with None") {
+    val result = Eru.unfold(())(_ => Eru.succeed(None)).unsafeRunSync()
+    assertEquals(result, List.empty[Nothing])
+  }
+
+  test("Eru.unfold generates single element list") {
+    val result = Eru
+      .unfold(1) { x =>
+        if (x == 1) Eru.succeed(Some((x, 2)))
+        else Eru.succeed(None)
+      }
+      .unsafeRunSync()
+    assertEquals(result, List(1))
+  }
+
+  test("Eru.unfold generates Fibonacci sequence") {
+    val result = Eru
+      .unfold((0, 1)) { case (a, b) =>
+        if (a > 20) Eru.succeed(None)
+        else Eru.succeed(Some((a, (b, a + b))))
+      }
+      .unsafeRunSync()
+
+    assertEquals(result, List(0, 1, 1, 2, 3, 5, 8, 13))
+  }
+
+  test("Eru.unfold propagates errors from generator function") {
+    val result = Eru
+      .unfold(0) { x =>
+        if (x == 0) Eru.fail("generator error")
+        else Eru.succeed(Some((x, x + 1)))
+      }
+      .attempt
+      .unsafeRunSync()
+
+    result match {
+      case Result.Failure(error: String) => assertEquals(error, "generator error")
+      case _ => fail(s"Expected error, got $result")
+    }
+  }
+
+  test("Eru.unfold handles large sequences without stack overflow") {
+    val result = Eru
+      .unfold(0) { x =>
+        if (x >= 1000) Eru.succeed(None)
+        else Eru.succeed(Some((x, x + 1)))
+      }
+      .unsafeRunSync()
+
+    assertEquals(result.length, 1000)
+    assertEquals(result.take(5), List(0, 1, 2, 3, 4))
+    assertEquals(result.takeRight(5), List(995, 996, 997, 998, 999))
+  }
+
+  property("Eru.unfold respects termination condition") {
+    forAll(Gen.choose(0, 50)) { limit =>
+      val result = Eru
+        .unfold(0) { x =>
+          if (x >= limit) Eru.succeed(None)
+          else Eru.succeed(Some((x, x + 1)))
+        }
+        .unsafeRunSync()
+
+      assertEquals(result.length, limit)
+      if (limit > 0) {
+        assertEquals(result.head, 0)
+        assertEquals(result.last, limit - 1)
+      }
+    }
+  }
+
+  /** Tests for Eru.sequence method. */
+
+  test("Eru.sequence with empty list returns empty list") {
+    val result = Eru.sequence(List.empty[Eru[String, Int]]).unsafeRunSync()
+    assertEquals(result, List.empty[Int])
+  }
+
+  test("Eru.sequence with single success returns single element list") {
+    val result = Eru.sequence(List(Eru.succeed(42))).unsafeRunSync()
+    assertEquals(result, List(42))
+  }
+
+  test("Eru.sequence with multiple successes returns all results") {
+    val effects = List(Eru.succeed(1), Eru.succeed(2), Eru.succeed(3))
+    val result = Eru.sequence(effects).unsafeRunSync()
+    assertEquals(result, List(1, 2, 3))
+  }
+
+  test("Eru.sequence fails fast on first error") {
+    val effects = List(
+      Eru.succeed(1),
+      Eru.fail("second fails"),
+      Eru.succeed(3)
+    )
+    val result = Eru.sequence(effects).attempt.unsafeRunSync()
+
+    result match {
+      case Result.Failure(error: String) => assertEquals(error, "second fails")
+      case _ => fail(s"Expected error, got $result")
+    }
+  }
+
+  test("Eru.sequence handles large lists without stack overflow") {
+    val effects = (1 to 1000).map(Eru.succeed(_)).toList
+    val result = Eru.sequence(effects).unsafeRunSync()
+    assertEquals(result.length, 1000)
+    assertEquals(result.take(5), List(1, 2, 3, 4, 5))
+    assertEquals(result.takeRight(5), List(996, 997, 998, 999, 1000))
+  }
+
+  property("Eru.sequence preserves order") {
+    forAll(Gen.listOf(smallInts)) { numbers =>
+      val effects = numbers.map(Eru.succeed(_))
+      val result = Eru.sequence(effects).unsafeRunSync()
+      assertEquals(result, numbers)
+    }
+  }
+
+  /** Tests for Eru.traverse method. */
+
+  test("Eru.traverse with empty list returns empty list") {
+    val result = Eru.traverse(List.empty[Int])(x => Eru.succeed(x * 2)).unsafeRunSync()
+    assertEquals(result, List.empty[Int])
+  }
+
+  test("Eru.traverse transforms and sequences correctly") {
+    val result = Eru.traverse(List(1, 2, 3))(x => Eru.succeed(x * 2)).unsafeRunSync()
+    assertEquals(result, List(2, 4, 6))
+  }
+
+  test("Eru.traverse fails fast on first transformation error") {
+    val result = Eru
+      .traverse(List(1, 2, 3)) { x =>
+        if (x == 2) Eru.fail("transformation error") else Eru.succeed(x * 2)
+      }
+      .attempt
+      .unsafeRunSync()
+
+    result match {
+      case Result.Failure(error: String) => assertEquals(error, "transformation error")
+      case _ => fail(s"Expected error, got $result")
+    }
+  }
+
+  test("Eru.traverse handles large lists without stack overflow") {
+    val input = (1 to 1000).toList
+    val result = Eru.traverse(input)(x => Eru.succeed(x * 2)).unsafeRunSync()
+    assertEquals(result.length, 1000)
+    assertEquals(result.take(5), List(2, 4, 6, 8, 10))
+    assertEquals(result.takeRight(5), List(1992, 1994, 1996, 1998, 2000))
+  }
+
+  test("Eru.traverse is equivalent to sequence(map(f))") {
+    val input = List(1, 2, 3, 4, 5)
+    val f = (x: Int) => Eru.succeed(x * x)
+
+    val traverseResult = Eru.traverse(input)(f).unsafeRunSync()
+    val sequenceMapResult = Eru.sequence(input.map(f)).unsafeRunSync()
+
+    assertEquals(traverseResult, sequenceMapResult)
+  }
+
+  property("Eru.traverse preserves input-output correspondence") {
+    forAll(Gen.listOf(smallInts)) { numbers =>
+      val result = Eru.traverse(numbers)(x => Eru.succeed(x.toString)).unsafeRunSync()
+      assertEquals(result, numbers.map(_.toString))
+    }
+  }
+
+  /** Stack safety regression test for all new iterative methods. */
+  test("Stack safety regression test for all iterative methods") {
+    val largeN = 10000
+
+    // Test iterateN
+    val iterateNResult = Eru.iterateN(0, largeN)(x => Eru.succeed(x + 1)).unsafeRunSync()
+    assertEquals(iterateNResult, largeN)
+
+    // Test unfold
+    val unfoldResult = Eru
+      .unfold(0) { x =>
+        if (x >= largeN) Eru.succeed(None) else Eru.succeed(Some((x, x + 1)))
+      }
+      .unsafeRunSync()
+    assertEquals(unfoldResult.length, largeN)
+
+    // Test sequence
+    val effects = (1 to largeN).map(Eru.succeed(_)).toList
+    val sequenceResult = Eru.sequence(effects).unsafeRunSync()
+    assertEquals(sequenceResult.length, largeN)
+
+    // Test traverse
+    val traverseResult = Eru.traverse((1 to largeN).toList)(x => Eru.succeed(x)).unsafeRunSync()
+    assertEquals(traverseResult.length, largeN)
+  }
 }

@@ -199,6 +199,27 @@ println(s"Deep result: $deep")
 
 **Key insight**: Eru's `flatMap` chains are stack-safe, but Scala function recursion is not. The iterative approach above builds an Eru data structure with many `flatMap` operations, which Eru's runtime can execute using trampolining. A naive recursive implementation would overflow the Scala call stack before Eru could provide its stack safety guarantees.
 
+**⚠️ Common Pitfall - Avoid Recursive Construction**:
+
+```scala
+// ❌ DON'T DO THIS - Scala recursion will overflow:
+def badChain(n: Int): Eru[Nothing, Int] =
+  if (n <= 0) Eru.succeed(0)
+  else Eru.succeed(n).flatMap(_ => badChain(n - 1))
+
+// ✅ DO THIS - Use iterative builders:
+def goodChain(n: Int): Eru[Nothing, Int] =
+  Eru.iterate(0)(current => Eru.succeed(current + 1))(_ >= n)
+
+// ✅ OR THIS - Build iteratively with foldLeft:
+def alsoGoodChain(n: Int): Eru[Nothing, Int] =
+  (1 to n).foldLeft(Eru.succeed(0)) { (acc, _) =>
+    acc.flatMap(current => Eru.succeed(current + 1))
+  }
+```
+
+The key difference: recursive functions create deep call stacks in **Scala itself**, while iterative approaches create deep `flatMap` chains in **Eru's data structure**, which the runtime handles safely.
+
 ## Mental Models
 
 Here are three mental models that will help you work effectively with Eru:

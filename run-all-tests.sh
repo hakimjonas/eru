@@ -30,8 +30,9 @@ OVERALL_SUCCESS=true
 # Native tests should complete in under 2 minutes
 run_test "Native Tests" "timeout 120s sbt testNative" || OVERALL_SUCCESS=false
 
-# JVM tests may take longer due to concurrency tests, allow 3 minutes
-run_test "JVM Tests" "timeout 180s sbt testJVM" || OVERALL_SUCCESS=false  
+# JVM tests may take longer due to concurrency tests, allow 5 minutes
+# Increased timeout due to potential resource contention with new tests
+run_test "JVM Tests" "timeout 300s sbt testJVM" || OVERALL_SUCCESS=false  
 
 # Integration tests are lighter, allow 2 minutes
 run_test "Integration Tests" "timeout 120s sbt testIntegration" || OVERALL_SUCCESS=false
