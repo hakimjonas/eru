@@ -292,11 +292,30 @@ lazy val docs = project
     name := "eru-docs",
     publish / skip := true,
     mdocIn := file("docs-src"),
-    mdocOut := file("target/mdoc"),
+    mdocOut := (ThisBuild / baseDirectory).value / "eru-docs" / "target" / "mdoc",
     mdocVariables := Map(
       "VERSION" -> version.value,
       "SCALA_VERSION" -> scalaVersion.value
-    )
+    ),
+    mdoc := {
+      val result = mdoc.evaluated
+      val baseDir = (ThisBuild / baseDirectory).value
+      val mdocOutputDir = mdocOut.value
+
+      // Files that should be copied to root
+      val rootFiles = Seq("README.md", "CONTRIBUTING.md")
+
+      rootFiles.foreach { fileName =>
+        val source = mdocOutputDir / fileName
+        val target = baseDir / fileName
+        if (source.exists()) {
+          IO.copyFile(source, target)
+          streams.value.log.info(s"Copied $fileName to project root")
+        }
+      }
+
+      result
+    }
   )
 
 // ===== Site Generation & GitHub Pages =====
