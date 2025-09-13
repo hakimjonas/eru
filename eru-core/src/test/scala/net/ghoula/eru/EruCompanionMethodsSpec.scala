@@ -388,7 +388,7 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     * Tests that the unit effect produces the Unit value when executed.
     */
   test("Eru.unit contains Unit value") {
-    val result = Eru.unit.unsafeRunSync()
+    val result: Unit = Eru.unit.unsafeRunSync()
     assertEquals(result, ())
   }
 
@@ -656,7 +656,7 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
   }
 
   test("Eru.sequence handles large lists without stack overflow") {
-    val effects = (1 to 1000).map(Eru.succeed(_)).toList
+    val effects = (1 to 1000).map(Eru.succeed).toList
     val result = Eru.sequence(effects).unsafeRunSync()
     assertEquals(result.length, 1000)
     assertEquals(result.take(5), List(1, 2, 3, 4, 5))
@@ -665,7 +665,7 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
 
   property("Eru.sequence preserves order") {
     forAll(Gen.listOf(smallInts)) { numbers =>
-      val effects = numbers.map(Eru.succeed(_))
+      val effects = numbers.map(Eru.succeed)
       val result = Eru.sequence(effects).unsafeRunSync()
       assertEquals(result, numbers)
     }
@@ -739,7 +739,7 @@ class EruCompanionMethodsSpec extends ScalaCheckSuite {
     assertEquals(unfoldResult.length, largeN)
 
     // Test sequence
-    val effects = (1 to largeN).map(Eru.succeed(_)).toList
+    val effects = (1 to largeN).map(Eru.succeed).toList
     val sequenceResult = Eru.sequence(effects).unsafeRunSync()
     assertEquals(sequenceResult.length, largeN)
 
