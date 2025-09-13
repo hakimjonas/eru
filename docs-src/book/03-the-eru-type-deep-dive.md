@@ -46,10 +46,10 @@ The `Eru[E, A]` type represents a **program description** that:
                ┌──────────────▼──────────────┐
                │                             │
                ▼                             ▼
-        ╭─────────────╮               ╭─────────────╮
-        │ Failure [E] │               │ Success [A] │
-        │ Error Channel│               │Value Channel│
-        ╰─────────────╯               ╰─────────────╯
+        ╭───────────────╮               ╭──────────────╮
+        │ Failure [E]   │               │ Success [A]  │
+        │ Error Channel │               │Value Channel │
+        ╰───────────────╯               ╰──────────────╯
 ```
 
 This visual shows that an `Eru` program is a description with two potential outcomes: it can follow the **error channel** (type `E`) or the **success channel** (type `A`).
