@@ -35,8 +35,14 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all tests on JVM
-        run: sbt eruCoreJVM/test eruRuntimeJVM/test eruIntegrationTest/test
+      - name: Run all tests on JVM (isolated)
+        run: |
+          echo "🧪 Running JVM Core Tests..."
+          timeout 180s sbt "eruCoreJVM/test"
+          echo "🧪 Running JVM Runtime Tests..."
+          timeout 180s sbt "eruRuntimeJVM/test"
+          echo "🧪 Running Integration Tests..."
+          timeout 120s sbt "eruIntegrationTest/test"
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
