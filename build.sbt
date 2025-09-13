@@ -307,46 +307,50 @@ lazy val site = project
   .settings(
     name := "eru-site",
     publish / skip := true,
-    
+
     // Unidoc settings for cross-platform ScalaDoc
     ScalaUnidoc / unidoc / unidocProjectFilter := inProjects(eruCoreJVM, eruRuntimeJVM),
     ScalaUnidoc / unidoc / scalacOptions ++= Seq(
       "-groups",
-      "-doc-title", "Eru",
-      "-doc-version", version.value,
-      "-sourcepath", (ThisBuild / baseDirectory).value.getAbsolutePath,
-      "-doc-source-url", s"https://github.com/hakimjonas/eru/tree/v${version.value}€{FILE_PATH}.scala"
+      "-doc-title",
+      "Eru",
+      "-doc-version",
+      version.value,
+      "-sourcepath",
+      (ThisBuild / baseDirectory).value.getAbsolutePath,
+      "-doc-source-url",
+      s"https://github.com/hakimjonas/eru/tree/v${version.value}€{FILE_PATH}.scala"
     ),
-    
+
     // Site structure
     SiteScaladoc / siteSubdirName := s"api/${version.value}",
     addMappingsToSiteDir(ScalaUnidoc / packageDoc / mappings, SiteScaladoc / siteSubdirName),
-    
+
     // GitHub Pages settings
     git.remoteRepo := "git@github.com:hakimjonas/eru.git",
     ghpagesNoJekyll := true,
     ghpagesBranch := "gh-pages",
-    
+
     // Custom domain
     ghpagesRepository := file("/tmp/gh-pages-eru"),
     ghpagesPushSite := {
       val repo = ghpagesRepository.value
       val log = streams.value.log
-      
+
       // Ensure repo exists
       if (!repo.exists) {
         log.info(s"Cloning gh-pages to ${repo}")
         Process(Seq("git", "clone", "-b", "gh-pages", git.remoteRepo.value, repo.getAbsolutePath)).!
       }
-      
+
       // Create CNAME file for custom domain
       val cnameFile = repo / "CNAME"
       IO.write(cnameFile, "eru.ghoula.net")
-      
+
       // Run default push
       ghpagesPushSite.value
     },
-    
+
     // Site mappings for versioned docs
     makeSite / mappings ++= Seq(
       file("docs-src/MANIFESTO_DRAFT_V3.md") -> "vision.md",
