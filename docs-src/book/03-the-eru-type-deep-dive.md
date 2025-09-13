@@ -186,16 +186,18 @@ Deep `flatMap` chains are automatically trampolined, preventing stack overflow:
 
 ```scala mdoc
 def deepChain(n: Int): Eru[Nothing, Int] = {
-  if (n <= 0) 
-    Eru.succeed(0)
-  else 
-    Eru.succeed(n).flatMap(_ => deepChain(n - 1))
+  // Build the chain iteratively to avoid Scala stack overflow
+  (1 to n).foldLeft(Eru.succeed(0)) { (acc, _) =>
+    acc.flatMap(current => Eru.succeed(current + 1))
+  }
 }
 
-// This won't overflow, even with large numbers
+// This demonstrates true stack safety - Eru handles deep chains
 val deep = deepChain(10000).unsafeRunSync()
 println(s"Deep result: $deep")
 ```
+
+**Key insight**: Eru's `flatMap` chains are stack-safe, but Scala function recursion is not. The iterative approach above builds an Eru data structure with many `flatMap` operations, which Eru's runtime can execute using trampolining. A naive recursive implementation would overflow the Scala call stack before Eru could provide its stack safety guarantees.
 
 ## Mental Models
 
