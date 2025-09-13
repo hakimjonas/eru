@@ -11,9 +11,16 @@ The foundational effect type representing a computation that may fail with error
 ```scala
 // Core constructors
 Eru.succeed[A](value: A): Eru[Nothing, A]
-Eru.fail[E](error: E): Eru[E, Nothing]  
+Eru.fail[E](error: E): Eru[E, Nothing]
 Eru.effect[A](computation: => A): Eru[Throwable, A]
 Eru.blocking[A](computation: => A): Eru[Throwable, A]
+
+// Iterative builders (stack-safe)
+Eru.iterate[E, A](start: A)(step: A => Eru[E, A])(condition: A => Boolean): Eru[E, A]
+Eru.iterateN[E, A](start: A, n: Int)(step: A => Eru[E, A]): Eru[String | E, A]
+Eru.unfold[E, A, B](seed: A)(f: A => Eru[E, Option[(B, A)]]): Eru[E, List[B]]
+Eru.sequence[E, A](effects: List[Eru[E, A]]): Eru[E, List[A]]
+Eru.traverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]]
 
 // Transformation
 map[B](f: A => B): Eru[E, B]
@@ -30,6 +37,43 @@ orElse[E1, A1 >: A](that: => Eru[E1, A1]): Eru[E1, A1]
 // Execution
 unsafeRunSync(): A  // May throw
 unsafeRunSyncWith(observer: EruObserver): A
+```
+
+## Iterative Construction
+
+Stack-safe builders for common iteration patterns:
+
+```scala
+// Iterate until a condition is met
+def iterate[E, A](start: A)(step: A => Eru[E, A])(condition: A => Boolean): Eru[E, A]
+
+// Iterate exactly N times
+def iterateN[E, A](start: A, n: Int)(step: A => Eru[E, A]): Eru[String | E, A]
+
+// Build a list by unfolding from a seed value
+def unfold[E, A, B](seed: A)(f: A => Eru[E, Option[(B, A)]]): Eru[E, List[B]]
+
+// Execute effects sequentially, collecting results
+def sequence[E, A](effects: List[Eru[E, A]]): Eru[E, List[A]]
+
+// Map and sequence in one operation
+def traverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]]
+```
+
+**Usage Examples:**
+
+```scala
+// Generate first 10 squares
+val squares = Eru.iterateN(0, 10)(i => Eru.succeed(i + 1)).map(_ * _)
+
+// Generate Fibonacci sequence up to 1000
+val fibs = Eru.unfold((0, 1)) { case (a, b) =>
+  if (a > 1000) Eru.succeed(None)
+  else Eru.succeed(Some((a, (b, a + b))))
+}
+
+// Process list of items safely
+val processed = Eru.traverse(items)(item => processItem(item))
 ```
 
 ## Concurrency & Fibers
@@ -267,3 +311,41 @@ import net.ghoula.eru.EruRuntime.*   // Runtime operations only
 ```
 
 The `prelude` import provides the most ergonomic experience with all commonly needed functionality.
+
+## Stack Safety Guidelines
+
+**⚠️ Important**: Eru provides full stack safety for its own operations (`flatMap`, `map`, etc.), but Scala function recursion can still cause stack overflow. Always prefer iterative patterns:
+
+### ✅ Safe Patterns
+
+```scala
+// Use iterative builders for loops
+Eru.iterate(0)(i => Eru.succeed(i + 1))(_ >= 10000)
+
+// Use foldLeft for accumulation
+values.foldLeft(Eru.succeed(0)) { (acc, v) =>
+  acc.flatMap(total => Eru.succeed(total + v))
+}
+
+// Use traverse/sequence for collections
+Eru.traverse(items)(item => processItem(item))
+```
+
+### ❌ Avoid These Patterns
+
+```scala
+// DON'T: Recursive Eru construction - Scala stack overflow
+def recursive(n: Int): Eru[Nothing, Int] =
+  if (n <= 0) Eru.succeed(0)
+  else Eru.succeed(n).flatMap(_ => recursive(n - 1))
+
+// DON'T: Deep Scala recursion with Eru
+def recursiveProcess(items: List[A]): Eru[E, List[B]] = items match {
+  case Nil => Eru.succeed(Nil)
+  case head :: tail =>
+    processItem(head).flatMap(b =>
+      recursiveProcess(tail).map(bs => b :: bs))  // Scala recursion!
+}
+```
+
+**Key insight**: Eru makes `flatMap` chains stack-safe, but you must build those chains without Scala recursion. Use iterative construction with `foldLeft`, `traverse`, `iterate`, or loops to avoid stack overflow.

@@ -53,6 +53,12 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
+      - name: Build documentation site
+        run: sbt docsSite
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
       - name: Run benchmarks (smoke test)
         run: sbt "eruBenchJVM/Jmh/run -i 2 -wi 1 -f1 -t1 net.ghoula.eru.bench.fair.CoreOperationsBench"
         env:
@@ -90,6 +96,9 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.PGP_SECRET }}
           passphrase: ${{ secrets.PGP_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          trust_level: 5
 
       - name: Debug Secrets Availability
         run: |
@@ -126,6 +135,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Token for creating GitHub release
         run: sbt +publishSigned sonatypeCentralUpload
 
+      - name: Setup SSH for GitHub Pages
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.GH_PAGES_DEPLOY_KEY }}
+
+      - name: Configure Git for documentation publishing
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Publish documentation to eru.ghoula.net
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+        run: sbt docsPublish
+
   # SNAPSHOT publishing job: Publishes SNAPSHOT versions on pushes to main branch only
   publish-snapshot:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -156,6 +181,9 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.PGP_SECRET }}
           passphrase: ${{ secrets.PGP_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          trust_level: 5
 
       - name: Publish SNAPSHOT to Sonatype
         env:

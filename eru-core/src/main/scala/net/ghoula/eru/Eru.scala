@@ -117,6 +117,9 @@ enum Eru[+E, +A] {
   /** Chains another computation to be run after this one completes. This is the Monad `flatMap` (or
     * `bind`) operation.
     *
+    * ⚠️ **Stack Safety**: Eru provides stack-safe `flatMap` chains, but avoid Scala recursion when
+    * building these chains. Use iterative construction patterns instead.
+    *
     * @param f
     *   the function to apply to the success value, returning the next `Eru`.
     * @return
@@ -387,6 +390,20 @@ object Eru {
     Suspend(register)
 
   /** Creates an `Eru[Nothing, A]` that succeeds with the given pure value.
+    *
+    * ⚠️ **Stack Safety Note**: When building chains of computations, avoid recursive patterns. Use
+    * iterative builders instead:
+    *
+    * ```scala
+    * // ✅ Stack-safe approach:
+    * Eru.iterate(0)(current => Eru.succeed(current + 1))(_ >= n)
+    *
+    * // ❌ Problematic approach:
+    * def recursive(n: Int): Eru[Nothing, Int] =
+    *   if (n <= 0) Eru.succeed(0)
+    *   else Eru.succeed(n).flatMap(_ => recursive(n - 1))
+    * ```
+    *
     * @param value
     *   the value to wrap in a successful `Eru`.
     * @return
@@ -867,6 +884,169 @@ object Eru {
           }
       }
     loop(as.toList, Nil, Nil)
+  }
+
+  /** Repeats an effect exactly N times, starting from an initial value.
+    *
+    * This is a more constrained version of `iterate` that's useful when you know the exact number
+    * of iterations needed. The implementation uses iterative Eru chain building to ensure stack
+    * safety even with large iteration counts.
+    *
+    * @param start
+    *   the initial value
+    * @param n
+    *   the number of iterations (must be >= 0)
+    * @param step
+    *   the function to apply at each step
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the value type
+    * @return
+    *   an effect that yields the result after exactly n iterations
+    * @example
+    *   {{{
+    * // Build a computation that increments a value 1000 times safely
+    * val result = Eru.iterateN(0, 1000)(x => Eru.succeed(x + 1))
+    * // result.unsafeRunSync() == 1000
+    *   }}}
+    */
+  def iterateN[E, A](start: A, n: Int)(step: A => Eru[E, A]): Eru[String | E, A] = {
+    if (n < 0) {
+      fail(s"iterateN requires n >= 0, got: $n")
+    } else if (n == 0) {
+      succeed(start)
+    } else {
+      // Build the chain iteratively using foldLeft to avoid Scala stack overflow
+      // This creates a single Eru data structure that can be executed safely
+      (1 to n).foldLeft(succeed(start)) { (accEru, _) =>
+        accEru.flatMap(step)
+      }
+    }
+  }
+
+  /** Builds a list by repeatedly applying a function until it returns None.
+    *
+    * This is similar to `List.unfold` but works with effects. The implementation uses an iterative
+    * approach with a bounded iteration count to ensure stack safety. The function will generate
+    * elements until either the generator function returns None or the maximum element limit is
+    * reached.
+    *
+    * @param seed
+    *   the initial value
+    * @param f
+    *   function that returns Some(element, nextSeed) to continue or None to stop
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the seed type
+    * @tparam B
+    *   the element type
+    * @return
+    *   an effect that yields the accumulated list
+    * @example
+    *   {{{
+    * // Generate first 10 Fibonacci numbers
+    * val fibs = Eru.unfold((0, 1)) { case (a, b) =>
+    *   if (a > 100) Eru.succeed(None)
+    *   else Eru.succeed(Some((a, (b, a + b))))
+    * }
+    * // Generates: List(0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89)
+    *   }}}
+    */
+  def unfold[E, A, B](seed: A)(f: A => Eru[E, Option[(B, A)]]): Eru[E, List[B]] = {
+    // Stack-safe implementation using iterative foldLeft approach
+    // Bounded iteration prevents infinite loops and ensures predictable resource usage
+    val maxElements = 15000 // Safe limit for most practical use cases
+
+    // Build a list of potential seed values up to the limit
+    (0 until maxElements)
+      .foldLeft(succeed((seed, List.empty[B], false))) { (accEru, _) =>
+        accEru.flatMap { case (currentSeed, acc, done) =>
+          if (done) succeed((currentSeed, acc, done))
+          else {
+            f(currentSeed).map {
+              case None => (currentSeed, acc, true)
+              case Some((element, nextSeed)) => (nextSeed, element :: acc, false)
+            }
+          }
+        }
+      }
+      .map { case (_, acc, _) => acc.reverse }
+  }
+
+  /** Sequences a list of effects into a single effect that produces a list of results.
+    *
+    * All effects are executed sequentially in order. The implementation uses an iterative approach
+    * with foldLeft to ensure stack safety even with large collections. If any effect fails, the
+    * entire sequence fails immediately (fail-fast semantics).
+    *
+    * @param effects
+    *   the list of effects to sequence
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the result type
+    * @return
+    *   an effect that yields a list of all results
+    * @example
+    *   {{{
+    * // Sequence multiple database queries safely
+    * val queries = List(
+    *   fetchUser(1), fetchUser(2), fetchUser(3)
+    * )
+    * val users = Eru.sequence(queries) // Executes all queries in order
+    *   }}}
+    */
+  def sequence[E, A](effects: List[Eru[E, A]]): Eru[E, List[A]] = {
+    // Stack-safe implementation using iterative foldLeft approach
+    // Builds a single Eru chain that accumulates results without Scala recursion
+    effects
+      .foldLeft(succeed(List.empty[A])) { (accEru, effect) =>
+        accEru.flatMap { acc =>
+          effect.map(result => result :: acc)
+        }
+      }
+      .map(_.reverse)
+  }
+
+  /** Maps each element through an effectful function and sequences the results.
+    *
+    * This is equivalent to `sequence(inputs.map(f))` but more efficient as it avoids creating
+    * intermediate collections. The implementation uses an iterative approach with foldLeft to
+    * ensure stack safety even with large input collections. Processing occurs sequentially, and the
+    * function fails fast on the first error encountered.
+    *
+    * @param inputs
+    *   the list of inputs to process
+    * @param f
+    *   the effectful function to apply to each input
+    * @tparam A
+    *   the input type
+    * @tparam E
+    *   the error type
+    * @tparam B
+    *   the output type
+    * @return
+    *   an effect that yields a list of all results
+    * @example
+    *   {{{
+    * // Process user IDs into user profiles safely
+    * val userIds = List(1, 2, 3, 4, 5)
+    * val profiles = Eru.traverse(userIds)(id => fetchUserProfile(id))
+    * // More efficient than: Eru.sequence(userIds.map(fetchUserProfile))
+    *   }}}
+    */
+  def traverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]] = {
+    // Stack-safe implementation using iterative foldLeft approach
+    // Directly processes inputs without creating intermediate effect collections
+    inputs
+      .foldLeft(succeed(List.empty[B])) { (accEru, input) =>
+        accEru.flatMap { acc =>
+          f(input).map(result => result :: acc)
+        }
+      }
+      .map(_.reverse)
   }
 
   /** A successful `Eru` containing `Unit`. */

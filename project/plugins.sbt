@@ -27,6 +27,7 @@ addSbtPlugin("ch.epfl.scala" % "sbt-tasty-mima" % "1.3.0")
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.7")
 
 // Aggregated Scaladoc
+addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.5.0")
 
 // Site + GitHub Pages publishing
 addSbtPlugin("com.github.sbt" % "sbt-site" % "1.6.0")
