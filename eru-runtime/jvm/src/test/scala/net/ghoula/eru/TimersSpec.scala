@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import java.time.Duration
 
 import net.ghoula.eru.prelude.*
@@ -14,7 +12,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * non-blocking semantics, and integrate correctly with the fiber scheduling system while
   * maintaining high performance under concurrent load.
   */
-final class TimersSpec extends TestWithRuntime {
+final class TimersSpec extends munit.FunSuite {
 
   test("sleep completes after duration (non-blocking semantics)") {
     IsolatedTestRunner.withIsolatedRuntime { runtime =>
