@@ -112,6 +112,15 @@ Eru is a high-performance effect system built with modern Scala 3, organized as 
 3. **Guided Correctness** - Easy path must be the correct path
 4. **Exceptional Observability** - Runtime must not be a black box
 
+### Critical Correctness Mandate
+**NEVER compromise on correctness.** This project aims to deliver a world-class, best-of-its-kind Scala 3 effects system. Any attempt to:
+- Skip failing tests by ignoring/commenting them out
+- Hide test failures or reduce coverage
+- Take shortcuts that compromise functionality
+- Claim "fixes" that only mask underlying problems
+
+...is a fundamental violation of our mission. Every single test must pass. Every feature must work correctly in all scenarios. There are no acceptable compromises on correctness - the easy path must also be the correct path.
+
 ### Scala 3 Language Requirements
 - Use `enum` for ADTs (not sealed traits)
 - Use `opaque type` for domain integrity  

@@ -17,21 +17,15 @@ import net.ghoula.eru.*
   *   - **Full integration**: Works seamlessly with existing Eru timeout/retry operations
   *
   * @example
-  *   {{{
-  * // Test timeout behavior deterministically
-  * EruTest.withTestClock { clock =>
-  *   val effect = runtime.sleep(Duration.ofSeconds(10)).map(_ => "completed")
-  *   val timedEffect = effect.timeout(Duration.ofSeconds(5))
+  *   {{{\n * // Test timeout behavior deterministically EruTest.withTestClock { clock => val effect =
+  *   runtime.sleep(Duration.ofSeconds(10)).map(_ => \"completed\") val timedEffect =
+  *   effect.timeout(Duration.ofSeconds(5))
   *
-  *   val fiber = timedEffect.fork.unsafeRunSync()
+  * val fiber = timedEffect.fork.unsafeRunSync()
   *
-  *   // Advance past timeout threshold
-  *   clock.advance(Duration.ofSeconds(6))
+  * // Advance past timeout threshold clock.advance(Duration.ofSeconds(6))
   *
-  *   // Should timeout
-  *   assert(fiber.await.runExit().isFailure)
-  * }
-  *   }}}
+  * // Should timeout assert(fiber.await.runExit().isFailure) } }}}
   *
   * '''Design Principles:'''
   *   - **Zero Global State**: Each TestClock instance is isolated
@@ -43,7 +37,7 @@ trait TestClock {
 
   /** Current logical time maintained by this test clock.
     *
-    * This represents the "current time" from the perspective of effects running within the test
+    * This represents the \"current time\" from the perspective of effects running within the test
     * clock's context. All timing operations (sleep, timeout, retry delays) use this logical time
     * rather than system time.
     *
@@ -135,6 +129,29 @@ trait TestClock {
     pending
   }
 
+  /** Advances the scheduler to execute all ready fibers.
+    *
+    * This is the key method for driving TestClock execution forward. It executes all currently
+    * ready fibers, then any fibers that become ready as a result, continuing until no more progress
+    * can be made.
+    *
+    * This is similar to Cats Effect TestControl.tickAll() method.
+    *
+    * @return
+    *   number of fibers that were executed
+    */
+  def tickAll: Int
+
+  /** Advances the scheduler by one step.
+    *
+    * Executes one batch of ready fibers and returns. This provides more fine-grained control over
+    * execution than tickAll.
+    *
+    * @return
+    *   number of fibers that were executed in this tick
+    */
+  def tick: Int
+
   /** Internal method to get all scheduled operation times.
     *
     * Used by completeAll to find the maximum scheduled time. Implementations should provide this
@@ -164,13 +181,18 @@ object TestClock {
 
 }
 
-/** Implementation of TestClock with precise time control and pending operation tracking.
+/** Implementation of TestClock with precise time control, fiber scheduling, and coordination
+  * support.
   *
   * This implementation maintains:
   *   - Current logical time with nanosecond precision
   *   - Queue of scheduled operations sorted by completion time
+  *   - Fiber scheduler for coordination primitives
   *   - Thread-safe operation for concurrent test scenarios
   *   - Integration hooks for ConcurrencyBackend sleep/timeout operations
+  *
+  * The fiber scheduler enables proper coordination primitive support by tracking suspended fibers
+  * and resuming them when conditions are met, similar to Cats Effect TestControl.
   */
 private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
 
@@ -182,6 +204,10 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
   // Key: target completion time, Value: list of callbacks to complete at that time
   private val scheduledOps = new ConcurrentSkipListMap[Instant, java.util.concurrent.CopyOnWriteArrayList[() => Unit]]()
   private val _currentTimeRef = new AtomicReference[Instant](startTime)
+
+  // Fiber scheduler for coordination primitives
+  private val readyFibers = new java.util.concurrent.ConcurrentLinkedQueue[() => Unit]()
+  private val suspendedFibers = new java.util.concurrent.ConcurrentHashMap[String, () => Unit]()
 
   def currentTime: Instant = _currentTimeRef.get()
 
@@ -225,6 +251,44 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
     scheduledOps.keySet().asScala.toList
   }
 
+  def tickAll: Int = {
+    var totalExecuted = 0
+    var lastExecuted = 0
+
+    while ({
+      lastExecuted = tick
+      totalExecuted += lastExecuted
+      lastExecuted > 0
+    }) {}
+
+    totalExecuted
+  }
+
+  def tick: Int = {
+    var executed = 0
+    var continue = true
+
+    // Execute all ready fibers
+    while (continue) {
+      Option(readyFibers.poll()) match {
+        case Some(nextFiber) =>
+          try {
+            nextFiber()
+            executed += 1
+          } catch {
+            case _: Throwable =>
+              // Fiber execution errors are handled by the effect system
+              executed += 1
+          }
+        case None =>
+          // No more ready fibers
+          continue = false
+      }
+    }
+
+    executed
+  }
+
   /** Schedules a callback to be executed when time reaches the specified instant.
     *
     * This is the integration point used by TestClockBackend to schedule sleep and timeout
@@ -240,6 +304,104 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
       scheduledOps.computeIfAbsent(targetTime, _ => new java.util.concurrent.CopyOnWriteArrayList[() => Unit]())
     callbacks.add(callback)
   }
+
+  /** Schedules a fiber for execution in the TestClock controlled environment.
+    *
+    * Instead of executing immediately, the fiber is scheduled to run when TestClock time advances.
+    * This enables deterministic testing where fiber execution is controlled by explicit time
+    * advancement rather than immediate execution.
+    *
+    * @param fiber
+    *   the fiber to complete when execution occurs
+    * @param effect
+    *   the effect to execute
+    * @param observer
+    *   optional observer for fiber lifecycle events
+    */
+  def scheduleFiberExecution[E, A](
+    fiber: UnifiedFiber[E, A],
+    effect: Eru[E, A],
+    observer: Option[EruObserver]
+  ): Unit = {
+    // Schedule fiber execution to happen immediately on next clock advancement
+    // This mimics Cats Effect TestControl behavior where fibers execute on tick()
+    val executionTime = currentTime.plusNanos(1)
+
+    schedule(
+      executionTime,
+      () => {
+        // Try to execute the effect
+        val exitOption =
+          try {
+            Some(Result.toExit(effect.attempt.unsafeRunSync()))
+          } catch {
+            case e: RuntimeException if e.getMessage.contains("TestClock suspend operation") =>
+              // Effect contains suspend operations - it's not ready to complete yet
+              // Don't complete the fiber, let it remain pending
+              None
+            case t: Throwable =>
+              Some(Exit.Die(t))
+          }
+
+        // Complete the fiber with the result if execution succeeded
+        exitOption.foreach { exit =>
+          UnifiedFiber.complete(fiber, exit)
+          // Emit completion event
+          observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(fiber.id, exit)))
+        }
+      }
+    )
+  }
+
+  /** Enqueues a fiber for immediate execution.
+    *
+    * This adds a fiber to the ready queue to be executed on the next tick().
+    *
+    * @param fiberAction
+    *   the fiber execution action
+    */
+  private[test] def enqueueFiber(fiberAction: () => Unit): Unit = {
+    readyFibers.offer(fiberAction)
+  }
+
+  /** Suspends a fiber with a unique identifier.
+    *
+    * The fiber will remain suspended until explicitly resumed via resumeFiber().
+    *
+    * @param fiberId
+    *   unique identifier for the suspended fiber
+    * @param resumeAction
+    *   the action to execute when the fiber is resumed
+    */
+  private[test] def suspendFiber(fiberId: String, resumeAction: () => Unit): Unit = {
+    suspendedFibers.put(fiberId, resumeAction)
+  }
+
+  /** Resumes a suspended fiber by its identifier.
+    *
+    * If the fiber exists, it's moved from suspended to ready state.
+    *
+    * @param fiberId
+    *   the identifier of the fiber to resume
+    * @return
+    *   true if the fiber was found and resumed, false otherwise
+    */
+  private[test] def resumeFiber(fiberId: String): Boolean = {
+    Option(suspendedFibers.remove(fiberId)) match {
+      case Some(resumeAction) =>
+        readyFibers.offer(resumeAction)
+        true
+      case None =>
+        false
+    }
+  }
+
+  /** Gets the count of suspended fibers.
+    *
+    * @return
+    *   number of currently suspended fibers
+    */
+  private[test] def suspendedCount: Int = suspendedFibers.size()
 
   /** Blocks until TestClock time reaches or exceeds the target time.
     *

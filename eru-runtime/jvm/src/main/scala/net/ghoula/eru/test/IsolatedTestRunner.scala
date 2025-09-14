@@ -5,6 +5,7 @@ import java.time.Duration
 import net.ghoula.eru.*
 import net.ghoula.eru.internal.{ConcurrencyBackend, RuntimeBackendAdapter}
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.{TestClock, TestClockBackend}
 
 /** Test utility providing complete isolation between test executions.
   *
@@ -22,7 +23,7 @@ object IsolatedTestRunner {
     * This class wraps a fresh backend instance and provides all the standard EruRuntime methods.
     * Use this in tests instead of the global EruRuntime to avoid state interference.
     */
-  class IsolatedRuntime(private val backend: ConcurrencyBackend) {
+  class IsolatedRuntime(private val backend: ConcurrencyBackend, val testClock: TestClock) {
     def fork[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] = backend.fork(fa)
 
     def sleep(duration: Duration): Eru[Nothing, Unit] = backend.sleep(duration)
@@ -147,12 +148,14 @@ object IsolatedTestRunner {
 
   /** Creates an isolated runtime for test execution.
     *
-    * The returned runtime uses a fresh backend instance that won't interfere with other tests.
-    * Remember to call cleanup() after your test completes.
+    * The returned runtime uses a fresh TestClockBackend instance that won't interfere with other
+    * tests and provides deterministic timing behavior. Remember to call cleanup() after your test
+    * completes.
     */
   def createIsolatedRuntime(): IsolatedRuntime = {
-    val backend = RuntimeBackendAdapter.virtualThreads()
-    new IsolatedRuntime(backend)
+    val testClock = TestClock.create()
+    val backend = new TestClockBackend(testClock)
+    new IsolatedRuntime(backend, testClock)
   }
 
   /** Executes a test function with an isolated runtime, ensuring proper cleanup.

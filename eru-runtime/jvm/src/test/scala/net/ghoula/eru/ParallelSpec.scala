@@ -20,8 +20,17 @@ final class ParallelSpec extends TestWithRuntime {
       val a = runtime.sleep(Duration.ofMillis(30)).flatMap(_ => Eru.succeed(1))
       val b = runtime.sleep(Duration.ofMillis(30)).flatMap(_ => Eru.succeed(2))
 
-      val out = runtime.zipPar(a, b).unsafeRunSync()
-      assertEquals(out, (1, 2))
+      // Fork the zipPar operation to allow TestClock advancement
+      val fiber = runtime.fork(runtime.zipPar(a, b)).unsafeRunSync()
+
+      // Advance TestClock to complete the sleep operations
+      runtime.testClock.advance(Duration.ofMillis(30))
+
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success(out) => assertEquals(out, (1, 2))
+        case other => fail(s"Expected successful zipPar, got: $other")
+      }
     }
   }
 
@@ -30,10 +39,16 @@ final class ParallelSpec extends TestWithRuntime {
       val leftFail: Eru[String, Int] = Eru.fail("boom")
       val rightSucc = runtime.sleep(Duration.ofMillis(10)).flatMap(_ => Eru.succeed(2))
 
-      val res = runtime.zipPar(leftFail, rightSucc).attempt.unsafeRunSync()
-      res match {
-        case Result.Failure(e) => assertEquals(s"$e", "boom")
-        case Result.Success(_) => fail("Expected typed failure, but got success")
+      // Fork the zipPar operation
+      val fiber = runtime.fork(runtime.zipPar(leftFail, rightSucc)).unsafeRunSync()
+
+      // Advance time to allow any sleep to complete (though failure should happen immediately)
+      runtime.testClock.advance(Duration.ofMillis(10))
+
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Failure(e) => assertEquals(s"$e", "boom")
+        case other => fail(s"Expected typed failure, got: $other")
       }
     }
   }
@@ -43,8 +58,17 @@ final class ParallelSpec extends TestWithRuntime {
       val fastLeft = runtime.sleep(Duration.ofMillis(5)).flatMap(_ => Eru.succeed("L"))
       val slowRight = runtime.sleep(Duration.ofMillis(30)).flatMap(_ => Eru.succeed("R"))
 
-      val out = runtime.race(fastLeft, slowRight).unsafeRunSync()
-      assertEquals(out, Left("L"))
+      // Fork the race operation
+      val fiber = runtime.fork(runtime.race(fastLeft, slowRight)).unsafeRunSync()
+
+      // Advance time to allow the faster operation to complete
+      runtime.testClock.advance(Duration.ofMillis(5))
+
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success(out) => assertEquals(out, Left("L"))
+        case other => fail(s"Expected successful race with Left result, got: $other")
+      }
     }
   }
 }

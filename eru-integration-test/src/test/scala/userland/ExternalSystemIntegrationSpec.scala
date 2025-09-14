@@ -40,11 +40,8 @@ class ExternalSystemIntegrationSpec extends FunSuite {
 
     def executeQuery(conn: String, query: String): Eru[String, String] = {
       Eru.effect {
-        try {
-          Thread.sleep(50)
-        } catch {
-          case _: InterruptedException => () // Ignore interruption for test simulation
-        }
+        // Simulate database operation without blocking
+        // Real database operations would be asynchronous
         completedQueries.incrementAndGet()
         s"Result for $query on $conn"
       }.mapError(_.getMessage)

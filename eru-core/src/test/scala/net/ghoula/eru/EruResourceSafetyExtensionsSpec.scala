@@ -245,6 +245,7 @@ class EruResourceSafetyExtensionsSpec extends FunSuite {
       Eru.succeed(id).autoCleanup { resourceId =>
         Eru.effect {
           val currentValue = sharedResource.incrementAndGet()
+          // Small delay to ensure ordering in test
           Thread.sleep(1)
           cleanupOrder.add(s"cleanup-$resourceId-$currentValue")
         }

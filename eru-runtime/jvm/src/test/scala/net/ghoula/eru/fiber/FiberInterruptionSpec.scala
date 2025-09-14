@@ -171,6 +171,9 @@ class FiberInterruptionSpec extends FunSuite {
       val effect = Eru.succeed("already done")
       val fiber = runtime.fork(effect).unsafeRunSync()
 
+      // Advance TestClock to allow the forked fiber to execute
+      runtime.testClock.advance(java.time.Duration.ofNanos(1))
+
       val exit = fiber.await.unsafeRunSync()
       assertEquals(exit, Exit.Success("already done"))
 

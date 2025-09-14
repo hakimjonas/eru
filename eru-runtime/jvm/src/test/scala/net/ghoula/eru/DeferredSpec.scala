@@ -3,7 +3,7 @@ package net.ghoula.eru
 import munit.FunSuite
 
 import net.ghoula.eru.prelude.*
-import net.ghoula.eru.test.EruTest
+import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Test suite for Deferred concurrent primitive functionality.
   *
@@ -75,24 +75,31 @@ final class DeferredSpec extends TestWithRuntime {
   }
 
   test("await blocks until completion and returns the value - TestClock version (deterministic fiber coordination)") {
-    EruTest.withTestClock { clock =>
-      given runtime: EruRuntime = EruTest.testRuntime(clock)
-      val d = Deferred.make[Int].unsafeRunSync()
+    IsolatedTestRunner.withIsolatedRuntime { isolatedRuntime =>
+      val clock = isolatedRuntime.testClock
 
-      // Fork a fiber that completes the deferred after a delay (TestClock: instant execution)
-      val completingFiber = runtime.fork {
-        runtime.sleep(java.time.Duration.ofMillis(10)).flatMap { _ =>
-          d.complete(42)
+      val program = for {
+        d <- Eru.deferred[Int]
+        // Fork a fiber that completes the deferred after a delay
+        completingFiber <- isolatedRuntime.fork {
+          isolatedRuntime.sleep(java.time.Duration.ofMillis(10)).flatMap { _ =>
+            d.complete(42)
+          }
         }
-      }.unsafeRunSync()
+        // Advance TestClock to allow the fiber to execute
+        _ <- Eru.effect(clock.advance(java.time.Duration.ofMillis(15)))
+        // Now await the deferred - should complete deterministically
+        value <- d.await
+        // Verify the completing fiber succeeded
+        completed <- completingFiber.await
+      } yield (value, completed)
 
-      // Await should block until completion (TestClock: deterministic coordination)
-      val value = d.await.unsafeRunSync()
-      assertEquals(value, 42)
-
-      // Verify the completing fiber succeeded
-      val completed = completingFiber.await.unsafeRunSync()
-      assertEquals(completed, Exit.Success(true))
+      program.runExit() match {
+        case Exit.Success((value, Exit.Success(completionResult))) =>
+          assertEquals(value, 42)
+          assertEquals(completionResult, true)
+        case other => fail(s"Expected successful deferred coordination, got: $other")
+      }
 
       println("TestClock Deferred: deterministic fiber coordination without 10ms wall-clock delay")
     }

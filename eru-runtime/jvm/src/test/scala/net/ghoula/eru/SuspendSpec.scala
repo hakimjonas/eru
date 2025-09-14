@@ -19,15 +19,16 @@ import net.ghoula.eru.test.IsolatedTestRunner
   */
 final class SuspendSpec extends TestWithRuntime {
 
-  private val isolatedRuntime = IsolatedTestRunner.createIsolatedRuntime()
-
+  // Use the TestWithRuntime's implicit runtime instead of shared isolatedRuntime
   private object LocalEruRuntime {
-    def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E | Throwable, A] =
-      isolatedRuntime.suspend(register)
+    def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit])(using
+      runtime: EruRuntime
+    ): Eru[E | Throwable, A] =
+      runtime.suspend(register)
     def timeout[E, A](duration: Duration)(
       effect: Eru[E, A]
-    ): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
-      isolatedRuntime.timeout(duration)(effect)
+    )(using runtime: EruRuntime): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
+      runtime.timeout(duration)(effect)
   }
 
   /** Validates that suspend with synchronous callback invocation succeeds immediately.
@@ -302,21 +303,28 @@ final class SuspendSpec extends TestWithRuntime {
     * duration, ensuring responsive behavior.
     */
   test("suspend with timeout integration works correctly") {
-    val longRunning = LocalEruRuntime.suspend[String, Int] { callback =>
-      java.util.concurrent.CompletableFuture.runAsync(() => {
-        // Use CompletableFuture delay instead of Thread.sleep to avoid blocking thread pool
-        java.util.concurrent.CompletableFuture
-          .delayedExecutor(25, java.util.concurrent.TimeUnit.MILLISECONDS)
-          .execute(() => callback(Right(42)))
-      })
-      Eru.unit
-    }
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      // Create a suspend operation that will never complete on its own
+      val longRunning = runtime.suspend[String, Int] { _ =>
+        // Don't invoke callback - let it timeout naturally
+        Eru.unit
+      }
 
-    val result = LocalEruRuntime.timeout(Duration.ofMillis(20))(longRunning).attempt.unsafeRunSync()
-    result match {
-      case Result.Failure(_: java.util.concurrent.TimeoutException) =>
-        assert(true)
-      case other => fail(s"Expected TimeoutException but got: $other")
+      val timeoutEffect = runtime.timeout(Duration.ofMillis(20))(longRunning)
+
+      // Fork the timeout operation
+      val fiber = runtime.fork(timeoutEffect.attempt).unsafeRunSync()
+
+      // Advance time past timeout
+      runtime.testClock.advance(Duration.ofMillis(25))
+
+      // Check result - should timeout
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success(Result.Failure(_: java.util.concurrent.TimeoutException)) =>
+          assert(true)
+        case other => fail(s"Expected TimeoutException but got: $other")
+      }
     }
   }
 

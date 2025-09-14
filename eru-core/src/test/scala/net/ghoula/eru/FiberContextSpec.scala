@@ -131,7 +131,8 @@ class FiberContextSpec extends FunSuite {
     val age1 = context.ageNanos
     assert(age1 >= 0)
 
-    Thread.sleep(1)
+    // Small delay to ensure time passes for age calculation
+    Thread.sleep(1) // Keep minimal real delay since this tests actual time
     val age2 = context.ageNanos
     assert(age2 > age1)
   }

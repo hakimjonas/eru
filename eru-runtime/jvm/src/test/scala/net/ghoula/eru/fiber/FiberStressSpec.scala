@@ -151,11 +151,20 @@ class FiberStressSpec extends FunSuite {
         runtime.sleep(Duration.ofMillis((i * 5).toLong)).map(_ => s"contestant-$i")
       }.toList
 
-      val (winner, index) = runtime.raceAll(effects).unsafeRunSync()
+      // Fork the race operation to allow TestClock control
+      val fiber = runtime.fork(runtime.raceAll(effects)).unsafeRunSync()
 
-      // The immediate effect should always win
-      assertEquals(winner, "immediate-winner")
-      assertEquals(index, 0)
+      // Advance TestClock - the immediate effect should win before any sleep completes
+      runtime.testClock.advance(Duration.ofMillis(1))
+
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success((winner, index)) =>
+          // The immediate effect should always win
+          assertEquals(winner, "immediate-winner")
+          assertEquals(index, 0)
+        case other => fail(s"Expected successful race, got: $other")
+      }
     }
   }
 
@@ -491,14 +500,21 @@ class FiberStressSpec extends FunSuite {
         )
       } yield results
 
-      val results = computation.unsafeRunSync()
+      // Fork the computation to allow TestClock control
+      val fiber = runtime.fork(computation).unsafeRunSync()
 
-      assertEquals(results.length, fiberCount)
+      // Advance TestClock to complete all sleep operations
+      runtime.testClock.advance(Duration.ofMillis(2))
 
-      assertEquals(fiberStartEvents.get(), fiberCount)
-      assertEquals(fiberEndEvents.get(), fiberCount)
-
-      assert(eventCount.get() >= fiberStartEvents.get() + fiberEndEvents.get())
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success(results) =>
+          assertEquals(results.length, fiberCount)
+          assertEquals(fiberStartEvents.get(), fiberCount)
+          assertEquals(fiberEndEvents.get(), fiberCount)
+          assert(eventCount.get() >= fiberStartEvents.get() + fiberEndEvents.get())
+        case other => fail(s"Expected successful observer test, got: $other")
+      }
     }
   }
 }

@@ -35,26 +35,25 @@ final class VTForkSpec extends TestWithRuntime {
     */
   test("forkWithObserver emits FiberStarted then FiberCompleted with same id") {
     val events = java.util.concurrent.ConcurrentLinkedQueue[EruObserver.EruEvent]()
-    val completedSignal = java.util.concurrent.CountDownLatch(1)
+    val completionPromise = Eru.promise[Nothing, Unit].unsafeRunSync()
 
     val obs = new EruObserver {
       def onEvent(e: EruObserver.EruEvent): Unit = {
         events.offer(e)
         e match {
-          case _: EruObserver.EruEvent.FiberCompleted => completedSignal.countDown()
+          case _: EruObserver.EruEvent.FiberCompleted =>
+            completionPromise.succeed(()).unsafeRunSync()
           case _ => ()
         }
       }
     }
+
     val fiber = Eru.succeed(42).forkWithObserver(obs).unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
     assertEquals(exit, Exit.Success(42))
 
-    // Wait for the FiberCompleted event to be recorded (with timeout for safety)
-    assert(
-      completedSignal.await(1, java.util.concurrent.TimeUnit.SECONDS),
-      "FiberCompleted event should be recorded within 1 second"
-    )
+    // Wait for the FiberCompleted event to be recorded
+    completionPromise.await.unsafeRunSync()
 
     import scala.jdk.CollectionConverters.*
     val eventList = events.asScala.toList
