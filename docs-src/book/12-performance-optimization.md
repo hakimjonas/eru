@@ -146,10 +146,9 @@ def stackSafeRecursion(): Eru[String, Long] = {
 
 // More efficient iterative approach
 def iterativeApproach(): Eru[String, Long] = {
-  // Use Eru.iterate for better performance with large iterations
-  Eru.iterate((10000L, 0L)) { case (n, acc) =>
-    Eru.succeed((n - 1, acc + n))
-  }(_._1 <= 0).map(_._2)
+  // Use foldLeft for better performance with large iterations
+  val numbers = (1L to 10000L).toList
+  Eru.foldLeft(numbers)(0L)((acc, n) => Eru.succeed(acc + n))
 }
 
 // Compare performance approaches
@@ -295,11 +294,12 @@ Eru's fiber-based concurrency provides excellent performance characteristics:
 ```scala mdoc
 import net.ghoula.eru.EruRuntime
 
+// Create runtime for concurrency examples
+given runtime: EruRuntime = EruRuntime.create()
+
 // Concurrency performance testing
 def concurrencyPerformance(): Unit = {
   println("=== CONCURRENCY PERFORMANCE ===")
-
-  given runtime: EruRuntime = EruRuntime.create()
 
   // Benchmark sequential vs parallel processing
   def sequentialWork(): Eru[String, List[Int]] = {
@@ -578,10 +578,10 @@ object BenchmarkingBestPractices {
     val avg = measurements.sum / measurements.size
     val opsPerMs = measurementIterations / avg
 
-    println(f"  Average: $avg%.2f ms ($opsPerMs%.0f ops/ms)")
-    println(f"  Min: ${measurements.min}%.2f ms")
-    println(f"  Max: ${measurements.max}%.2f ms")
-    println(f"  Std Dev: ${standardDeviation(measurements.toList)}%.2f ms")
+    println(s"  Average: ${"%.2f".format(avg)} ms (${"%.0f".format(opsPerMs)} ops/ms)")
+    println(s"  Min: ${"%.2f".format(measurements.min)} ms")
+    println(s"  Max: ${"%.2f".format(measurements.max)} ms")
+    println(s"  Std Dev: ${"%.2f".format(standardDeviation(measurements.toList))} ms")
   }
 
   private def standardDeviation(values: List[Double]): Double = {
@@ -675,7 +675,7 @@ class ProductionPerformanceMonitor {
       val total = successes + failures
       val successRate = if (total > 0) (successes.toDouble / total * 100) else 0.0
 
-      sb.append(f"$op: $successes successes, $failures failures (${successRate}%.1f%% success rate)\n")
+      sb.append(s"$op: $successes successes, $failures failures (${"%.1f".format(successRate)}% success rate)\n")
     }
 
     // Timing statistics
@@ -685,11 +685,11 @@ class ProductionPerformanceMonitor {
         val min = durations.min
         val max = durations.max
         val p95 = percentile(durations.sorted.toList, 0.95)
-        sb.append(f"$op timing: avg=${avg}%.1f ms, min=${min}ms, max=${max}ms, p95=${p95}%.1f ms\n")
+        sb.append(s"$op timing: avg=${"%.1f".format(avg)} ms, min=${min}ms, max=${max}ms, p95=${"%.1f".format(p95)} ms\n")
       }
     }
 
-    sb.toString()
+    sb.toString
   }
 
   private def percentile(sortedValues: List[Long], p: Double): Double = {
