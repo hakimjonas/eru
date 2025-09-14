@@ -387,13 +387,10 @@ def timeoutOperation[E, A](
   val timeout = Eru.fail("Operation timed out")
   
   if (shouldTimeout) {
-    operation.race(timeout).map {
-      case Left(result) => result
-      case Right(_) => throw new RuntimeException("Timed out")
-    }.mapError {
-      case ex: RuntimeException => ex.getMessage
-      case other => other.toString
-    }
+    operation.race(timeout).flatMap {
+      case Left(result) => Eru.succeed(result)
+      case Right(_) => Eru.fail("Timed out")
+    }.mapError(_.toString)
   } else {
     operation.mapError(_.toString)
   }

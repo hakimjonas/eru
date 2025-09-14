@@ -56,7 +56,7 @@ trait JsonCodec[A] {
   def decode(json: String): Either[String, A]
 }
 
-implicit val apiResponseCodec: JsonCodec[ApiResponse] = new JsonCodec[ApiResponse] {
+given apiResponseCodec: JsonCodec[ApiResponse] with {
   def encode(value: ApiResponse): String =
     s"""{"data":"${value.data}","status":${value.status}}"""
 
@@ -74,7 +74,7 @@ def ecosystemIntegration(): Eru[String, String] = {
 
   for {
     response <- client.get("https://api.example.com/data")
-    encoded = apiResponseCodec.encode(response)
+    encoded = summon[JsonCodec[ApiResponse]].encode(response)
     _ <- Eru.succeed(encoded).debug("API response encoded")
     result <- Eru.succeed(s"Successfully processed API response: ${response.status}")
   } yield result
