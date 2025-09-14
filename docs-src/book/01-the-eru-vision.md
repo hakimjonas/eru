@@ -331,6 +331,7 @@ I treat correctness as non-negotiable. Every design decision prioritizes reliabi
 
 ```scala mdoc
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.prelude.given
 
 // This creates a description - no side effects happen yet
 val program: Eru[Nothing, String] = Eru.succeed("Hello, Eru!")

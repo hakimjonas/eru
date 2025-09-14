@@ -22,7 +22,15 @@ import net.ghoula.eru.prelude.*
 import scala.util.{Try, Success, Failure}
 import scala.concurrent.{Future, ExecutionContext}
 import java.io.File
-import net.ghoula.eru.FutureInterop.fromFuture
+
+// Define typed errors for integration scenarios
+enum IntegrationError:
+  case InvalidInput(field: String, value: String)
+  case ServiceUnavailable(service: String, reason: String)
+  case NetworkTimeout(durationMs: Long)
+  case ParseError(input: String, expected: String)
+  case FileNotFound(path: String)
+  case DatabaseError(operation: String, details: String)
 
 // Example legacy code that we need to integrate
 class LegacyUserService {
@@ -47,15 +55,25 @@ class LegacyUserService {
   }
 }
 
-// Pattern 1: Basic wrapping with Eru.effect
+// Pattern 1: Basic wrapping with Eru.effect and typed errors
 class EruUserService(legacy: LegacyUserService) {
 
-  def getUser(id: String): Eru[String, String] = {
-    Eru.effect(legacy.getUserById(id)).mapError(_.getMessage)
+  def getUser(id: String): Eru[IntegrationError, String] = {
+    Eru.effect(legacy.getUserById(id)).mapError {
+      case _: IllegalArgumentException => IntegrationError.InvalidInput("userId", id)
+      case _: java.sql.SQLException => IntegrationError.DatabaseError("getUser", s"Failed to fetch user $id")
+      case other => IntegrationError.ServiceUnavailable("UserService", other.getMessage)
+    }
   }
 
-  def updateUser(id: String, data: String): Eru[String, Boolean] = {
-    Eru.effect(legacy.updateUser(id, data)).mapError(_.getMessage)
+  def updateUser(id: String, data: String): Eru[IntegrationError, Boolean] = {
+    Eru.effect(legacy.updateUser(id, data)).mapError {
+      case _: IllegalArgumentException =>
+        if (id.isEmpty) IntegrationError.InvalidInput("userId", id)
+        else IntegrationError.InvalidInput("userData", data)
+      case _: java.sql.SQLException => IntegrationError.DatabaseError("updateUser", s"Failed to update user $id")
+      case other => IntegrationError.ServiceUnavailable("UserService", other.getMessage)
+    }
   }
 }
 
@@ -63,7 +81,7 @@ class EruUserService(legacy: LegacyUserService) {
 val legacyService = LegacyUserService()
 val eruService = EruUserService(legacyService)
 
-def basicIntegrationExample(): Eru[String, String] = {
+def basicIntegrationExample(): Eru[IntegrationError, String] = {
   for {
     user <- eruService.getUser("user123")
     _ <- eruService.updateUser("user123", "updated data")
@@ -74,7 +92,12 @@ def basicIntegrationExample(): Eru[String, String] = {
 val integrationResult = basicIntegrationExample().attempt.unsafeRunSync()
 integrationResult match {
   case net.ghoula.eru.Result.Success(result) => println(s"Integration success: $result")
-  case net.ghoula.eru.Result.Failure(error) => println(s"Integration error: $error")
+  case net.ghoula.eru.Result.Failure(error) => error match {
+    case IntegrationError.InvalidInput(field, value) => println(s"Invalid $field: $value")
+    case IntegrationError.ServiceUnavailable(service, reason) => println(s"$service unavailable: $reason")
+    case IntegrationError.DatabaseError(op, details) => println(s"Database error in $op: $details")
+    case other => println(s"Integration error: $other")
+  }
 }
 ```
 
@@ -91,27 +114,37 @@ import scala.io.Source
 object BlockingIntegration {
 
   // File operations with resource safety
-  def readFileBlocking(filename: String): Eru[String, String] = {
-    def openFile(): Eru[String, BufferedReader] = {
+  def readFileBlocking(filename: String): Eru[IntegrationError, String] = {
+    def openFile(): Eru[IntegrationError, BufferedReader] = {
       Eru.effect {
         new BufferedReader(new FileReader(filename))
-      }.mapError(_.getMessage)
+      }.mapError {
+        case _: java.io.FileNotFoundException => IntegrationError.FileNotFound(filename)
+        case _: java.io.IOException => IntegrationError.ServiceUnavailable("FileSystem", s"Cannot access file $filename")
+        case other => IntegrationError.ServiceUnavailable("FileSystem", other.getMessage)
+      }
     }
 
-    def readContent(reader: BufferedReader): Eru[String, String] = {
+    def readContent(reader: BufferedReader): Eru[IntegrationError, String] = {
       Eru.effect {
         val content = new StringBuilder
-        var line = reader.readLine()
+        var line = reader.readLine() // intentional var for I/O iteration
         while (line != null) {
           content.append(line).append("\n")
           line = reader.readLine()
         }
         content.toString
-      }.mapError(_.getMessage)
+      }.mapError {
+        case _: java.io.IOException => IntegrationError.ServiceUnavailable("FileSystem", "Error reading file content")
+        case other => IntegrationError.ServiceUnavailable("FileSystem", other.getMessage)
+      }
     }
 
-    def closeReader(reader: BufferedReader): Eru[String, Unit] = {
-      Eru.effect(reader.close()).mapError(_.getMessage)
+    def closeReader(reader: BufferedReader): Eru[IntegrationError, Unit] = {
+      Eru.effect(reader.close()).mapError {
+        case _: java.io.IOException => IntegrationError.ServiceUnavailable("FileSystem", "Error closing file")
+        case other => IntegrationError.ServiceUnavailable("FileSystem", other.getMessage)
+      }
     }
 
     // Use bracket for guaranteed resource cleanup
@@ -168,7 +201,7 @@ object BlockingIntegration {
 
     def acquireConnection(): Eru[String, DatabaseConnection] = {
       Eru.effect {
-        synchronized {
+        synchronized { // Note: In new code, prefer Eru's Semaphore or Queue for coordination
           if (availableConnections.nonEmpty) {
             val connection = availableConnections.head
             availableConnections = availableConnections.tail
@@ -197,7 +230,7 @@ object BlockingIntegration {
 }
 
 // Usage examples
-def blockingIntegrationExample(): Eru[String, String] = {
+def blockingIntegrationExample(): Eru[IntegrationError, String] = {
   // Create a test file for demonstration
   val testContent = "Hello, Eru Integration!\nThis is a test file.\nEnd of content."
   val testFile = "integration-test.txt"
@@ -211,13 +244,19 @@ def blockingIntegrationExample(): Eru[String, String] = {
       } finally {
         writer.close()
       }
-    }.mapError(_.getMessage)
+    }.mapError {
+      case _: java.io.IOException => IntegrationError.ServiceUnavailable("FileSystem", s"Cannot create file $testFile")
+      case other => IntegrationError.ServiceUnavailable("FileSystem", other.getMessage)
+    }
 
     // Read the file using blocking integration
     content <- BlockingIntegration.readFileBlocking(testFile)
 
     // Clean up test file
-    _ <- Eru.effect(new File(testFile).delete()).mapError(_.getMessage)
+    _ <- Eru.effect(new File(testFile).delete()).mapError {
+      case _: java.io.IOException => IntegrationError.ServiceUnavailable("FileSystem", s"Cannot delete file $testFile")
+      case other => IntegrationError.ServiceUnavailable("FileSystem", other.getMessage)
+    }
 
     result <- Eru.succeed(s"File content (${content.length} chars): ${content.take(50)}...")
   } yield result
@@ -226,7 +265,11 @@ def blockingIntegrationExample(): Eru[String, String] = {
 val blockingResult = blockingIntegrationExample().attempt.unsafeRunSync()
 blockingResult match {
   case net.ghoula.eru.Result.Success(result) => println(s"Blocking integration: $result")
-  case net.ghoula.eru.Result.Failure(error) => println(s"Blocking integration error: $error")
+  case net.ghoula.eru.Result.Failure(error) => error match {
+    case IntegrationError.FileNotFound(path) => println(s"File not found: $path")
+    case IntegrationError.ServiceUnavailable(service, reason) => println(s"$service unavailable: $reason")
+    case other => println(s"Blocking integration error: $other")
+  }
 }
 
 // Database pool example

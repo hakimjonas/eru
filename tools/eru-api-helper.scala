@@ -77,34 +77,56 @@ Examples:
 
   def validateSnippet(code: String): Unit = {
     println(s"Validating: $code")
+    println("Note: Using simple syntax validation - full API validation requires sbt compilation context")
 
-    val tempDir = Files.createTempDirectory("eru-validate")
-    val testFile = tempDir.resolve("Test.scala")
+    // Basic syntax validation - check for common issues
+    val issues = scala.collection.mutable.ListBuffer[String]()
 
-    val fullCode = s"""
-import net.ghoula.eru.prelude.*
+    // Check for deprecated methods
+    if (code.contains("catchAll")) {
+      issues += "  • Replace 'catchAll' with 'recoverWith'"
+    }
 
-object Test {
-  def test(): Unit = {
-    $code
-  }
-}
-"""
+    if (code.contains("Eru.loop")) {
+      issues += "  • 'Eru.loop' doesn't exist - use 'Eru.iterate' or 'Eru.foldLeft'"
+    }
 
-    Files.write(testFile, fullCode.getBytes)
+    if (code.contains("*>")) {
+      issues += "  • Operator '*>' not available - use for-comprehensions or flatMap"
+    }
 
-    try {
-      val result = Process(Seq("scala", "-cp", getClasspath(), testFile.toString)).!!
-      println("✅ Code validates successfully!")
-    } catch {
-      case e: Exception =>
-        println("❌ Validation failed:")
-        println(e.getMessage)
-        suggestFixes(code)
-    } finally {
-      // Cleanup
-      Files.deleteIfExists(testFile)
-      Files.deleteIfExists(tempDir)
+    // Check for anti-patterns
+    if (code.contains("mapError(_.getMessage)")) {
+      issues += "  • Avoid 'mapError(_.getMessage)' - use typed errors instead"
+    }
+
+    if (code.contains("throw new")) {
+      issues += "  • Avoid 'throw new' - use Eru.fail() for functional error handling"
+    }
+
+    if (code.contains("var ") && !code.contains("// intentional")) {
+      issues += "  • Avoid 'var' - use immutable values and Eru's state management"
+    }
+
+    if (code.contains("synchronized")) {
+      issues += "  • Avoid 'synchronized' - use Eru's concurrency primitives (Semaphore, Ref, etc.)"
+    }
+
+    // Check for runtime methods - no longer an issue since prelude includes default runtime
+    val runtimeMethods = List("fork", "race", "zipPar", "parTraverse", "timeout", "sleep")
+    val hasRuntimeMethod = runtimeMethods.exists(code.contains)
+    val hasPreludeImport = code.contains("import net.ghoula.eru.prelude")
+
+    if (hasRuntimeMethod && !hasPreludeImport) {
+      issues += "  • Runtime methods detected but missing 'import net.ghoula.eru.prelude.*'"
+    }
+
+    if (issues.isEmpty) {
+      println("✅ Code passes basic validation!")
+      println("  (Note: Full compilation validation would require project context)")
+    } else {
+      println("⚠️  Potential issues found:")
+      issues.foreach(println)
     }
   }
 
@@ -162,16 +184,16 @@ println(result)
   }
 
   private def getRequiredImports(methodName: String): List[String] = {
-    // With defaultRuntime in prelude, everything just works with one import
+    // The prelude includes everything needed, including the default runtime
     List("import net.ghoula.eru.prelude.*")
   }
 
   private def suggestFixes(code: String): Unit = {
     println("\nPossible fixes:")
 
-    if (code.contains("parTraverse") && !code.contains("RuntimeExtensions")) {
-      println("  • Add: import net.ghoula.eru.RuntimeExtensions.*")
-      println("  • Add: given runtime: EruRuntime = EruRuntime.create()")
+    if (code.contains("parTraverse") && !code.contains("prelude")) {
+      println("  • Add: import net.ghoula.eru.prelude.*")
+      println("  • The prelude provides everything including a default runtime")
     }
 
     if (code.contains("Eru.loop")) {
@@ -186,10 +208,22 @@ println(result)
   private def getClasspath(): String = {
     // Try to get classpath from sbt
     try {
-      val cp = Process(Seq("sbt", "-batch", "-error", "export runtime:fullClasspath")).!!
-      cp.trim
+      val output = Process(Seq("sbt", "-batch", "-error", "show eruRuntimeJVM/fullClasspath")).!!
+      // Extract paths from sbt output (lines with "* Attributed(path)")
+      val paths = output.split("\n")
+        .filter(_.contains("* Attributed("))
+        .map(line => line.substring(line.indexOf("(") + 1, line.lastIndexOf(")")))
+        .mkString(":")
+
+      if (paths.nonEmpty) paths else throw new Exception("No classpath found in sbt output")
     } catch {
-      case _ => System.getProperty("java.class.path")
+      case e: Exception =>
+        println(s"Failed to get sbt classpath: ${e.getMessage}")
+        // Fallback: try to construct classpath from target directories
+        val coreClasses = "eru-core/.jvm/target/scala-3.7.2/classes"
+        val runtimeClasses = "eru-runtime/jvm/target/scala-3.7.2/classes"
+        val currentCp = System.getProperty("java.class.path")
+        s"$coreClasses:$runtimeClasses:$currentCp"
     }
   }
 }

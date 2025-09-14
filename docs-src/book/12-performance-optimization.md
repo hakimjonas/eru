@@ -292,10 +292,7 @@ resourcePerformanceTest()
 Eru's fiber-based concurrency provides excellent performance characteristics:
 
 ```scala mdoc
-import net.ghoula.eru.EruRuntime
-
-// Create runtime for concurrency examples
-given runtime: EruRuntime = EruRuntime.create()
+import net.ghoula.eru.prelude.given
 
 // Concurrency performance testing
 def concurrencyPerformance(): Unit = {

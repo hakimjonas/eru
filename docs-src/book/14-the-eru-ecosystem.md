@@ -258,8 +258,6 @@ object CatsEffectMigration {
   // 3. Concurrent operations
   // Cats Effect: IO.both(fa, fb), fa.start, fiber.joinWithNever
   // Eru equivalent: zip, fork, await
-  import net.ghoula.eru.EruRuntime
-  given runtime: EruRuntime = EruRuntime.create()
 
   def concurrencyMigration(): Eru[String, (String, String)] = {
     val task1 = Eru.succeed("Task 1")
@@ -305,6 +303,8 @@ println(s"Cats Effect migration example: $catsEffectMigrationResult")
 ### From ZIO
 
 ```scala mdoc
+import net.ghoula.eru.prelude.given
+
 // Migration patterns from ZIO
 object ZIOMigration {
 
@@ -342,7 +342,6 @@ object ZIOMigration {
   // 3. Fiber management
   // ZIO: fiber.fork, fiber.join, fiber.interrupt
   // Eru equivalent: fork, await, interrupt
-  given runtime: EruRuntime = EruRuntime.create()
 
   def zioFiberMigration(): Eru[String, String] = {
     val task = Eru.succeed("Background task")

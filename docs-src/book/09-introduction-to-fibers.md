@@ -10,10 +10,7 @@ A fiber is a lightweight concurrent execution context that runs Eru programs ind
 
 ```scala mdoc
 import net.ghoula.eru.prelude.*
-import net.ghoula.eru.{EruRuntime, Fiber}
-
-// Create a runtime for concurrent execution
-given runtime: EruRuntime = EruRuntime.create()
+import net.ghoula.eru.prelude.given
 
 // A simple program that represents background work
 def longRunningTask(id: Int): Eru[String, String] = {
@@ -244,7 +241,6 @@ println(errorHandlingResult)
 Fibers support cooperative interruption, allowing graceful cancellation:
 
 ```scala mdoc
-import net.ghoula.eru.InterruptCause
 
 def interruptibleTask(): Eru[String, String] = {
   // A task that could be interrupted during computation

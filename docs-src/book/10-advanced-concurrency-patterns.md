@@ -10,10 +10,7 @@ One of the most common concurrency needs is processing collections in parallel w
 
 ```scala mdoc
 import net.ghoula.eru.prelude.*
-import net.ghoula.eru.EruRuntime
-
-// Create runtime for concurrent execution
-given runtime: EruRuntime = EruRuntime.create()
+import net.ghoula.eru.prelude.given
 
 // Simulate different types of work with varying complexity
 def lightProcessing(item: String): Eru[String, String] = {
@@ -343,38 +340,52 @@ println(s"Timeout demo: $timeoutResults")
 ### Circuit Breaker Pattern
 
 ```scala mdoc
-// Implement a basic circuit breaker pattern
-class CircuitBreaker(failureThreshold: Int, recoveryTimeout: Long) {
-  private var failureCount = 0
-  private var lastFailureTime = 0L
-  private var isOpen = false
+import net.ghoula.eru.prelude.given
+
+// State for circuit breaker - immutable case class
+case class CircuitBreakerState(
+  failureCount: Int = 0,
+  lastFailureTime: Long = 0L,
+  isOpen: Boolean = false
+)
+
+// Functional circuit breaker using Ref for thread-safe state management
+class FunctionalCircuitBreaker(failureThreshold: Int, recoveryTimeout: Long) {
+  private val stateRef = Eru.ref(CircuitBreakerState()).unsafeRunSync()
 
   def execute[A](operation: Eru[String, A]): Eru[String | Throwable, A] = {
-    if (isOpen && (System.currentTimeMillis() - lastFailureTime) < recoveryTimeout) {
-      Eru.fail("Circuit breaker is OPEN - failing fast")
-    } else {
-      operation.tapError { _ =>
-        Eru.effect {
-          failureCount += 1
-          lastFailureTime = System.currentTimeMillis()
-          if (failureCount >= failureThreshold) {
-            isOpen = true
-            println(s"Circuit breaker OPENED after $failureCount failures")
-          }
-        }.attempt.map(_ => ())
-      }.tap { _ =>
-        Eru.effect {
-          // Success resets the circuit breaker
-          failureCount = 0
-          isOpen = false
-        }.attempt.map(_ => ())
+    for {
+      state <- stateRef.get
+      currentTime = System.currentTimeMillis()
+
+      result <- if (state.isOpen && (currentTime - state.lastFailureTime) < recoveryTimeout) {
+        Eru.fail("Circuit breaker is OPEN - failing fast")
+      } else {
+        operation.tapError { _ =>
+          // Update state atomically on failure
+          stateRef.update { currentState =>
+            val newFailureCount = currentState.failureCount + 1
+            val newState = currentState.copy(
+              failureCount = newFailureCount,
+              lastFailureTime = currentTime,
+              isOpen = newFailureCount >= failureThreshold
+            )
+            if (!currentState.isOpen && newState.isOpen) {
+              println(s"Circuit breaker OPENED after $newFailureCount failures")
+            }
+            newState
+          }.map(_ => ())
+        }.tap { _ =>
+          // Reset state on success
+          stateRef.set(CircuitBreakerState()).map(_ => ())
+        }
       }
-    }
+    } yield result
   }
 }
 
 def circuitBreakerDemo(): Eru[String | Throwable, List[String]] = {
-  val circuitBreaker = new CircuitBreaker(failureThreshold = 2, recoveryTimeout = 1000)
+  val circuitBreaker = new FunctionalCircuitBreaker(failureThreshold = 2, recoveryTimeout = 1000)
 
   // Simulate an unreliable service
   var callCount = 0

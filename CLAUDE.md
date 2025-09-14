@@ -122,6 +122,16 @@ Eru is a high-performance effect system built with modern Scala 3, organized as 
 
 ...is a fundamental violation of our mission. Every single test must pass. Every feature must work correctly in all scenarios. There are no acceptable compromises on correctness - the easy path must also be the correct path.
 
+### Data-Driven Development Mantra
+**Be data-driven, not assumption-driven.** Before suggesting fixes or claiming something is broken:
+- Run tests to verify actual behavior
+- Examine the code carefully to understand the implementation
+- Prove issues with concrete evidence (test failures, error messages, incorrect output)
+- Don't assume the implementation is wrong when tests are passing - the test might be flawed
+- When tests hang or fail, investigate both the test specification AND the implementation
+
+Remember: "Don't just assume and start fixing things that are not broken - but if you can prove it, let's look at a fix."
+
 ### Scala 3 Language Requirements
 - Use `enum` for ADTs (not sealed traits)
 - Use `opaque type` for domain integrity  
