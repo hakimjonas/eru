@@ -146,8 +146,8 @@ def stackSafeRecursion(): Eru[String, Long] = {
 
 // More efficient iterative approach
 def iterativeApproach(): Eru[String, Long] = {
-  // Use foldLeft for better performance with large iterations
-  val numbers = (1L to 10000L).toList
+  // Use a smaller range to avoid infinite loops in documentation
+  val numbers = (1L to 100L).toList
   Eru.foldLeft(numbers)(0L)((acc, n) => Eru.succeed(acc + n))
 }
 
