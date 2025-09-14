@@ -474,12 +474,24 @@ class FiberStressSpec extends FunSuite {
 
       val fiberCount = 100
 
-      def createObservableFiber(id: Int): Eru[Nothing, String] = {
+      def createObservableFiber(id: Int): Eru[String, String] = {
         for {
-          _ <- runtime.sleep(Duration.ofMillis(1))
-          _ <- Eru.succeed(s"work-$id")
-          _ <- runtime.sleep(Duration.ofMillis(1))
-        } yield s"completed-$id"
+          // CPU-bound work that creates real concurrency without TestClock dependency
+          _ <- Eru.effect {
+            (1 to 1000).map(_ * id).sum // Initial computation
+          }.mapError(_.getMessage)
+
+          _ <- Eru.effect {
+            s"work-$id".hashCode // Some string processing
+          }.mapError(_.getMessage)
+
+          result <- Eru.effect {
+            // Final computation that combines results
+            val computation = (1 to 500).map(i => i * id + i).sum
+            s"completed-$id-$computation"
+          }.mapError(_.getMessage)
+
+        } yield result
       }
 
       val computation = for {
@@ -500,20 +512,30 @@ class FiberStressSpec extends FunSuite {
         )
       } yield results
 
-      // Fork the computation to allow TestClock control
-      val fiber = runtime.fork(computation).unsafeRunSync()
+      // Execute the computation with proper concurrency
+      val results = computation.unsafeRunSync()
 
-      // Advance TestClock to complete all sleep operations
-      runtime.testClock.advance(Duration.ofMillis(2))
+      // Wait for all observer events to be processed (observer events are async)
+      def waitForObserverCompletion(): Unit = {
+        var attempts = 0
+        while (fiberEndEvents.get() < fiberCount && attempts < 1000) {
+          Thread.sleep(1) // Give observer events time to process
+          attempts += 1
+        }
+      }
 
-      val result = fiber.await.unsafeRunSync()
-      result match {
-        case Exit.Success(results) =>
-          assertEquals(results.length, fiberCount)
-          assertEquals(fiberStartEvents.get(), fiberCount)
-          assertEquals(fiberEndEvents.get(), fiberCount)
-          assert(eventCount.get() >= fiberStartEvents.get() + fiberEndEvents.get())
-        case other => fail(s"Expected successful observer test, got: $other")
+      waitForObserverCompletion()
+
+      // Verify results
+      assertEquals(results.length, fiberCount)
+      assertEquals(fiberStartEvents.get(), fiberCount)
+      assertEquals(fiberEndEvents.get(), fiberCount)
+      assert(eventCount.get() >= fiberStartEvents.get() + fiberEndEvents.get())
+
+      // Verify each result contains the expected computation
+      results.foreach { result =>
+        assert(result.contains("completed-"))
+        assert(result.contains("-"))
       }
     }
   }

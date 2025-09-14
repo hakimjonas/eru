@@ -41,23 +41,23 @@ JVM vs Native execution models. Writing platform-agnostic code with consistent A
 **[Chapter 9: Introduction to Fibers](09-introduction-to-fibers.md)**  
 What fibers are and why they matter. Basic patterns and structured concurrency principles.
 
-**Chapter 10: Advanced Concurrency Patterns**  
+**[Chapter 10: Advanced Concurrency Patterns](10-advanced-concurrency-patterns.md)**
 Racing, parallel processing, and coordination. Resource-bounded concurrency patterns.
 
 ### Part V: Production Readiness
 
-**Chapter 11: Observability & Debugging**  
+**[Chapter 11: Observability & Debugging](11-observability-debugging.md)**
 `EruObserver` and tracing patterns. Making program execution transparent and debuggable.
 
-**Chapter 12: Performance & Optimization**  
+**[Chapter 12: Performance & Optimization](12-performance-optimization.md)**
 Understanding Eru's performance characteristics. Benchmarking and measurement techniques.
 
 ### Part VI: Ecosystem & Integration
 
-**Chapter 13: Integration Patterns**  
+**[Chapter 13: Integration Patterns](13-integration-patterns.md)**
 Working with legacy code, blocking operations, and third-party libraries.
 
-**Chapter 14: The Eru Ecosystem**  
+**[Chapter 14: The Eru Ecosystem](14-the-eru-ecosystem.md)**
 Valar integration, community patterns, and migration strategies.
 
 ---

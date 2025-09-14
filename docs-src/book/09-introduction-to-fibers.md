@@ -45,7 +45,7 @@ fiberResult match {
 }
 ```
 
-Notice how `fork` returns immediately while the task runs in the background, and `await` safely collects the result.
+Notice how `fork` returns immediately while the task runs in the background, and `await` safely collects the result. The `fork` operation returns an `Eru[Nothing, Fiber[E, A]]`, meaning that starting a fiber is itself a non-blocking and infallible effect—you get back a reference to the fiber, not the result of its computation.
 
 ## Fiber Lifecycle
 
