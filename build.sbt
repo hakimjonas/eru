@@ -298,7 +298,7 @@ lazy val docs = project
       "SCALA_VERSION" -> scalaVersion.value
     ),
     mdoc := {
-      val result = mdoc.evaluated
+      val result: Unit = mdoc.evaluated
       val baseDir = (ThisBuild / baseDirectory).value
       val mdocOutputDir = mdocOut.value
 
@@ -358,7 +358,7 @@ lazy val site = project
 
       // Ensure repo exists
       if (!repo.exists) {
-        log.info(s"Cloning gh-pages to ${repo}")
+        log.info(s"Cloning gh-pages to $repo")
         Process(Seq("git", "clone", "-b", "gh-pages", git.remoteRepo.value, repo.getAbsolutePath)).!
       }
 
