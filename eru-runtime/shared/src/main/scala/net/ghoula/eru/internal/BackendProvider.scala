@@ -7,3 +7,10 @@ package net.ghoula.eru.internal
 private[eru] trait BackendProvider {
   def backend: ConcurrencyBackend
 }
+
+/** Extended provider interface that supports creating fresh backend instances for isolation. */
+private[eru] trait BackendFactory extends BackendProvider {
+
+  /** Creates a fresh backend instance for runtime isolation. */
+  def createFresh(): ConcurrencyBackend
+}

@@ -164,13 +164,30 @@ object CountDownLatch {
           runtime
             .suspend[Nothing, Unit](safeRegisterCallback)
             .attempt
-            .map {
-              case Result.Success(_) => ()
-              case Result.Failure(_) =>
-                // This should never happen in a correctly implemented CountDownLatch
-                throw new IllegalStateException("CountDownLatch await encountered unexpected error")
+            .flatMap {
+              case Result.Success(_) => Eru.unit
+              case Result.Failure(e) =>
+                // Log warning and fall back to polling
+                Eru.effect {
+                  System.err.println(s"WARNING: CountDownLatch await suspend failed: $e")
+                  System.err.println("Falling back to polling mode")
+                }.attempt.flatMap(_ => pollUntilZero())
             }
         }
       }
+
+    /** Polling fallback for backends that don't support suspend. */
+    private def pollUntilZero(): Eru[Nothing, Unit] = {
+      def checkAndRepeat: Eru[Nothing, Unit] =
+        Eru.succeed(count.get()).flatMap { currentCount =>
+          if (currentCount == 0) {
+            Eru.unit
+          } else {
+            // Small delay to avoid busy-waiting, then check again
+            Eru.effect(Thread.`yield`()).attempt.flatMap(_ => checkAndRepeat)
+          }
+        }
+      checkAndRepeat
+    }
   }
 }

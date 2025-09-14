@@ -6,9 +6,12 @@ package net.ghoula.eru.internal
   * requiring reflection. When present on the classpath, the shared PlatformBackend will discover
   * this provider and use its backend.
   *
-  * This provider creates a singleton backend with its own fiber tracking queue, ensuring production
-  * code has proper auto-join cleanup support while maintaining isolation from tests.
+  * Implements BackendFactory to support creating fresh isolated backends for each runtime instance.
   */
-private[eru] final class JvmBackendProvider extends BackendProvider {
-  val backend: ConcurrencyBackend = RuntimeBackendAdapter.virtualThreads()
+private[eru] final class JvmBackendProvider extends BackendFactory {
+  // Singleton backend for shared runtime
+  lazy val backend: ConcurrencyBackend = RuntimeBackendAdapter.virtualThreads()
+
+  /** Creates a fresh backend for isolated runtime instances. */
+  def createFresh(): ConcurrencyBackend = RuntimeBackendAdapter.virtualThreads()
 }

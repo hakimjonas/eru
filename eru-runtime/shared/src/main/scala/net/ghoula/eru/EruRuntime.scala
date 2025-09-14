@@ -782,12 +782,39 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 /** Companion object providing factory methods for creating EruRuntime instances. */
 object EruRuntime {
 
-  /** Creates a new EruRuntime with the platform-appropriate backend.
+  /** Creates a new EruRuntime with a completely isolated backend.
     *
-    * Each call creates a fresh runtime instance with its own fiber tracking, ensuring complete
-    * isolation from other runtime instances.
+    * Each call creates a fresh runtime instance with its own thread pools, fiber tracking, and
+    * coordination primitives, ensuring complete isolation from other runtime instances.
+    *
+    * For applications that explicitly need a shared runtime across components, use
+    * `EruRuntime.shared` instead.
     */
   def create(): EruRuntime = {
+    // Create a fresh backend for true isolation
+    val freshBackend = createFreshBackend()
+    new EruRuntime(freshBackend)
+  }
+
+  /** Creates a fresh backend instance for the current platform.
+    *
+    * This ensures each EruRuntime.create() call gets its own isolated backend, preventing shared
+    * state issues with coordination primitives.
+    */
+  private def createFreshBackend(): internal.ConcurrencyBackend = {
+    // Platform-specific fresh backend creation without casting
+    PlatformBackend.createFreshBackend()
+  }
+
+  /** Shared runtime instance for applications that explicitly need a singleton runtime.
+    *
+    * WARNING: Using a shared runtime across independent components can cause coordination primitive
+    * interference. Only use when you explicitly need a single shared runtime for your entire
+    * application.
+    *
+    * Most applications should use `EruRuntime.create()` for isolated instances.
+    */
+  lazy val shared: EruRuntime = {
     val backend = PlatformBackend.backend
     new EruRuntime(backend)
   }
