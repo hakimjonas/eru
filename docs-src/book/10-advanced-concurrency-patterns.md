@@ -31,7 +31,7 @@ def heavyProcessing(item: String): Eru[String, String] = {
 }
 
 // parTraverse processes items in parallel with bounded concurrency
-def parallelLightWork(): Eru[String, List[String]] = {
+def parallelLightWork(): Eru[String | Throwable, List[String]] = {
   val items = List("item1", "item2", "item3", "item4", "item5")
   parTraverse(items)(lightProcessing)
 }
@@ -56,31 +56,13 @@ For more control over concurrency, you can build custom parallel processing:
 def customParallelProcessing[A, B](
   items: List[A],
   maxConcurrency: Int
-)(processor: A => Eru[String, B]): Eru[String, List[B]] = {
-
-  def processChunk(chunk: List[A]): Eru[String, List[B]] = {
-    val fiberPrograms = chunk.map(item => processor(item).fork)
-
-    for {
-      fibers <- Eru.collectAll(fiberPrograms)
-      exits <- Eru.collectAll(fibers.map(_.await))
-      results <- Eru.succeed(exits.collect {
-        case net.ghoula.eru.Exit.Success(value) => value
-      })
-    } yield results
-  }
-
-  // Split into chunks based on max concurrency
-  val chunks = items.grouped(maxConcurrency).toList
-
-  for {
-    chunkResults <- Eru.traverse(chunks)(processChunk)
-    flatResults <- Eru.succeed(chunkResults.flatten)
-  } yield flatResults
+)(processor: A => Eru[String, B]): Eru[String | Throwable, List[B]] = {
+  // Use the built-in foreachParN for bounded concurrency
+  foreachParN(maxConcurrency, items)(processor)
 }
 
 // Test custom parallel processing
-def testCustomParallel(): Eru[String, List[String]] = {
+def testCustomParallel(): Eru[String | Throwable, List[String]] = {
   val items = (1 to 8).map(i => s"task-$i").toList
 
   customParallelProcessing(items, maxConcurrency = 3) { item =>
@@ -102,13 +84,11 @@ Advanced concurrent systems need coordination between fibers. Eru provides sever
 ### Promise-Based Coordination
 
 ```scala mdoc
-import net.ghoula.eru.coordination.Promise
-
 // Promises allow one fiber to complete a value that other fibers await
-def promiseCoordination(): Eru[String, String] = {
+def promiseCoordination(): Eru[String | Throwable, String] = {
   for {
     // Create a promise that will be completed later
-    promise <- Promise.make[String, String]()
+    promise <- Eru.promise[String, String]
 
     // Fork a fiber that will complete the promise
     producer <- Eru.effect {
@@ -116,16 +96,16 @@ def promiseCoordination(): Eru[String, String] = {
       Thread.sleep(10) // Minimal delay for demonstration
       "Producer result"
     }.mapError(_.getMessage)
-      .flatMap(result => promise.complete(net.ghoula.eru.Exit.Success(result)))
+      .flatMap(result => promise.succeed(result).map(_ => ()))
       .fork
 
     // Fork fibers that wait for the promise
     consumer1 <- promise.await
-      .map(exit => s"Consumer1 received: $exit")
+      .map(result => s"Consumer1 received: $result")
       .fork
 
     consumer2 <- promise.await
-      .map(exit => s"Consumer2 received: $exit")
+      .map(result => s"Consumer2 received: $result")
       .fork
 
     // Collect all results
@@ -157,20 +137,18 @@ promiseResult match {
 ### Deferred Values for Lazy Coordination
 
 ```scala mdoc
-import net.ghoula.eru.coordination.Deferred
-
 // Deferred values provide single-assignment variables for coordination
-def deferredCoordination(): Eru[String, String] = {
+def deferredCoordination(): Eru[Throwable, String] = {
   for {
     // Create a deferred value
-    deferred <- Deferred.make[String, Int]()
+    deferred <- Eru.deferred[Int]
 
     // Fork a computation that will complete the deferred
     computation <- Eru.effect {
       // Expensive computation
       (1 to 1000).sum
     }.mapError(_.getMessage)
-      .flatMap(result => deferred.complete(result))
+      .flatMap(result => deferred.complete(result).map(_ => ()))
       .fork
 
     // Multiple fibers can await the same deferred value
@@ -212,28 +190,29 @@ Production systems need to limit concurrent resource usage to prevent overwhelmi
 ### Semaphore-Based Rate Limiting
 
 ```scala mdoc
-import net.ghoula.eru.coordination.Semaphore
-
 // Semaphores control access to limited resources
-def semaphoreExample(): Eru[String, List[String]] = {
+def semaphoreExample(): Eru[String | Throwable, List[String]] = {
+  // Define a resource-intensive operation
+  def limitedOperation(semaphore: Semaphore)(id: Int): Eru[String | Throwable, String] = {
+    semaphore.withPermit {
+      Eru.effect {
+        println(s"Operation $id started (concurrent access limited)")
+        // Simulate work that uses limited resources
+        Thread.sleep(5) // Brief delay for demonstration
+        s"Operation $id completed"
+      }.mapError(_.getMessage)
+    }.flatMap {
+      case Some(result) => Eru.succeed(result)
+      case None => Eru.fail(s"Failed to acquire permit for operation $id")
+    }
+  }
+
   for {
     // Create semaphore with 2 permits (max 2 concurrent operations)
-    semaphore <- Semaphore.make(2)
-
-    // Define a resource-intensive operation
-    def limitedOperation(id: Int): Eru[String, String] = {
-      semaphore.withPermit {
-        Eru.effect {
-          println(s"Operation $id started (concurrent access limited)")
-          // Simulate work that uses limited resources
-          Thread.sleep(5) // Brief delay for demonstration
-          s"Operation $id completed"
-        }.mapError(_.getMessage)
-      }
-    }
+    semaphore <- Eru.semaphore(2)
 
     // Start many operations - only 2 will run concurrently
-    operations = (1 to 6).map(limitedOperation).toList
+    operations = (1 to 6).map(limitedOperation(semaphore)).toList
     fibers <- Eru.traverse(operations)(_.fork)
 
     // Wait for all to complete
@@ -260,10 +239,10 @@ case class Connection(id: String) {
 }
 
 class ConnectionPool(maxConnections: Int) {
-  private val semaphore = Semaphore.make(maxConnections).unsafeRunSync()
+  private val semaphore = Eru.semaphore(maxConnections).unsafeRunSync()
   private var connectionCounter = 0
 
-  def withConnection[A](operation: Connection => Eru[String, A]): Eru[String, A] = {
+  def withConnection[A](operation: Connection => Eru[String, A]): Eru[String | Throwable, A] = {
     semaphore.withPermit {
       for {
         // Acquire connection
@@ -277,15 +256,18 @@ class ConnectionPool(maxConnections: Int) {
           Eru.effect(connection.close()).mapError(_.getMessage)
         )
       } yield result
+    }.flatMap {
+      case Some(result) => Eru.succeed(result)
+      case None => Eru.fail("No database connections available")
     }
   }
 }
 
-def connectionPoolDemo(): Eru[String, List[String]] = {
+def connectionPoolDemo(): Eru[String | Throwable, List[String]] = {
   val pool = ConnectionPool(maxConnections = 2)
 
   // Define database operations
-  def databaseOperation(id: Int): Eru[String, String] = {
+  def databaseOperation(id: Int): Eru[String | Throwable, String] = {
     pool.withConnection { connection =>
       Eru.effect {
         connection.execute(s"SELECT * FROM table WHERE id = $id")
@@ -317,26 +299,16 @@ Beyond simple racing, production systems need sophisticated timeout and racing s
 ### Timeout with Fallback
 
 ```scala mdoc
-import net.ghoula.eru.InterruptCause
-
 // Create timeout patterns for robust service calls
 def serviceWithTimeout[A](
   operation: Eru[String, A],
   timeoutMs: Long,
   fallback: A
-): Eru[String, A] = {
+): Eru[String | java.util.concurrent.TimeoutException | Throwable, A] = {
+  import java.time.Duration
 
-  // Create a timeout operation
-  val timeout = Eru.effect {
-    Thread.sleep(timeoutMs)
-    throw new RuntimeException("Operation timed out")
-  }.mapError(_.getMessage)
-
-  // Race the operation against timeout
-  operation.race(timeout).map {
-    case Left(result) => result      // Operation completed first
-    case Right(_) => fallback        // Timeout occurred, use fallback
-  }.catchAll(_ => Eru.succeed(fallback))  // Any error results in fallback
+  // Use the built-in timeout with fallback
+  operation.timeoutTo(Duration.ofMillis(timeoutMs), fallback)
 }
 
 // Test timeout behavior
@@ -346,12 +318,18 @@ def fastService(): Eru[String, String] = {
 
 def slowService(): Eru[String, String] = {
   Eru.effect {
-    Thread.sleep(100) // This will timeout
-    "Slow service response"
+    try {
+      Thread.sleep(100) // This will timeout
+      "Slow service response"
+    } catch {
+      case _: InterruptedException =>
+        Thread.currentThread().interrupt() // Restore interrupt status
+        "Slow service interrupted"
+    }
   }.mapError(_.getMessage)
 }
 
-def timeoutDemo(): Eru[String, String] = {
+def timeoutDemo(): Eru[String | java.util.concurrent.TimeoutException | Throwable, String] = {
   for {
     fastResult <- serviceWithTimeout(fastService(), 50, "Fast fallback")
     slowResult <- serviceWithTimeout(slowService(), 50, "Slow fallback")
@@ -371,7 +349,7 @@ class CircuitBreaker(failureThreshold: Int, recoveryTimeout: Long) {
   private var lastFailureTime = 0L
   private var isOpen = false
 
-  def execute[A](operation: Eru[String, A]): Eru[String, A] = {
+  def execute[A](operation: Eru[String, A]): Eru[String | Throwable, A] = {
     if (isOpen && (System.currentTimeMillis() - lastFailureTime) < recoveryTimeout) {
       Eru.fail("Circuit breaker is OPEN - failing fast")
     } else {
@@ -383,20 +361,20 @@ class CircuitBreaker(failureThreshold: Int, recoveryTimeout: Long) {
             isOpen = true
             println(s"Circuit breaker OPENED after $failureCount failures")
           }
-        }.mapError(_.getMessage)
+        }.attempt.map(_ => ())
       }.tap { _ =>
         Eru.effect {
           // Success resets the circuit breaker
           failureCount = 0
           isOpen = false
-        }.mapError(_.getMessage)
+        }.attempt.map(_ => ())
       }
     }
   }
 }
 
-def circuitBreakerDemo(): Eru[String, List[String]] = {
-  val circuitBreaker = CircuitBreaker(failureThreshold = 2, recoveryTimeout = 1000)
+def circuitBreakerDemo(): Eru[String | Throwable, List[String]] = {
+  val circuitBreaker = new CircuitBreaker(failureThreshold = 2, recoveryTimeout = 1000)
 
   // Simulate an unreliable service
   var callCount = 0
@@ -417,7 +395,7 @@ def circuitBreakerDemo(): Eru[String, List[String]] = {
     }
   }.toList
 
-  Eru.collectAll(calls)
+  Eru.sequence(calls)
 }
 
 val circuitResults = circuitBreakerDemo().unsafeRunSync()
@@ -430,58 +408,46 @@ circuitResults.foreach(println)
 Coordinate producers and consumers with backpressure handling:
 
 ```scala mdoc
-import net.ghoula.eru.coordination.Queue
-
 // Producer-consumer pattern with bounded queues
-def producerConsumerDemo(): Eru[String, String] = {
+def producerConsumerDemo(): Eru[String | Throwable, String] = {
   for {
     // Create bounded queue for backpressure
-    queue <- Queue.bounded[String](capacity = 3)
+    queue <- Eru.queue[String](capacity = 3)
 
-    // Producer fiber
+    // Producer fiber that adds items to queue
     producer <- Eru.traverse((1 to 5).toList) { i =>
       val item = s"item-$i"
-      queue.offer(item).map { offered =>
-        if (offered) {
-          println(s"Produced: $item")
-          s"Produced $item"
-        } else {
-          println(s"Queue full, dropped: $item")
-          s"Dropped $item"
-        }
+      queue.offer(item).map { _ =>
+        println(s"Produced: $item")
+        s"Produced $item"
       }
     }.fork
 
-    // Consumer fibers
-    consumer1 <- Eru.iterate(0)(_ =>
-      queue.take.map { item =>
-        println(s"Consumer1 consumed: $item")
+    // Consumer fiber that takes items from queue
+    consumer <- (for {
+      item1 <- queue.take.map { item =>
+        println(s"Consumer consumed: $item")
         item
       }
-    )(_ => false).fork  // This will run once then complete
-
-    consumer2 <- Eru.iterate(0)(_ =>
-      queue.take.map { item =>
-        println(s"Consumer2 consumed: $item")
+      item2 <- queue.take.map { item =>
+        println(s"Consumer consumed: $item")
         item
       }
-    )(_ => false).fork  // This will run once then complete
+      item3 <- queue.take.map { item =>
+        println(s"Consumer consumed: $item")
+        item
+      }
+    } yield List(item1, item2, item3)).fork
 
-    // Let producer complete
+    // Wait for both to complete
     producerResult <- producer.await
+    consumerResult <- consumer.await
 
-    // Brief delay to let some consumption happen
-    _ <- Eru.effect(Thread.sleep(10)).mapError(_.getMessage)
-
-    // Interrupt consumers (they would run forever otherwise)
-    _ <- consumer1.interrupt(InterruptCause.Cancelled(Some("Demo complete")))
-    _ <- consumer2.interrupt(InterruptCause.Cancelled(Some("Demo complete")))
-
-    result <- producerResult match {
-      case net.ghoula.eru.Exit.Success(items) =>
-        Eru.succeed(s"Producer completed ${items.size} items")
-      case other =>
-        Eru.succeed(s"Producer failed: $other")
+    result <- (producerResult, consumerResult) match {
+      case (net.ghoula.eru.Exit.Success(produced), net.ghoula.eru.Exit.Success(consumed)) =>
+        Eru.succeed(s"Produced ${produced.size} items, consumed ${consumed.size} items")
+      case (failure, _) =>
+        Eru.succeed(s"Demo failed: producer=$failure")
     }
 
   } yield result
@@ -502,7 +468,7 @@ Build processing pipelines with stages that can run concurrently:
 // Multi-stage processing pipeline
 case class Item(id: Int, data: String, processed: Boolean = false)
 
-def pipelineDemo(): Eru[String, List[Item]] = {
+def pipelineDemo(): Eru[String | Throwable, List[Item]] = {
 
   // Stage 1: Input validation
   def validateStage(item: Item): Eru[String, Item] = {
@@ -526,7 +492,7 @@ def pipelineDemo(): Eru[String, List[Item]] = {
   }
 
   // Pipeline composition
-  def processItem(item: Item): Eru[String, Item] = {
+  def processItem(item: Item): Eru[String | Throwable, Item] = {
     for {
       validated <- validateStage(item)
       transformed <- transformStage(validated)
@@ -568,7 +534,7 @@ Advanced error handling patterns for concurrent systems:
 
 ```scala mdoc
 // Bulkhead pattern - isolate failures between different service groups
-def bulkheadPattern(): Eru[String, String] = {
+def bulkheadPattern(): Eru[String | Throwable, String] = {
 
   // Critical service group
   def criticalService(): Eru[String, String] = {

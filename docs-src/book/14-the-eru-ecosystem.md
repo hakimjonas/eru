@@ -35,7 +35,7 @@ trait HttpClient[F[_]] {
 }
 
 // Eru-based HTTP client implementation
-class EruHttpClient extends HttpClient[Eru[String, *]] {
+class EruHttpClient extends HttpClient[[A] =>> Eru[String, A]] {
   def get(url: String): Eru[String, ApiResponse] = {
     Eru.effect {
       // Integration with actual HTTP library would go here
@@ -75,7 +75,7 @@ def ecosystemIntegration(): Eru[String, String] = {
   for {
     response <- client.get("https://api.example.com/data")
     encoded = apiResponseCodec.encode(response)
-    _ <- Eru.debug("API response encoded", Map("json" -> encoded))
+    _ <- Eru.succeed(encoded).debug("API response encoded")
     result <- Eru.succeed(s"Successfully processed API response: ${response.status}")
   } yield result
 }
@@ -112,7 +112,7 @@ object ValarPatterns {
     case NetworkError(cause: String)
 
   // Valar-style service implementation with Eru
-  class EruApiService extends ApiService[Eru[ApiError, *]] {
+  class EruApiService extends ApiService[[A] =>> Eru[ApiError, A]] {
 
     def getUser(id: String): Eru[ApiError, ApiResponse] = {
       if (id.isEmpty) {
@@ -141,7 +141,7 @@ object ValarPatterns {
   // Valar-style application composition
   case class AppConfig(apiUrl: String, timeout: Int, retries: Int)
 
-  class Application(config: AppConfig, apiService: ApiService[Eru[ApiError, *]]) {
+  class Application(config: AppConfig, apiService: ApiService[[A] =>> Eru[ApiError, A]]) {
 
     def handleUserRequest(action: String, userId: String, data: Option[String] = None): Eru[String, String] = {
       val apiCall = action match {
@@ -169,10 +169,12 @@ object ValarPatterns {
     // Valar-style retry patterns
     def withRetry[A](operation: Eru[String, A], maxRetries: Int = config.retries): Eru[String, A] = {
       def attempt(retriesLeft: Int): Eru[String, A] = {
-        operation.catchAll { error =>
+        operation.recoverWith { error =>
           if (retriesLeft > 0) {
-            Eru.debug("Retrying operation", Map("retriesLeft" -> retriesLeft.toString, "error" -> error)) *>
-            attempt(retriesLeft - 1)
+            for {
+              _ <- Eru.succeed(s"Retrying operation: $error (retriesLeft: $retriesLeft)").debug("Retry")
+              result <- attempt(retriesLeft - 1)
+            } yield result
           } else {
             Eru.fail(s"Operation failed after ${maxRetries} retries: $error")
           }
@@ -286,7 +288,7 @@ object CatsEffectMigration {
 
     // Cats Effect: riskyOperation.handleErrorWith(error => IO.pure(s"Recovered: $error"))
     // Eru equivalent:
-    riskyOperation.catchAll(error => Eru.succeed(s"Recovered: $error"))
+    riskyOperation.recoverWith(error => Eru.succeed(s"Recovered: $error"))
   }
 
   // Migration helper function
@@ -362,10 +364,12 @@ object ZIOMigration {
     delayMs: Long = 100
   ): Eru[String, A] = {
     def attempt(retriesLeft: Int): Eru[String, A] = {
-      operation.catchAll { error =>
+      operation.recoverWith { error =>
         if (retriesLeft > 0) {
-          Eru.effect(Thread.sleep(delayMs)).mapError(_.getMessage) *>
-          attempt(retriesLeft - 1)
+          for {
+            _ <- Eru.effect(Thread.sleep(delayMs)).mapError(_.getMessage)
+            result <- attempt(retriesLeft - 1)
+          } yield result
         } else {
           Eru.fail(s"Failed after $maxRetries retries: $error")
         }
@@ -402,18 +406,18 @@ object CommunityPatterns {
     def healthCheck(): F[String]
   }
 
-  class EruApplicationService extends ApplicationService[Eru[String, *]] {
+  class EruApplicationService extends ApplicationService[[A] =>> Eru[String, A]] {
 
     def initialize(): Eru[String, Unit] = {
       for {
-        _ <- Eru.debug("Initializing application service")
+        _ <- Eru.succeed("Initializing application service").debug("Init")
         _ <- Eru.effect(println("Service initialized")).mapError(_.getMessage)
       } yield ()
     }
 
     def shutdown(): Eru[String, Unit] = {
       for {
-        _ <- Eru.debug("Shutting down application service")
+        _ <- Eru.succeed("Shutting down application service").debug("Shutdown")
         _ <- Eru.effect(println("Service shutdown complete")).mapError(_.getMessage)
       } yield ()
     }
@@ -432,7 +436,7 @@ object CommunityPatterns {
 
   case class User(id: String, name: String, email: String)
 
-  class InMemoryUserRepository extends Repository[Eru[String, *], String, User] {
+  class InMemoryUserRepository extends Repository[[A] =>> Eru[String, A], String, User] {
     private val store = scala.collection.mutable.Map[String, User]()
 
     def find(key: String): Eru[String, Option[User]] = {
@@ -487,12 +491,13 @@ object CommunityPatterns {
     def getEvents(): F[List[Event]]
   }
 
-  class InMemoryEventStore extends EventStore[Eru[String, *]] {
+  class InMemoryEventStore extends EventStore[[A] =>> Eru[String, A]] {
     private val events = scala.collection.mutable.ListBuffer[Event]()
 
     def appendEvent(event: Event): Eru[String, Unit] = {
       Eru.effect {
         events += event
+        ()
       }.mapError(_.getMessage)
     }
 
@@ -550,6 +555,9 @@ Advanced testing patterns for Eru applications:
 // Advanced testing strategies
 object TestingStrategies {
 
+  // Define User for testing scope
+  case class User(id: String, name: String, email: String)
+
   // Property-based testing integration
   trait PropertyTesting {
     def forAll[A](generator: () => A)(property: A => Eru[String, Boolean]): Eru[String, Unit] = {
@@ -603,7 +611,7 @@ object TestingStrategies {
   }
 
   // Mock service for testing
-  class MockUserService extends ServiceContract[Eru[String, *]] {
+  class MockUserService extends ServiceContract[[A] =>> Eru[String, A]] {
     private val users = scala.collection.mutable.Map[String, User]()
 
     def getUserById(id: String): Eru[String, Either[String, User]] = {
@@ -630,14 +638,16 @@ object TestingStrategies {
   class IntegrationTestFramework {
     def runTestSuite(suiteName: String)(tests: Eru[String, List[String]]): Eru[String, Unit] = {
       for {
-        _ <- Eru.debug(s"Starting test suite: $suiteName")
+        _ <- Eru.succeed(s"Starting test suite: $suiteName").debug("TestSuite")
         results <- tests
         failures = results.filter(_.nonEmpty)
         _ <- if (failures.nonEmpty) {
-          Eru.debug(s"Test suite $suiteName failed", Map("failures" -> failures.mkString(", "))) *>
-          Eru.fail(s"${failures.size} test(s) failed")
+          for {
+            _ <- Eru.succeed(s"Test suite $suiteName failed: ${failures.mkString(", ")}").debug("TestFailure")
+            result <- Eru.fail(s"${failures.size} test(s) failed")
+          } yield result
         } else {
-          Eru.debug(s"Test suite $suiteName passed")
+          Eru.succeed(s"Test suite $suiteName passed").debug("TestSuccess")
         }
       } yield ()
     }
@@ -722,7 +732,7 @@ object FutureEvolution {
   def futureFeatureExample(): Eru[String, String] = {
     // This demonstrates how future enhancements might work
     for {
-      _ <- Eru.debug("Future features demo")
+      _ <- Eru.succeed("Future features demo").debug("FutureDemo")
       result <- Eru.succeed("Future Eru will have even more powerful abstractions")
     } yield result
   }

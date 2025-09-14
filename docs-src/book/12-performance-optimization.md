@@ -199,7 +199,7 @@ def errorHandlingPerformance(): Unit = {
   // Success path performance
   val successEffect = Eru.succeed(42).flatMap { x =>
     if (x > 0) Eru.succeed(x * 2) else Eru.fail("Negative number")
-  }.catchAll(_ => Eru.succeed(-1))
+  }.recoverWith { case _ => Eru.succeed(-1) }
 
   val successStart = System.nanoTime()
   (1 to iterations).foreach { _ =>
@@ -214,7 +214,7 @@ def errorHandlingPerformance(): Unit = {
   // Failure path performance
   val failureEffect = Eru.succeed(-1).flatMap { x =>
     if (x > 0) Eru.succeed(x * 2) else Eru.fail("Negative number")
-  }.catchAll(_ => Eru.succeed(-1))
+  }.recoverWith { case _ => Eru.succeed(-1) }
 
   val failureStart = System.nanoTime()
   (1 to iterations).foreach { _ =>
@@ -307,9 +307,9 @@ def concurrencyPerformance(): Unit = {
     Eru.collectAll(tasks)
   }
 
-  def parallelWork(): Eru[String, List[Int]] = {
-    val tasks = (1 to 100).map(i => Eru.succeed(i * 2)).toList
-    parTraverse(tasks)(identity)
+  def parallelWork(): Eru[String | Throwable, List[Int]] = {
+    val tasks = (1 to 100).map(i => i * 2).toList
+    parTraverse(tasks)(i => Eru.effect(i).mapError(_.getMessage))
   }
 
   // Sequential benchmark
@@ -388,7 +388,7 @@ def memoryOptimizedPatterns(): Unit = {
   }
 
   class ResourcePool(size: Int) {
-    private val resources = (1 to size).map(PooledResource).toList
+    private val resources = (1 to size).map(PooledResource.apply).toList
     private var index = 0
 
     def withResource[A](f: PooledResource => Eru[String, A]): Eru[String, A] = {
@@ -501,7 +501,7 @@ def measurementExample(): Unit = {
   PerformanceMeasurement.measureEruOperation("Error Handling", 20000) { () =>
     Eru.succeed(42).flatMap { x =>
       if (x > 0) Eru.succeed(x.toString) else Eru.fail("Error")
-    }.catchAll(_ => Eru.succeed("Default"))
+    }.recoverWith { case _ => Eru.succeed("Default") }
   }
 }
 
@@ -581,7 +581,7 @@ object BenchmarkingBestPractices {
     println(f"  Average: $avg%.2f ms ($opsPerMs%.0f ops/ms)")
     println(f"  Min: ${measurements.min}%.2f ms")
     println(f"  Max: ${measurements.max}%.2f ms")
-    println(f"  Std Dev: ${standardDeviation(measurements)}%.2f ms")
+    println(f"  Std Dev: ${standardDeviation(measurements.toList)}%.2f ms")
   }
 
   private def standardDeviation(values: List[Double]): Double = {
@@ -639,7 +639,7 @@ class ProductionPerformanceMonitor {
     }
   }
 
-  def recordEruOperation[E, A](operationName: String)(operation: Eru[E, A]): Eru[E, A] = {
+  def recordEruOperation[E, A](operationName: String)(operation: Eru[E, A]): Eru[E | Throwable, A] = {
     Eru.effect {
       val start = System.nanoTime()
       val result = operation.unsafeRunSync()
@@ -647,9 +647,8 @@ class ProductionPerformanceMonitor {
       recordTiming(operationName, (end - start) / 1000000)
       recordSuccess(operationName)
       result
-    }.mapError { error =>
-      recordFailure(operationName)
-      error
+    }.tapError { _ =>
+      Eru.effect(recordFailure(operationName)).attempt.map(_ => ())
     }
   }
 

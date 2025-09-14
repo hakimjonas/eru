@@ -10,45 +10,52 @@ Eru provides structured observability through the `EruObserver` interface, which
 
 ```scala mdoc
 import net.ghoula.eru.prelude.*
-import net.ghoula.eru.{EruObserver, EruEvent, EruRuntime}
 
 // Define a simple observer for demonstration
 class LoggingObserver extends EruObserver {
   def onEvent(event: EruEvent): Unit = {
     event match {
-      case EruEvent.ProgramStart(programId, timestamp) =>
-        println(s"🚀 Program $programId started at $timestamp")
+      case EruEvent.ProgramStart(scopeId) =>
+        println(s"🚀 Program started with scope $scopeId")
 
-      case EruEvent.ProgramEnd(programId, timestamp, exit) =>
-        println(s"🏁 Program $programId ended at $timestamp: $exit")
+      case EruEvent.ProgramEnd(scopeId, outcome) =>
+        val outcomeStr = outcome match {
+          case EruObserver.Outcome.Success => "Success"
+          case EruObserver.Outcome.TypedFailure(error) => s"TypedFailure($error)"
+          case EruObserver.Outcome.Defect(throwable) => s"Defect(${throwable.getMessage})"
+        }
+        println(s"🏁 Program ended with scope $scopeId: $outcomeStr")
 
-      case EruEvent.FiberStart(fiberId, programId, timestamp) =>
-        println(s"🧵 Fiber $fiberId started in program $programId at $timestamp")
+      case EruEvent.FiberStarted(fiberId) =>
+        println(s"🧵 Fiber $fiberId started")
 
-      case EruEvent.FiberEnd(fiberId, programId, timestamp, exit) =>
-        println(s"🔚 Fiber $fiberId ended in program $programId at $timestamp: $exit")
+      case EruEvent.FiberCompleted(fiberId, exit) =>
+        println(s"🔚 Fiber $fiberId completed: $exit")
 
-      case EruEvent.Debug(fiberId, programId, timestamp, step, metadata) =>
-        println(s"🐛 Debug [$fiberId]: $step - $metadata")
+      case EruEvent.Step(scopeId, label) =>
+        println(s"🐛 Debug step [$scopeId]: $label")
+
+      case _ => // Handle other event types
+        println(s"📝 Other event: $event")
     }
   }
 }
 
-// Create runtime with observer
-val observer = LoggingObserver()
-given runtime: EruRuntime = EruRuntime.create(observer = Some(observer))
+// Create runtime (standard creation)
+given runtime: EruRuntime = EruRuntime.create()
 
 // Simple program to demonstrate observation
 def observableProgram(): Eru[String, String] = {
   for {
-    _      <- Eru.debug("Starting computation")
+    _      <- Eru.succeed("Starting").debug("Starting computation")
     result <- Eru.effect("Hello, Observable World!").mapError(_.getMessage)
-    _      <- Eru.debug("Computation completed", Map("result" -> result))
+    _      <- Eru.succeed(result).debug(s"Computation completed with result: $result")
   } yield result
 }
 
-// Run and observe
-val observedResult = observableProgram().unsafeRunSync()
+// Run with observer
+val observer = LoggingObserver()
+val observedResult = observableProgram().runWith(observer)
 println(s"Final result: $observedResult")
 ```
 
@@ -62,29 +69,29 @@ The observer system captures different types of events throughout program execut
 // Program lifecycle tracking
 def lifecycleDemo(): Eru[String, String] = {
   for {
-    _ <- Eru.debug("Phase 1: Initialization")
+    _ <- Eru.succeed(()).debug("Phase 1: Initialization")
 
     // Simulate some initialization work
     config <- Eru.effect("Configuration loaded").mapError(_.getMessage)
-    _ <- Eru.debug("Configuration phase complete", Map("config" -> config))
+    _ <- Eru.succeed(config).debug(s"Configuration phase complete: $config")
 
-    _ <- Eru.debug("Phase 2: Processing")
+    _ <- Eru.succeed(()).debug("Phase 2: Processing")
 
     // Main processing
     result <- Eru.effect {
       "Processing completed successfully"
     }.mapError(_.getMessage)
 
-    _ <- Eru.debug("Phase 3: Cleanup")
+    _ <- Eru.succeed(()).debug("Phase 3: Cleanup")
 
     // Cleanup
     _ <- Eru.effect(println("Resources cleaned up")).mapError(_.getMessage)
-    _ <- Eru.debug("All phases complete")
+    _ <- Eru.succeed(()).debug("All phases complete")
 
   } yield result
 }
 
-val lifecycleResult = lifecycleDemo().unsafeRunSync()
+val lifecycleResult = lifecycleDemo().runWith(observer)
 println(s"Lifecycle demo result: $lifecycleResult")
 ```
 
@@ -92,24 +99,24 @@ println(s"Lifecycle demo result: $lifecycleResult")
 
 ```scala mdoc
 // Monitor concurrent fiber execution
-def concurrentObservation(): Eru[String, List[String]] = {
+def concurrentObservation(): Eru[String | Throwable, List[String]] = {
   for {
-    _ <- Eru.debug("Starting concurrent operations")
+    _ <- Eru.succeed(()).debug("Starting concurrent operations")
 
     // Fork multiple fibers with observation
     fiber1 <- (for {
-      _ <- Eru.debug("Worker 1 starting")
+      _ <- Eru.succeed(()).debug("Worker 1 starting")
       result <- Eru.effect("Worker 1 completed").mapError(_.getMessage)
-      _ <- Eru.debug("Worker 1 finished", Map("result" -> result))
+      _ <- Eru.succeed(result).debug(s"Worker 1 finished with result: $result")
     } yield result).fork
 
     fiber2 <- (for {
-      _ <- Eru.debug("Worker 2 starting")
+      _ <- Eru.succeed(()).debug("Worker 2 starting")
       result <- Eru.effect("Worker 2 completed").mapError(_.getMessage)
-      _ <- Eru.debug("Worker 2 finished", Map("result" -> result))
+      _ <- Eru.succeed(result).debug(s"Worker 2 finished with result: $result")
     } yield result).fork
 
-    _ <- Eru.debug("All workers forked, awaiting completion")
+    _ <- Eru.succeed(()).debug("All workers forked, awaiting completion")
 
     // Collect results
     exit1 <- fiber1.await
@@ -121,12 +128,12 @@ def concurrentObservation(): Eru[String, List[String]] = {
       }
     }
 
-    _ <- Eru.debug("All concurrent work completed", Map("resultCount" -> results.size.toString))
+    _ <- Eru.succeed(()).debug(s"All concurrent work completed with ${results.size} results")
 
   } yield results
 }
 
-val concurrentResults = concurrentObservation().unsafeRunSync()
+val concurrentResults = concurrentObservation().runWith(observer)
 println(s"Concurrent observation results: ${concurrentResults.mkString(", ")}")
 ```
 
@@ -141,37 +148,30 @@ case class Customer(id: String, name: String, creditLimit: Double)
 
 def processOrder(order: Order): Eru[String, String] = {
   for {
-    _ <- Eru.debug("Order processing started", Map(
-      "orderId" -> order.id,
-      "customerId" -> order.customerId,
-      "amount" -> order.amount.toString
-    ))
+    _ <- Eru.succeed(()).debug(s"Order processing started: orderId=${order.id}, customerId=${order.customerId}, amount=${order.amount}")
 
     // Step 1: Customer validation
-    _ <- Eru.debug("Validating customer")
+    _ <- Eru.succeed(()).debug("Validating customer")
     customer <- validateCustomer(order.customerId)
-    _ <- Eru.debug("Customer validated", Map(
-      "customerName" -> customer.name,
-      "creditLimit" -> customer.creditLimit.toString
-    ))
+    _ <- Eru.succeed(customer).debug(s"Customer validated: name=${customer.name}, creditLimit=${customer.creditLimit}")
 
     // Step 2: Credit check
-    _ <- Eru.debug("Performing credit check")
+    _ <- Eru.succeed(()).debug("Performing credit check")
     _ <- checkCredit(customer, order.amount)
-    _ <- Eru.debug("Credit check passed")
+    _ <- Eru.succeed(()).debug("Credit check passed")
 
     // Step 3: Process payment
-    _ <- Eru.debug("Processing payment")
+    _ <- Eru.succeed(()).debug("Processing payment")
     paymentResult <- processPayment(order)
-    _ <- Eru.debug("Payment processed", Map("paymentResult" -> paymentResult))
+    _ <- Eru.succeed(paymentResult).debug(s"Payment processed: $paymentResult")
 
     // Step 4: Update inventory
-    _ <- Eru.debug("Updating inventory")
+    _ <- Eru.succeed(()).debug("Updating inventory")
     _ <- updateInventory(order)
-    _ <- Eru.debug("Inventory updated")
+    _ <- Eru.succeed(()).debug("Inventory updated")
 
     finalResult <- Eru.succeed(s"Order ${order.id} processed successfully")
-    _ <- Eru.debug("Order processing completed", Map("result" -> finalResult))
+    _ <- Eru.succeed(finalResult).debug(s"Order processing completed: $finalResult")
 
   } yield finalResult
 }
@@ -203,7 +203,7 @@ def updateInventory(order: Order): Eru[String, Unit] = {
 
 // Test order processing with full observation
 val testOrder = Order("ORD-123", "CUST-456", 750.0)
-val orderResult = processOrder(testOrder).attempt.unsafeRunSync()
+val orderResult = processOrder(testOrder).attempt.runWith(observer)
 
 orderResult match {
   case net.ghoula.eru.Result.Success(result) =>
@@ -224,30 +224,34 @@ class PerformanceObserver extends EruObserver {
   private val metrics = scala.collection.mutable.Map[String, Long]()
 
   def onEvent(event: EruEvent): Unit = {
+    val currentTime = System.currentTimeMillis()
+
     event match {
-      case EruEvent.ProgramStart(programId, timestamp) =>
-        startTimes(s"program-$programId") = timestamp
+      case EruEvent.ProgramStart(scopeId) =>
+        startTimes(s"program-$scopeId") = currentTime
+        println(s"📊 Program started with scope $scopeId")
 
-      case EruEvent.ProgramEnd(programId, timestamp, _) =>
-        startTimes.get(s"program-$programId").foreach { startTime =>
-          val duration = timestamp - startTime
-          metrics(s"program-$programId-duration") = duration
-          println(s"📊 Program $programId executed in ${duration}ms")
+      case EruEvent.ProgramEnd(scopeId, outcome) =>
+        startTimes.get(s"program-$scopeId").foreach { startTime =>
+          val duration = currentTime - startTime
+          metrics(s"program-$scopeId-duration") = duration
+          println(s"📊 Program $scopeId executed in ${duration}ms with outcome: $outcome")
         }
 
-      case EruEvent.FiberStart(fiberId, programId, timestamp) =>
-        startTimes(s"fiber-$fiberId") = timestamp
+      case EruEvent.FiberStarted(fiberId) =>
+        startTimes(s"fiber-$fiberId") = currentTime
+        println(s"📊 Fiber $fiberId started")
 
-      case EruEvent.FiberEnd(fiberId, programId, timestamp, _) =>
+      case EruEvent.FiberCompleted(fiberId, exit) =>
         startTimes.get(s"fiber-$fiberId").foreach { startTime =>
-          val duration = timestamp - startTime
+          val duration = currentTime - startTime
           metrics(s"fiber-$fiberId-duration") = duration
-          println(s"📊 Fiber $fiberId executed in ${duration}ms")
+          println(s"📊 Fiber $fiberId completed in ${duration}ms with exit: $exit")
         }
 
-      case EruEvent.Debug(_, _, _, step, metadata) =>
-        if (step.contains("performance")) {
-          println(s"🔍 Performance marker: $step - $metadata")
+      case EruEvent.Step(scopeId, label) =>
+        if (label.contains("performance")) {
+          println(s"🔍 Performance marker [$scopeId]: $label")
         }
 
       case _ => // Ignore other events
@@ -257,14 +261,13 @@ class PerformanceObserver extends EruObserver {
   def getMetrics: Map[String, Long] = metrics.toMap
 }
 
-// Create runtime with performance observer
+// Create performance observer
 val perfObserver = PerformanceObserver()
-given perfRuntime: EruRuntime = EruRuntime.create(observer = Some(perfObserver))
 
 // Program with performance markers
 def performanceTrackedProgram(): Eru[String, String] = {
   for {
-    _ <- Eru.debug("performance: Starting heavy computation")
+    _ <- Eru.succeed(()).debug("performance: Starting heavy computation")
 
     // Simulate CPU-intensive work
     result <- Eru.effect {
@@ -272,9 +275,9 @@ def performanceTrackedProgram(): Eru[String, String] = {
       s"Heavy computation result: $computation"
     }.mapError(_.getMessage)
 
-    _ <- Eru.debug("performance: Heavy computation completed", Map("result" -> result))
+    _ <- Eru.succeed(result).debug(s"performance: Heavy computation completed with result: $result")
 
-    _ <- Eru.debug("performance: Starting I/O simulation")
+    _ <- Eru.succeed(()).debug("performance: Starting I/O simulation")
 
     // Simulate I/O work
     ioResult <- Eru.effect {
@@ -282,12 +285,12 @@ def performanceTrackedProgram(): Eru[String, String] = {
       "I/O operation completed"
     }.mapError(_.getMessage)
 
-    _ <- Eru.debug("performance: I/O operation completed", Map("ioResult" -> ioResult))
+    _ <- Eru.succeed(ioResult).debug(s"performance: I/O operation completed: $ioResult")
 
   } yield s"$result | $ioResult"
 }
 
-val perfResult = performanceTrackedProgram().unsafeRunSync()
+val perfResult = performanceTrackedProgram().runWith(perfObserver)
 println(s"Performance tracked result: $perfResult")
 
 // Print collected metrics
@@ -308,31 +311,63 @@ class TracingObserver extends EruObserver {
   private val traces = scala.collection.mutable.Map[String, scala.collection.mutable.ListBuffer[String]]()
 
   def onEvent(event: EruEvent): Unit = {
-    event match {
-      case EruEvent.ProgramStart(programId, timestamp) =>
-        val traceBuffer = scala.collection.mutable.ListBuffer[String]()
-        traceBuffer += s"TRACE [$timestamp] Program $programId started"
-        traces(programId) = traceBuffer
+    val timestamp = System.currentTimeMillis()
 
-      case EruEvent.ProgramEnd(programId, timestamp, exit) =>
-        traces.get(programId).foreach { traceBuffer =>
-          traceBuffer += s"TRACE [$timestamp] Program $programId ended: $exit"
+    event match {
+      case EruEvent.ProgramStart(scopeId) =>
+        val traceBuffer = scala.collection.mutable.ListBuffer[String]()
+        traceBuffer += s"TRACE [$timestamp] Program $scopeId started"
+        traces(scopeId.toString) = traceBuffer
+
+      case EruEvent.ProgramEnd(scopeId, outcome) =>
+        traces.get(scopeId.toString).foreach { traceBuffer =>
+          traceBuffer += s"TRACE [$timestamp] Program $scopeId ended: $outcome"
         }
 
-      case EruEvent.FiberStart(fiberId, programId, timestamp) =>
-        traces.get(programId).foreach { traceBuffer =>
+      case EruEvent.FiberStarted(fiberId) =>
+        // For fiber events, we associate with the current scope
+        traces.values.lastOption.foreach { traceBuffer =>
           traceBuffer += s"TRACE [$timestamp]   → Fiber $fiberId started"
         }
 
-      case EruEvent.FiberEnd(fiberId, programId, timestamp, exit) =>
-        traces.get(programId).foreach { traceBuffer =>
+      case EruEvent.FiberCompleted(fiberId, exit) =>
+        traces.values.lastOption.foreach { traceBuffer =>
           traceBuffer += s"TRACE [$timestamp]   ← Fiber $fiberId ended: $exit"
         }
 
-      case EruEvent.Debug(fiberId, programId, timestamp, step, metadata) =>
-        traces.get(programId).foreach { traceBuffer =>
-          val metaStr = if (metadata.nonEmpty) s" {${metadata.map { case (k, v) => s"$k=$v" }.mkString(", ")}}" else ""
-          traceBuffer += s"TRACE [$timestamp]   • [$fiberId] $step$metaStr"
+      case EruEvent.Step(scopeId, label) =>
+        traces.get(scopeId.toString).foreach { traceBuffer =>
+          traceBuffer += s"TRACE [$timestamp]   • [$scopeId] $label"
+        }
+
+      case EruEvent.FiberInterrupted(fiberId, cause) =>
+        traces.values.lastOption.foreach { traceBuffer =>
+          traceBuffer += s"TRACE [$timestamp]   ✕ Fiber $fiberId interrupted: $cause"
+        }
+
+      case EruEvent.FiberForked(parentId, childId) =>
+        traces.values.lastOption.foreach { traceBuffer =>
+          traceBuffer += s"TRACE [$timestamp]   ⎇ Fiber $parentId forked child $childId"
+        }
+
+      case EruEvent.StructuredCleanupStarted(scopeId, childCount) =>
+        traces.get(scopeId.toString).foreach { traceBuffer =>
+          traceBuffer += s"TRACE [$timestamp]   🧹 Cleanup started for scope $scopeId ($childCount children)"
+        }
+
+      case EruEvent.StructuredCleanupCompleted(scopeId, childCount, outcome) =>
+        traces.get(scopeId.toString).foreach { traceBuffer =>
+          traceBuffer += s"TRACE [$timestamp]   ✓ Cleanup completed for scope $scopeId ($childCount children): $outcome"
+        }
+
+      case EruEvent.ChildInterruptionRequested(parentId, childId, signal, reason) =>
+        traces.values.lastOption.foreach { traceBuffer =>
+          traceBuffer += s"TRACE [$timestamp]   ⚡ Parent $parentId requested interruption of child $childId ($signal): $reason"
+        }
+
+      case EruEvent.TraceSpan(span) =>
+        traces.values.lastOption.foreach { traceBuffer =>
+          traceBuffer += s"TRACE [$timestamp]   📊 Trace span: $span"
         }
     }
   }
@@ -344,32 +379,38 @@ class TracingObserver extends EruObserver {
   def printTrace(programId: String): Unit = {
     getTrace(programId).foreach(println)
   }
+
+  def printAllTraces(): Unit = {
+    traces.foreach { case (id, buffer) =>
+      println(s"\nTrace for $id:")
+      buffer.foreach(println)
+    }
+  }
 }
 
-// Create runtime with tracing observer
+// Create tracing observer
 val tracingObserver = TracingObserver()
-given tracingRuntime: EruRuntime = EruRuntime.create(observer = Some(tracingObserver))
 
 // Distributed service simulation
-def distributedServiceCall(): Eru[String, String] = {
+def distributedServiceCall(): Eru[String | Throwable, String] = {
   for {
-    _ <- Eru.debug("Incoming request received", Map("endpoint" -> "/api/users"))
+    _ <- Eru.succeed(()).debug("Incoming request received for /api/users")
 
     // Service call 1: User service
     userFiber <- (for {
-      _ <- Eru.debug("Calling user service")
+      _ <- Eru.succeed(()).debug("Calling user service")
       user <- Eru.effect("User data retrieved").mapError(_.getMessage)
-      _ <- Eru.debug("User service call completed", Map("user" -> user))
+      _ <- Eru.succeed(user).debug(s"User service call completed: $user")
     } yield user).fork
 
     // Service call 2: Preferences service
     prefsFiber <- (for {
-      _ <- Eru.debug("Calling preferences service")
+      _ <- Eru.succeed(()).debug("Calling preferences service")
       prefs <- Eru.effect("User preferences retrieved").mapError(_.getMessage)
-      _ <- Eru.debug("Preferences service call completed", Map("prefs" -> prefs))
+      _ <- Eru.succeed(prefs).debug(s"Preferences service call completed: $prefs")
     } yield prefs).fork
 
-    _ <- Eru.debug("All service calls initiated, awaiting responses")
+    _ <- Eru.succeed(()).debug("All service calls initiated, awaiting responses")
 
     // Collect results
     userExit <- userFiber.await
@@ -378,26 +419,28 @@ def distributedServiceCall(): Eru[String, String] = {
     response <- (userExit, prefsExit) match {
       case (net.ghoula.eru.Exit.Success(user), net.ghoula.eru.Exit.Success(prefs)) =>
         val combined = s"$user + $prefs"
-        Eru.debug("Response prepared", Map("response" -> combined)) *>
-        Eru.succeed(combined)
+        for {
+          _ <- Eru.succeed(combined).debug(s"Response prepared: $combined")
+          result <- Eru.succeed(combined)
+        } yield result
       case _ =>
-        Eru.debug("Service calls failed") *>
-        Eru.fail("Service call failure")
+        for {
+          _ <- Eru.succeed(()).debug("Service calls failed")
+          result <- Eru.fail("Service call failure")
+        } yield result
     }
 
-    _ <- Eru.debug("Request processing completed")
+    _ <- Eru.succeed(()).debug("Request processing completed")
 
   } yield response
 }
 
 // Execute with tracing
-val tracedResult = distributedServiceCall().attempt.unsafeRunSync()
+val tracedResult = distributedServiceCall().attempt.runWith(tracingObserver)
 
 println(s"Distributed service result: $tracedResult")
-println("\nDistributed Trace:")
-
-// The program ID is generated internally - for demo, we'll assume it exists
-// In practice, you'd capture this from the first event or use runtime APIs
+println("\nDistributed Traces:")
+tracingObserver.printAllTraces()
 ```
 
 ## Error Debugging
@@ -412,20 +455,19 @@ class ErrorContextObserver extends EruObserver {
 
   def onEvent(event: EruEvent): Unit = {
     event match {
-      case EruEvent.ProgramStart(programId, _) =>
-        executionSteps(programId) = scala.collection.mutable.ListBuffer[String]()
+      case EruEvent.ProgramStart(scopeId) =>
+        executionSteps(scopeId.toString) = scala.collection.mutable.ListBuffer[String]()
 
-      case EruEvent.Debug(_, programId, _, step, metadata) =>
-        executionSteps.get(programId).foreach { steps =>
-          val metaStr = if (metadata.nonEmpty) s" [${metadata.map { case (k, v) => s"$k=$v" }.mkString(", ")}]" else ""
-          steps += s"$step$metaStr"
+      case EruEvent.Step(scopeId, label) =>
+        executionSteps.get(scopeId.toString).foreach { steps =>
+          steps += label
         }
 
-      case EruEvent.ProgramEnd(programId, _, exit) =>
-        exit match {
-          case net.ghoula.eru.Exit.Failure(_) | net.ghoula.eru.Exit.Die(_) =>
-            executionSteps.get(programId).foreach { steps =>
-              errorContexts(programId) = steps.toList
+      case EruEvent.ProgramEnd(scopeId, outcome) =>
+        outcome match {
+          case EruObserver.Outcome.TypedFailure(_) | EruObserver.Outcome.Defect(_) =>
+            executionSteps.get(scopeId.toString).foreach { steps =>
+              errorContexts(scopeId.toString) = steps.toList
             }
           case _ => // Success cases don't need error context
         }
@@ -437,57 +479,71 @@ class ErrorContextObserver extends EruObserver {
   def getErrorContext(programId: String): List[String] = {
     errorContexts.get(programId).getOrElse(List.empty)
   }
+
+  def printErrorContext(programId: String): Unit = {
+    val context = getErrorContext(programId)
+    if (context.nonEmpty) {
+      println(s"\nError context for $programId:")
+      context.foreach(step => println(s"  - $step"))
+    }
+  }
 }
 
-// Create runtime with error context observer
+// Create error context observer
 val errorObserver = ErrorContextObserver()
-given errorRuntime: EruRuntime = EruRuntime.create(observer = Some(errorObserver))
 
 // Program that will fail with detailed context
 def failingProgram(): Eru[String, String] = {
   for {
-    _ <- Eru.debug("Starting data validation")
+    _ <- Eru.succeed(()).debug("Starting data validation")
 
     data <- Eru.effect("input-data").mapError(_.getMessage)
-    _ <- Eru.debug("Data loaded", Map("dataSize" -> data.length.toString))
+    _ <- Eru.succeed(data).debug(s"Data loaded with size: ${data.length}")
 
-    _ <- Eru.debug("Starting transformation phase")
+    _ <- Eru.succeed(()).debug("Starting transformation phase")
 
     // This step will fail
     processed <- if (data.contains("invalid")) {
-      Eru.debug("Invalid data detected") *>
-      Eru.fail("Data validation failed: contains invalid content")
+      for {
+        _ <- Eru.succeed(()).debug("Invalid data detected")
+        result <- Eru.fail("Data validation failed: contains invalid content")
+      } yield result
     } else {
-      Eru.debug("Data processing step 1") *>
-      Eru.effect(data.toUpperCase).mapError(_.getMessage)
+      for {
+        _ <- Eru.succeed(()).debug("Data processing step 1")
+        result <- Eru.effect(data.toUpperCase).mapError(_.getMessage)
+      } yield result
     }
 
-    _ <- Eru.debug("Transformation completed", Map("result" -> processed))
+    _ <- Eru.succeed(processed).debug(s"Transformation completed: $processed")
 
     finalResult <- Eru.succeed(s"Processed: $processed")
-    _ <- Eru.debug("All processing completed")
+    _ <- Eru.succeed(()).debug("All processing completed")
 
   } yield finalResult
 }
 
 // Test with both success and failure cases
 println("=== Testing Success Case ===")
-val successResult = failingProgram().attempt.unsafeRunSync()
+val successResult = failingProgram().attempt.runWith(errorObserver)
 println(s"Success result: $successResult")
 
 println("\n=== Testing Failure Case ===")
 // Simulate failure by using invalid data
 val failureProgram = for {
-  _ <- Eru.debug("Starting data validation")
+  _ <- Eru.succeed(()).debug("Starting data validation")
   data <- Eru.succeed("invalid-input-data")
-  _ <- Eru.debug("Data loaded", Map("dataSize" -> data.length.toString))
-  _ <- Eru.debug("Starting transformation phase")
-  _ <- Eru.debug("Invalid data detected")
+  _ <- Eru.succeed(data).debug(s"Data loaded with size: ${data.length}")
+  _ <- Eru.succeed(()).debug("Starting transformation phase")
+  _ <- Eru.succeed(()).debug("Invalid data detected")
   result <- Eru.fail("Data validation failed: contains invalid content")
 } yield result
 
-val failureResult = failureProgram.attempt.unsafeRunSync()
+val failureResult = failureProgram.attempt.runWith(errorObserver)
 println(s"Failure result: $failureResult")
+
+// Print error context for debugging
+errorObserver.printErrorContext("failure-program")
 ```
 
 ## Production Observability Patterns
@@ -498,39 +554,39 @@ println(s"Failure result: $failureResult")
 // Integration with structured logging systems
 class StructuredLoggingObserver extends EruObserver {
   def onEvent(event: EruEvent): Unit = {
+    val timestamp = System.currentTimeMillis()
+
     val logEntry = event match {
-      case EruEvent.ProgramStart(programId, timestamp) =>
+      case EruEvent.ProgramStart(scopeId) =>
         Map(
           "event" -> "program.start",
-          "programId" -> programId,
+          "scopeId" -> scopeId.toString,
           "timestamp" -> timestamp.toString,
           "level" -> "INFO"
         )
 
-      case EruEvent.ProgramEnd(programId, timestamp, exit) =>
-        val (level, exitType) = exit match {
-          case net.ghoula.eru.Exit.Success(_) => ("INFO", "success")
-          case net.ghoula.eru.Exit.Failure(_) => ("WARN", "failure")
-          case net.ghoula.eru.Exit.Die(_) => ("ERROR", "die")
-          case net.ghoula.eru.Exit.Interrupt(_, _) => ("INFO", "interrupt")
+      case EruEvent.ProgramEnd(scopeId, outcome) =>
+        val (level, exitType) = outcome match {
+          case EruObserver.Outcome.Success => ("INFO", "success")
+          case EruObserver.Outcome.TypedFailure(_) => ("WARN", "failure")
+          case EruObserver.Outcome.Defect(_) => ("ERROR", "defect")
         }
         Map(
           "event" -> "program.end",
-          "programId" -> programId,
+          "scopeId" -> scopeId.toString,
           "timestamp" -> timestamp.toString,
           "level" -> level,
           "exitType" -> exitType
         )
 
-      case EruEvent.Debug(fiberId, programId, timestamp, step, metadata) =>
+      case EruEvent.Step(scopeId, label) =>
         Map(
           "event" -> "debug",
-          "fiberId" -> fiberId,
-          "programId" -> programId,
+          "scopeId" -> scopeId.toString,
           "timestamp" -> timestamp.toString,
-          "step" -> step,
+          "step" -> label,
           "level" -> "DEBUG"
-        ) ++ metadata
+        )
 
       case _ =>
         Map("event" -> "unknown", "level" -> "DEBUG")
@@ -543,17 +599,16 @@ class StructuredLoggingObserver extends EruObserver {
 
 // Example usage with structured logging
 val structuredObserver = StructuredLoggingObserver()
-given structuredRuntime: EruRuntime = EruRuntime.create(observer = Some(structuredObserver))
 
 def businessProcess(): Eru[String, String] = {
   for {
-    _ <- Eru.debug("business.process.start", Map("version" -> "1.0"))
+    _ <- Eru.succeed(()).debug("business.process.start v1.0")
     result <- Eru.effect("Business logic completed").mapError(_.getMessage)
-    _ <- Eru.debug("business.process.end", Map("resultType" -> "success"))
+    _ <- Eru.succeed(()).debug("business.process.end success")
   } yield result
 }
 
-val structuredResult = businessProcess().unsafeRunSync()
+val structuredResult = businessProcess().runWith(structuredObserver)
 println(s"Structured logging result: $structuredResult")
 ```
 
@@ -567,37 +622,38 @@ class MetricsObserver extends EruObserver {
   private val startTimes = scala.collection.mutable.Map[String, Long]()
 
   def onEvent(event: EruEvent): Unit = {
-    event match {
-      case EruEvent.ProgramStart(programId, timestamp) =>
-        incrementCounter("programs.started")
-        startTimes(s"program-$programId") = timestamp
+    val currentTime = System.currentTimeMillis()
 
-      case EruEvent.ProgramEnd(programId, timestamp, exit) =>
+    event match {
+      case EruEvent.ProgramStart(scopeId) =>
+        incrementCounter("programs.started")
+        startTimes(s"program-$scopeId") = currentTime
+
+      case EruEvent.ProgramEnd(scopeId, outcome) =>
         incrementCounter("programs.completed")
 
-        exit match {
-          case net.ghoula.eru.Exit.Success(_) => incrementCounter("programs.success")
-          case net.ghoula.eru.Exit.Failure(_) => incrementCounter("programs.failure")
-          case net.ghoula.eru.Exit.Die(_) => incrementCounter("programs.error")
-          case net.ghoula.eru.Exit.Interrupt(_, _) => incrementCounter("programs.interrupted")
+        outcome match {
+          case EruObserver.Outcome.Success => incrementCounter("programs.success")
+          case EruObserver.Outcome.TypedFailure(_) => incrementCounter("programs.failure")
+          case EruObserver.Outcome.Defect(_) => incrementCounter("programs.error")
         }
 
-        startTimes.get(s"program-$programId").foreach { startTime =>
-          recordTimer("program.duration", timestamp - startTime)
+        startTimes.get(s"program-$scopeId").foreach { startTime =>
+          recordTimer("program.duration", currentTime - startTime)
         }
 
-      case EruEvent.FiberStart(fiberId, _, timestamp) =>
+      case EruEvent.FiberStarted(fiberId) =>
         incrementCounter("fibers.started")
-        startTimes(s"fiber-$fiberId") = timestamp
+        startTimes(s"fiber-$fiberId") = currentTime
 
-      case EruEvent.FiberEnd(fiberId, _, timestamp, _) =>
+      case EruEvent.FiberCompleted(fiberId, _) =>
         incrementCounter("fibers.completed")
         startTimes.get(s"fiber-$fiberId").foreach { startTime =>
-          recordTimer("fiber.duration", timestamp - startTime)
+          recordTimer("fiber.duration", currentTime - startTime)
         }
 
-      case EruEvent.Debug(_, _, _, step, _) =>
-        incrementCounter(s"debug.steps.$step")
+      case EruEvent.Step(_, label) =>
+        incrementCounter(s"debug.steps.${label.replaceAll("\\W", "_")}")
 
       case _ => // Ignore other events
     }
@@ -637,22 +693,27 @@ class MetricsObserver extends EruObserver {
 
 // Test metrics collection
 val metricsObserver = MetricsObserver()
-given metricsRuntime: EruRuntime = EruRuntime.create(observer = Some(metricsObserver))
 
-def metricsTestProgram(): Eru[String, String] = {
+def metricsTestProgram(): Eru[String | Throwable, String] = {
   for {
-    _ <- Eru.debug("initialization")
+    _ <- Eru.succeed(()).debug("initialization")
 
     // Fork some concurrent work
-    fiber1 <- (Eru.debug("worker.task") *> Eru.succeed("Work 1")).fork
-    fiber2 <- (Eru.debug("worker.task") *> Eru.succeed("Work 2")).fork
+    fiber1 <- (for {
+      _ <- Eru.succeed(()).debug("worker.task")
+      result <- Eru.succeed("Work 1")
+    } yield result).fork
+    fiber2 <- (for {
+      _ <- Eru.succeed(()).debug("worker.task")
+      result <- Eru.succeed("Work 2")
+    } yield result).fork
 
-    _ <- Eru.debug("coordination")
+    _ <- Eru.succeed(()).debug("coordination")
 
     result1 <- fiber1.await
     result2 <- fiber2.await
 
-    _ <- Eru.debug("completion")
+    _ <- Eru.succeed(()).debug("completion")
 
     finalResult <- (result1, result2) match {
       case (net.ghoula.eru.Exit.Success(r1), net.ghoula.eru.Exit.Success(r2)) =>
@@ -664,7 +725,7 @@ def metricsTestProgram(): Eru[String, String] = {
   } yield finalResult
 }
 
-val metricsResult = metricsTestProgram().unsafeRunSync()
+val metricsResult = metricsTestProgram().runWith(metricsObserver)
 println(s"Metrics test result: $metricsResult")
 
 // Print collected metrics

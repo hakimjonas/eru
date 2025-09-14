@@ -20,6 +20,9 @@ The most common integration scenario is wrapping existing synchronous code in Er
 ```scala mdoc
 import net.ghoula.eru.prelude.*
 import scala.util.{Try, Success, Failure}
+import scala.concurrent.{Future, ExecutionContext}
+import java.io.File
+import net.ghoula.eru.FutureInterop.fromFuture
 
 // Example legacy code that we need to integrate
 class LegacyUserService {
@@ -81,7 +84,7 @@ Handle blocking I/O operations safely within Eru's execution model:
 
 ```scala mdoc
 import java.io.{File, FileReader, BufferedReader}
-import java.net.{URL, HttpURLConnection}
+import java.net.{URI, HttpURLConnection}
 import scala.io.Source
 
 // Pattern 2: Blocking I/O with proper resource management
@@ -119,7 +122,7 @@ object BlockingIntegration {
   def httpRequestBlocking(url: String, timeoutMs: Int = 5000): Eru[String, String] = {
     def openConnection(): Eru[String, HttpURLConnection] = {
       Eru.effect {
-        val connection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
+        val connection = URI.create(url).toURL.openConnection().asInstanceOf[HttpURLConnection]
         connection.setConnectTimeout(timeoutMs)
         connection.setReadTimeout(timeoutMs)
         connection.setRequestMethod("GET")
@@ -199,22 +202,25 @@ def blockingIntegrationExample(): Eru[String, String] = {
   val testContent = "Hello, Eru Integration!\nThis is a test file.\nEnd of content."
   val testFile = "integration-test.txt"
 
-  // Write test file
-  Eru.effect {
-    val writer = new java.io.PrintWriter(testFile)
-    try {
-      writer.print(testContent)
-    } finally {
-      writer.close()
-    }
-  }.mapError(_.getMessage) *>
+  for {
+    // Write test file
+    _ <- Eru.effect {
+      val writer = new java.io.PrintWriter(testFile)
+      try {
+        writer.print(testContent)
+      } finally {
+        writer.close()
+      }
+    }.mapError(_.getMessage)
 
-  // Read the file using blocking integration
-  BlockingIntegration.readFileBlocking(testFile).flatMap { content =>
+    // Read the file using blocking integration
+    content <- BlockingIntegration.readFileBlocking(testFile)
+
     // Clean up test file
-    Eru.effect(new File(testFile).delete()).mapError(_.getMessage) *>
-    Eru.succeed(s"File content (${content.length} chars): ${content.take(50)}...")
-  }
+    _ <- Eru.effect(new File(testFile).delete()).mapError(_.getMessage)
+
+    result <- Eru.succeed(s"File content (${content.length} chars): ${content.take(50)}...")
+  } yield result
 }
 
 val blockingResult = blockingIntegrationExample().attempt.unsafeRunSync()
@@ -264,27 +270,28 @@ object FutureIntegration {
   }
 
   // Convert Eru to Future
-  def toFuture[E, A](eru: Eru[E, A]): Future[A] = {
+  def toFuture[E, A](eru: Eru[E, A])(using ExecutionContext): Future[A] = {
     Future {
       eru.unsafeRunSync() match {
         case value => value
       }
-    }(ExecutionContext.global).recover {
+    }.recover {
       case ex => throw ex
     }
   }
 
   // Example service that returns Futures
   class AsyncUserService {
-    def fetchUserAsync(id: String): Future[String] = {
+    def fetchUserAsync(id: String)(using ExecutionContext): Future[String] = {
       Future {
         Thread.sleep(15) // Simulate async work
         if (id.nonEmpty) s"Async user data for $id" else throw new Exception("Invalid ID")
-      }(ExecutionContext.global)
+      }
     }
   }
 
   def integrateAsyncService(): Eru[Throwable, String] = {
+    given ExecutionContext = ExecutionContext.global
     val service = new AsyncUserService()
 
     for {
@@ -809,6 +816,7 @@ object PerformanceIntegration {
       Eru.effect {
         synchronized {
           available.enqueue(resource)
+          () // Return Unit explicitly
         }
       }.mapError(_.getMessage)
     }
