@@ -37,6 +37,8 @@ jobs:
 
       - name: Run all tests on JVM (isolated)
         run: |
+          echo "🧪 Cleaning before tests to ensure clean JVM state..."
+          sbt clean
           echo "🧪 Running JVM Core Tests..."
           timeout 180s sbt "eruCoreJVM/test"
           echo "🧪 Running JVM Runtime Tests..."
