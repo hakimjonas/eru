@@ -65,11 +65,22 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run benchmarks (smoke test)
-        run: sbt "eruBenchJVM/Jmh/run -i 3 -wi 2 -f1 -t1 net.ghoula.eru.bench.fair.CoreOperationsBench net.ghoula.eru.bench.fair.ErrorHandlingBench net.ghoula.eru.bench.fair.ConcurrencyBench"
+      - name: Run benchmarks (smoke test with structured JSON output)
+        run: ./tools/smoke-test.sh
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-validation-results/*.json
+            benchmark-validation-results/*.md
+            benchmark-validation-results/*.log
+          retention-days: 30
 
   # Publish job: Runs only on tag pushes, publishes to Sonatype, creates GitHub release
   publish:

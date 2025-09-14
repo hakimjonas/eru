@@ -184,14 +184,20 @@ Eru achieves exceptional performance (4,756-160,143 ops/ms, 50-80x faster than C
 ### Benchmarking
 
 ```bash
-# Quick performance check
+# Quick performance check (structured JSON output)
 ./run-fair-benchmarks.sh core
 
 # Full benchmark suite
 ./run-fair-benchmarks.sh all
 
-# Individual benchmark
-sbt "eruBenchJVM/Jmh/run CoreOperationsBench.eruSucceed"
+# Smoke test validation (15 minutes, comprehensive)
+./tools/smoke-test.sh
+
+# Individual benchmark with JSON output (recommended)
+LANG=C LC_ALL=C sbt "eruBenchJVM/Jmh/run -rf json -rff results.json CoreOperationsBench.eruSucceed"
+
+# With profiling
+LANG=C LC_ALL=C sbt "eruBenchJVM/Jmh/run -prof gc -rf json -rff results.json StateManagementBench"
 ```
 
 ## Documentation

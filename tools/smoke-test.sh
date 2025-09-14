@@ -46,8 +46,11 @@ run_benchmark() {
     start_time=$(date +%s)
     
     # Run with quick settings: 1 warmup, 2 measurements for smoke test
+    # Generate structured JSON output with unambiguous number formatting
+    local json_file="$(pwd)/$RESULTS_DIR/$(echo "$bench_name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -d '()' | tr -d ',')-$TIMESTAMP.json"
+
     # Store the command result properly
-    if timeout ${timeout_duration} bash -c "sbt 'eruBenchJVM/Jmh/run -i 2 -wi 1 -f1 -t1 ${bench_class}'" 2>&1 | tee "$log_file"; then
+    if timeout ${timeout_duration} bash -c "LANG=C LC_ALL=C sbt 'eruBenchJVM/Jmh/run -rf json -rff $json_file -i 2 -wi 1 -f1 -t1 ${bench_class}'" 2>&1 | tee "$log_file"; then
         local exit_code=0
     else
         local exit_code=$?
@@ -61,7 +64,9 @@ run_benchmark() {
     
     if [[ $exit_code -eq 0 ]]; then
         echo -e "\n${BOLD}${GREEN}✅ COMPLETED${NC} - ${duration}s"
-        
+        echo -e "${BLUE}📄 JSON results:${NC} ${json_file}"
+        echo -e "${BLUE}📋 Full log:${NC} ${log_file}"
+
         # Store results for final matrix
         echo "$bench_name" >> "$RESULTS_DIR/completed-benchmarks.txt"
         grep -E "thrpt.*Score" "$log_file" >> "$RESULTS_DIR/all-results.txt" || true

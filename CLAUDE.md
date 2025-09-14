@@ -56,8 +56,9 @@ sbt testAllOptimizedVerbose # Verbose version with full compilation visibility
 ./run-fair-benchmarks.sh concurrency --quick  # Quick concurrency test
 
 # Individual benchmark debugging
-sbt "eruBenchJVM/Jmh/run CoreOperationsBench.eruSucceed"  # Single method
-sbt "eruBenchJVM/Jmh/run -prof gc *StateManagementBench*"  # With profiler
+LANG=C LC_ALL=C sbt "eruBenchJVM/Jmh/run -rf json -rff results.json CoreOperationsBench.eruSucceed"  # Single method with JSON
+sbt "eruBenchJVM/Jmh/run -prof gc *StateManagementBench*"  # With profiler (console output)
+sbt "eruBenchJVM/Jmh/run CoreOperationsBench.eruSucceed"  # Quick console output
 ```
 
 ### Code Quality

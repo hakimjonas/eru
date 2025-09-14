@@ -187,10 +187,13 @@ Eru achieves exceptional performance (4,756-160,143 ops/ms, 50-80x faster than C
 # Quick performance check
 ./run-fair-benchmarks.sh core
 
-# Full benchmark suite
+# Full benchmark suite (with structured JSON output)
 ./run-fair-benchmarks.sh all
 
-# Individual benchmark
+# Individual benchmark with JSON output
+LANG=C LC_ALL=C sbt "eruBenchJVM/Jmh/run -rf json -rff results.json CoreOperationsBench.eruSucceed"
+
+# Individual benchmark (console output)
 sbt "eruBenchJVM/Jmh/run CoreOperationsBench.eruSucceed"
 ```
 
