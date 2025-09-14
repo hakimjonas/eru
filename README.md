@@ -4,7 +4,7 @@ Eru is a pragmatic and ergonomic effect system for Scala 3, built for correctnes
 
 This project is guided by a strong philosophical vision for what a modern effect system should be. To understand the design principles and goals of Eru, please read our core document:
 
-**[The Eru Manifesto](MANIFESTO.md)**
+**[The Eru Manifesto](docs-src/MANIFESTO.md)**
 
 ## Status
 

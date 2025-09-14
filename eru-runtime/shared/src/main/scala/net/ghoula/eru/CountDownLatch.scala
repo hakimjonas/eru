@@ -166,12 +166,9 @@ object CountDownLatch {
             .attempt
             .flatMap {
               case Result.Success(_) => Eru.unit
-              case Result.Failure(e) =>
-                // Log warning and fall back to polling
-                Eru.effect {
-                  System.err.println(s"WARNING: CountDownLatch await suspend failed: $e")
-                  System.err.println("Falling back to polling mode")
-                }.attempt.flatMap(_ => pollUntilZero())
+              case Result.Failure(_) =>
+                // Fall back to polling mode when suspend fails
+                pollUntilZero()
             }
         }
       }

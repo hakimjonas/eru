@@ -22,6 +22,16 @@ final class TimersSpec extends munit.FunSuite {
       // Fork the sleep operation to test non-blocking behavior
       val fiber = runtime.fork(sleepEffect).unsafeRunSync()
 
+      // Poll for the sleep to be registered with TestClock (more reliable than Thread.sleep)
+      def waitForPending(): Unit = {
+        var attempts = 0
+        while (runtime.testClock.pendingCount == 0 && attempts < 100) {
+          Thread.sleep(1)
+          attempts += 1
+        }
+      }
+      waitForPending()
+
       // Verify sleep is pending initially
       assertEquals(runtime.testClock.pendingCount, 1)
 

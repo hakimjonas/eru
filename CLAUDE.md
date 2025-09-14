@@ -99,7 +99,7 @@ Eru is a high-performance effect system built with modern Scala 3, organized as 
 
 ### Core Components
 
-- `eru-core/src/main/scala/net/ghoula/eru/Eru.scala` - Main effect type (704 lines)
+- `eru-core/src/main/scala/net/ghoula/eru/Eru.scala` - Main effect type (1,636 lines)
 - `eru-core/src/main/scala/net/ghoula/eru/EruObserver.scala` - Observability system
 - `eru-core/src/main/scala/net/ghoula/eru/Exit.scala` - Exit/result modeling
 - `eru-runtime/shared/src/main/scala/net/ghoula/eru/EruRuntime.scala` - Runtime execution
