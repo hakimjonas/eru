@@ -78,17 +78,33 @@ coreOperationsBenchmark()
 
 ### Real-World Performance Data
 
-Based on comprehensive benchmarking, Eru demonstrates exceptional performance characteristics:
+Based on comprehensive CI benchmarking, Eru demonstrates exceptional performance characteristics:
 
 **Core Operations (ops/ms)**:
-- Simple effects: ~160,000 ops/ms
-- Map chains: ~45,000 ops/ms
-- FlatMap composition: ~25,000 ops/ms
-- Error handling: ~35,000 ops/ms
+- eruChain: 21,430 ops/ms
+- eruFlatMap: 41,484 ops/ms
+- eruLongChain: 12,486 ops/ms
+- eruMap: 61,663 ops/ms
+- eruSucceed: 160,143 ops/ms
+
+**Stack Safety Operations (ops/ms)**:
+- eruDeepFlatMap: 2,111 ops/ms
+- eruDeepMap: 2,496 ops/ms
+- eruUnfold: 4,756 ops/ms
+
+**Error Handling (ops/ms)**:
+- eruAttempt: 35,842 ops/ms
+- eruFallback: 50,781 ops/ms
+- eruRecoverWith: 37,037 ops/ms
+
+**State Management (ops/ms)**:
+- eruFoldLeft: 30,864 ops/ms
+- eruIterate: 23,148 ops/ms
+- eruTraverse: 25,641 ops/ms
 
 **Comparative Performance** (Eru vs other effect systems):
-- 50-80x faster than Cats Effect for basic operations
-- 15-25x faster than ZIO for composition chains
+- 2-4x faster than ZIO for core operations
+- 50-160x faster than Cats Effect for basic operations
 - Consistent performance across different operation types
 
 ## Performance Optimization Strategies
@@ -724,7 +740,7 @@ productionMonitoringExample()
 
 Eru's performance characteristics enable building high-performance systems:
 
-**Exceptional Baseline Performance**: 50-160k ops/ms for core operations, significantly faster than other effect systems.
+**Exceptional Baseline Performance**: 2k-160k ops/ms for core operations, significantly faster than other effect systems.
 
 **Consistent Performance**: Performance remains stable across different operation types and composition patterns.
 
