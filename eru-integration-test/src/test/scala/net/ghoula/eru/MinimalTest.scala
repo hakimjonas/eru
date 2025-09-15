@@ -1,10 +1,8 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.prelude.*
 
-class MinimalTest extends FunSuite {
+class MinimalTest extends munit.FunSuite {
 
   test("can import prelude") {
     val effect = Eru.succeed(42)

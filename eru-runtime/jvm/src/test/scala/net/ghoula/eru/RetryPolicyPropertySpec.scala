@@ -1,6 +1,5 @@
 package net.ghoula.eru
 
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -15,7 +14,7 @@ import net.ghoula.eru.prelude.*
   * calculations, and termination conditions to ensure that retry mechanisms provide predictable and
   * reliable behavior under all operational scenarios.
   */
-final class RetryPolicyPropertySpec extends ScalaCheckSuite {
+final class RetryPolicyPropertySpec extends munit.ScalaCheckSuite {
 
   given runtime: EruRuntime = EruRuntime.shared
 

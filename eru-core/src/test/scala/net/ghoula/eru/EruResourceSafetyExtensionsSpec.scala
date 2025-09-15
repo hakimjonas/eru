@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Test suite for advanced resource safety extensions and edge cases.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * that the extended resource safety mechanisms maintain correctness under various failure
   * conditions and provide comprehensive coverage for advanced resource management patterns.
   */
-class EruResourceSafetyExtensionsSpec extends FunSuite {
+class EruResourceSafetyExtensionsSpec extends munit.FunSuite {
 
   test("ensureAll runs multiple finalizers in FILO order") {
     var order = List.empty[String]

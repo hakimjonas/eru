@@ -2,7 +2,8 @@ package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
 
-class QueueAsyncSpec extends TestWithSharedRuntime {
+class QueueAsyncSpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   // =============================================================================
   // Async Suspension Tests (JVM Only)

@@ -1,7 +1,5 @@
 package userland
 
-import munit.FunSuite
-
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -14,7 +12,7 @@ import net.ghoula.eru.prelude.*
   * management, error handling, timeout behavior, and cancellation semantics in production-like
   * environments.
   */
-class ExternalSystemIntegrationSpec extends FunSuite {
+class ExternalSystemIntegrationSpec extends munit.FunSuite {
 
   given runtime: EruRuntime = EruRuntime.create()
 

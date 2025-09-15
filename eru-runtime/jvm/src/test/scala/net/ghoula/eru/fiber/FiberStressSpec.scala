@@ -1,7 +1,5 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import java.time.Duration
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters.*
@@ -20,7 +18,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * indicate race conditions or resource management issues that violate Eru's correctness
   * guarantees.
   */
-class FiberStressSpec extends FunSuite {
+class FiberStressSpec extends munit.FunSuite {
 
   override def munitTimeout: scala.concurrent.duration.Duration =
     scala.concurrent.duration.Duration(5, scala.concurrent.duration.MINUTES)

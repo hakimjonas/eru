@@ -1,6 +1,5 @@
 package userland
 
-import munit.FunSuite
 import userland.TestRuntime.*
 
 import java.time.Duration
@@ -14,7 +13,7 @@ import net.ghoula.eru.*
   * correctly by establishing formal properties and verifying them through deterministic
   * synchronization mechanisms rather than timing assumptions.
   */
-class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
+class MathematicallyCorrectStructuredConcurrencyTest extends munit.FunSuite {
 
   /** Validates the mathematical property of parent-child lifetime binding.
     *

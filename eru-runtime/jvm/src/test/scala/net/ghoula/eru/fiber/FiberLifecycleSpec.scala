@@ -1,7 +1,5 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
 
@@ -10,7 +8,8 @@ import net.ghoula.eru.prelude.*
   * Tests the fundamental fiber operations (fork, await) across success, failure, and interruption
   * scenarios to ensure correct behavior in the unified fiber runtime.
   */
-class FiberLifecycleSpec extends TestWithSharedRuntime {
+class FiberLifecycleSpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   /** Validates that fiber fork creates new fibers with unique identifiers.
     *
@@ -19,7 +18,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
     */
   test("fiber fork creates new fiber with unique ID") {
     val effect = Eru.succeed(42)
-    val fiber = runtime.fork(effect).unsafeRunSync()
+    val fiber = effect.fork.unsafeRunSync()
 
     assertNotEquals(fiber.id.toLong, 0L, "Fiber should have non-zero ID")
     assertNotEquals(fiber.id, FiberId.fresh(), "Each fiber should have unique ID")
@@ -34,7 +33,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
     val value = 42
     val effect = Eru.succeed(value)
 
-    val fiber = runtime.fork(effect).unsafeRunSync()
+    val fiber = effect.fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Success(value))
@@ -49,7 +48,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
     val error = "test error"
     val effect = Eru.fail(error)
 
-    val fiber = runtime.fork(effect).unsafeRunSync()
+    val fiber = effect.fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Failure(error))
@@ -64,7 +63,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
     val exception = new RuntimeException("test exception")
     val effect = Eru.effect(throw exception)
 
-    val fiber = runtime.fork(effect).unsafeRunSync()
+    val fiber = effect.fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     exit match {
@@ -81,7 +80,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
   test("fiber await is referentially transparent - multiple awaits return same result") {
     val value = 42
     val effect = Eru.succeed(value)
-    val fiber = runtime.fork(effect).unsafeRunSync()
+    val fiber = effect.fork.unsafeRunSync()
 
     val exit1 = fiber.await.unsafeRunSync()
     val exit2 = fiber.await.unsafeRunSync()
@@ -104,7 +103,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
       c <- Eru.effect(a + b + 12)
     } yield c
 
-    val fiber = runtime.fork(computation).unsafeRunSync()
+    val fiber = computation.fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Success(42))
@@ -120,7 +119,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
       .fail("initial error")
       .recoverWith(_ => Eru.succeed(42))
 
-    val fiber = runtime.fork(computation).unsafeRunSync()
+    val fiber = computation.fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Success(42))
@@ -138,7 +137,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
       case _ => Eru.fail(error)
     }
 
-    val fiber = runtime.fork(computation).unsafeRunSync()
+    val fiber = computation.fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Failure(error))
@@ -150,7 +149,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
     * valid Unit effect.
     */
   test("fiber interrupt method creates effect (placeholder implementation)") {
-    val fiber = runtime.fork(Eru.succeed(42)).unsafeRunSync()
+    val fiber = Eru.succeed(42).fork.unsafeRunSync()
     val interruptEffect = fiber.interrupt(InterruptCause.Cancelled(Some("test")))
 
     val result = interruptEffect.unsafeRunSync()
@@ -165,13 +164,13 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
   test("nested fiber fork and await works correctly") {
     val innerComputation = Eru.succeed("inner")
     val outerComputation = for {
-      innerFiber <- runtime.fork(innerComputation)
+      innerFiber <- innerComputation.fork
       innerExit <- innerFiber.await
       innerResult <- Eru.fromExit(innerExit)
       result <- Eru.succeed(s"outer-$innerResult")
     } yield result
 
-    val outerFiber = runtime.fork(outerComputation).unsafeRunSync()
+    val outerFiber = outerComputation.fork.unsafeRunSync()
     val outerExit = outerFiber.await.unsafeRunSync()
 
     assertEquals(outerExit, Exit.Success("outer-inner"))
@@ -183,7 +182,7 @@ class FiberLifecycleSpec extends TestWithSharedRuntime {
     * subtype substitution in both error and success types.
     */
   test("fiber types preserve variance correctly") {
-    val stringFiber: Fiber[String, String] = runtime.fork(Eru.succeed("test")).unsafeRunSync()
+    val stringFiber: Fiber[String, String] = Eru.succeed("test").fork.unsafeRunSync()
     val anyFiber: Fiber[Any, Any] = stringFiber
 
     val exit = anyFiber.await.unsafeRunSync()

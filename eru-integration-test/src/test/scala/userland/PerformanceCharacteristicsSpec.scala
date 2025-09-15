@@ -1,7 +1,5 @@
 package userland
 
-import munit.FunSuite
-
 import java.util.concurrent.atomic.AtomicLong
 
 import net.ghoula.eru.prelude.*
@@ -11,7 +9,7 @@ import net.ghoula.eru.prelude.*
   * Tests that verify expected performance characteristics including stack safety, memory
   * efficiency, and execution speed under various load conditions.
   */
-class PerformanceCharacteristicsSpec extends FunSuite {
+class PerformanceCharacteristicsSpec extends munit.FunSuite {
 
   given runtime: EruRuntime = EruRuntime.create()
 

@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive test suite for Eru resource management functionality.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * are always executed and resources are never leaked, maintaining the correctness guarantees
   * essential for production effect systems.
   */
-class EruResourceSpec extends FunSuite {
+class EruResourceSpec extends munit.FunSuite {
 
   /** Validates that ensure finalizers run on successful completion.
     *

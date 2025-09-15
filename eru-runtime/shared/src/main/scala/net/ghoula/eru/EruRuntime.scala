@@ -806,18 +806,17 @@ object EruRuntime {
     PlatformBackend.createFreshBackend()
   }
 
-  /** Shared runtime instance for applications that explicitly need a singleton runtime.
+  /** Shared runtime instance for convenient access across application components.
     *
-    * WARNING: Using a shared runtime across independent components can cause coordination primitive
-    * interference. Only use when you explicitly need a single shared runtime for your entire
-    * application.
+    * This provides a globally accessible runtime that can be shared across different parts of your
+    * application without requiring explicit runtime management. Each application gets its own
+    * isolated backend with dedicated thread pools and fiber tracking, ensuring optimal performance
+    * and no coordination interference.
     *
-    * Most applications should use `EruRuntime.create()` for isolated instances.
+    * This is now equivalent to calling `EruRuntime.create()` once per application, providing both
+    * convenience and performance.
     */
-  lazy val shared: EruRuntime = {
-    val backend = PlatformBackend.backend
-    new EruRuntime(backend)
-  }
+  lazy val shared: EruRuntime = create()
 
   /** Creates a new EruRuntime with a specific backend.
     *

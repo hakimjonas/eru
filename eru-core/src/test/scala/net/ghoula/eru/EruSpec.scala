@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive test suite for the core Eru effect type functionality.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * computations, lazy evaluation semantics, and construction-time optimizations for maximum
   * performance.
   */
-class EruSpec extends FunSuite {
+class EruSpec extends munit.FunSuite {
 
   /** Validates that Eru.succeed creates a successful computation with the given value.
     *

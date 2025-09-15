@@ -1,7 +1,5 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import java.util.concurrent.atomic.AtomicBoolean
 
 import net.ghoula.eru.*
@@ -14,7 +12,8 @@ import net.ghoula.eru.prelude.*
   * safety even in complex concurrent scenarios and prevents common concurrency pitfalls like
   * resource leaks and improper cleanup ordering.
   */
-class FiberExecutionSpec extends TestWithSharedRuntime {
+class FiberExecutionSpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   test("fork without await prevents finalizer leaks via auto-join") {
     val finalizerExecuted = new AtomicBoolean(false)

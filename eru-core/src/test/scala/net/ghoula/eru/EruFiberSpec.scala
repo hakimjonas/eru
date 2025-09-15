@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Test suite for EruFiber implementation and fiber lifecycle management.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * reliable implementation of the Fiber interface with correct semantics for concurrent execution
   * and proper integration with the effect system's resource safety guarantees.
   */
-class EruFiberSpec extends FunSuite {
+class EruFiberSpec extends munit.FunSuite {
 
   test("EruFiber creates fibers with unique IDs") {
     val fiber1 = EruFiber.completed(Exit.Success(42), Nil)

@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -17,7 +15,8 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * error conditions, and integration scenarios while maintaining Eru's correctness guarantees
   * including proper finalizer execution and resource safety.
   */
-final class SuspendSpec extends TestWithSharedRuntime {
+final class SuspendSpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   // Use the shared runtime for consistent, reliable testing
   private object LocalEruRuntime {
@@ -242,7 +241,7 @@ final class SuspendSpec extends TestWithSharedRuntime {
   test("suspend with finalizers executes cleanup on success") {
     var finalizerExecuted = false
 
-    val effect = runtime
+    val effect = LocalEruRuntime
       .suspend[String, Int] { callback =>
         callback(Right(42))
         Eru.unit
@@ -262,7 +261,7 @@ final class SuspendSpec extends TestWithSharedRuntime {
   test("suspend with finalizers executes cleanup on failure") {
     var finalizerExecuted = false
 
-    val effect = runtime
+    val effect = LocalEruRuntime
       .suspend[String, Int] { callback =>
         callback(Left("error"))
         Eru.unit
@@ -284,7 +283,7 @@ final class SuspendSpec extends TestWithSharedRuntime {
   test("suspend with nested finalizers maintains FILO execution order") {
     var executionOrder: List[String] = Nil
 
-    val effect = runtime
+    val effect = LocalEruRuntime
       .suspend[String, Int] { callback =>
         callback(Right(42))
         Eru.unit

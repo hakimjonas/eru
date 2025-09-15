@@ -1,7 +1,5 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters.*
 
@@ -19,7 +17,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * ordering can can lead to resource leaks, corrupted cleanup sequences, or undefined behavior in
   * complex concurrent scenarios. These tests must pass with zero tolerance for ordering violations.
   */
-class FiberFinalizerIntegrationSpec extends FunSuite {
+class FiberFinalizerIntegrationSpec extends munit.FunSuite {
 
   // Create a runtime instance for tests that don't use IsolatedTestRunner
   private val defaultRuntime = EruRuntime.create()

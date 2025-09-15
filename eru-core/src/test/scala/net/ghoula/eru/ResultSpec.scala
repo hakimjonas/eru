@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive test suite for the Result data type functionality.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * representation of computation outcomes in the Eru effect system, providing both success and
   * failure modeling with complete type safety.
   */
-class ResultSpec extends FunSuite {
+class ResultSpec extends munit.FunSuite {
 
   /** Validates that Result.succeed creates a Success with the given value.
     *

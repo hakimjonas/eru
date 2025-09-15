@@ -1,10 +1,7 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
-import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Comprehensive tests for error and defect propagation between parent and child fibers.
   *
@@ -12,12 +9,8 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * error handling works correctly across fiber boundaries. This test suite focuses on correctness
   * rather than timing to ensure reliable behavior across different execution environments.
   */
-class FiberErrorPropagationSpec extends TestWithSharedRuntime {
-
-  /** Helper to run operations with isolated runtime to prevent test interference */
-  private def withIsolatedRuntime[A](f: IsolatedTestRunner.IsolatedRuntime => A): A = {
-    IsolatedTestRunner.withIsolatedRuntime(f)
-  }
+class FiberErrorPropagationSpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   /** Helper method to create a detailed assertion message for Exit comparisons */
   private def assertExitEquals[E, A](actual: Exit[E, A], expected: Exit[E, A], context: String): Unit = {
@@ -66,7 +59,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val childEffect = Eru.fail(childError)
 
     val parentEffect = for {
-      childFiber <- runtime.fork(childEffect)
+      childFiber <- childEffect.fork
       childExit <- childFiber.await
     } yield childExit
 
@@ -83,7 +76,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val childEffect = Eru.effect(throw exception)
 
     val parentEffect = for {
-      childFiber <- runtime.fork(childEffect)
+      childFiber <- childEffect.fork
       childExit <- childFiber.await
     } yield childExit
 
@@ -102,7 +95,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val recoveredValue = "recovered successfully"
 
     val parentEffect = for {
-      childFiber <- runtime.fork(childEffect)
+      childFiber <- childEffect.fork
       childExit <- childFiber.await
       result <- childExit match {
         case Exit.Success(value) => Eru.succeed(value)
@@ -128,7 +121,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val childEffect = Eru.effect(throw exception)
 
     val parentEffect = for {
-      childFiber <- runtime.fork(childEffect)
+      childFiber <- childEffect.fork
       childExit <- childFiber.await
       result <- (childExit match {
         case Exit.Success(value) => Eru.succeed(value)
@@ -155,9 +148,9 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val child3Effect = Eru.succeed("success")
 
     val parentEffect = for {
-      fiber1 <- runtime.fork(child1Effect)
-      fiber2 <- runtime.fork(child2Effect)
-      fiber3 <- runtime.fork(child3Effect)
+      fiber1 <- child1Effect.fork
+      fiber2 <- child2Effect.fork
+      fiber3 <- child3Effect.fork
       exit1 <- fiber1.await
       exit2 <- fiber2.await
       exit3 <- fiber3.await
@@ -177,7 +170,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val leftEffect = Eru.fail(leftError)
     val rightEffect = Eru.fail(rightError)
 
-    val result = runtime.zipPar(leftEffect, rightEffect).attempt.unsafeRunSync()
+    val result = leftEffect.zipPar(rightEffect).attempt.unsafeRunSync()
 
     result match {
       case Result.Failure(error) =>
@@ -193,9 +186,9 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
 
   test("zipPar demonstrates error-first completion behavior") {
     val fastFail = Eru.fail("fast failure")
-    val slowSuccess = runtime.sleep(java.time.Duration.ofMillis(100)).map(_ => "slow success")
+    val slowSuccess = sleep(java.time.Duration.ofMillis(100)).map(_ => "slow success")
 
-    val result = runtime.zipPar(fastFail, slowSuccess).attempt.unsafeRunSync()
+    val result = fastFail.zipPar(slowSuccess).attempt.unsafeRunSync()
 
     result match {
       case Result.Failure(error) =>
@@ -210,25 +203,23 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
   }
 
   test("parSequence fails on first error without waiting for all effects") {
-    withIsolatedRuntime { runtime =>
-      val effects = List(
-        Eru.succeed("success1"),
-        Eru.fail("failure"),
-        runtime.sleep(java.time.Duration.ofMillis(100)).map(_ => "slow success")
-      )
+    val effects = List(
+      Eru.succeed("success1"),
+      Eru.fail("failure"),
+      sleep(java.time.Duration.ofMillis(100)).map(_ => "slow success")
+    )
 
-      val result = runtime.parSequence(effects).attempt.unsafeRunSync()
+    val result = parSequence(effects).attempt.unsafeRunSync()
 
-      result match {
-        case Result.Failure(error) =>
-          assertEquals(
-            error,
-            "failure",
-            "parSequence should fail fast with the first error encountered"
-          )
-        case Result.Success(value) =>
-          fail(s"Expected parSequence to fail with 'failure' but got success: $value")
-      }
+    result match {
+      case Result.Failure(error) =>
+        assertEquals(
+          error,
+          "failure",
+          "parSequence should fail fast with the first error encountered"
+        )
+      case Result.Success(value) =>
+        fail(s"Expected parSequence to fail with 'failure' but got success: $value")
     }
   }
 
@@ -236,7 +227,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val childEffect = Eru.succeed("child completed")
 
     val parentEffect = for {
-      childFiber <- runtime.fork(childEffect)
+      childFiber <- childEffect.fork
       _ <- Eru.fail("parent error")
     } yield childFiber
 
@@ -255,38 +246,36 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
   }
 
   test("nested error propagation through multiple fiber levels") {
-    withIsolatedRuntime { runtime =>
-      val deepError = "deep nested error"
-      val deepEffect = Eru.fail(deepError)
+    val deepError = "deep nested error"
+    val deepEffect = Eru.fail(deepError)
 
-      val middleEffect = for {
-        deepFiber <- runtime.fork(deepEffect)
-        deepExit <- deepFiber.await
-        deepResult <- deepExit match {
-          case Exit.Success(value) => Eru.succeed(value)
-          case Exit.Failure(error) => Eru.fail(error)
-          case Exit.Die(t) => Eru.effect(throw t)
-          case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
-        }
-      } yield s"middle processed: $deepResult"
-
-      val topEffect = for {
-        middleFiber <- runtime.fork(middleEffect)
-        middleExit <- middleFiber.await
-      } yield middleExit
-
-      val result = topEffect.unsafeRunSync()
-
-      result match {
-        case Exit.Failure(error) =>
-          assertEquals(
-            error,
-            deepError,
-            "Error should propagate through multiple fiber levels unchanged"
-          )
-        case other =>
-          fail(s"Expected nested error propagation to produce Failure($deepError) but got: $other")
+    val middleEffect = for {
+      deepFiber <- deepEffect.fork
+      deepExit <- deepFiber.await
+      deepResult <- deepExit match {
+        case Exit.Success(value) => Eru.succeed(value)
+        case Exit.Failure(error) => Eru.fail(error)
+        case Exit.Die(t) => Eru.effect(throw t)
+        case Exit.Interrupt(_, _) => Eru.succeed("interrupted")
       }
+    } yield s"middle processed: $deepResult"
+
+    val topEffect = for {
+      middleFiber <- middleEffect.fork
+      middleExit <- middleFiber.await
+    } yield middleExit
+
+    val result = topEffect.unsafeRunSync()
+
+    result match {
+      case Exit.Failure(error) =>
+        assertEquals(
+          error,
+          deepError,
+          "Error should propagate through multiple fiber levels unchanged"
+        )
+      case other =>
+        fail(s"Expected nested error propagation to produce Failure($deepError) but got: $other")
     }
   }
 
@@ -297,7 +286,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val deepEffect = Eru.fail(originalError)
 
     val middleEffect = for {
-      deepFiber <- runtime.fork(deepEffect)
+      deepFiber <- deepEffect.fork
       deepExit <- deepFiber.await
       result <- (deepExit match {
         case Exit.Success(value) => Eru.succeed(value)
@@ -311,7 +300,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     } yield result
 
     val topEffect = for {
-      middleFiber <- runtime.fork(middleEffect)
+      middleFiber <- middleEffect.fork
       middleExit <- middleFiber.await
       result <- middleExit match {
         case Exit.Success(value) => Eru.succeed(value)
@@ -337,7 +326,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
 
     val effects = (1 to 5).map(createEffect).toList
 
-    val result = runtime.parTraverse(effects)(identity).attempt.unsafeRunSync()
+    val result = parTraverse(effects)(identity).attempt.unsafeRunSync()
 
     result match {
       case Result.Failure(error) =>
@@ -408,9 +397,9 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
     val defectEffect = Eru.effect(throw new RuntimeException("isolated defect"))
 
     val compositeEffect = for {
-      errorFiber <- runtime.fork(errorEffect)
-      successFiber <- runtime.fork(successEffect)
-      defectFiber <- runtime.fork(defectEffect)
+      errorFiber <- errorEffect.fork
+      successFiber <- successEffect.fork
+      defectFiber <- defectEffect.fork
       errorExit <- errorFiber.await
       successExit <- successFiber.await
       defectExit <- defectFiber.await
@@ -445,7 +434,7 @@ class FiberErrorPropagationSpec extends TestWithSharedRuntime {
         Eru.fail(baseError)
       } else {
         for {
-          childFiber <- runtime.fork(createNestedFiber(depth - 1))
+          childFiber <- createNestedFiber(depth - 1).fork
           childExit <- childFiber.await
           result <- {
             (childExit match {

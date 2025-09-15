@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import java.util.concurrent.atomic.AtomicInteger
 
 import net.ghoula.eru.prelude.*
@@ -9,7 +7,8 @@ import net.ghoula.eru.prelude.*
 /** Standalone runtime health verification to prove the hanging is test infrastructure, not runtime
   * bugs
   */
-class RuntimeHealthCheck extends TestWithRuntime {
+class RuntimeHealthCheck extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   test("runtime can handle coordination primitives under load without hanging") {
     val latch = Eru.countDownLatch(5).unsafeRunSync()
@@ -18,18 +17,16 @@ class RuntimeHealthCheck extends TestWithRuntime {
 
     // If runtime had fundamental bugs, these would deadlock
     val producers = (1 to 3).map { i =>
-      runtime.fork {
-        for {
-          _ <- latch.countDown
-          _ <- queue.offer(s"msg-$i")
-          _ <- barrier.await // This would hang if runtime was broken
-        } yield s"producer-$i-done"
-      }.unsafeRunSync()
+      (for {
+        _ <- latch.countDown
+        _ <- queue.offer(s"msg-$i")
+        _ <- barrier.await // This would hang if runtime was broken
+      } yield s"producer-$i-done").fork.unsafeRunSync()
     }
 
     // Complete the latch from separate fibers
     (1 to 2).foreach { _ =>
-      runtime.fork(latch.countDown).unsafeRunSync()
+      latch.countDown.fork.unsafeRunSync()
     }
 
     // All should complete without hanging
@@ -54,14 +51,14 @@ class RuntimeHealthCheck extends TestWithRuntime {
     val cleanupCounter = new AtomicInteger(0)
 
     val fibers = (1 to fiberCount).map { i =>
-      runtime.fork {
-        Eru.effect {
-          completedCounter.incrementAndGet()
-          i
-        }.ensure(Eru.effect {
-          cleanupCounter.incrementAndGet()
-        })
-      }.unsafeRunSync()
+      (Eru.effect {
+        completedCounter.incrementAndGet()
+        i
+      }.ensure(Eru.effect {
+        cleanupCounter.incrementAndGet()
+      }))
+        .fork
+        .unsafeRunSync()
     }
 
     // Wait for all fibers - if runtime was broken, this would hang or fail
@@ -83,7 +80,7 @@ class RuntimeHealthCheck extends TestWithRuntime {
     val cleanupCounter = new AtomicInteger(0)
 
     val work = (1 to workCount).map { i =>
-      runtime.fork {
+      ({
         val effect = if (i % 3 == 0) {
           Eru.fail(s"deliberate-failure-$i").flatMap { _ =>
             failureCounter.incrementAndGet()
@@ -101,7 +98,7 @@ class RuntimeHealthCheck extends TestWithRuntime {
             cleanupCounter.incrementAndGet()
           })
           .attempt
-      }.unsafeRunSync()
+      }).fork.unsafeRunSync()
     }
 
     val results = work.map(_.await.unsafeRunSync())

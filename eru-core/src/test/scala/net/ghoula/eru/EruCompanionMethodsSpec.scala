@@ -1,6 +1,5 @@
 package net.ghoula.eru
 
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -14,7 +13,7 @@ import net.ghoula.eru.CorePrelude.*
   * fromEither, fromTry, fromOption, and unit, providing both example-based and property-based
   * testing to achieve EXCELLENT status for all methods.
   */
-class EruCompanionMethodsSpec extends ScalaCheckSuite {
+class EruCompanionMethodsSpec extends munit.ScalaCheckSuite {
 
   /** Generator for small positive integers to control test complexity. */
   private val smallInts: Gen[Int] = Gen.choose(-100, 100)

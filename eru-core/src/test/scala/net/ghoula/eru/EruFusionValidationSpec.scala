@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Validation suite for Eru's fusion optimization system.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * computational semantics and do not introduce performance regressions or correctness issues,
   * validating the construction-time optimizations critical for high-performance effect execution.
   */
-class EruFusionValidationSpec extends FunSuite {
+class EruFusionValidationSpec extends munit.FunSuite {
 
   /** Validates that pure fusion produces correct AST structure.
     *

@@ -1,7 +1,5 @@
 package userland
 
-import munit.FunSuite
-
 import java.time.Duration
 
 import net.ghoula.eru.prelude.*
@@ -12,7 +10,7 @@ import net.ghoula.eru.test.EruTest
   * Validates complex compositions of all Eru features including concurrency, resource management,
   * error handling, observability, and runtime operations in realistic application scenarios.
   */
-final class EndToEndSpec extends FunSuite {
+final class EndToEndSpec extends munit.FunSuite {
 
   given runtime: EruRuntime = EruRuntime.create()
 

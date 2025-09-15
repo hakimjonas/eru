@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 /** Test suite for fiber context and state management.
   *
   * Validates the behavior of FiberState enumeration, FiberContext operations, and related fiber
@@ -9,7 +7,7 @@ import munit.FunSuite
   * context information is properly maintained throughout fiber lifecycle operations, supporting
   * reliable concurrent execution in the runtime system.
   */
-class FiberContextSpec extends FunSuite {
+class FiberContextSpec extends munit.FunSuite {
 
   /** Validates that FiberState values are distinct from each other.
     *

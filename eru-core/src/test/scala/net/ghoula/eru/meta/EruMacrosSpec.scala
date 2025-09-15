@@ -1,7 +1,5 @@
 package net.ghoula.eru.meta
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Test suite for Eru's macro-based compile-time optimizations and validations.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * code maintains semantic equivalence with hand-written effects while providing additional
   * development-time benefits and optimizations.
   */
-class EruMacrosSpec extends FunSuite {
+class EruMacrosSpec extends munit.FunSuite {
 
   test("validated macro preserves effect behavior for simple success case") {
     val effect = Eru.succeed(42).validated

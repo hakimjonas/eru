@@ -2,7 +2,8 @@ package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
 
-class HubSpec extends TestWithSharedRuntime {
+class HubSpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   // =============================================================================
   // Bounded Hub Tests

@@ -2,7 +2,8 @@ package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
 
-class QueueSpec extends TestWithSharedRuntime {
+class QueueSpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   // =============================================================================
   // Bounded Queue Tests

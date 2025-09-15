@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Test suite for fork and await operations in the core Eru effect system.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * construction and semantic validation, with full runtime execution testing covered in the runtime
   * module specifications.
   */
-class ForkAwaitSpec extends FunSuite {
+class ForkAwaitSpec extends munit.FunSuite {
 
   test("Eru.fork creates Fork case") {
     val computation = Eru.succeed(42)

@@ -1,7 +1,5 @@
 package userland
 
-import munit.FunSuite
-
 import net.ghoula.eru.prelude.*
 
 /** Integration tests for Eru's concurrency primitives and deterministic behavior.
@@ -10,7 +8,7 @@ import net.ghoula.eru.prelude.*
   * primitives, and proper cancellation semantics. All tests use deterministic synchronization
   * mechanisms rather than timing assumptions to ensure reliability.
   */
-final class ConcurrencySpec extends FunSuite {
+final class ConcurrencySpec extends munit.FunSuite {
 
   given runtime: EruRuntime = EruRuntime.create()
 

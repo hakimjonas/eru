@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive test suite for the EruObserver system and event emission.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * visibility into runtime behavior without affecting computational correctness or performance,
   * supporting the Exceptional Observability pillar of the Eru framework.
   */
-class EruObserverSpec extends FunSuite {
+class EruObserverSpec extends munit.FunSuite {
 
   private class CollectingObserver extends EruObserver {
     private var _events: List[EruEvent] = Nil

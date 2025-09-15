@@ -1,6 +1,5 @@
 package userland
 
-import munit.FunSuite
 import userland.TestRuntime.*
 
 import java.time.Duration
@@ -14,7 +13,7 @@ import net.ghoula.eru.*
   * running after their parent scope terminates. This is a critical correctness bug that can lead to
   * resource leaks and violation of structured concurrency principles.
   */
-class StructuredConcurrencyLeakSpec extends FunSuite {
+class StructuredConcurrencyLeakSpec extends munit.FunSuite {
 
   /** Validates that child fibers are deterministically interrupted when parent completes.
     *

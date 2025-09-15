@@ -1,7 +1,5 @@
 package net.ghoula.eru.patterns
 
-import munit.FunSuite
-
 import java.time.{Duration, Instant}
 
 import net.ghoula.eru.CorePrelude.*
@@ -13,7 +11,7 @@ import net.ghoula.eru.CorePrelude.*
   * approaches to error management that support the Guided Correctness pillar by making the correct
   * error handling approach the most natural and ergonomic choice.
   */
-class ErrorHandlingSpec extends FunSuite {
+class ErrorHandlingSpec extends munit.FunSuite {
 
   test("RetryPolicy.conditional retries on matching errors") {
 

@@ -1,7 +1,5 @@
 package userland
 
-import munit.FunSuite
-
 import net.ghoula.eru.prelude.*
 
 /** Integration test suite for resource management in complex real-world scenarios.
@@ -11,7 +9,7 @@ import net.ghoula.eru.prelude.*
   * effect operations. These tests ensure that resource safety guarantees hold under complex
   * compositions that reflect production application requirements.
   */
-final class ResourceSpec extends FunSuite {
+final class ResourceSpec extends munit.FunSuite {
 
   given runtime: EruRuntime = EruRuntime.create()
 
