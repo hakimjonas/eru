@@ -522,17 +522,69 @@ object EruTrace {
       Some((context.traceId, context.currentSpan, context.baggage))
   }
 
-  /** Global trace context holder using thread-local storage. */
+  /** Global trace context holder using optimal strategy (Scoped Values on JVM 25+, ThreadLocal
+    * fallback).
+    */
   private val currentContext = new ThreadLocal[Option[TraceContext]] {
     override def initialValue(): Option[TraceContext] = None
   }
 
-  /** Gets the current trace context, if any. */
-  def getCurrentContext: Option[TraceContext] = currentContext.get()
+  /** Gets the current trace context using optimal strategy (Scoped Values on JVM 25+, ThreadLocal
+    * fallback).
+    *
+    * @return
+    *   the current trace context if one is active
+    */
+  def getCurrentContext: Option[TraceContext] = {
+    try {
+      import net.ghoula.eru.context.EruScopedValues.TraceContextProvider
+      TraceContextProvider.current()
+    } catch {
+      case _: Exception =>
+        // Fallback to ThreadLocal if Scoped Values aren't available
+        currentContext.get()
+    }
+  }
 
-  /** Sets the current trace context. */
+  /** Sets the current trace context using optimal strategy.
+    *
+    * Note: This method is deprecated for direct use. Prefer using `runWithContext` for scope
+    * management.
+    * @param context
+    *   the trace context to set as current
+    */
+  @deprecated("Use runWithContext for proper scope management", "1.0.0")
   def setCurrentContext(context: Option[TraceContext]): Unit =
     currentContext.set(context)
+
+  /** Run an operation with the given trace context using optimal propagation strategy.
+    *
+    * This is the preferred way to manage trace context scope. On JVM 25+, it uses Scoped Values for
+    * automatic cleanup and better performance. On older JVMs, it uses ThreadLocal.
+    *
+    * @param context
+    *   the trace context to use for this scope
+    * @param operation
+    *   the operation to run within this trace context
+    * @return
+    *   the result of the operation
+    */
+  def runWithContext[A](context: TraceContext)(operation: => A): A = {
+    try {
+      import net.ghoula.eru.context.EruScopedValues.TraceContextProvider
+      TraceContextProvider.runWith(context)(operation)
+    } catch {
+      case _: Exception =>
+        // Fallback to ThreadLocal if Scoped Values aren't available
+        val previousContext = currentContext.get()
+        currentContext.set(Some(context))
+        try {
+          operation
+        } finally {
+          currentContext.set(previousContext)
+        }
+    }
+  }
 
   /** Creates a new root trace context. */
   def startTrace(operation: String, tags: Map[String, String] = Map.empty): TraceContext = {

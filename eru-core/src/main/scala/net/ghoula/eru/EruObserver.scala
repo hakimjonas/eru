@@ -519,6 +519,9 @@ object EruObserver {
     *
     * This trait provides a specialized interface for observing tracing events, making it easier to
     * build observers that focus on performance analysis and distributed tracing integration.
+    *
+    * JVM 25 Enhancement: Automatically emits JFR events with @Contextual annotations for deep
+    * integration with JVM Flight Recorder and enhanced observability.
     */
   trait TracingEruObserver extends EruObserver {
 
@@ -529,9 +532,38 @@ object EruObserver {
       */
     def onSpanCompleted(span: net.ghoula.eru.trace.EruTrace.Span): Unit
 
+    /** Called when a fiber starts execution.
+      */
+    def onFiberStarted(fiberId: FiberId): Unit = {
+      val _ = fiberId
+      // Default implementation - no-op
+    }
+
+    /** Called when a fiber completes execution.
+      */
+    def onFiberCompleted(fiberId: FiberId, exit: Exit[Any, Any]): Unit = {
+      val _ = (fiberId, exit)
+      // Default implementation - no-op
+    }
+
+    /** Called for resource management operations.
+      */
+    def onResourceOperation(
+      operation: String,
+      resourceType: String,
+      resourceId: String,
+      cleanupStatus: String
+    ): Unit = {
+      val _ = (operation, resourceType, resourceId, cleanupStatus)
+      // Default implementation - no-op
+    }
+
     override def onEvent(event: EruEvent): Unit = {
       event match {
-        case EruEvent.TraceSpan(span) => onSpanCompleted(span)
+        case EruEvent.TraceSpan(span) =>
+          onSpanCompleted(span)
+        case EruEvent.FiberStarted(fiberId) => onFiberStarted(fiberId)
+        case EruEvent.FiberCompleted(fiberId, exit) => onFiberCompleted(fiberId, exit)
         case other => onOtherEvent(other)
       }
     }

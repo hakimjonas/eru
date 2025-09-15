@@ -30,7 +30,7 @@ final class TimeoutRetrySpec extends TestProgressReporter {
     assertEquals(timedFast.runExit(), Exit.Success(1))
 
     // Test timeout - should yield fallback value
-    val slow = runtime.sleep(Duration.ofMillis(20)).map(_ => 1)
+    val slow = TestRuntime.runtime.sleep(Duration.ofMillis(20)).map(_ => 1)
     val timedSlow = slow.timeoutTo(Duration.ofMillis(5), 0)
     assertEquals(timedSlow.runExit(), Exit.Success(0))
   }
@@ -60,7 +60,7 @@ final class TimeoutRetrySpec extends TestProgressReporter {
 
       // Test timeout logic - with TestClock this is deterministic
       // The sleep completes immediately, so timeout never occurs
-      val slow = runtime.sleep(Duration.ofMillis(20)).map(_ => 1)
+      val slow = TestRuntime.runtime.sleep(Duration.ofMillis(20)).map(_ => 1)
       val timedSlow = slow.timeoutTo(Duration.ofMillis(5), 0)
 
       // With TestClock: sleep operations complete immediately, so no timeout

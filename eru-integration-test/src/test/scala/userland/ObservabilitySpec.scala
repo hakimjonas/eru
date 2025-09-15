@@ -73,7 +73,7 @@ final class ObservabilitySpec extends munit.FunSuite {
     * the observability system.
     */
   test("forkWithObserver emits FiberStarted and FiberCompleted with Exit.Success") {
-    val fiber = TestRuntime.runIsolated(runtime.fork(Eru.succeed(10)))
+    val fiber = TestRuntime.runIsolated(TestRuntime.runtime.fork(Eru.succeed(10)))
     val exit = fiber.await.runIsolatedExit
 
     val result = exit match {

@@ -24,14 +24,14 @@ class FinalizerInterruptionMathematicalTest extends TestProgressReporter {
     val finalizerExecuted = new AtomicBoolean(false)
 
     val computation = for {
-      fiber <- runtime.fork {
+      fiber <- TestRuntime.runtime.fork {
         Eru
           .succeed("running")
           .ensure(Eru.effect {
             finalizerExecuted.set(true)
           })
       }
-      _ <- runtime.sleep(Duration.ofMillis(10))
+      _ <- TestRuntime.runtime.sleep(Duration.ofMillis(10))
       _ <- fiber.interrupt(InterruptCause.Cancelled(Some("Test interruption")))
       exit <- fiber.await
     } yield exit
@@ -50,16 +50,16 @@ class FinalizerInterruptionMathematicalTest extends TestProgressReporter {
     val finalizerExecuted = new AtomicBoolean(false)
 
     val computation = for {
-      fiber <- runtime.fork {
+      fiber <- TestRuntime.runtime.fork {
         import java.time.Duration
-        runtime
+        TestRuntime.runtime
           .sleep(Duration.ofMillis(20))
           .ensure(Eru.effect {
             finalizerExecuted.set(true)
             println("SLEEP FINALIZER EXECUTED")
           })
       }
-      _ <- runtime.sleep(Duration.ofMillis(10))
+      _ <- TestRuntime.runtime.sleep(Duration.ofMillis(10))
       _ <- fiber.interrupt(InterruptCause.Cancelled(Some("Test interruption")))
       exit <- fiber.await
     } yield exit
