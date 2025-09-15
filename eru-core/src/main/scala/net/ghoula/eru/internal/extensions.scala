@@ -2,7 +2,6 @@ package net.ghoula.eru.internal
 
 import java.time.{Duration, Instant}
 
-import net.ghoula.eru.EruObserver.EruEvent
 import net.ghoula.eru.{DomainTypes, Eru, Result, patterns, trace}
 
 /** Consolidated extension methods for Eru.
@@ -348,7 +347,7 @@ object extensions {
         (newContext, taggedSpan)
       }.flatMap { case (_, span) =>
         eru.attempt.map { result =>
-          val completedSpan = result match {
+          result match {
             case Result.Success(value) =>
               span.complete(SpanStatus.Success)
             case Result.Failure(error) =>
@@ -358,8 +357,6 @@ object extensions {
               }
               span.complete(SpanStatus.Error(errorMsg))
           }
-
-          EruEvent.TraceSpan(completedSpan)
 
           result
         }.flatMap {

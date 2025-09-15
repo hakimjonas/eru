@@ -8,7 +8,7 @@ import scala.sys.process.Process
 // ===== Build-wide Settings =====
 ThisBuild / organization := "net.ghoula"
 ThisBuild / versionScheme := Some("early-semver")
-ThisBuild / scalaVersion := "3.7.2"
+ThisBuild / scalaVersion := "3.7.3"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
@@ -31,6 +31,7 @@ lazy val sharedScalacOptions = Seq(
   "-feature",
   "-Xfatal-warnings",
   "-Wunused:all",
+  "-Wrecurse-with-default",
   "-no-indent"
 )
 
