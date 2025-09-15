@@ -10,7 +10,7 @@ import net.ghoula.eru.prelude.*
   * Tests the fundamental fiber operations (fork, await) across success, failure, and interruption
   * scenarios to ensure correct behavior in the unified fiber runtime.
   */
-class FiberLifecycleSpec extends TestWithRuntime {
+class FiberLifecycleSpec extends TestWithSharedRuntime {
 
   /** Validates that fiber fork creates new fibers with unique identifiers.
     *

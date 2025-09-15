@@ -12,7 +12,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * error handling works correctly across fiber boundaries. This test suite focuses on correctness
   * rather than timing to ensure reliable behavior across different execution environments.
   */
-class FiberErrorPropagationSpec extends TestWithRuntime {
+class FiberErrorPropagationSpec extends TestWithSharedRuntime {
 
   /** Helper to run operations with isolated runtime to prevent test interference */
   private def withIsolatedRuntime[A](f: IsolatedTestRunner.IsolatedRuntime => A): A = {

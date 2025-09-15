@@ -2,9 +2,7 @@ package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
 
-class CyclicBarrierSpec extends munit.FunSuite {
-
-  implicit val runtime: EruRuntime = EruRuntime.create()
+class CyclicBarrierSpec extends TestWithSharedRuntime {
 
   test("cyclic barrier creation succeeds") {
     val barrier = Eru.cyclicBarrier(3).unsafeRunSync()

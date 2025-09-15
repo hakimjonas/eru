@@ -7,7 +7,7 @@ import net.ghoula.eru.prelude.*
   * These tests validate Promise behavior under concurrent access without relying on timing
   * assumptions or Thread.sleep.
   */
-class PromiseConcurrencySpec extends TestWithRuntime {
+class PromiseConcurrencySpec extends TestWithSharedRuntime {
 
   test("promise coordinates multiple waiters correctly") {
     val promise = Eru.promise[String, Int].unsafeRunSync()

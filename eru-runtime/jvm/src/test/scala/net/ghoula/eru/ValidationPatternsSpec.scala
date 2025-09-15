@@ -8,7 +8,7 @@ import net.ghoula.eru.prelude.*
   * enable flexible error handling strategies for domain modeling and validation scenarios. These
   * operations are essential for Valar integration and form validation workflows.
   */
-final class ValidationPatternsSpec extends TestWithRuntime {
+final class ValidationPatternsSpec extends TestWithSharedRuntime {
 
   test("validatePar accumulates all errors when all effects fail") {
     val errors = List("error1", "error2", "error3")

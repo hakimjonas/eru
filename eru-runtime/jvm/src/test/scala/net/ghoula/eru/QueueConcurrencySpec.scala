@@ -7,7 +7,7 @@ import net.ghoula.eru.prelude.*
   * Tests queue behavior under concurrent access using coordination primitives for deterministic
   * testing without timing dependencies.
   */
-class QueueConcurrencySpec extends TestWithRuntime {
+class QueueConcurrencySpec extends TestWithSharedRuntime {
 
   test("bounded queue producer-consumer coordination") {
     val queue = Eru.queue[String](3).unsafeRunSync()

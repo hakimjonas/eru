@@ -10,7 +10,7 @@ import net.ghoula.eru.prelude.*
   * Tests that fork/await operations are referentially transparent and preserve fundamental
   * properties like monad laws in the unified fiber runtime.
   */
-class FiberPropertySpec extends TestWithRuntime {
+class FiberPropertySpec extends TestWithSharedRuntime {
 
   /** Validates that fork/await operations are referentially transparent.
     *

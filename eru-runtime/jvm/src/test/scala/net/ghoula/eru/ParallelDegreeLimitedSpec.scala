@@ -12,7 +12,7 @@ import net.ghoula.eru.prelude.*
   * fibers while still providing parallel execution benefits. These operations are essential for
   * resource-controlled parallel processing when working with external systems.
   */
-final class ParallelDegreeLimitedSpec extends TestWithRuntime {
+final class ParallelDegreeLimitedSpec extends TestWithSharedRuntime {
 
   test("foreachParN processes all items with results") {
     val items = (1 to 10).toList

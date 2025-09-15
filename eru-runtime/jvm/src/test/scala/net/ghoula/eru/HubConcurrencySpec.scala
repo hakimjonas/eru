@@ -7,7 +7,7 @@ import net.ghoula.eru.prelude.*
   * These tests demonstrate correct async behavior without relying on Thread.sleep or polling,
   * instead using Promise and CountDownLatch for deterministic coordination.
   */
-class HubConcurrencySpec extends TestWithRuntime {
+class HubConcurrencySpec extends TestWithSharedRuntime {
 
   test("hub concurrent publishing maintains message delivery") {
     val hub = Eru.hub[String](10).unsafeRunSync() // Large capacity to avoid blocking

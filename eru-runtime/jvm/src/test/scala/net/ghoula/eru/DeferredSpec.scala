@@ -12,7 +12,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * between concurrent fibers, supporting common patterns like producer-consumer communication and
   * synchronization barriers.
   */
-final class DeferredSpec extends TestWithRuntime {
+final class DeferredSpec extends TestWithSharedRuntime {
 
   test("await blocks until completion and returns the value") {
     val d = Deferred.make[Int].unsafeRunSync()

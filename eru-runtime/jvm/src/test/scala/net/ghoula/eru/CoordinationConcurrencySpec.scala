@@ -8,7 +8,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * These tests validate proper async coordination behavior for synchronization primitives. Uses
   * IsolatedTestRunner with improved TestClock coordination support.
   */
-class CoordinationConcurrencySpec extends TestWithRuntime {
+class CoordinationConcurrencySpec extends TestWithSharedRuntime {
 
   test("countdown latch coordinates multiple waiters") {
     IsolatedTestRunner.withIsolatedRuntime { runtime =>

@@ -14,7 +14,7 @@ import net.ghoula.eru.prelude.*
   * safety even in complex concurrent scenarios and prevents common concurrency pitfalls like
   * resource leaks and improper cleanup ordering.
   */
-class FiberExecutionSpec extends TestWithRuntime {
+class FiberExecutionSpec extends TestWithSharedRuntime {
 
   test("fork without await prevents finalizer leaks via auto-join") {
     val finalizerExecuted = new AtomicBoolean(false)

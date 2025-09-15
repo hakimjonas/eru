@@ -17,9 +17,9 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * error conditions, and integration scenarios while maintaining Eru's correctness guarantees
   * including proper finalizer execution and resource safety.
   */
-final class SuspendSpec extends TestWithRuntime {
+final class SuspendSpec extends TestWithSharedRuntime {
 
-  // Use the TestWithRuntime's implicit runtime instead of shared isolatedRuntime
+  // Use the shared runtime for consistent, reliable testing
   private object LocalEruRuntime {
     def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit])(using
       runtime: EruRuntime
@@ -187,24 +187,20 @@ final class SuspendSpec extends TestWithRuntime {
     * ignored to ensure consistent behavior.
     */
   test("suspend prevents multiple callback invocations (idempotency)") {
-    var callbackInvocationCount = 0
+    var callbackCount = 0
     val future = new CompletableFuture[String]()
 
     val suspendEffect = LocalEruRuntime.suspend[Throwable, String] { callback =>
-      // Wrap the callback to track actual invocations
-      val trackedCallback: Either[Throwable, String] => Unit = result => {
-        callbackInvocationCount += 1
-        callback(result)
-      }
-
       future.whenComplete { (value, throwable) =>
+        callbackCount += 1
         Option(throwable) match {
-          case Some(error) =>
-            trackedCallback(Left(error)) // First call
-            trackedCallback(Left(error)) // Second call (should be ignored by suspend)
-          case None =>
-            trackedCallback(Right(value)) // First call
-            trackedCallback(Right("second call")) // Second call (should be ignored by suspend)
+          case Some(error) => callback(Left(error))
+          case None => callback(Right(value))
+        }
+
+        Option(throwable) match {
+          case Some(error) => callback(Left(error))
+          case None => callback(Right("second call"))
         }
       }
       Eru.unit
@@ -218,8 +214,7 @@ final class SuspendSpec extends TestWithRuntime {
 
     val result = suspendEffect.unsafeRunSync()
     assertEquals(result, "first result")
-    // The callback is invoked twice, but suspend should only use the first result
-    assertEquals(callbackInvocationCount, 2)
+    assertEquals(callbackCount, 1)
   }
 
   /** Validates that suspend properly handles registration failures.

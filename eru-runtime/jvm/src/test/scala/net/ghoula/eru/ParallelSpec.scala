@@ -13,7 +13,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * characteristics, and provide correct error handling semantics while leveraging the performance
   * benefits of the JVM's virtual thread implementation.
   */
-final class ParallelSpec extends TestWithRuntime {
+final class ParallelSpec extends TestWithSharedRuntime {
 
   test("zipPar runs effects in parallel on JVM VT backend") {
     IsolatedTestRunner.withIsolatedRuntime { runtime =>
