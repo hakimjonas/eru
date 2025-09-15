@@ -89,7 +89,6 @@ object Queue {
   def unbounded[A](using runtime: EruRuntime): Eru[Nothing, Queue[A]] =
     Eru.succeed(new UnboundedQueue[A](runtime))
 
-  // Implementation for bounded queues
   private final class BoundedQueue[A](capacity: Int, runtime: EruRuntime) extends Queue[A] {
     import java.util.concurrent.ConcurrentLinkedQueue
     import java.util.concurrent.atomic.AtomicInteger
@@ -230,7 +229,6 @@ object Queue {
     }
   }
 
-  // Implementation for unbounded queues
   private final class UnboundedQueue[A](runtime: EruRuntime) extends Queue[A] {
     import java.util.concurrent.ConcurrentLinkedQueue
     import java.util.concurrent.atomic.AtomicInteger

@@ -83,7 +83,6 @@ object FiberId {
     val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode.toLong & ProcessIdMask
     val timestamp = System.nanoTime() & TimestampMask
 
-    // Combine: sign bit (0) + processId (15 bits) + timestamp (48 bits)
     (processId << 48) | timestamp
   }
   private val next = new java.util.concurrent.atomic.AtomicLong(processUniqueStart)

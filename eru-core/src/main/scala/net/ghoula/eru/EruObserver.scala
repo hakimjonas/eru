@@ -32,12 +32,16 @@ object EruObserver {
     */
   opaque type ScopeId = Long
 
+  /** Companion object for ScopeId providing unique identifier generation.
+    *
+    * Uses a process-unique starting point to avoid conflicts between multiple Eru instances. The ID
+    * generation combines process ID and nano time with atomic increment for uniqueness.
+    */
   object ScopeId {
-    // Use process-unique starting point to avoid conflicts between multiple Eru instances
     private val processUniqueStart = {
       val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode & 0xffffL
       val nanoTime = (System.nanoTime() >> 24) & 0xffffffffffffL
-      (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x3000L // Offset for ScopeId
+      (processId.toLong << 48) | (nanoTime & 0xffffL) | 0x3000L
     }
     private val next = new java.util.concurrent.atomic.AtomicLong(processUniqueStart)
 
