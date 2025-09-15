@@ -204,17 +204,20 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
         runtime.sleep(Duration.ofMillis(delay.toLong)).map(_ => i)
       }
 
-      val results = timers.map(timer => runtime.fork(timer))
-      val completed = results
-        .map(_.flatMap(_.await).flatMap {
-          case Exit.Success(value) => Eru.succeed(value)
-          case Exit.Failure(error) => Eru.fail(new RuntimeException(s"Timer failed with error: $error"))
-          case Exit.Die(t) => Eru.fail(new RuntimeException("Timer died", t))
-          case Exit.Interrupt(_, _) => Eru.fail(new RuntimeException("Timer was interrupted"))
-        })
-        .toList
-        .sequence
-        .unsafeRunSync()
+      // Fork all timers efficiently
+      val fibers = timers.map(_.fork).toList.sequence.unsafeRunSync()
+
+      // Advance TestClock past maximum timer delay (10ms) to complete all timers
+      clock.advance(Duration.ofMillis(11))
+
+      // Collect results from completed fibers efficiently
+      val awaitResults = fibers.map(_.await).sequence.unsafeRunSync()
+      val completed = awaitResults.map {
+        case Exit.Success(value) => value
+        case Exit.Failure(error) => throw new RuntimeException(s"Timer failed with error: $error")
+        case Exit.Die(t) => throw new RuntimeException("Timer died", t)
+        case Exit.Interrupt(_, _) => throw new RuntimeException("Timer was interrupted")
+      }
 
       val endTime = clock.currentTime
       val elapsedMs = java.time.Duration.between(startTime, endTime).toMillis
@@ -222,9 +225,10 @@ final class ConcurrencyStressSpec extends TestWithRuntime {
       // Same correctness verification as original
       assertEquals(completed.sorted, (1 to timerCount).toList)
 
-      // But with TestClock: instant, deterministic execution
-      assert(elapsedMs < 10) // Should complete almost instantly vs original ~643ms
+      // With TestClock: logical time advances by exactly the amount we advance the clock
       println(s"TestClock timer test: ${elapsedMs}ms vs original: ~643ms")
+      // We advanced by 11ms, so logical time should be 11ms (deterministic)
+      assertEquals(elapsedMs, 11L)
     }
   }
 
