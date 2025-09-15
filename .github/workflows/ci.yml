@@ -10,15 +10,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: ['21', '25']
+    name: Build and Test (JDK ${{ matrix.java-version }})
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up JDK 25
+      - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
-          java-version: '25'
+          distribution: 'openjdk'
+          java-version: ${{ matrix.java-version }}
           cache: 'sbt'
 
       - name: Set up sbt
@@ -29,21 +34,21 @@ jobs:
           export JAVA_OPTS="-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           export SBT_OPTS="-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all checks (style, formatting, API compatibility)
+      - name: Run all checks (style, formatting, API compatibility) on JDK ${{ matrix.java-version }}
         run: sbt check
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all tests on JVM (isolated)
+      - name: Run all tests on JVM (isolated) - JDK ${{ matrix.java-version }}
         run: |
-          echo "🧪 Cleaning before tests to ensure clean JVM state..."
+          echo "🧪 Testing on JDK ${{ matrix.java-version }} - Cleaning before tests to ensure clean JVM state..."
           sbt clean
-          echo "🧪 Running JVM Core Tests..."
+          echo "🧪 Running JVM Core Tests on JDK ${{ matrix.java-version }}..."
           timeout 180s sbt "eruCoreJVM/test"
-          echo "🧪 Running JVM Runtime Tests..."
+          echo "🧪 Running JVM Runtime Tests on JDK ${{ matrix.java-version }}..."
           timeout 180s sbt "eruRuntimeJVM/test"
-          echo "🧪 Running Integration Tests..."
+          echo "🧪 Running Integration Tests on JDK ${{ matrix.java-version }}..."
           timeout 120s sbt "eruIntegrationTest/test"
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
@@ -99,11 +104,11 @@ jobs:
         with:
           fetch-depth: 0 # Fetch full history for dynver/release notes
 
-      - name: Set up JDK 25
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
-          java-version: '25'
+          distribution: 'openjdk'
+          java-version: '21'
           cache: 'sbt'
 
       - name: Set up sbt launcher
@@ -181,11 +186,11 @@ jobs:
         with:
           fetch-depth: 0 # Fetch full history for dynver
 
-      - name: Set up JDK 25
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
-          java-version: '25'
+          distribution: 'openjdk'
+          java-version: '21'
           cache: 'sbt'
 
       - name: Set up sbt launcher

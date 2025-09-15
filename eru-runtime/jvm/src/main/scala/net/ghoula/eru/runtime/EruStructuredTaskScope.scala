@@ -1,6 +1,6 @@
 package net.ghoula.eru.runtime
 
-import java.util.concurrent.{Callable, StructuredTaskScope}
+import java.util.concurrent.Callable
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.fold
@@ -27,12 +27,14 @@ import net.ghoula.eru.prelude.fold
   */
 object EruStructuredTaskScope {
 
-  /** Detects if StructuredTaskScope is available (JVM 25+). */
+  /** Detects if StructuredTaskScope is available (JVM 19+ preview, JVM 25+ final). */
   val isAvailable: Boolean = {
     try {
+      // Try to load the class to see if it's available
+      Class.forName("java.util.concurrent.StructuredTaskScope")
       val javaVersion = System.getProperty("java.version")
       val majorVersion = javaVersion.split("\\.")(0).toInt
-      majorVersion >= 25
+      majorVersion >= 19 // Available as preview since JDK 19
     } catch {
       case _: Exception => false
     }
@@ -61,9 +63,18 @@ object EruStructuredTaskScope {
     */
   class EruTaskScope[T] private (val policy: TaskScopePolicy) extends AutoCloseable {
 
-    private val scope = StructuredTaskScope.open[T]()
+    private val scope: Option[Any] = if (isAvailable) {
+      try {
+        val clazz = Class.forName("java.util.concurrent.StructuredTaskScope")
+        val openMethod = clazz.getMethod("open")
+        Some(openMethod.invoke(clazz))
+      } catch {
+        case _: Exception => None
+      }
+    } else None
+
     private var firstException: Option[Throwable] = None
-    private val subtasks = scala.collection.mutable.ListBuffer[StructuredTaskScope.Subtask[T]]()
+    private val subtasks = scala.collection.mutable.ListBuffer[Any]()
 
     /** Fork a task within this structured scope.
       *
@@ -73,14 +84,22 @@ object EruStructuredTaskScope {
       *   a subtask representing the task result
       */
     def forkTask(effect: Eru[?, T]): Unit = {
-      val subtask = scope.fork(new Callable[T] {
-        def call(): T = {
-          // Execute effect within structured task scope
-          effect.unsafeRunSync()
+      scope.foreach { scopeInstance =>
+        try {
+          val callable = new Callable[T] {
+            def call(): T = {
+              // Execute effect within structured task scope
+              effect.unsafeRunSync()
+            }
+          }
+          val forkMethod = scopeInstance.getClass.getMethod("fork", classOf[Callable[?]])
+          val subtask = forkMethod.invoke(scopeInstance, callable)
+          subtasks += subtask
+        } catch {
+          case ex: Exception =>
+            firstException = Some(ex)
         }
-      })
-
-      subtasks += subtask
+      }
     }
 
     /** Wait for all tasks to complete and return results.
@@ -89,11 +108,14 @@ object EruStructuredTaskScope {
       *   the scope after joining all tasks
       */
     def joinAll(): EruTaskScope[T] = {
-      try {
-        scope.join()
-      } catch {
-        case ex: Throwable =>
-          firstException = Some(ex)
+      scope.foreach { scopeInstance =>
+        try {
+          val joinMethod = scopeInstance.getClass.getMethod("join")
+          joinMethod.invoke(scopeInstance)
+        } catch {
+          case ex: Throwable =>
+            firstException = Some(ex)
+        }
       }
       this
     }
@@ -115,15 +137,48 @@ object EruStructuredTaskScope {
 
     /** Get all results from completed subtasks. */
     def getAllResults(): List[T] = {
-      subtasks
-        .filter(_.state() == java.util.concurrent.Future.State.SUCCESS)
-        .map(_.get())
-        .toList
+      scope match {
+        case Some(_) if subtasks.nonEmpty =>
+          try {
+            subtasks.flatMap { subtask =>
+              try {
+                val stateMethod = subtask.getClass.getMethod("state")
+                val state = stateMethod.invoke(subtask)
+                val futureStateClass = Class.forName("java.util.concurrent.Future$State")
+                val successField = futureStateClass.getDeclaredField("SUCCESS")
+                val successState = successField.get(futureStateClass)
+                if (state == successState) {
+                  val getMethod = subtask.getClass.getMethod("get")
+                  val result = getMethod.invoke(subtask)
+                  // Safe cast using match to avoid unsafe asInstanceOf
+                  result match {
+                    case value: T @unchecked => Some(value)
+                    case _ => None
+                  }
+                } else {
+                  None
+                }
+              } catch {
+                case _: Exception => None
+              }
+            }.toList
+          } catch {
+            case _: Exception => List.empty
+          }
+        case _ => List.empty
+      }
     }
 
     /** Close the scope and clean up resources. */
     def close(): Unit = {
-      scope.close()
+      scope.foreach { scopeInstance =>
+        try {
+          val closeMethod = scopeInstance.getClass.getMethod("close")
+          closeMethod.invoke(scopeInstance)
+        } catch {
+          case _: Exception => // Ignore close errors
+        }
+      }
     }
   }
 

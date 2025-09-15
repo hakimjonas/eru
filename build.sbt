@@ -43,7 +43,7 @@ lazy val testScalacOptions = Seq(
 lazy val commonSettings = Seq(
   scalacOptions ++= sharedScalacOptions,
   Test / scalacOptions ++= testScalacOptions,
-  javacOptions ++= Seq("--release", "25")
+  javacOptions ++= Seq("--release", "21")
 )
 
 // ===== Project Definitions =====
