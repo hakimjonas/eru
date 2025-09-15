@@ -136,7 +136,7 @@ jobs:
         run: sbt +publishSigned sonatypeCentralUpload
 
       - name: Setup SSH for GitHub Pages
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.GH_PAGES_DEPLOY_KEY }}
 
