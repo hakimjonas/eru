@@ -13,7 +13,7 @@ This project is guided by a strong philosophical vision for what a modern effect
 - **Correctness Foundation**: 576+ tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
 
 - **Cross-Platform Support**:
-    - **JVM**: Full support with true concurrency via Java Virtual Threads (JDK 21+)
+    - **JVM**: Full support with Structured Concurrency and Virtual Threads (JDK 25+)
     - **Scala Native**: Complete synchronous runtime with identical API surface
 
 - **Concurrency Runtime**: Production-ready concurrent operations including fork, race, zipPar, timeouts, structured concurrency patterns, optimized coordination primitives (Ref, Semaphore, Deferred), degree-limited parallel execution, and error accumulation patterns for domain validation.

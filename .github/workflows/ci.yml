@@ -14,11 +14,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '25'
           cache: 'sbt'
 
       - name: Set up sbt
@@ -99,11 +99,11 @@ jobs:
         with:
           fetch-depth: 0 # Fetch full history for dynver/release notes
 
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '25'
           cache: 'sbt'
 
       - name: Set up sbt launcher
@@ -181,11 +181,11 @@ jobs:
         with:
           fetch-depth: 0 # Fetch full history for dynver
 
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '25'
           cache: 'sbt'
 
       - name: Set up sbt launcher

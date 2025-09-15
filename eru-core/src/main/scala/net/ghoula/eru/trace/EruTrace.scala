@@ -536,14 +536,9 @@ object EruTrace {
     *   the current trace context if one is active
     */
   def getCurrentContext: Option[TraceContext] = {
-    try {
-      import net.ghoula.eru.context.EruScopedValues.TraceContextProvider
-      TraceContextProvider.current()
-    } catch {
-      case _: Exception =>
-        // Fallback to ThreadLocal if Scoped Values aren't available
-        currentContext.get()
-    }
+    // Use ThreadLocal implementation for cross-platform compatibility
+    // For optimal ScopedValues support on JVM 25+, use EruScopedValues.TraceContextProvider directly
+    currentContext.get()
   }
 
   /** Sets the current trace context using optimal strategy.
@@ -570,19 +565,14 @@ object EruTrace {
     *   the result of the operation
     */
   def runWithContext[A](context: TraceContext)(operation: => A): A = {
+    // Use ThreadLocal implementation for cross-platform compatibility
+    // For optimal ScopedValues support on JVM 25+, use EruScopedValues.TraceContextProvider directly
+    val previousContext = currentContext.get()
+    currentContext.set(Some(context))
     try {
-      import net.ghoula.eru.context.EruScopedValues.TraceContextProvider
-      TraceContextProvider.runWith(context)(operation)
-    } catch {
-      case _: Exception =>
-        // Fallback to ThreadLocal if Scoped Values aren't available
-        val previousContext = currentContext.get()
-        currentContext.set(Some(context))
-        try {
-          operation
-        } finally {
-          currentContext.set(previousContext)
-        }
+      operation
+    } finally {
+      currentContext.set(previousContext)
     }
   }
 

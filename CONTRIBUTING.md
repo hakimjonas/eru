@@ -5,7 +5,7 @@ Thank you for your interest in contributing to Eru! This guide will help you und
 ## Quick Start
 
 1. **Fork and clone** the repository
-2. **Install dependencies**: Ensure you have JDK 21+ and sbt installed
+2. **Install dependencies**: Ensure you have JDK 25+ and sbt installed
 3. **Run tests**: Execute `./run-all-tests.sh` to verify everything works
 4. **Make changes** following our development workflow below
 5. **Submit a PR** with clear description and tests

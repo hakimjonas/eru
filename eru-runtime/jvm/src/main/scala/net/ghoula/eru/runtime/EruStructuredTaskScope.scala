@@ -1,10 +1,8 @@
 package net.ghoula.eru.runtime
 
-import java.time.Instant
 import java.util.concurrent.{Callable, StructuredTaskScope}
 
 import net.ghoula.eru.*
-import net.ghoula.eru.context.EruScopedValues
 import net.ghoula.eru.prelude.fold
 
 /** JVM 25 Structured Concurrency backend using StructuredTaskScope.
@@ -61,7 +59,7 @@ object EruStructuredTaskScope {
     * @tparam T
     *   the type of values produced by tasks in this scope
     */
-  class EruTaskScope[T] private (policy: TaskScopePolicy) extends AutoCloseable {
+  class EruTaskScope[T] private (val policy: TaskScopePolicy) extends AutoCloseable {
 
     private val scope = StructuredTaskScope.open[T]()
     private var firstException: Option[Throwable] = None
@@ -75,21 +73,10 @@ object EruStructuredTaskScope {
       *   a subtask representing the task result
       */
     def forkTask(effect: Eru[?, T]): Unit = {
-      val fiberId = FiberId.fresh()
-
       val subtask = scope.fork(new Callable[T] {
         def call(): T = {
-          // Create fiber context for this task
-          val fiberContext = EruScopedValues.FiberContext(
-            fiberId = fiberId,
-            startTime = Instant.now(),
-            metadata = Map("scope-policy" -> policy.toString)
-          )
-
-          // Execute with proper context propagation
-          EruScopedValues.FiberContextProvider.runWith(fiberContext) {
-            effect.unsafeRunSync()
-          }
+          // Execute effect within structured task scope
+          effect.unsafeRunSync()
         }
       })
 

@@ -1,0 +1,4 @@
+#!/bin/bash
+export JAVA_HOME="$HOME/.sdkman/candidates/java/25.ea.36-open"
+export PATH="$JAVA_HOME/bin:$PATH"
+sbt "$@"
