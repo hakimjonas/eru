@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 /** Test suite for fiber context and state management.
   *
   * Validates the behavior of FiberState enumeration, FiberContext operations, and related fiber
@@ -9,7 +7,7 @@ import munit.FunSuite
   * context information is properly maintained throughout fiber lifecycle operations, supporting
   * reliable concurrent execution in the runtime system.
   */
-class FiberContextSpec extends FunSuite {
+class FiberContextSpec extends munit.FunSuite {
 
   /** Validates that FiberState values are distinct from each other.
     *
@@ -131,7 +129,8 @@ class FiberContextSpec extends FunSuite {
     val age1 = context.ageNanos
     assert(age1 >= 0)
 
-    Thread.sleep(1)
+    // Small delay to ensure time passes for age calculation
+    Thread.sleep(1) // Keep minimal real delay since this tests actual time
     val age2 = context.ageNanos
     assert(age2 > age1)
   }

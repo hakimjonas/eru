@@ -1,7 +1,5 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
 
@@ -10,7 +8,8 @@ import net.ghoula.eru.prelude.*
   * Tests that fork/await operations are referentially transparent and preserve fundamental
   * properties like monad laws in the unified fiber runtime.
   */
-class FiberPropertySpec extends TestWithRuntime {
+class FiberPropertySpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   /** Validates that fork/await operations are referentially transparent.
     *
@@ -23,7 +22,7 @@ class FiberPropertySpec extends TestWithRuntime {
     val directResult = computation.unsafeRunSync()
 
     val fiberResult = for {
-      fiber <- runtime.fork(computation)
+      fiber <- computation.fork
       exit <- fiber.await
       result <- Eru.fromExit(exit)
     } yield result
@@ -42,9 +41,9 @@ class FiberPropertySpec extends TestWithRuntime {
     val value = "pure value"
     val pureEffect = Eru.succeed(value)
 
-    val fiber1 = runtime.fork(pureEffect).unsafeRunSync()
-    val fiber2 = runtime.fork(pureEffect).unsafeRunSync()
-    val fiber3 = runtime.fork(pureEffect).unsafeRunSync()
+    val fiber1 = pureEffect.fork.unsafeRunSync()
+    val fiber2 = pureEffect.fork.unsafeRunSync()
+    val fiber3 = pureEffect.fork.unsafeRunSync()
 
     val exit1 = fiber1.await.unsafeRunSync()
     val exit2 = fiber2.await.unsafeRunSync()
@@ -64,8 +63,8 @@ class FiberPropertySpec extends TestWithRuntime {
     val error = "test error"
     val failingEffect = Eru.fail(error)
 
-    val fiber1 = runtime.fork(failingEffect).unsafeRunSync()
-    val fiber2 = runtime.fork(failingEffect).unsafeRunSync()
+    val fiber1 = failingEffect.fork.unsafeRunSync()
+    val fiber2 = failingEffect.fork.unsafeRunSync()
 
     val exit1 = fiber1.await.unsafeRunSync()
     val exit2 = fiber2.await.unsafeRunSync()
@@ -86,7 +85,7 @@ class FiberPropertySpec extends TestWithRuntime {
     val direct = f(a).unsafeRunSync()
 
     val throughFiber = for {
-      fiber <- runtime.fork(Eru.succeed(a))
+      fiber <- Eru.succeed(a).fork
       exit <- fiber.await
       value <- Eru.fromExit(exit)
       result <- f(value)
@@ -108,7 +107,7 @@ class FiberPropertySpec extends TestWithRuntime {
     val direct = m.unsafeRunSync()
 
     val throughFiber = for {
-      fiber <- runtime.fork(m)
+      fiber <- m.fork
       exit <- fiber.await
       result <- Eru.fromExit(exit).flatMap(Eru.succeed)
     } yield result
@@ -129,18 +128,18 @@ class FiberPropertySpec extends TestWithRuntime {
     val g: Int => Eru[Nothing, String] = x => Eru.succeed(s"result: $x")
 
     val leftAssoc = for {
-      fiber1 <- runtime.fork(m)
+      fiber1 <- m.fork
       exit1 <- fiber1.await
       value1 <- Eru.fromExit(exit1)
       intermediateEffect = f(value1)
-      fiber2 <- runtime.fork(intermediateEffect)
+      fiber2 <- intermediateEffect.fork
       exit2 <- fiber2.await
       value2 <- Eru.fromExit(exit2)
       result <- g(value2)
     } yield result
 
     val rightAssoc = for {
-      fiber <- runtime.fork(m)
+      fiber <- m.fork
       exit <- fiber.await
       value <- Eru.fromExit(exit)
       result <- f(value).flatMap(g)
@@ -166,7 +165,7 @@ class FiberPropertySpec extends TestWithRuntime {
     } yield a + b + c
 
     val runs = (1 to 10).map { _ =>
-      val fiber = runtime.fork(computation).unsafeRunSync()
+      val fiber = computation.fork.unsafeRunSync()
       val exit = fiber.await.unsafeRunSync()
       exit match {
         case Exit.Success(value) => value
@@ -191,7 +190,7 @@ class FiberPropertySpec extends TestWithRuntime {
     val errorEffect: Eru[CustomError, String] = Eru.fail(ErrorA)
 
     val fiberResult = for {
-      fiber <- runtime.fork(errorEffect)
+      fiber <- errorEffect.fork
       exit <- fiber.await
     } yield exit
 
@@ -214,7 +213,7 @@ class FiberPropertySpec extends TestWithRuntime {
     val f: Int => Eru[Nothing, Int] = x => Eru.succeed(x * x)
 
     def forkAwait[E, A](effect: Eru[E, A]): Eru[E | Throwable, A] = for {
-      fiber <- runtime.fork(effect)
+      fiber <- effect.fork
       exit <- fiber.await
       result <- Eru.fromExit(exit)
     } yield result
@@ -253,7 +252,7 @@ class FiberPropertySpec extends TestWithRuntime {
       _ <- Eru.effect(events.offer("step3"))
     } yield "done"
 
-    val fiber = runtime.fork(computation).unsafeRunSync()
+    val fiber = computation.fork.unsafeRunSync()
     val exit = fiber.await.unsafeRunSync()
 
     assertEquals(exit, Exit.Success("done"))
@@ -281,8 +280,8 @@ class FiberPropertySpec extends TestWithRuntime {
     } yield "comp2-done"
 
     val parallelExecution = for {
-      fiber1 <- runtime.fork(computation1)
-      fiber2 <- runtime.fork(computation2)
+      fiber1 <- computation1.fork
+      fiber2 <- computation2.fork
       exit1 <- fiber1.await
       exit2 <- fiber2.await
       result1 <- Eru.fromExit(exit1)
@@ -310,7 +309,7 @@ class FiberPropertySpec extends TestWithRuntime {
       val direct = Eru.succeed(value).unsafeRunSync()
 
       val throughFiber = for {
-        fiber <- runtime.fork(Eru.succeed(value))
+        fiber <- Eru.succeed(value).fork
         exit <- fiber.await
         result <- Eru.fromExit(exit)
       } yield result
@@ -345,7 +344,7 @@ class FiberPropertySpec extends TestWithRuntime {
     val direct = businessLogic.unsafeRunSync()
 
     val throughFiber = for {
-      fiber <- runtime.fork(businessLogic)
+      fiber <- businessLogic.fork
       exit <- fiber.await
       result <- Eru.fromExit(exit)
     } yield result

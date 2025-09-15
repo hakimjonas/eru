@@ -1,11 +1,9 @@
 package userland
 
-import munit.FunSuite
 import userland.TestRuntime.*
 
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import net.ghoula.eru.*
 
@@ -15,7 +13,7 @@ import net.ghoula.eru.*
   * correctly by establishing formal properties and verifying them through deterministic
   * synchronization mechanisms rather than timing assumptions.
   */
-class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
+class MathematicallyCorrectStructuredConcurrencyTest extends munit.FunSuite {
 
   /** Validates the mathematical property of parent-child lifetime binding.
     *
@@ -24,24 +22,23 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
     * the parent completes.
     */
   test("parent-child lifetime binding - mathematical property") {
-    val childStarted = new CountDownLatch(1)
-    val parentCompleted = new CountDownLatch(1)
     val childAttemptedCompletion = new AtomicBoolean(false)
+    val childStarted = new AtomicBoolean(false)
 
     val parentComputation = for {
       _ <- runtime.fork {
         for {
-          _ <- Eru.effect { childStarted.countDown() }
+          _ <- Eru.effect { childStarted.set(true) }
           _ <- runtime.sleep(Duration.ofSeconds(10))
           _ <- Eru.effect { childAttemptedCompletion.set(true) }
         } yield "child-done"
       }
-      _ <- Eru.effect { childStarted.await(5, TimeUnit.SECONDS) }
+      _ <- Eru.effect {
+        // Spin until child starts (purely for coordination, no timing)
+        while (!childStarted.get()) { /* spin */ }
+      }
       result <- Eru.succeed("parent-completed")
-    } yield {
-      parentCompleted.countDown()
-      result
-    }
+    } yield result
 
     val result = parentComputation.runIsolatedExit match {
       case Exit.Success(value) => value
@@ -50,8 +47,7 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
 
     assert(result == "parent-completed", "Parent should complete successfully")
 
-    Thread.sleep(100)
-
+    // Child should be interrupted by structured concurrency - no timing needed
     assert(
       !childAttemptedCompletion.get(),
       "STRUCTURED CONCURRENCY VIOLATION: Child continued executing after parent completed"
@@ -64,24 +60,22 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
     * both B and C. Formally: parent(A,B) ∧ parent(B,C) → terminate(A) ⇒ terminate(B) ∧ terminate(C)
     */
   test("transitive termination - mathematical property") {
-    val aStarted = new CountDownLatch(1)
-    val bStarted = new CountDownLatch(1)
-    val cStarted = new CountDownLatch(1)
-    val rootCompleted = new CountDownLatch(1)
-
     val cAttemptedWork = new AtomicBoolean(false)
     val bAttemptedWork = new AtomicBoolean(false)
+    val aStarted = new AtomicBoolean(false)
+    val bStarted = new AtomicBoolean(false)
+    val cStarted = new AtomicBoolean(false)
 
     val rootComputation = for {
       _ <- runtime.fork {
         for {
-          _ <- Eru.effect { aStarted.countDown() }
+          _ <- Eru.effect { aStarted.set(true) }
           _ <- runtime.fork {
             for {
-              _ <- Eru.effect { bStarted.countDown() }
+              _ <- Eru.effect { bStarted.set(true) }
               _ <- runtime.fork {
                 for {
-                  _ <- Eru.effect { cStarted.countDown() }
+                  _ <- Eru.effect { cStarted.set(true) }
                   _ <- runtime.sleep(Duration.ofSeconds(10))
                   _ <- Eru.effect { cAttemptedWork.set(true) }
                 } yield "c-done"
@@ -94,22 +88,17 @@ class MathematicallyCorrectStructuredConcurrencyTest extends FunSuite {
         } yield "a-done"
       }
       _ <- Eru.effect {
-        aStarted.await(5, TimeUnit.SECONDS)
-        bStarted.await(5, TimeUnit.SECONDS)
-        cStarted.await(5, TimeUnit.SECONDS)
+        // Spin until all nested fibers start (purely for coordination, no timing)
+        while (!aStarted.get() || !bStarted.get() || !cStarted.get()) { /* spin */ }
       }
       result <- Eru.succeed("root-completed")
-    } yield {
-      rootCompleted.countDown()
-      result
-    }
+    } yield result
 
     val result = rootComputation.runIsolatedExit match {
       case Exit.Success(value) => value
       case other => fail(s"Root computation should succeed, got: $other")
     }
-    Thread.sleep(100)
-
+    // All nested fibers should be terminated transitively - no timing needed
     assert(result == "root-completed", "Root should complete successfully")
     assert(!bAttemptedWork.get(), "Fiber B should be terminated transitively")
     assert(!cAttemptedWork.get(), "Fiber C should be terminated transitively")

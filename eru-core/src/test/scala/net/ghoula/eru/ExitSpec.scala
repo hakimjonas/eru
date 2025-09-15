@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive test suite for the Exit data type and its operations.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * execution, encoding success, failure, and interruption states with complete type safety and
   * providing the foundation for fiber coordination and error propagation.
   */
-class ExitSpec extends FunSuite {
+class ExitSpec extends munit.FunSuite {
 
   /** Validates that Exit.Success properly holds the provided value.
     *

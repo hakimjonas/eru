@@ -1,7 +1,5 @@
 package userland
 
-import munit.FunSuite
-
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -14,7 +12,7 @@ import net.ghoula.eru.prelude.*
   * management, error handling, timeout behavior, and cancellation semantics in production-like
   * environments.
   */
-class ExternalSystemIntegrationSpec extends FunSuite {
+class ExternalSystemIntegrationSpec extends munit.FunSuite {
 
   given runtime: EruRuntime = EruRuntime.create()
 
@@ -40,11 +38,8 @@ class ExternalSystemIntegrationSpec extends FunSuite {
 
     def executeQuery(conn: String, query: String): Eru[String, String] = {
       Eru.effect {
-        try {
-          Thread.sleep(50)
-        } catch {
-          case _: InterruptedException => () // Ignore interruption for test simulation
-        }
+        // Simulate database operation without blocking
+        // Real database operations would be asynchronous
         completedQueries.incrementAndGet()
         s"Result for $query on $conn"
       }.mapError(_.getMessage)

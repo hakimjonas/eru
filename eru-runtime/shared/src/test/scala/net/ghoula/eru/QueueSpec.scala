@@ -3,8 +3,7 @@ package net.ghoula.eru
 import net.ghoula.eru.prelude.*
 
 class QueueSpec extends munit.FunSuite {
-
-  implicit val runtime: EruRuntime = EruRuntime.create()
+  given EruRuntime = EruRuntime.shared
 
   // =============================================================================
   // Bounded Queue Tests

@@ -133,7 +133,7 @@ object EruTest {
     *   the success type of the effect
     * @return
     *   the successful result of the effect
-    * @throws AssertionError
+    * @throws java.lang.AssertionError
     *   if the effect fails, throws, or times out
     *
     * @example
@@ -184,7 +184,7 @@ object EruTest {
     *   the error type of the effect
     * @tparam A
     *   the success type of the effect
-    * @throws AssertionError
+    * @throws java.lang.AssertionError
     *   if the effect succeeds, throws, or fails with a different error
     *
     * @example
@@ -226,7 +226,7 @@ object EruTest {
     *   the error type of the effect (must be a Throwable or supertype)
     * @tparam A
     *   the success type of the effect
-    * @throws AssertionError
+    * @throws java.lang.AssertionError
     *   if the effect succeeds or fails with a different error type
     *
     * @example
@@ -271,7 +271,7 @@ object EruTest {
     *   the error type of the effect
     * @tparam A
     *   the success type of the effect
-    * @throws AssertionError
+    * @throws java.lang.AssertionError
     *   if the effect succeeds, fails, or is interrupted with a different cause
     *
     * @example
@@ -320,7 +320,7 @@ object EruTest {
     *   the error type of the effect
     * @tparam A
     *   the success type of the effect
-    * @throws AssertionError
+    * @throws java.lang.AssertionError
     *   if the effect fails, throws, times out, or returns a different value
     */
   def assertSucceedsWith[E, A](effect: Eru[E, A], expected: A, timeout: Duration = Duration.ofSeconds(5)): Unit = {

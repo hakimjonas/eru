@@ -361,12 +361,20 @@ object Eru {
       next: Continuation[E1, Mid1, Out1]
     ) extends Continuation[E1, In1, Out1]
 
+    /** A lazily composed continuation that defers the appending operation. This allows us to build
+      * deep chains without stack overflow during construction.
+      */
+    case Compose[+E1, In1, Mid1, +Out1](
+      first: Continuation[E1, In1, Mid1],
+      g: Mid1 => Eru[E1, Out1]
+    ) extends Continuation[E1, In1, Out1]
+
     /** Appends a new function to the end of this continuation stack, maintaining type safety. This
       * is the key operation that allows us to build continuation chains without casts.
       */
-    @inline def andThen[E2 >: E, NewOut](g: Out => Eru[E2, NewOut]): Continuation[E2, In, NewOut] = this match {
-      case End() => Step(g, End())
-      case Step(f, next) => Step(f, next.andThen(g))
+    @inline def andThen[E2 >: E, NewOut](g: Out => Eru[E2, NewOut]): Continuation[E2, In, NewOut] = {
+      // Use Compose to defer the actual appending, avoiding stack overflow
+      Compose(this, g)
     }
   }
 
@@ -513,9 +521,21 @@ object Eru {
   /** Converts an Exit to an Eru, preserving error information.
     *
     * This method provides a convenient way to convert Exit outcomes back into Eru computations,
-    * enabling composition and recovery patterns when working with fiber results. It handles all
-    * Exit cases: Success becomes succeed, Failure becomes fail, Die re-throws the exception, and
-    * Interrupt fails with InterruptedException in the error channel.
+    * enabling composition and recovery patterns when working with fiber results. It handles most
+    * Exit cases: Success becomes succeed, Failure becomes fail, and Die re-throws the exception.
+    *
+    * '''Mathematical Correctness:''' Interruptions cannot be converted to the error channel as they
+    * represent control flow operations that should be handled through native interpreter
+    * mechanisms, not converted to domain errors. This method throws an IllegalArgumentException
+    * when encountering an Exit.Interrupt.
+    *
+    * If you need to handle interruptions, use pattern matching on the Exit directly:
+    * {{{
+    * exit match {
+    *   case Exit.Interrupt(_, _) => /* handle interruption */
+    *   case other => Eru.fromExit(other)
+    * }
+    * }}}
     *
     * @param exit
     *   the Exit outcome to convert to an Eru
@@ -543,15 +563,6 @@ object Eru {
     case Exit.Failure(error) => Eru.fail(error)
     case Exit.Die(throwable) => Eru.effect(throw throwable)
     case Exit.Interrupt(fiberId, cause) =>
-      // MATHEMATICAL CORRECTNESS: Interruptions should not be converted to the error channel.
-      // Interruptions are control flow operations that should be handled through
-      // native interpreter mechanisms, not converted to domain errors.
-      //
-      // If you need to handle interruptions, use pattern matching on the Exit directly:
-      //   exit match {
-      //     case Exit.Interrupt(_, _) => /* handle interruption */
-      //     case other => Eru.fromExit(other)
-      //   }
       Eru.effect(
         throw new IllegalArgumentException(
           s"fromExit cannot handle Exit.Interrupt($fiberId, $cause). " +
@@ -917,8 +928,6 @@ object Eru {
     } else if (n == 0) {
       succeed(start)
     } else {
-      // Build the chain iteratively using foldLeft to avoid Scala stack overflow
-      // This creates a single Eru data structure that can be executed safely
       (1 to n).foldLeft(succeed(start)) { (accEru, _) =>
         accEru.flatMap(step)
       }
@@ -956,10 +965,9 @@ object Eru {
     */
   def unfold[E, A, B](seed: A)(f: A => Eru[E, Option[(B, A)]]): Eru[E, List[B]] = {
     // Stack-safe implementation using iterative foldLeft approach
-    // Bounded iteration prevents infinite loops and ensures predictable resource usage
+    // The Compose continuation structure prevents stack overflow during construction
     val maxElements = 15000 // Safe limit for most practical use cases
 
-    // Build a list of potential seed values up to the limit
     (0 until maxElements)
       .foldLeft(succeed((seed, List.empty[B], false))) { (accEru, _) =>
         accEru.flatMap { case (currentSeed, acc, done) =>
@@ -999,8 +1007,6 @@ object Eru {
     *   }}}
     */
   def sequence[E, A](effects: List[Eru[E, A]]): Eru[E, List[A]] = {
-    // Stack-safe implementation using iterative foldLeft approach
-    // Builds a single Eru chain that accumulates results without Scala recursion
     effects
       .foldLeft(succeed(List.empty[A])) { (accEru, effect) =>
         accEru.flatMap { acc =>
@@ -1038,8 +1044,6 @@ object Eru {
     *   }}}
     */
   def traverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]] = {
-    // Stack-safe implementation using iterative foldLeft approach
-    // Directly processes inputs without creating intermediate effect collections
     inputs
       .foldLeft(succeed(List.empty[B])) { (accEru, input) =>
         accEru.flatMap { acc =>
@@ -1140,8 +1144,11 @@ object Eru {
       * This method provides the implementation for the public API that runtime backends use to
       * execute computations while preserving finalizer information. It now uses the unified
       * fiber-aware interpreter to ensure consistent behavior with unsafeRunSync.
+      *
+      * The exception handling specifically catches InterruptedWithFinalizers to properly merge
+      * finalizers from both the interrupted computation and any fibers that were forked before the
+      * interruption, ensuring proper resource cleanup.
       */
-    // In the Eru companion object
     def executeWithFinalizers[E, A](computation: Eru[E, A]): (Exit[E, A], List[() => Eru[Nothing, Unit]]) = {
       initializeAsyncSchedulerIfNeeded()
 
@@ -1165,9 +1172,6 @@ object Eru {
         (exit, allFinalizers)
       } catch {
         case interrupted: InterruptedWithFinalizers =>
-          // CORRECT: We specifically catch our custom exception here at the boundary.
-          // We now have both the finalizers from the interrupted computation and
-          // any finalizers from fibers that were forked before the interruption.
           val allFinalizers = outstandingFibers.foldLeft(interrupted.finalizers) { (acc, fiber) =>
             fiber.finalizers ++ acc
           }
@@ -1175,7 +1179,6 @@ object Eru {
           (exit, allFinalizers)
 
         case NonFatal(ex) =>
-          // A safety net for any other unexpected exceptions.
           val allFinalizers = outstandingFibers.foldLeft(List.empty[() => Eru[Nothing, Unit]]) { (acc, fiber) =>
             fiber.finalizers ++ acc
           }
@@ -1208,6 +1211,8 @@ object Eru {
       *   - FILO finalizer ordering: Child finalizers merge in front to maintain order
       *   - Stack-safe: Uses TailRec for all recursive calls
       *   - Auto-join: Tracks outstanding fibers to prevent finalizer leakage
+      *   - Interruption safety: Proper exception handling merges ensure finalizers with interrupted
+      *     computation finalizers to prevent resource leaks
       */
     private def runFiberLoop[E, A](
       eru: Eru[E, A],
@@ -1276,8 +1281,6 @@ object Eru {
           tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers))
 
         case Ensure(source, fin) =>
-          // FIXED: Use TailRec with exception handling to properly collect ensure finalizers
-          // even when InterruptedWithFinalizers is thrown from the source computation
           tailcall {
             try {
               runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers).result match {
@@ -1285,8 +1288,6 @@ object Eru {
               }
             } catch {
               case interrupted: InterruptedWithFinalizers =>
-                // When source computation is interrupted, merge the ensure finalizer with
-                // the existing finalizers in the exception, then re-throw.
                 throw new InterruptedWithFinalizers(
                   interrupted.fiberId,
                   interrupted.cause,
@@ -1366,31 +1367,18 @@ object Eru {
 
         case Await(fiber) =>
           outstandingFibers -= fiber
-          // When a fiber is awaited, its finalizers must be executed immediately
-          // to ensure that the await operation is a true sequential barrier.
           drainFinalizers(fiber.finalizers).result
-          // The parent computation continues with its own finalizers.
           done((Right(fiber.exit), fins))
 
-        // Inside the interpreter's runFiberLoop method, in the main pattern match:
         case InterruptibleBlocking(thunk) =>
           try {
-            // If the thunk succeeds, continue the loop with its successful value.
             done((Right(thunk()), fins))
           } catch {
             case _: InterruptedException =>
-              // When the blocking thread is interrupted (via Thread.interrupt()),
-              // we convert to our internal exception format, taking care to preserve
-              // the finalizers with it. This allows the finalizers to be preserved
-              // as the exception unwinds to the top-level executor.
               val fiberId = currentFiberId.getOrElse(FiberId.fresh())
               throw new InterruptedWithFinalizers(fiberId, InterruptCause.Cancelled(), fins)
 
             case NonFatal(ex) =>
-              // For any other non-fatal error, we re-throw it.
-              // It will be caught by the boundary function (e.g., executeWithFinalizers)
-              // and correctly converted to an Exit.Die, which is the proper
-              // representation for a defect.
               throw ex
           }
       }
@@ -1411,6 +1399,13 @@ object Eru {
           tailcall(runFiberLoop(f(input), fins, hooks, currentFiberId, outstandingFibers)).flatMap {
             case (Right(intermediate), fs) =>
               tailcall(runFiberContinuation(next, intermediate, fs, hooks, currentFiberId, outstandingFibers))
+            case (Left(error), fs) => done((Left(error), fs))
+          }
+        case Continuation.Compose(first, g) =>
+          // Process the first continuation, then apply g to the result
+          tailcall(runFiberContinuation(first, input, fins, hooks, currentFiberId, outstandingFibers)).flatMap {
+            case (Right(intermediate), fs) =>
+              tailcall(runFiberLoop(g(intermediate), fs, hooks, currentFiberId, outstandingFibers))
             case (Left(error), fs) => done((Left(error), fs))
           }
       }

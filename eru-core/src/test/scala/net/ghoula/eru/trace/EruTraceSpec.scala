@@ -1,7 +1,5 @@
 package net.ghoula.eru.trace
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 import net.ghoula.eru.trace.EruTrace.Span
 
@@ -10,7 +8,7 @@ import net.ghoula.eru.trace.EruTrace.Span
   * Validates span creation, trace propagation, observer integration, and the correctness of trace
   * data collection across effect composition boundaries.
   */
-final class EruTraceSpec extends FunSuite {
+final class EruTraceSpec extends munit.FunSuite {
 
   /** Validates that SpanId.fresh generates unique identifiers.
     *

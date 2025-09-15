@@ -41,7 +41,6 @@ object EruTrace {
       val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode.toLong & ProcessIdMask
       val timestamp = ((System.nanoTime() >> 16) & TimestampMask) | SpanIdOffset
 
-      // Combine: sign bit (0) + processId (15 bits) + timestamp (48 bits)
       (processId << 48) | timestamp
     }
     private val counter = new AtomicLong(processUniqueStart)
@@ -74,7 +73,6 @@ object EruTrace {
       val processId = java.lang.management.ManagementFactory.getRuntimeMXBean.getName.hashCode.toLong & ProcessIdMask
       val timestamp = ((System.nanoTime() >> 20) & TimestampMask) | TraceIdOffset
 
-      // Combine: sign bit (0) + processId (15 bits) + timestamp (48 bits)
       (processId << 48) | timestamp
     }
     private val counter = new AtomicLong(processUniqueStart)

@@ -1,6 +1,5 @@
 package userland
 
-import munit.FunSuite
 import userland.TestRuntime.*
 
 import net.ghoula.eru.prelude.*
@@ -13,7 +12,7 @@ import net.ghoula.eru.prelude.*
   * Observability pillar by making runtime behavior transparent and debuggable in production
   * environments.
   */
-final class ObservabilitySpec extends FunSuite {
+final class ObservabilitySpec extends munit.FunSuite {
 
   /** Validates that observers receive proper event sequences for successful programs.
     *

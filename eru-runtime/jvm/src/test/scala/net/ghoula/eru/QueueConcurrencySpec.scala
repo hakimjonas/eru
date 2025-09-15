@@ -7,7 +7,8 @@ import net.ghoula.eru.prelude.*
   * Tests queue behavior under concurrent access using coordination primitives for deterministic
   * testing without timing dependencies.
   */
-class QueueConcurrencySpec extends TestWithRuntime {
+class QueueConcurrencySpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   test("bounded queue producer-consumer coordination") {
     val queue = Eru.queue[String](3).unsafeRunSync()
@@ -16,24 +17,20 @@ class QueueConcurrencySpec extends TestWithRuntime {
     val consumerReady = Eru.promise[Nothing, Unit].unsafeRunSync()
 
     // Producer
-    val producer = runtime.fork {
-      for {
-        _ <- producerReady.succeed(())
-        _ <- consumerReady.await
-        _ <- Eru.foreach(1 to itemCount) { i =>
-          queue.offer(s"item$i")
-        }
-      } yield "producer-done"
-    }.unsafeRunSync()
+    val producer = (for {
+      _ <- producerReady.succeed(())
+      _ <- consumerReady.await
+      _ <- Eru.foreach(1 to itemCount) { i =>
+        queue.offer(s"item$i")
+      }
+    } yield "producer-done").fork.unsafeRunSync()
 
     // Consumer
-    val consumer = runtime.fork {
-      for {
-        _ <- producerReady.await
-        _ <- consumerReady.succeed(())
-        items <- Eru.collectAll((1 to itemCount).map(_ => queue.take))
-      } yield items
-    }.unsafeRunSync()
+    val consumer = (for {
+      _ <- producerReady.await
+      _ <- consumerReady.succeed(())
+      items <- Eru.collectAll((1 to itemCount).map(_ => queue.take))
+    } yield items).fork.unsafeRunSync()
 
     val (producerResult, consumerResult) = (
       producer.await.unsafeRunSync(),
@@ -63,25 +60,21 @@ class QueueConcurrencySpec extends TestWithRuntime {
 
     // Multiple producers
     val producers = (1 to producerCount).map { producerId =>
-      runtime.fork {
-        for {
-          _ <- allReady.countDown
-          _ <- allReady.await
-          _ <- Eru.foreach(1 to itemsPerProducer) { i =>
-            queue.offer(s"P$producerId-I$i")
-          }
-        } yield s"producer$producerId-done"
-      }.unsafeRunSync()
+      (for {
+        _ <- allReady.countDown
+        _ <- allReady.await
+        _ <- Eru.foreach(1 to itemsPerProducer) { i =>
+          queue.offer(s"P$producerId-I$i")
+        }
+      } yield s"producer$producerId-done").fork.unsafeRunSync()
     }
 
     // Single consumer
-    val consumer = runtime.fork {
-      for {
-        _ <- allReady.countDown
-        _ <- allReady.await
-        items <- Eru.collectAll((1 to (producerCount * itemsPerProducer)).map(_ => queue.take))
-      } yield items
-    }.unsafeRunSync()
+    val consumer = (for {
+      _ <- allReady.countDown
+      _ <- allReady.await
+      items <- Eru.collectAll((1 to (producerCount * itemsPerProducer)).map(_ => queue.take))
+    } yield items).fork.unsafeRunSync()
 
     // Wait for all producers
     producers.foreach { producer =>
@@ -117,13 +110,11 @@ class QueueConcurrencySpec extends TestWithRuntime {
     queue.offer(2).unsafeRunSync()
 
     // This offer should block
-    val blockedOffer = runtime.fork {
-      for {
-        _ <- offerStarted.succeed(())
-        _ <- takeReady.await
-        _ <- queue.offer(3) // Should block until take
-      } yield "offer-completed"
-    }.unsafeRunSync()
+    val blockedOffer = (for {
+      _ <- offerStarted.succeed(())
+      _ <- takeReady.await
+      _ <- queue.offer(3) // Should block until take
+    } yield "offer-completed").fork.unsafeRunSync()
 
     // Wait for offer to start
     offerStarted.await.unsafeRunSync()

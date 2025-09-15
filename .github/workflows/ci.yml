@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -35,8 +35,16 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all tests on JVM
-        run: sbt eruCoreJVM/test eruRuntimeJVM/test eruIntegrationTest/test
+      - name: Run all tests on JVM (isolated)
+        run: |
+          echo "🧪 Cleaning before tests to ensure clean JVM state..."
+          sbt clean
+          echo "🧪 Running JVM Core Tests..."
+          timeout 180s sbt "eruCoreJVM/test"
+          echo "🧪 Running JVM Runtime Tests..."
+          timeout 180s sbt "eruRuntimeJVM/test"
+          echo "🧪 Running Integration Tests..."
+          timeout 120s sbt "eruIntegrationTest/test"
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
@@ -59,11 +67,22 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run benchmarks (smoke test)
-        run: sbt "eruBenchJVM/Jmh/run -i 2 -wi 1 -f1 -t1 net.ghoula.eru.bench.fair.CoreOperationsBench"
+      - name: Run benchmarks (smoke test with structured JSON output)
+        run: ./tools/smoke-test.sh
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-validation-results/*.json
+            benchmark-validation-results/*.md
+            benchmark-validation-results/*.log
+          retention-days: 30
 
   # Publish job: Runs only on tag pushes, publishes to Sonatype, creates GitHub release
   publish:
@@ -76,12 +95,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Fetch full history for dynver/release notes
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -96,9 +115,6 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.PGP_SECRET }}
           passphrase: ${{ secrets.PGP_PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-          trust_level: 5
 
       - name: Debug Secrets Availability
         run: |
@@ -161,12 +177,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Fetch full history for dynver
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -181,9 +197,6 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.PGP_SECRET }}
           passphrase: ${{ secrets.PGP_PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-          trust_level: 5
 
       - name: Publish SNAPSHOT to Sonatype
         env:

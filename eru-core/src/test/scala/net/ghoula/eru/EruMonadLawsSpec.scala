@@ -1,6 +1,5 @@
 package net.ghoula.eru
 
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -18,7 +17,7 @@ import net.ghoula.eru.CorePrelude.*
   * Tests both success and failure cases to ensure the laws hold under all conditions, and validates
   * coherence between different combinators like map/flatMap and recover/recoverWith.
   */
-final class EruMonadLawsSpec extends ScalaCheckSuite {
+final class EruMonadLawsSpec extends munit.ScalaCheckSuite {
 
   /** Generator for small positive integers to control test complexity. */
   private val smallInts: Gen[Int] = Gen.choose(1, 100)

@@ -311,7 +311,7 @@ The three components are clearly separated:
 - **RELEASE**: The cleanup function that's guaranteed to run (`resource => close(resource)`)  
 - **USE**: The work to be done with the resource (`resource => getData(resource)`)
 
-This pattern ensures that no matter what happens in the USE phase—success, failure, or interruption—the RELEASE function will execute.
+This pattern ensures that no matter what happens in the USE phase—success, failure, or interruption—the RELEASE function will execute. Importantly, if the ACQUIRE step fails, the RELEASE function is not called (as there's nothing to release), which is the correct and safe behavior.
 
 ### Bracket vs Ensure
 

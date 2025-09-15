@@ -1,7 +1,5 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import java.time.Duration
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters.*
@@ -20,7 +18,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * indicate race conditions or resource management issues that violate Eru's correctness
   * guarantees.
   */
-class FiberStressSpec extends FunSuite {
+class FiberStressSpec extends munit.FunSuite {
 
   override def munitTimeout: scala.concurrent.duration.Duration =
     scala.concurrent.duration.Duration(5, scala.concurrent.duration.MINUTES)
@@ -151,11 +149,20 @@ class FiberStressSpec extends FunSuite {
         runtime.sleep(Duration.ofMillis((i * 5).toLong)).map(_ => s"contestant-$i")
       }.toList
 
-      val (winner, index) = runtime.raceAll(effects).unsafeRunSync()
+      // Fork the race operation to allow TestClock control
+      val fiber = runtime.fork(runtime.raceAll(effects)).unsafeRunSync()
 
-      // The immediate effect should always win
-      assertEquals(winner, "immediate-winner")
-      assertEquals(index, 0)
+      // Advance TestClock - the immediate effect should win before any sleep completes
+      runtime.testClock.advance(Duration.ofMillis(1))
+
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success((winner, index)) =>
+          // The immediate effect should always win
+          assertEquals(winner, "immediate-winner")
+          assertEquals(index, 0)
+        case other => fail(s"Expected successful race, got: $other")
+      }
     }
   }
 
@@ -465,12 +472,24 @@ class FiberStressSpec extends FunSuite {
 
       val fiberCount = 100
 
-      def createObservableFiber(id: Int): Eru[Nothing, String] = {
+      def createObservableFiber(id: Int): Eru[String, String] = {
         for {
-          _ <- runtime.sleep(Duration.ofMillis(1))
-          _ <- Eru.succeed(s"work-$id")
-          _ <- runtime.sleep(Duration.ofMillis(1))
-        } yield s"completed-$id"
+          // CPU-bound work that creates real concurrency without TestClock dependency
+          _ <- Eru.effect {
+            (1 to 1000).map(_ * id).sum // Initial computation
+          }.mapError(_.getMessage)
+
+          _ <- Eru.effect {
+            s"work-$id".hashCode // Some string processing
+          }.mapError(_.getMessage)
+
+          result <- Eru.effect {
+            // Final computation that combines results
+            val computation = (1 to 500).map(i => i * id + i).sum
+            s"completed-$id-$computation"
+          }.mapError(_.getMessage)
+
+        } yield result
       }
 
       val computation = for {
@@ -491,14 +510,31 @@ class FiberStressSpec extends FunSuite {
         )
       } yield results
 
+      // Execute the computation with proper concurrency
       val results = computation.unsafeRunSync()
 
-      assertEquals(results.length, fiberCount)
+      // Wait for all observer events to be processed (observer events are async)
+      def waitForObserverCompletion(): Unit = {
+        var attempts = 0
+        while (fiberEndEvents.get() < fiberCount && attempts < 1000) {
+          Thread.sleep(1) // Give observer events time to process
+          attempts += 1
+        }
+      }
 
+      waitForObserverCompletion()
+
+      // Verify results
+      assertEquals(results.length, fiberCount)
       assertEquals(fiberStartEvents.get(), fiberCount)
       assertEquals(fiberEndEvents.get(), fiberCount)
-
       assert(eventCount.get() >= fiberStartEvents.get() + fiberEndEvents.get())
+
+      // Verify each result contains the expected computation
+      results.foreach { result =>
+        assert(result.contains("completed-"))
+        assert(result.contains("-"))
+      }
     }
   }
 }

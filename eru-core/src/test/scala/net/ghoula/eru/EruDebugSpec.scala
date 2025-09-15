@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive testing specification for Eru's debug functionality and observability features.
@@ -10,7 +8,7 @@ import net.ghoula.eru.CorePrelude.*
   * to provide runtime visibility into effect execution while maintaining correctness and
   * performance characteristics of the underlying computations.
   */
-class EruDebugSpec extends FunSuite {
+class EruDebugSpec extends munit.FunSuite {
 
   /** Test observer that captures emitted events for verification. */
   class TestObserver extends EruObserver {

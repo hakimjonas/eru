@@ -1,7 +1,5 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import java.time.Duration
 
 import net.ghoula.eru.*
@@ -13,7 +11,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * Tests complex interruption patterns to ensure cancellation is propagated correctly and
   * cooperative interruption works as expected in the unified fiber runtime.
   */
-class FiberInterruptionSpec extends FunSuite {
+class FiberInterruptionSpec extends munit.FunSuite {
 
   /** Helper to run operations with isolated runtime to prevent test interference */
   private def withIsolatedRuntime[A](f: IsolatedTestRunner.IsolatedRuntime => A): A = {
@@ -170,6 +168,9 @@ class FiberInterruptionSpec extends FunSuite {
     withIsolatedRuntime { runtime =>
       val effect = Eru.succeed("already done")
       val fiber = runtime.fork(effect).unsafeRunSync()
+
+      // Advance TestClock to allow the forked fiber to execute
+      runtime.testClock.advance(java.time.Duration.ofNanos(1))
 
       val exit = fiber.await.unsafeRunSync()
       assertEquals(exit, Exit.Success("already done"))

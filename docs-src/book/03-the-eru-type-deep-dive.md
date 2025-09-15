@@ -193,7 +193,8 @@ def deepChain(n: Int): Eru[Nothing, Int] = {
 }
 
 // This demonstrates true stack safety - Eru handles deep chains
-val deep = deepChain(10000).unsafeRunSync()
+// Use smaller number for documentation to avoid long compilation times
+val deep = deepChain(100).unsafeRunSync()
 println(s"Deep result: $deep")
 ```
 

@@ -45,6 +45,7 @@ object CorePrelude {
 
   /** Export all Exit types and companion methods. */
   export net.ghoula.eru.Exit
+  export net.ghoula.eru.InterruptCause
 
   /** Export error handling patterns and types. */
   export net.ghoula.eru.patterns.ErrorHandling.*

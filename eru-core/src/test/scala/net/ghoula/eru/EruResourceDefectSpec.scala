@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Specialized test suite for resource management under defect conditions.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * encounters unexpected failures, resource finalizers are properly executed and no resource leaks
   * occur, maintaining system reliability under extreme error conditions.
   */
-final class EruResourceDefectSpec extends FunSuite {
+final class EruResourceDefectSpec extends munit.FunSuite {
 
   test("bracket release runs exactly once when use throws Throwable (defect path)") {
     var released = 0

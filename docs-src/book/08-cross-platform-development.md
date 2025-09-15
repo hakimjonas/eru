@@ -6,7 +6,7 @@ Eru is designed from the ground up as a cross-platform effect system. Your core 
 
 ## Understanding Platform Differences
 
-Eru's architecture cleanly separates pure effect descriptions from platform-specific runtime execution:
+Eru's architecture cleanly separates pure effect descriptions from platform-specific runtime execution. The runtime uses a `BackendProvider` model with `ServiceLoader`-style discovery to automatically detect and use the appropriate runtime implementation (JVM or Native) without requiring explicit configuration:
 
 ```scala mdoc
 import net.ghoula.eru.prelude.*

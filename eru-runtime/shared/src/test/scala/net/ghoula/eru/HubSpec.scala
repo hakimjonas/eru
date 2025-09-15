@@ -3,8 +3,7 @@ package net.ghoula.eru
 import net.ghoula.eru.prelude.*
 
 class HubSpec extends munit.FunSuite {
-
-  implicit val runtime: EruRuntime = EruRuntime.create()
+  given EruRuntime = EruRuntime.shared
 
   // =============================================================================
   // Bounded Hub Tests

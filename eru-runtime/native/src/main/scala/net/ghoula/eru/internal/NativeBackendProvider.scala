@@ -7,8 +7,13 @@ package net.ghoula.eru.internal
   * PlatformBackend will discover this provider and use its backend.
   *
   * The Native backend is purely synchronous and designed to work within Scala Native's
-  * single-threaded execution model and compilation constraints.
+  * single-threaded execution model. Since it's stateless, the same instance can be safely reused
+  * across multiple runtimes.
   */
-private[eru] final class NativeBackendProvider extends BackendProvider {
+private[eru] final class NativeBackendProvider extends BackendFactory {
+  // Native backend is stateless, so sharing is safe
   val backend: ConcurrencyBackend = NativeSynchronousBackend
+
+  /** Returns the same stateless backend for Native platform. */
+  def createFresh(): ConcurrencyBackend = NativeSynchronousBackend
 }

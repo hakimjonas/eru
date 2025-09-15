@@ -42,6 +42,14 @@ object prelude {
   export net.ghoula.eru.CorePrelude.*
   export net.ghoula.eru.RuntimeExtensions.*
 
+  /** Default runtime for convenient concurrent operations.
+    *
+    * Uses EruRuntime.shared for ergonomic concurrent operations without requiring explicit runtime
+    * management. Applications that need isolated runtimes can override this with their own given
+    * instance.
+    */
+  given defaultRuntime: EruRuntime = EruRuntime.shared
+
   /** Exposes the EruRuntime companion object for runtime creation and Policy types. */
   val EruRuntime = net.ghoula.eru.EruRuntime
 

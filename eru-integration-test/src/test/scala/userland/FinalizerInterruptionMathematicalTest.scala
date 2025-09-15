@@ -3,6 +3,7 @@ package userland
 import munit.FunSuite
 import userland.TestRuntime.*
 
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
 
 import net.ghoula.eru.*
@@ -30,7 +31,7 @@ class FinalizerInterruptionMathematicalTest extends TestProgressReporter {
             finalizerExecuted.set(true)
           })
       }
-      _ <- Eru.effect { Thread.sleep(10) }
+      _ <- runtime.sleep(Duration.ofMillis(10))
       _ <- fiber.interrupt(InterruptCause.Cancelled(Some("Test interruption")))
       exit <- fiber.await
     } yield exit
@@ -58,7 +59,7 @@ class FinalizerInterruptionMathematicalTest extends TestProgressReporter {
             println("SLEEP FINALIZER EXECUTED")
           })
       }
-      _ <- Eru.effect { Thread.sleep(10) }
+      _ <- runtime.sleep(Duration.ofMillis(10))
       _ <- fiber.interrupt(InterruptCause.Cancelled(Some("Test interruption")))
       exit <- fiber.await
     } yield exit

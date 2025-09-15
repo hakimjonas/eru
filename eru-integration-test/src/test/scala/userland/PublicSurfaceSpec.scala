@@ -1,7 +1,5 @@
 package userland
 
-import munit.FunSuite
-
 import net.ghoula.eru.prelude.*
 
 /** Integration test suite for the Eru public API surface and prelude functionality.
@@ -10,7 +8,7 @@ import net.ghoula.eru.prelude.*
   * that the prelude import provides access to core operations without additional imports. These
   * tests serve as both API validation and documentation of the intended user experience.
   */
-final class PublicSurfaceSpec extends FunSuite {
+final class PublicSurfaceSpec extends munit.FunSuite {
 
   given runtime: EruRuntime = EruRuntime.create()
 

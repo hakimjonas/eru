@@ -63,13 +63,16 @@ The **Fair Benchmark System** provides modular, comprehensive coverage of effect
 ### Individual Benchmarks (for debugging)
 
 ```bash
-# Run only Eru benchmarks from a category
+# Run only Eru benchmarks from a category (console output)
 sbt "eruBenchJVM/Jmh/run *CoreOperationsBench.eru*"
 
 # Run with GC profiling
 sbt "eruBenchJVM/Jmh/run -prof gc CoreOperationsBench"
 
-# Run single method
+# Run single method with JSON output (recommended for analysis)
+LANG=C LC_ALL=C sbt "eruBenchJVM/Jmh/run -rf json -rff results.json CoreOperationsBench.eruSucceed"
+
+# Run single method (console output)
 sbt "eruBenchJVM/Jmh/run CoreOperationsBench.eruSucceed"
 ```
 

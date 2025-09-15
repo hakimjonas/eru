@@ -10,10 +10,7 @@ A fiber is a lightweight concurrent execution context that runs Eru programs ind
 
 ```scala mdoc
 import net.ghoula.eru.prelude.*
-import net.ghoula.eru.{EruRuntime, Fiber}
-
-// Create a runtime for concurrent execution
-given runtime: EruRuntime = EruRuntime.create()
+import net.ghoula.eru.prelude.given
 
 // A simple program that represents background work
 def longRunningTask(id: Int): Eru[String, String] = {
@@ -45,7 +42,7 @@ fiberResult match {
 }
 ```
 
-Notice how `fork` returns immediately while the task runs in the background, and `await` safely collects the result.
+Notice how `fork` returns immediately while the task runs in the background, and `await` safely collects the result. The `fork` operation returns an `Eru[Nothing, Fiber[E, A]]`, meaning that starting a fiber is itself a non-blocking and infallible effect—you get back a reference to the fiber, not the result of its computation.
 
 ## Fiber Lifecycle
 
@@ -244,7 +241,6 @@ println(errorHandlingResult)
 Fibers support cooperative interruption, allowing graceful cancellation:
 
 ```scala mdoc
-import net.ghoula.eru.InterruptCause
 
 def interruptibleTask(): Eru[String, String] = {
   // A task that could be interrupted during computation
@@ -387,13 +383,10 @@ def timeoutOperation[E, A](
   val timeout = Eru.fail("Operation timed out")
   
   if (shouldTimeout) {
-    operation.race(timeout).map {
-      case Left(result) => result
-      case Right(_) => throw new RuntimeException("Timed out")
-    }.mapError {
-      case ex: RuntimeException => ex.getMessage
-      case other => other.toString
-    }
+    operation.race(timeout).flatMap {
+      case Left(result) => Eru.succeed(result)
+      case Right(_) => Eru.fail("Timed out")
+    }.mapError(_.toString)
   } else {
     operation.mapError(_.toString)
   }

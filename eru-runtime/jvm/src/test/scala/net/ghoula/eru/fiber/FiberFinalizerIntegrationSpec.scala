@@ -1,7 +1,5 @@
 package net.ghoula.eru.fiber
 
-import munit.FunSuite
-
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters.*
 
@@ -19,7 +17,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * ordering can can lead to resource leaks, corrupted cleanup sequences, or undefined behavior in
   * complex concurrent scenarios. These tests must pass with zero tolerance for ordering violations.
   */
-class FiberFinalizerIntegrationSpec extends FunSuite {
+class FiberFinalizerIntegrationSpec extends munit.FunSuite {
 
   // Create a runtime instance for tests that don't use IsolatedTestRunner
   private val defaultRuntime = EruRuntime.create()
@@ -229,25 +227,27 @@ class FiberFinalizerIntegrationSpec extends FunSuite {
   }
 
   test("race operation preserves finalizer order for winner and cancels loser cleanly") {
-    val executionOrder = new ConcurrentLinkedQueue[String]()
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      val executionOrder = new ConcurrentLinkedQueue[String]()
 
-    val fastEffect = for {
-      _ <- Eru.succeed("fast1").ensure(Eru.effect(executionOrder.add("fast-fin1")))
-      _ <- Eru.succeed("fast2").ensure(Eru.effect(executionOrder.add("fast-fin2")))
-    } yield "fast-won"
+      val fastEffect = for {
+        _ <- Eru.succeed("fast1").ensure(Eru.effect(executionOrder.add("fast-fin1")))
+        _ <- Eru.succeed("fast2").ensure(Eru.effect(executionOrder.add("fast-fin2")))
+      } yield "fast-won"
 
-    val slowEffect = for {
-      // Remove blocking sleep - let effect complete normally without delay
-      _ <- Eru.succeed("slow1").ensure(Eru.effect(executionOrder.add("slow-fin1")))
-      _ <- Eru.succeed("slow2").ensure(Eru.effect(executionOrder.add("slow-fin2")))
-    } yield "slow-won"
+      val slowEffect = for {
+        // Remove blocking sleep - let effect complete normally without delay
+        _ <- Eru.succeed("slow1").ensure(Eru.effect(executionOrder.add("slow-fin1")))
+        _ <- Eru.succeed("slow2").ensure(Eru.effect(executionOrder.add("slow-fin2")))
+      } yield "slow-won"
 
-    val result = defaultRuntime.race(fastEffect, slowEffect).unsafeRunSync()
+      val result = runtime.race(fastEffect, slowEffect).unsafeRunSync()
 
-    assertEquals(result, Left("fast-won"))
+      assertEquals(result, Left("fast-won"))
 
-    val fastFinalizers = executionOrder.asScala.filter(_.startsWith("fast")).toList
-    assertEquals(fastFinalizers, List("fast-fin2", "fast-fin1"))
+      val fastFinalizers = executionOrder.asScala.filter(_.startsWith("fast")).toList
+      assertEquals(fastFinalizers, List("fast-fin2", "fast-fin1"))
+    }
   }
 
   test("auto-join prevents finalizer leaks from unawaited fibers") {

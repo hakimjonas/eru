@@ -7,7 +7,8 @@ import net.ghoula.eru.prelude.*
   * These tests validate Promise behavior under concurrent access without relying on timing
   * assumptions or Thread.sleep.
   */
-class PromiseConcurrencySpec extends TestWithRuntime {
+class PromiseConcurrencySpec extends munit.FunSuite {
+  given EruRuntime = EruRuntime.shared
 
   test("promise coordinates multiple waiters correctly") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
@@ -16,12 +17,10 @@ class PromiseConcurrencySpec extends TestWithRuntime {
 
     // Multiple waiters
     val waiters = (1 to waiterCount).map { i =>
-      runtime.fork {
-        for {
-          _ <- waiterReady.countDown
-          result <- promise.await
-        } yield s"waiter$i: $result"
-      }.unsafeRunSync()
+      (for {
+        _ <- waiterReady.countDown
+        result <- promise.await
+      } yield s"waiter$i: $result").fork.unsafeRunSync()
     }
 
     // Wait for all waiters to be ready
@@ -48,21 +47,17 @@ class PromiseConcurrencySpec extends TestWithRuntime {
     val resultPromise = Eru.promise[Nothing, String].unsafeRunSync()
 
     // Producer
-    val producer = runtime.fork {
-      for {
-        _ <- workPromise.succeed("work-data")
-        result <- resultPromise.await
-      } yield s"Producer received: $result"
-    }.unsafeRunSync()
+    val producer = (for {
+      _ <- workPromise.succeed("work-data")
+      result <- resultPromise.await
+    } yield s"Producer received: $result").fork.unsafeRunSync()
 
     // Consumer
-    val consumer = runtime.fork {
-      for {
-        work <- workPromise.await
-        processed = work.toUpperCase
-        _ <- resultPromise.succeed(processed)
-      } yield s"Consumer processed: $processed"
-    }.unsafeRunSync()
+    val consumer = (for {
+      work <- workPromise.await
+      processed = work.toUpperCase
+      _ <- resultPromise.succeed(processed)
+    } yield s"Consumer processed: $processed").fork.unsafeRunSync()
 
     val (producerResult, consumerResult) = (
       producer.await.unsafeRunSync(),
@@ -87,12 +82,10 @@ class PromiseConcurrencySpec extends TestWithRuntime {
 
     // Multiple waiters
     val waiters = (1 to waiterCount).map { _ =>
-      runtime.fork {
-        for {
-          _ <- allReady.countDown
-          result <- promise.await.attempt
-        } yield result
-      }.unsafeRunSync()
+      (for {
+        _ <- allReady.countDown
+        result <- promise.await.attempt
+      } yield result).fork.unsafeRunSync()
     }
 
     // Wait for all waiters
@@ -118,13 +111,11 @@ class PromiseConcurrencySpec extends TestWithRuntime {
 
     // Multiple competitors trying to complete the promise
     val competitors = (1 to competitorCount).map { i =>
-      runtime.fork {
-        for {
-          _ <- allReady.countDown
-          _ <- allReady.await // Wait for all to be ready
-          completed <- promise.succeed(i)
-        } yield if (completed) Some(i) else None
-      }.unsafeRunSync()
+      (for {
+        _ <- allReady.countDown
+        _ <- allReady.await // Wait for all to be ready
+        completed <- promise.succeed(i)
+      } yield if (completed) Some(i) else None).fork.unsafeRunSync()
     }
 
     val results = competitors.map { competitor =>

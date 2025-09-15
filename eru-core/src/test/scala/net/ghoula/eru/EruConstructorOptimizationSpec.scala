@@ -1,7 +1,5 @@
 package net.ghoula.eru
 
-import munit.FunSuite
-
 import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive test suite for constructor optimizations in Eru effect construction.
@@ -11,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * optimization. Tests cover flatMap chaining, map fusion, error propagation, and stack safety of
   * optimized operations.
   */
-class EruConstructorOptimizationSpec extends FunSuite {
+class EruConstructorOptimizationSpec extends munit.FunSuite {
 
   /** Validates that fromEither optimization creates direct Succeed/Fail instances.
     *
