@@ -8,22 +8,19 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  test-jdk21:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        java-version: ['21', '25-ea']
-    name: Build and Test (JDK ${{ matrix.java-version }})
+    name: Build and Test (JDK 21)
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up JDK ${{ matrix.java-version }}
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: ${{ matrix.java-version }}
+          java-version: '21'
           check-latest: true
           cache: 'sbt'
 
@@ -35,21 +32,21 @@ jobs:
           export JAVA_OPTS="-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           export SBT_OPTS="-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all checks (style, formatting, API compatibility) on JDK ${{ matrix.java-version }}
+      - name: Run all checks (style, formatting, API compatibility) on JDK 21
         run: sbt check
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all tests on JVM (isolated) - JDK ${{ matrix.java-version }}
+      - name: Run all tests on JVM (isolated) - JDK 21
         run: |
-          echo "🧪 Testing on JDK ${{ matrix.java-version }} - Cleaning before tests to ensure clean JVM state..."
+          echo "🧪 Testing on JDK 21 - Cleaning before tests to ensure clean JVM state..."
           sbt clean
-          echo "🧪 Running JVM Core Tests on JDK ${{ matrix.java-version }}..."
+          echo "🧪 Running JVM Core Tests on JDK 21..."
           timeout 180s sbt "eruCoreJVM/test"
-          echo "🧪 Running JVM Runtime Tests on JDK ${{ matrix.java-version }}..."
+          echo "🧪 Running JVM Runtime Tests on JDK 21..."
           timeout 180s sbt "eruRuntimeJVM/test"
-          echo "🧪 Running Integration Tests on JDK ${{ matrix.java-version }}..."
+          echo "🧪 Running Integration Tests on JDK 21..."
           timeout 120s sbt "eruIntegrationTest/test"
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
@@ -83,17 +80,90 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: benchmark-results-jdk${{ matrix.java-version }}
+          name: benchmark-results-jdk21
           path: |
             benchmark-validation-results/*.json
             benchmark-validation-results/*.md
             benchmark-validation-results/*.log
           retention-days: 30
 
+  test-jdk25:
+    runs-on: ubuntu-latest
+    needs: test-jdk21  # Run sequentially after JDK 21
+    name: Build and Test (JDK 25-ea)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 25-ea
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25-ea'
+          check-latest: true
+          cache: 'sbt'
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Set JVM options for CI
+        run: |
+          export JAVA_OPTS="-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          export SBT_OPTS="-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run all checks (style, formatting, API compatibility) on JDK 25-ea
+        run: sbt check
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run all tests on JVM (isolated) - JDK 25-ea
+        run: |
+          echo "🧪 Testing on JDK 25-ea - Cleaning before tests to ensure clean JVM state..."
+          sbt clean
+          echo "🧪 Running JVM Core Tests on JDK 25-ea..."
+          timeout 180s sbt "eruCoreJVM/test"
+          echo "🧪 Running JVM Runtime Tests on JDK 25-ea..."
+          timeout 180s sbt "eruRuntimeJVM/test"
+          echo "🧪 Running Integration Tests on JDK 25-ea..."
+          timeout 120s sbt "eruIntegrationTest/test"
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run all tests on Scala Native
+        run: sbt eruCoreNative/test eruRuntimeNative/test
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Check documentation (mdoc)
+        run: sbt docs
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Build documentation site
+        run: sbt docsSite
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      # Skip heavy benchmarks on CI - run them locally only
+      - name: Upload test results (JDK 25-ea)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-jdk25-ea
+          path: |
+            target/test-reports/**
+          retention-days: 7
+
   # Publish job: Runs only on tag pushes, publishes to Sonatype, creates GitHub release
   publish:
     if: startsWith(github.ref, 'refs/tags/') # Only run on tags like v1.0.0
-    needs: build # Depends on the build job succeeding
+    needs: [test-jdk21, test-jdk25] # Depends on both test jobs succeeding
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -177,7 +247,7 @@ jobs:
   # SNAPSHOT publishing job: Publishes SNAPSHOT versions on pushes to main branch only
   publish-snapshot:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: build # Depends on the build job succeeding
+    needs: [test-jdk21, test-jdk25] # Depends on both test jobs succeeding
     runs-on: ubuntu-latest
     permissions:
       contents: read
