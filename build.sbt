@@ -210,7 +210,10 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
     )
   )
   .jvmSettings(
-    testFrameworks += new TestFramework("munit.Framework")
+    testFrameworks += new TestFramework("munit.Framework"),
+    Test / parallelExecution := false,
+    Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b"),
+    Test / testForkedParallel := false
   )
   .nativeSettings(
     testFrameworks += new TestFramework("munit.Framework"),
@@ -219,7 +222,6 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
         .withMode(Mode.releaseFast)
         .withGC(GC.immix)
     },
-    // Make native compilation more visible
     logLevel := Level.Info
   )
   .dependsOn(eruCore)
