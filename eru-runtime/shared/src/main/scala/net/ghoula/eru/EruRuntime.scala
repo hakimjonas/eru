@@ -782,13 +782,16 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 /** Companion object providing factory methods for creating EruRuntime instances. */
 object EruRuntime {
 
-  /** Creates a new EruRuntime with a completely isolated backend.
+  /** Creates a new EruRuntime instance with a fresh backend.
     *
-    * Each call creates a fresh runtime instance with its own thread pools, fiber tracking, and
-    * coordination primitives, ensuring complete isolation from other runtime instances.
+    * Each call creates a separate runtime with its own thread pools and execution resources.
+    * However, individual Eru effects remain isolated regardless of which runtime executes them, so
+    * most applications should use `EruRuntime.shared` for optimal performance.
     *
-    * For applications that explicitly need a shared runtime across components, use
-    * `EruRuntime.shared` instead.
+    * Only create multiple runtime instances if you have specific architectural requirements like:
+    *   - Different thread pool configurations for different subsystems
+    *   - Explicit resource partitioning between application components
+    *   - Testing scenarios that require complete runtime isolation
     */
   def create(): EruRuntime = {
     // Create a fresh backend for true isolation
@@ -806,15 +809,18 @@ object EruRuntime {
     PlatformBackend.createFreshBackend()
   }
 
-  /** Shared runtime instance for convenient access across application components.
+  /** Singleton runtime instance for convenient access across application components.
     *
-    * This provides a globally accessible runtime that can be shared across different parts of your
-    * application without requiring explicit runtime management. Each application gets its own
-    * isolated backend with dedicated thread pools and fiber tracking, ensuring optimal performance
-    * and no coordination interference.
+    * This provides a single, reusable runtime instance to avoid unnecessary object creation across
+    * your application. The runtime itself is just an execution engine - individual Eru effects
+    * remain completely isolated from each other regardless of which runtime executes them.
     *
-    * This is now equivalent to calling `EruRuntime.create()` once per application, providing both
-    * convenience and performance.
+    * **Important**: "Shared" refers only to reusing the execution engine, NOT sharing state between
+    * effects. Each `Eru.queue()`, `Eru.countDownLatch()`, etc. creates independent instances with
+    * their own state, ensuring complete isolation even when using the shared runtime.
+    *
+    * Use `EruRuntime.create()` only if you need multiple runtime instances for specific
+    * architectural reasons, otherwise this singleton provides optimal performance.
     */
   lazy val shared: EruRuntime = create()
 

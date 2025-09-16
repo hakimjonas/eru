@@ -26,16 +26,18 @@ run_test() {
 # Track overall success
 OVERALL_SUCCESS=true
 
-# Run each test suite in a separate sbt invocation with aggressive timeouts
-# Native tests should complete in under 2 minutes
-run_test "Native Tests" "timeout 120s sbt testNative" || OVERALL_SUCCESS=false
+# Run each test suite in a separate sbt invocation with realistic timeouts
+# Based on successful run: JVM ~2.15min, Native ~4.13min total
+# Native tests include compilation time which can be significant
+run_test "Native Core Tests" "timeout 180s sbt eruCoreNative/test" || OVERALL_SUCCESS=false
+run_test "Native Runtime Tests" "timeout 240s sbt eruRuntimeNative/test" || OVERALL_SUCCESS=false
 
-# JVM tests may take longer due to concurrency tests, allow 5 minutes
-# Increased timeout due to potential resource contention with new tests
-run_test "JVM Tests" "timeout 300s sbt testJVM" || OVERALL_SUCCESS=false  
+# JVM tests split for better isolation (concurrency tests can hang)
+run_test "JVM Core Tests" "timeout 120s sbt eruCoreJVM/test" || OVERALL_SUCCESS=false
+run_test "JVM Runtime Tests" "timeout 180s sbt eruRuntimeJVM/test" || OVERALL_SUCCESS=false
 
 # Integration tests are lighter, allow 2 minutes
-run_test "Integration Tests" "timeout 120s sbt testIntegration" || OVERALL_SUCCESS=false
+run_test "Integration Tests" "timeout 120s sbt eruIntegrationTest/test" || OVERALL_SUCCESS=false
 
 echo "=== Test Suite Summary ==="
 if [ "$OVERALL_SUCCESS" = true ]; then

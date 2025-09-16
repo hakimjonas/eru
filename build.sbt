@@ -214,7 +214,15 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
     testFrameworks += new TestFramework("munit.Framework"),
     Test / parallelExecution := false,
     Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b"),
-    Test / testForkedParallel := false
+    Test / testForkedParallel := false,
+    Test / fork := true,
+    Test / javaOptions ++= Seq(
+      "-Xms1G",
+      "-Xmx2G",
+      "-XX:+UseG1GC",
+      "-XX:MaxGCPauseMillis=200",
+      "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4"
+    )
   )
   .nativeSettings(
     testFrameworks += new TestFramework("munit.Framework"),
