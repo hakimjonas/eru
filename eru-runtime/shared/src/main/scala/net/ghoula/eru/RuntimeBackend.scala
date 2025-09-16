@@ -134,38 +134,128 @@ enum RuntimeBackend {
         }
 
       case VirtualThreads =>
-        Eru.effect {
-          val id = FiberId.fresh()
-          val fiber = UnifiedFiber.active[E, A](id)
+        import Eru.Internals.View.*
+        Eru.Internals.view(fa) match {
+          case VSucceed(value) =>
+            Eru.effect {
+              val id = FiberId.fresh()
+              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+              val exit = Exit.Success(value)
+              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+              UnifiedFiber.completed(id, exit): Fiber[E, A]
+            }.attempt.map {
+              case Result.Success(fiber) => fiber
+              case Result.Failure(t) =>
+                val id = FiberId.fresh()
+                val exit = Exit.Die(t)
+                observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                UnifiedFiber.completed(id, exit)
+            }
 
-          StructuredConcurrency.addChildFiber(fiber, rootFibers)
+          case VFail(error) =>
+            Eru.effect {
+              val id = FiberId.fresh()
+              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+              val exit = Exit.Failure(error)
+              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+              UnifiedFiber.completed(id, exit): Fiber[E, A]
+            }.attempt.map {
+              case Result.Success(fiber) => fiber
+              case Result.Failure(t) =>
+                val id = FiberId.fresh()
+                val exit = Exit.Die(t)
+                observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                UnifiedFiber.completed(id, exit)
+            }
 
-          observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+          case VMapChain(source, f) =>
+            Eru.Internals.view(source) match {
+              case VSucceed(value) =>
+                Eru.effect {
+                  val id = FiberId.fresh()
+                  observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+                  val mappedValue = f(value)
+                  val exit = Exit.Success(mappedValue)
+                  observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                  UnifiedFiber.completed(id, exit): Fiber[E, A]
+                }.attempt.map {
+                  case Result.Success(fiber) => fiber
+                  case Result.Failure(t) =>
+                    val id = FiberId.fresh()
+                    val exit = Exit.Die(t)
+                    observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                    UnifiedFiber.completed(id, exit)
+                }
+              case _ =>
+                Eru.effect {
+                  val id = FiberId.fresh()
+                  val fiber = UnifiedFiber.active[E, A](id)
 
-          Thread.startVirtualThread { () =>
-            UnifiedFiber.setThread(fiber, Thread.currentThread())
+                  StructuredConcurrency.addChildFiber(fiber, rootFibers)
 
-            StructuredConcurrency.withNewScope { _ =>
-              val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+                  observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
 
-              finalizers.foreach { finalizer =>
-                try finalizer().unsafeRunSync()
-                catch case _: Exception => ()
+                  Thread.startVirtualThread { () =>
+                    UnifiedFiber.setThread(fiber, Thread.currentThread())
+
+                    StructuredConcurrency.withNewScope { _ =>
+                      val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+
+                      finalizers.foreach { finalizer =>
+                        try finalizer().unsafeRunSync()
+                        catch case _: Exception => ()
+                      }
+
+                      UnifiedFiber.complete(fiber, exit)
+                      observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                    }
+                  }
+
+                  fiber: Fiber[E, A]
+                }.attempt.map {
+                  case Result.Success(fiber) => fiber
+                  case Result.Failure(t) =>
+                    val id = FiberId.fresh()
+                    val exit = Exit.Die(t)
+                    observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                    UnifiedFiber.completed(id, exit)
+                }
+            }
+
+          case _ =>
+            Eru.effect {
+              val id = FiberId.fresh()
+              val fiber = UnifiedFiber.active[E, A](id)
+
+              StructuredConcurrency.addChildFiber(fiber, rootFibers)
+
+              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+
+              Thread.startVirtualThread { () =>
+                UnifiedFiber.setThread(fiber, Thread.currentThread())
+
+                StructuredConcurrency.withNewScope { _ =>
+                  val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+
+                  finalizers.foreach { finalizer =>
+                    try finalizer().unsafeRunSync()
+                    catch case _: Exception => ()
+                  }
+
+                  UnifiedFiber.complete(fiber, exit)
+                  observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                }
               }
 
-              UnifiedFiber.complete(fiber, exit)
-              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+              fiber: Fiber[E, A]
+            }.attempt.map {
+              case Result.Success(fiber) => fiber
+              case Result.Failure(t) =>
+                val id = FiberId.fresh()
+                val exit = Exit.Die(t)
+                observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                UnifiedFiber.completed(id, exit)
             }
-          }
-
-          fiber: Fiber[E, A]
-        }.attempt.map {
-          case Result.Success(fiber) => fiber
-          case Result.Failure(t) =>
-            val id = FiberId.fresh()
-            val exit = Exit.Die(t)
-            observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-            UnifiedFiber.completed(id, exit)
         }
     }
 

@@ -107,23 +107,13 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
       exitA <- fiberA.await
       exitB <- fiberB.await
       result <- (exitA, exitB) match {
-        // Both successful
-        case (Exit.Success(a), Exit.Success(b)) =>
-          Eru.succeed((a, b))
-
-        // One or both failed - propagate first failure
+        case (Exit.Success(a), Exit.Success(b)) => Eru.succeed((a, b))
         case (Exit.Failure(e), _) => Eru.fail(e)
         case (_, Exit.Failure(e)) => Eru.fail(e)
-
-        // One or both died - propagate first defect
         case (Exit.Die(t), _) => Eru.effect(throw t)
         case (_, Exit.Die(t)) => Eru.effect(throw t)
-
-        // Both interrupted - zipPar should be interrupted
         case (Exit.Interrupt(_, _), Exit.Interrupt(_, _)) =>
           Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: both fibers interrupted") }
-
-        // One interrupted, one successful - this is a cancellation race, treat as interrupted
         case (Exit.Interrupt(_, _), Exit.Success(_)) =>
           Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber A interrupted") }
         case (Exit.Success(_), Exit.Interrupt(_, _)) =>

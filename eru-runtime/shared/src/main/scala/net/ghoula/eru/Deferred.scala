@@ -45,36 +45,33 @@ object Deferred {
     import java.util.concurrent.ConcurrentLinkedQueue
     import java.util.concurrent.atomic.AtomicReference
 
-    // Immutable state representation - None means pending, Some(value) means completed
     private val state = new AtomicReference[Option[A]](None)
-    // Lock-free queue of waiting callbacks - maintains FP principles with controlled effects
     private val waiters = new ConcurrentLinkedQueue[Either[Nothing, A] => Unit]()
 
-    /** Pure function to notify all waiters of completion, expressed as an effect. */
-    private def notifyAllWaiters(value: A): Eru[Nothing, Unit] = {
-      @annotation.tailrec
-      def drainWaiters(acc: List[Either[Nothing, A] => Unit]): List[Either[Nothing, A] => Unit] = {
-        Option(waiters.poll()) match {
-          case Some(waiter) => drainWaiters(waiter :: acc)
-          case None => acc
-        }
-      }
-
-      Eru.effect {
-        val waitersToNotify = drainWaiters(Nil)
-        waitersToNotify.foreach(_(Right(value)))
-      }.attempt.map(_ => ())
-    }
-
     def complete(a: A): Eru[Nothing, Boolean] = {
-      val attemptCompletion = Eru.effect(state.compareAndSet(None, Some(a))).attempt.map {
+      Eru.effect {
+        if (state.compareAndSet(None, Some(a))) {
+          val waitersToNotify = {
+            @annotation.tailrec
+            def drainWaiters(acc: List[Either[Nothing, A] => Unit]): List[Either[Nothing, A] => Unit] = {
+              Option(waiters.poll()) match {
+                case Some(waiter) => drainWaiters(waiter :: acc)
+                case None => acc
+              }
+            }
+            drainWaiters(Nil)
+          }
+          waitersToNotify.foreach { callback =>
+            try callback(Right(a))
+            catch { case _: Throwable => () }
+          }
+          true
+        } else {
+          false
+        }
+      }.attempt.map {
         case Result.Success(result) => result
         case Result.Failure(_) => false
-      }
-
-      attemptCompletion.flatMap { wasCompleted =>
-        if (wasCompleted) notifyAllWaiters(a).map(_ => true)
-        else Eru.succeed(false)
       }
     }
 
@@ -83,22 +80,17 @@ object Deferred {
       def checkAndRegister: Eru[Nothing, Unit] =
         Eru.succeed(state.get()).flatMap {
           case Some(value) =>
-            // Already completed - invoke callback immediately
             Eru.effect(callback(Right(value))).attempt.map(_ => ())
           case None =>
-            // Not completed - register callback and double-check
             val registerEffect = Eru.effect(waiters.offer(callback)).attempt.map(_ => ())
             val doubleCheck = Eru.succeed(state.get()).flatMap {
               case Some(value) =>
-                // Race condition: completed after registration
                 Eru.effect {
                   if (waiters.remove(callback)) {
                     callback(Right(value))
                   }
-                  // If remove failed, callback will be invoked by completer
                 }.attempt.map(_ => ())
               case None =>
-                // Still pending - callback will be invoked by completer
                 Eru.unit
             }
             registerEffect.flatMap(_ => doubleCheck)
@@ -108,27 +100,15 @@ object Deferred {
     }
 
     def await: Eru[Nothing, A] =
-      Eru.succeed(state.get()).flatMap {
+      state.get() match {
         case Some(value) =>
-          // Already completed - return immediately without suspension
           Eru.succeed(value)
         case None =>
-          // Not completed - suspend using runtime's async boundary support
-          // Convert any errors to defects since Deferred await should not have typed errors
-          runtime
-            .suspend[Nothing, A](safeRegisterCallback)
-            .attempt
-            .flatMap {
-              case Result.Success(value) => Eru.succeed(value)
-              case Result.Failure(throwable) => Eru.effect(throw throwable)
-            }
-            .attempt
-            .map {
-              case Result.Success(value) => value
-              case Result.Failure(_) =>
-                // This should never happen in a correctly implemented Deferred
-                throw new IllegalStateException("Deferred await encountered unexpected error")
-            }
+          runtime.suspend[Nothing, A](safeRegisterCallback).attempt.map {
+            case Result.Success(value) => value
+            case Result.Failure(throwable) =>
+              throw new IllegalStateException("Deferred await encountered unexpected error", throwable)
+          }
       }
   }
 }
