@@ -35,10 +35,44 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all tests (granular isolation to prevent hanging)
-        run: |
-          echo "🧪 Using granular isolated test runner to prevent resource contention..."
-          timeout 1800s ./run-all-tests.sh
+      - name: Run JVM Core tests
+        run: sbt eruCoreJVM/test
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run JVM Runtime tests
+        run: sbt eruRuntimeJVM/test
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Prepare Native compilation
+        run: sbt eruCoreNative/compile eruRuntimeNative/compile
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Compile Native test sources
+        run: sbt eruCoreNative/Test/compile eruRuntimeNative/Test/compile
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run Native Core tests
+        run: sbt eruCoreNative/test
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run Native Runtime tests
+        run: sbt eruRuntimeNative/test
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run Integration tests
+        run: sbt eruIntegrationTest/test
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"

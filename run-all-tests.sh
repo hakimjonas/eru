@@ -69,8 +69,8 @@ run_test "JVM Runtime - FiberInterruptionSpec" "timeout 60s sbt 'eruRuntimeJVM/t
 run_test "JVM Runtime - FiberLifecycleSpec" "timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberLifecycleSpec'" || OVERALL_SUCCESS=false
 run_test "JVM Runtime - FiberPropertySpec" "timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberPropertySpec'" || OVERALL_SUCCESS=false
 
-# Problematic finalizer test - keep isolated with special handling
-run_test "JVM Runtime - FiberFinalizerIntegrationSpec (Problematic)" "timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberFinalizerIntegrationSpec'" || OVERALL_SUCCESS=false
+# Finalizer integration test - rewritten for correctness and reliability
+run_test "JVM Runtime - FiberFinalizerIntegrationSpec" "timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberFinalizerIntegrationSpec'" || OVERALL_SUCCESS=false
 
 # Integration tests are lighter, allow 2 minutes
 run_test "Integration Tests" "timeout 120s sbt eruIntegrationTest/test" || OVERALL_SUCCESS=false
