@@ -190,9 +190,9 @@ generate_result_matrix() {
                     io_display="$io_avg"
                 fi
                 
-                printf "  %-15s: %s ops/ms\n" "Eru" "$eru_display"
-                printf "  %-15s: %s ops/ms\n" "ZIO" "$zio_display"
-                printf "  %-15s: %s ops/ms\n" "Cats Effect" "$io_display"
+                printf "  %-15s: %b ops/ms\n" "Eru" "$eru_display"
+                printf "  %-15s: %b ops/ms\n" "ZIO" "$zio_display"
+                printf "  %-15s: %b ops/ms\n" "Cats Effect" "$io_display"
             else
                 echo "  No results available"
             fi
