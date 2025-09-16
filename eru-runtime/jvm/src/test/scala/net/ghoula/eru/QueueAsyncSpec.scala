@@ -6,8 +6,8 @@ import net.ghoula.eru.test.EruTestSuite
 /** Essential tests for async queue suspension semantics.
   *
   * This test suite verifies the core async behavior: queue operations can suspend and resume
-  * correctly when blocking conditions are met/unmet. This is essential for backpressure
-  * and coordination.
+  * correctly when blocking conditions are met/unmet. This is essential for backpressure and
+  * coordination.
   *
   * Focus: Deterministic, essential async correctness tests only. Removed: Complex timing
   * dependencies, multiple concurrent fibers, race conditions.
@@ -18,10 +18,12 @@ class QueueAsyncSpec extends EruTestSuite {
     val queue = Eru.queue[String](2).unsafeRunSync()
 
     // Use zipPar for deterministic coordination instead of manual fork/await
-    val result = runtime.zipPar(
-      queue.take,  // This will suspend
-      queue.offer("value")  // This will unblock the take
-    ).unsafeRunSync()
+    val result = runtime
+      .zipPar(
+        queue.take, // This will suspend
+        queue.offer("value") // This will unblock the take
+      )
+      .unsafeRunSync()
 
     assertEquals(result, ("value", ()))
   }
@@ -30,10 +32,12 @@ class QueueAsyncSpec extends EruTestSuite {
     val queue = Eru.unboundedQueue[String].unsafeRunSync()
 
     // Use zipPar for deterministic coordination
-    val result = runtime.zipPar(
-      queue.take,  // This will suspend
-      queue.offer("value")  // This will unblock the take
-    ).unsafeRunSync()
+    val result = runtime
+      .zipPar(
+        queue.take, // This will suspend
+        queue.offer("value") // This will unblock the take
+      )
+      .unsafeRunSync()
 
     assertEquals(result, ("value", ()))
   }
@@ -58,12 +62,14 @@ class QueueAsyncSpec extends EruTestSuite {
     queue.offer(2).unsafeRunSync()
 
     // Use zipPar to coordinate blocked offer with take that unblocks it
-    val result = runtime.zipPar(
-      queue.offer(3),  // This will suspend since queue is full
-      queue.take       // This will unblock the offer
-    ).unsafeRunSync()
+    val result = runtime
+      .zipPar(
+        queue.offer(3), // This will suspend since queue is full
+        queue.take // This will unblock the offer
+      )
+      .unsafeRunSync()
 
-    assertEquals(result, ((), 1))  // offer succeeds, take gets first element
+    assertEquals(result, ((), 1)) // offer succeeds, take gets first element
 
     // Verify final queue state
     assertEquals(queue.take.unsafeRunSync(), 2)
@@ -71,7 +77,7 @@ class QueueAsyncSpec extends EruTestSuite {
   }
 
   test("concurrent producers and consumers with backpressure") {
-    val queue = Eru.queue[Int](2).unsafeRunSync()  // Small capacity for backpressure
+    val queue = Eru.queue[Int](2).unsafeRunSync() // Small capacity for backpressure
 
     // Simplified producer-consumer with deterministic coordination
     val items = List(1, 2, 3, 4, 5)
