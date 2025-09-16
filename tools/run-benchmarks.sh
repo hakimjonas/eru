@@ -7,7 +7,7 @@
 #   ./tools/run-benchmarks.sh [mode] [options]
 #
 # Modes:
-#   smoke        - Quick smoke test (default, 1 warmup, 2 measurements)  
+#   smoke        - Quick smoke test (default, 3 warmups, 3 measurements)  
 #   fair         - Fair benchmarks with JSON output (all categories)
 #   matrix       - Parametric scaling benchmarks
 #   memory       - Memory & GC analysis benchmarks
@@ -15,7 +15,7 @@
 #   full         - Complete benchmark suite (all modes)
 #
 # Options:
-#   --quick      - Fast execution with minimal iterations
+#   --quick      - Fast execution (2 warmups, 3 measurements)
 #   --full       - Full statistical run with high iterations
 #   --gc         - Include GC profiling
 #   --output=X   - Output directory (default: benchmark-results)
@@ -35,8 +35,8 @@ NC='\033[0m' # No Color
 
 # Default configuration
 MODE="smoke"
-WARMUP_ITERATIONS=1
-MEASUREMENT_ITERATIONS=2
+WARMUP_ITERATIONS=3
+MEASUREMENT_ITERATIONS=3
 OUTPUT_DIR="benchmark-results"
 INCLUDE_GC=false
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
@@ -49,8 +49,8 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --quick)
-            WARMUP_ITERATIONS=1
-            MEASUREMENT_ITERATIONS=2
+            WARMUP_ITERATIONS=2
+            MEASUREMENT_ITERATIONS=3
             shift
             ;;
         --full)
@@ -80,8 +80,8 @@ while [[ $# -gt 0 ]]; do
             echo "  full     - Complete benchmark suite"
             echo ""
             echo "Options:"
-            echo "  --quick     - Fast execution"
-            echo "  --full      - Full statistical run"
+            echo "  --quick     - Fast execution (2 warmups, 3 measurements)"
+            echo "  --full      - Full statistical run (3 warmups, 5 measurements)"
             echo "  --gc        - Include GC profiling"
             echo "  --output=X  - Output directory"
             echo "  --help      - Show this help"
@@ -180,7 +180,10 @@ case $MODE in
         
     full)
         echo -e "${YELLOW}🎯 Running complete benchmark suite (all modes)${NC}\n"
-        
+        # Full mode should use full statistical iterations
+        WARMUP_ITERATIONS=3
+        MEASUREMENT_ITERATIONS=5
+
         echo -e "${BOLD}${MAGENTA}Phase 1: Smoke Test${NC}"
         run_benchmark "Core Operations Smoke" "net.ghoula.eru.bench.fair.CoreOperationsBench"
         
@@ -210,7 +213,7 @@ echo -e "${BOLD}${CYAN}                              🎉 BENCHMARKS COMPLETE   
 echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BOLD}Results saved to:${NC} ${CYAN}$OUTPUT_DIR/*-$TIMESTAMP.log${NC}"
 echo -e "${BOLD}Mode:${NC} $MODE"
-echo -e "${BOLD}Config:${NC} $WARMUP_ITERATIONS warmups, $MEASUREMENT_ITERATIONS measurements"
+echo -e "${BOLD}Config:${NC} $WARMUP_ITERATIONS warmups, $MEASUREMENT_ITERATIONS measurements (minimum 2-3 warmups for reliable results)"
 if [[ "$INCLUDE_GC" == "true" ]]; then
     echo -e "${BOLD}GC Profiling:${NC} ${GREEN}Enabled${NC}"
 fi

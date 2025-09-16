@@ -3,6 +3,7 @@ package net.ghoula.eru
 import java.time.Duration
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Test suite for JVM timer functionality in the Eru runtime system.
   *
@@ -12,42 +13,70 @@ import net.ghoula.eru.prelude.*
   * maintaining high performance under concurrent load.
   */
 final class TimersSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
 
   test("sleep completes after duration (non-blocking semantics)") {
-    // For TimersSpec, we'll use a simplified pattern that tests the sleep logic without complex isolation
-    val sleepDuration = Duration.ofMillis(50)
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      val sleepDuration = Duration.ofMillis(50)
 
-    // Test that sleep succeeds - the exact timing is less important than the logical behavior
-    val result = sleep(sleepDuration).unsafeRunSync()
-    assertEquals(result, ())
+      // Fork the sleep operation
+      val fiber = runtime.fork(runtime.sleep(sleepDuration)).unsafeRunSync()
 
-    // The test validates that sleep doesn't block the test execution and returns Unit
-    // This follows Cats Effect's pattern of testing sleep logic rather than precise timing
+      // Advance test clock past the sleep duration
+      runtime.testClock.advance(Duration.ofMillis(60))
+
+      // Sleep should complete successfully
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success(()) => assert(true)
+        case other => fail(s"Expected successful sleep completion, got: $other")
+      }
+    }
   }
 
   test("timeout yields TimeoutException when duration elapses first") {
-    // Create an operation that sleeps longer than the timeout
-    val longOperation = sleep(Duration.ofMillis(200)).map(_ => "should not complete")
-    val timeoutDuration = Duration.ofMillis(50)
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      // Create an operation that will never complete on its own
+      val longOperation = runtime.suspend[String, String] { _ =>
+        // Don't invoke callback - let it timeout naturally
+        Eru.unit
+      }
+      val timeoutDuration = Duration.ofMillis(50)
 
-    val result = longOperation.timeout(timeoutDuration).attempt.unsafeRunSync()
+      // Fork the timeout operation
+      val fiber = runtime.fork(runtime.timeout(timeoutDuration)(longOperation).attempt).unsafeRunSync()
 
-    result match {
-      case Result.Failure(_: java.util.concurrent.TimeoutException) =>
-        assert(true) // Expected timeout
-      case other =>
-        fail(s"Expected TimeoutException, got: $other")
+      // Advance time past timeout
+      runtime.testClock.advance(Duration.ofMillis(60))
+
+      // Should get a timeout exception
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success(Result.Failure(_: java.util.concurrent.TimeoutException)) =>
+          assert(true) // Expected timeout
+        case other =>
+          fail(s"Expected TimeoutException, got: $other")
+      }
     }
   }
 
   test("timeout passes through success when effect completes before deadline") {
-    // Create an operation that completes quickly
-    val quickOperation = sleep(Duration.ofMillis(10)).map(_ => 42)
-    val timeoutDuration = Duration.ofMillis(100)
+    IsolatedTestRunner.withIsolatedRuntime { runtime =>
+      // Create an operation that completes quickly
+      val quickOperation = runtime.sleep(Duration.ofMillis(10)).map(_ => 42)
+      val timeoutDuration = Duration.ofMillis(100)
 
-    val result = quickOperation.timeout(timeoutDuration).unsafeRunSync()
+      // Fork the timeout operation
+      val fiber = runtime.fork(runtime.timeout(timeoutDuration)(quickOperation)).unsafeRunSync()
 
-    assertEquals(result, 42)
+      // Advance time enough for the quick operation to complete but within timeout
+      runtime.testClock.advance(Duration.ofMillis(15))
+
+      // Should get the successful result
+      val result = fiber.await.unsafeRunSync()
+      result match {
+        case Exit.Success(42) => assert(true)
+        case other => fail(s"Expected success with value 42, got: $other")
+      }
+    }
   }
 }

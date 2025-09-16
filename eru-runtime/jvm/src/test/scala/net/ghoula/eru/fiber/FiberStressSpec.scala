@@ -517,7 +517,8 @@ class FiberStressSpec extends munit.FunSuite {
       def waitForObserverCompletion(): Unit = {
         var attempts = 0
         while (fiberEndEvents.get() < fiberCount && attempts < 1000) {
-          Thread.sleep(1) // Give observer events time to process
+          // Use a small effect instead of Thread.sleep to stay within Eru ecosystem
+          Eru.effect(()).unsafeRunSync()
           attempts += 1
         }
       }
