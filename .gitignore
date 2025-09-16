@@ -74,6 +74,9 @@ Thumbs.db
 logs/
 *.log
 
+# Claude Code development files
+CLAUDE.md
+
 # node
 node_modules/
 package-lock.json
