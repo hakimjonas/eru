@@ -18,6 +18,15 @@ final class RetryPolicyPropertySpec extends munit.ScalaCheckSuite {
 
   given runtime: EruRuntime = EruRuntime.shared
 
+  override def afterAll(): Unit = {
+    try {
+      EruRuntime.shared.cleanup()
+    } catch {
+      case _: Exception => ()
+    }
+    super.afterAll()
+  }
+
   private val nonNegativeSmall: Gen[Int] = Gen.choose(0, 10)
   private val positiveSmall: Gen[Int] = Gen.choose(1, 10)
 

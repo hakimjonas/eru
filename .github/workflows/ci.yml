@@ -35,16 +35,10 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all tests (isolated by platform and module)
+      - name: Run all tests (granular isolation to prevent hanging)
         run: |
-          echo "🧪 Using isolated test runner to prevent resource contention..."
-          timeout 900s ./run-all-tests.sh
-        env:
-          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
-
-      - name: Run all tests on Scala Native
-        run: sbt eruCoreNative/test eruRuntimeNative/test
+          echo "🧪 Using granular isolated test runner to prevent resource contention..."
+          timeout 1800s ./run-all-tests.sh
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"

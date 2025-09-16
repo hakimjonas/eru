@@ -1,14 +1,14 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Test case to reproduce and fix the collectAll deadlock with queue operations.
   *
   * This test demonstrates the bug where collectAll with concurrent queue.take operations can
   * deadlock, hanging after processing only some of the operations.
   */
-class CollectAllDeadlockSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class CollectAllDeadlockSpec extends EruTestSuite {
 
   test("collectAll should handle concurrent queue operations without deadlock") {
     val queue = Eru.queue[String](10).unsafeRunSync()

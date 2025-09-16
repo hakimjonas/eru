@@ -7,6 +7,7 @@ import scala.concurrent.Promise
 import scala.util.{Failure, Success}
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Comprehensive test suite for H.9.4 async boundary support via LocalEruRuntime.suspend.
@@ -15,8 +16,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * error conditions, and integration scenarios while maintaining Eru's correctness guarantees
   * including proper finalizer execution and resource safety.
   */
-final class SuspendSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+final class SuspendSpec extends EruTestSuite {
 
   // Use the shared runtime for consistent, reliable testing
   private object LocalEruRuntime {

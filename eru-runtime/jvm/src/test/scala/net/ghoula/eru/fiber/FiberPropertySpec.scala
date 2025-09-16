@@ -2,14 +2,14 @@ package net.ghoula.eru.fiber
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Property-based tests for fiber operations.
   *
   * Tests that fork/await operations are referentially transparent and preserve fundamental
   * properties like monad laws in the unified fiber runtime.
   */
-class FiberPropertySpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class FiberPropertySpec extends EruTestSuite {
 
   /** Validates that fork/await operations are referentially transparent.
     *

@@ -3,6 +3,7 @@ package net.ghoula.eru
 import java.time.Duration
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Test suite for JVM timer functionality in the Eru runtime system.
@@ -12,7 +13,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * non-blocking semantics, and integrate correctly with the fiber scheduling system while
   * maintaining high performance under concurrent load.
   */
-final class TimersSpec extends munit.FunSuite {
+final class TimersSpec extends EruTestSuite {
 
   test("sleep completes after duration (non-blocking semantics)") {
     IsolatedTestRunner.withIsolatedRuntime { runtime =>

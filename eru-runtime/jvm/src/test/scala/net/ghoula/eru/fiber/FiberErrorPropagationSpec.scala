@@ -2,6 +2,7 @@ package net.ghoula.eru.fiber
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Comprehensive tests for error and defect propagation between parent and child fibers.
   *
@@ -9,8 +10,7 @@ import net.ghoula.eru.prelude.*
   * error handling works correctly across fiber boundaries. This test suite focuses on correctness
   * rather than timing to ensure reliable behavior across different execution environments.
   */
-class FiberErrorPropagationSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class FiberErrorPropagationSpec extends EruTestSuite {
 
   /** Helper method to create a detailed assertion message for Exit comparisons */
   private def assertExitEquals[E, A](actual: Exit[E, A], expected: Exit[E, A], context: String): Unit = {

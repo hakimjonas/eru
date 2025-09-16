@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.jdk.CollectionConverters.*
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Stress test suite for JVM concurrency and fiber management under high load.
   *
@@ -33,8 +34,7 @@ extension [E, A](effects: List[Eru[E, A]]) {
   * operations, cancellation cascades, and resource cleanup under pressure. All tests ensure proper
   * resource safety and finalizer execution order guarantees.
   */
-final class ConcurrencyStressSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+final class ConcurrencyStressSpec extends EruTestSuite {
 
   /** Validates high-load fiber creation and completion under stress.
     *

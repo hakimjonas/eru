@@ -1,14 +1,14 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Async concurrency tests for Promise coordination patterns.
   *
   * These tests validate Promise behavior under concurrent access without relying on timing
   * assumptions or Thread.sleep.
   */
-class PromiseConcurrencySpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class PromiseConcurrencySpec extends EruTestSuite {
 
   test("promise coordinates multiple waiters correctly") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
