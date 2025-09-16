@@ -57,13 +57,17 @@ final class DeferredSpec extends EruTestSuite {
   test("multiple fibers can await the same deferred") {
     val d = Deferred.make[Int].unsafeRunSync()
 
-    // Fork multiple fibers that all await the same deferred
-    val waitingFibers = (1 to 5).map { _ =>
-      d.await.fork.unsafeRunSync()
-    }.toList
+    // Use zipPar for deterministic coordination
+    val result = runtime
+      .zipPar(
+        // Fork multiple fibers that all await the same deferred
+        parSequence((1 to 3).map { _ => runtime.fork(d.await) }.toList),
+        // Complete the deferred after a small delay to ensure fibers are waiting
+        sleep(java.time.Duration.ofMillis(5)).flatMap(_ => d.complete(99))
+      )
+      .unsafeRunSync()
 
-    // Complete the deferred
-    val completed = d.complete(99).unsafeRunSync()
+    val (waitingFibers, completed) = result
     assertEquals(completed, true)
 
     // All fibers should receive the same value
