@@ -49,29 +49,33 @@ object Deferred {
     private val waiters = new ConcurrentLinkedQueue[Either[Nothing, A] => Unit]()
 
     def complete(a: A): Eru[Nothing, Boolean] = {
-      Eru.effect {
-        if (state.compareAndSet(None, Some(a))) {
-          val waitersToNotify = {
-            @annotation.tailrec
-            def drainWaiters(acc: List[Either[Nothing, A] => Unit]): List[Either[Nothing, A] => Unit] = {
-              Option(waiters.poll()) match {
-                case Some(waiter) => drainWaiters(waiter :: acc)
-                case None => acc
+      if (state.get().isDefined) {
+        Eru.succeed(false)
+      } else {
+        Eru.effect {
+          if (state.compareAndSet(None, Some(a))) {
+            val waitersToNotify = {
+              @annotation.tailrec
+              def drainWaiters(acc: List[Either[Nothing, A] => Unit]): List[Either[Nothing, A] => Unit] = {
+                Option(waiters.poll()) match {
+                  case Some(waiter) => drainWaiters(waiter :: acc)
+                  case None => acc
+                }
               }
+              drainWaiters(Nil)
             }
-            drainWaiters(Nil)
+            waitersToNotify.foreach { callback =>
+              try callback(Right(a))
+              catch { case _: Throwable => () }
+            }
+            true
+          } else {
+            false
           }
-          waitersToNotify.foreach { callback =>
-            try callback(Right(a))
-            catch { case _: Throwable => () }
-          }
-          true
-        } else {
-          false
+        }.attempt.map {
+          case Result.Success(result) => result
+          case Result.Failure(_) => false
         }
-      }.attempt.map {
-        case Result.Success(result) => result
-        case Result.Failure(_) => false
       }
     }
 

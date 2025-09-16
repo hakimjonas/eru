@@ -110,9 +110,7 @@ class CoordinationBench extends FairBenchmarkBase {
     for {
       sem <- Eru.semaphore(1)
       ref <- Eru.ref(0)
-      result <- sem
-        .withPermit(ref.update(_ + TEST_VALUE).flatMap(_ => ref.get))
-        .map(_.getOrElse(0))
+      result <- sem.withPermit(ref.update(_ + TEST_VALUE).flatMap(_ => ref.get)).map(_.get)
     } yield result
   }
 

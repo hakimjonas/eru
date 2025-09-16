@@ -166,11 +166,33 @@ class ConcurrencyBench extends FairBenchmarkBase {
   }
 
   // =============================================================================
-  // Complex Parallel Composition
+  // Complex Parallel Composition (FAIR: Bulk parallel operations)
   // =============================================================================
 
   @Benchmark
   def eruComplexParallel(): Int = runEru {
+    val effects = (1 to TEST_ITERATIONS).map(i => Eru.succeed(i)).toList
+    runtime.parSequence(effects).map(_.sum)
+  }
+
+  @Benchmark
+  def zioComplexParallel(): Int = runZio {
+    val effects = (1 to TEST_ITERATIONS).map(i => ZIO.succeed(i))
+    ZIO.collectAllPar(effects).map(_.sum)
+  }
+
+  @Benchmark
+  def ioComplexParallel(): Int = runIO {
+    val effects = (1 to TEST_ITERATIONS).map(i => IO.pure(i)).toList
+    effects.parSequence.map(_.sum)
+  }
+
+  // =============================================================================
+  // Direct zipPar Chaining (Unfavorable pattern comparison)
+  // =============================================================================
+
+  @Benchmark
+  def eruZipParChaining(): Int = runEru {
     val effects = (1 to TEST_ITERATIONS).map(i => Eru.succeed(i))
     val combined = effects.foldLeft(Eru.succeed(0)) { (acc, eff) =>
       acc.zipPar(eff).map { case (sum, value) => sum + value }
@@ -179,7 +201,7 @@ class ConcurrencyBench extends FairBenchmarkBase {
   }
 
   @Benchmark
-  def zioComplexParallel(): Int = runZio {
+  def zioZipParChaining(): Int = runZio {
     val effects = (1 to TEST_ITERATIONS).map(i => ZIO.succeed(i))
     val combined = effects.foldLeft(ZIO.succeed(0)) { (acc, eff) =>
       acc.zipPar(eff).map { case (sum, value) => sum + value }
@@ -188,10 +210,9 @@ class ConcurrencyBench extends FairBenchmarkBase {
   }
 
   @Benchmark
-  def ioComplexParallel(): Int = runIO {
+  def ioZipParChaining(): Int = runIO {
     val effects = (1 to TEST_ITERATIONS).map(i => IO.pure(i))
     val combined = effects.foldLeft(IO.pure(0)) { (acc, eff) =>
-      // Use parMapN to match the zipPar semantics of Eru/ZIO
       (acc, eff).parMapN((sum, value) => sum + value)
     }
     combined
