@@ -113,7 +113,7 @@ sbt docsPublish       # Publish to GitHub Pages at eru.ghoula.net
 ```
 
 **Local Preview:**
-- ScalaDoc API: `eru-site/target/scala-3.7.2/unidoc/index.html`
+- ScalaDoc API: `eru-site/target/scala-3.7.3/unidoc/index.html`
 - Complete site: `eru-site/target/site/index.md` (with `api/` subfolder)
 - mdoc output: `target/mdoc/` (validated markdown)
 
