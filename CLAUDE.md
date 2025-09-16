@@ -33,27 +33,34 @@ sbt eruCoreNative/test    # Native tests for core module
 sbt eruIntegrationTest/test # Integration tests (JVM only)
 ```
 
-### Optimized Testing Commands
+### Alternative Benchmark Tools
 ```bash
-# FASTEST: Eliminates redundant compilation and "stalling" during native builds
-sbt testAllOptimized      # Compile all code first, then run tests by platform
-sbt testAllVerbose        # Shows all compilation phases explicitly  
-sbt testAllOptimizedVerbose # Verbose version with full compilation visibility
+# Comprehensive benchmark runner with multiple modes
+./tools/run-benchmarks.sh smoke      # Quick smoke test validation
+./tools/run-benchmarks.sh fair       # Fair benchmarks with JSON output (all categories)
+./tools/run-benchmarks.sh matrix     # Parametric scaling benchmarks
+./tools/run-benchmarks.sh memory     # Memory & GC analysis benchmarks
+./tools/run-benchmarks.sh full       # Complete benchmark suite (all modes)
 
-# How it works:
-# - Pre-compiles ALL test sources (JVM + Native) in parallel (~20-30s)
-# - Runs native tests with no compilation overhead (~1s)
-# - Runs JVM tests with no compilation overhead (~30s)
-# - Runs integration tests (~5s)
+# Options:
+./tools/run-benchmarks.sh smoke --quick    # Fast execution with minimal iterations
+./tools/run-benchmarks.sh fair --full      # Full statistical run with high iterations
+./tools/run-benchmarks.sh core --gc        # Include GC profiling
 ```
 
 ### Performance Benchmarking
 ```bash
-# Fair benchmark system (recommended)
-./run-fair-benchmarks.sh all      # Full comprehensive suite (~27min)
-./run-fair-benchmarks.sh core     # Core operations only (~2min)
-./run-fair-benchmarks.sh errors state  # Multiple categories
-./run-fair-benchmarks.sh concurrency --quick  # Quick concurrency test
+# Direct sbt benchmark commands (fast)
+sbt benchCore                # Core operations only (~2min)
+sbt benchState               # State management benchmarks
+sbt benchConcurrency         # Concurrency benchmarks
+sbt benchWithGC              # Core benchmarks with GC profiling
+
+# Matrix benchmark commands
+sbt benchMatrix              # All matrix benchmarks
+sbt benchConcurrencyMatrix   # Concurrency scaling only
+sbt benchDepthMatrix         # Depth scaling only
+sbt benchDataMatrix          # Data size scaling only
 
 # Individual benchmark debugging
 LANG=C LC_ALL=C sbt "eruBenchJVM/Jmh/run -rf json -rff results.json CoreOperationsBench.eruSucceed"  # Single method with JSON
@@ -65,7 +72,35 @@ sbt "eruBenchJVM/Jmh/run CoreOperationsBench.eruSucceed"  # Quick console output
 ```bash
 sbt scalafixAll       # Apply scalafix linting rules (very strict)
 sbt scalafmtAll       # Format all code (120 char width)
-sbt cleanAll          # Clean all target directories
+sbt cleanAll          # Clean all target directories (including custom cleanup)
+```
+
+### Additional Build Commands
+```bash
+# Specialized smoke testing
+./tools/smoke-test.sh     # 15-minute comprehensive validation
+./validate-docs.sh        # Validate documentation files
+
+# Platform-specific targets
+sbt eruCoreJVM/test       # JVM tests for core module
+sbt eruCoreNative/test    # Native tests for core module
+sbt eruRuntimeJVM/test    # JVM runtime tests
+sbt eruRuntimeNative/test # Native runtime tests
+sbt eruBenchJVM/Jmh/run   # JMH benchmarks
+sbt eruBenchMatrix/Jmh/run # Matrix benchmarks
+```
+
+### API Development Helper
+```bash
+# Interactive API helper tool for development assistance
+scala tools/eru-api-helper.scala --list-methods              # List all public methods in Eru
+scala tools/eru-api-helper.scala --validate "code snippet"   # Validate code against Eru API
+scala tools/eru-api-helper.scala --imports parTraverse       # Show required imports for method
+scala tools/eru-api-helper.scala --example parallel-processing # Generate working examples
+
+# Example usage:
+scala tools/eru-api-helper.scala --validate "import net.ghoula.eru.prelude.*; parTraverse(items)(f)"
+scala tools/eru-api-helper.scala --example basic-composition
 ```
 
 ### Documentation
@@ -84,12 +119,15 @@ sbt docsPublish       # Publish to GitHub Pages at eru.ghoula.net
 
 ## Architecture
 
-Eru is a high-performance effect system built with modern Scala 3, organized as a cross-platform library with four core modules:
+Eru is a high-performance effect system built with modern Scala 3, organized as a cross-platform library with specialized modules:
 
 - **eru-core**: Pure synchronous kernel (cross-platform JVM/Native)
-- **eru-runtime**: Runtime with concurrency support (cross-platform)
+- **eru-runtime**: Runtime with concurrency support (cross-platform with platform-specific backends)
 - **eru-bench-jvm**: JMH performance benchmarks (JVM only)
+- **eru-bench-matrix**: Parametric scaling benchmarks (JVM only)
 - **eru-integration-test**: End-to-end integration tests (JVM only)
+- **eru-docs**: Documentation validation with mdoc
+- **eru-site**: Site generation and ScalaDoc publishing
 
 ### Key Design Principles
 
@@ -100,12 +138,22 @@ Eru is a high-performance effect system built with modern Scala 3, organized as 
 
 ### Core Components
 
-- `eru-core/src/main/scala/net/ghoula/eru/Eru.scala` - Main effect type (1,636 lines)
+- `eru-core/src/main/scala/net/ghoula/eru/Eru.scala` - Main effect type (1,631 lines)
 - `eru-core/src/main/scala/net/ghoula/eru/EruObserver.scala` - Observability system
 - `eru-core/src/main/scala/net/ghoula/eru/Exit.scala` - Exit/result modeling
 - `eru-runtime/shared/src/main/scala/net/ghoula/eru/EruRuntime.scala` - Runtime execution
 
 ## Development Guidelines
+
+### Using the API Helper for Development
+
+The `tools/eru-api-helper.scala` tool is particularly useful for:
+- **API Discovery**: Quickly list all available methods and their classifications (CORE vs RUNTIME)
+- **Code Validation**: Check code snippets for common anti-patterns and missing imports
+- **Example Generation**: Generate working code examples for common patterns
+- **Import Assistance**: Determine exactly what imports are needed for specific methods
+
+When developing or helping users with Eru code, use this tool to verify API usage and generate accurate examples.
 
 ### Four Pillars Framework
 1. **Correctness as Foundation** - Correctness is non-negotiable
