@@ -117,8 +117,15 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run benchmarks (smoke test with structured JSON output)
-        run: ./tools/smoke-test.sh
+      - name: Run CI benchmarks (comprehensive sampling vs ZIO/Cats Effect)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "Running fast benchmarks for PR validation..."
+            timeout 8m ./tools/run-benchmarks.sh ci --quick --output=ci-results
+          else
+            echo "Running thorough benchmarks for main branch..."
+            timeout 12m ./tools/run-benchmarks.sh ci --thorough --output=ci-results
+          fi
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
@@ -127,11 +134,11 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: benchmark-results
+          name: ci-benchmark-results
           path: |
-            benchmark-validation-results/*.json
-            benchmark-validation-results/*.md
-            benchmark-validation-results/*.log
+            ci-results/*.json
+            ci-results/*.log
+            ci-results/system-info-*.json
           retention-days: 30
 
   # Publish job: Runs only on tag pushes, publishes to Sonatype, creates GitHub release

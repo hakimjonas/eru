@@ -188,6 +188,69 @@ class ConcurrencyBench extends FairBenchmarkBase {
   }
 
   // =============================================================================
+  // RaceAll Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruRaceAll(): (Int, Int) = runEru {
+    val effects = List(
+      Eru.succeed(10),
+      Eru.succeed(20),
+      Eru.succeed(30)
+    )
+    runtime.raceAll(effects)
+  }
+
+  @Benchmark
+  def zioRaceAll(): (Int, Int) = runZio {
+    val effects = List(
+      ZIO.succeed(10),
+      ZIO.succeed(20),
+      ZIO.succeed(30)
+    )
+    ZIO
+      .raceAll(effects(0), effects.tail)
+      .map(value => (value, 0)) // ZIO doesn't return index, simulate structure
+  }
+
+  @Benchmark
+  def ioRaceAll(): (Int, Int) = runIO {
+    val effects = List(
+      IO.pure(10),
+      IO.pure(20),
+      IO.pure(30)
+    )
+    // Cats Effect doesn't have raceAll, simulate with nested races
+    IO.race(effects(0), IO.race(effects(1), effects(2))).map {
+      case Left(v) => (v, 0)
+      case Right(Left(v)) => (v, 1)
+      case Right(Right(v)) => (v, 2)
+    }
+  }
+
+  // =============================================================================
+  // Timeout Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruTimeout(): Int = runEru {
+    Eru.succeed(TEST_VALUE).timeout(java.time.Duration.ofSeconds(1))
+  }
+
+  @Benchmark
+  def zioTimeout(): Int = runZio {
+    ZIO
+      .succeed(TEST_VALUE)
+      .timeout(zio.Duration.fromSeconds(1))
+      .map(_.getOrElse(0)) // Handle timeout as None
+  }
+
+  @Benchmark
+  def ioTimeout(): Int = runIO {
+    IO.pure(TEST_VALUE).timeout(scala.concurrent.duration.Duration(1, "second"))
+  }
+
+  // =============================================================================
   // Direct zipPar Chaining (Unfavorable pattern comparison)
   // =============================================================================
 

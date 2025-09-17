@@ -65,6 +65,42 @@ class CollectionOperationsBench extends FairBenchmarkBase {
     items.traverse(x => IO.pure(x * 2))
   }
 
+  @Benchmark
+  def eruForeachDiscard(): Unit = runEru {
+    val items = (1 to COLLECTION_SIZE).toList
+    Eru.foreachDiscard(items)(x => Eru.succeed(x * 2))
+  }
+
+  @Benchmark
+  def zioForeachDiscard(): Unit = runZio {
+    val items = (1 to COLLECTION_SIZE).toList
+    ZIO.foreachDiscard(items)(x => ZIO.succeed(x * 2))
+  }
+
+  @Benchmark
+  def ioForeachDiscard(): Unit = runIO {
+    val items = (1 to COLLECTION_SIZE).toList
+    items.traverse_(x => IO.pure(x * 2))
+  }
+
+  @Benchmark
+  def eruCollectAllDiscard(): Unit = runEru {
+    val effects = (1 to COLLECTION_SIZE).map(Eru.succeed(_)).toList
+    Eru.collectAllDiscard(effects)
+  }
+
+  @Benchmark
+  def zioCollectAllDiscard(): Unit = runZio {
+    val effects = (1 to COLLECTION_SIZE).map(ZIO.succeed(_)).toList
+    ZIO.collectAllDiscard(effects)
+  }
+
+  @Benchmark
+  def ioCollectAllDiscard(): Unit = runIO {
+    val effects = (1 to COLLECTION_SIZE).map(IO.pure(_)).toList
+    effects.sequence_
+  }
+
   // =============================================================================
   // Parallel Collection Processing
   // =============================================================================
@@ -136,6 +172,30 @@ class CollectionOperationsBench extends FairBenchmarkBase {
     val items = (1 to COLLECTION_SIZE).toList
     items.foldM(0) { (acc, item) =>
       IO.pure(acc + item)
+    }
+  }
+
+  @Benchmark
+  def eruFoldRight(): Int = runEru {
+    val items = (1 to COLLECTION_SIZE).toList
+    Eru.foldRight(items)(0) { (item, acc) =>
+      Eru.succeed(item + acc)
+    }
+  }
+
+  @Benchmark
+  def zioFoldRight(): Int = runZio {
+    val items = (1 to COLLECTION_SIZE).toList
+    ZIO.foldRight(items)(0) { (item, acc) =>
+      ZIO.succeed(item + acc)
+    }
+  }
+
+  @Benchmark
+  def ioFoldRight(): Int = runIO {
+    val items = (1 to COLLECTION_SIZE).toList
+    items.foldRight(IO.pure(0)) { (item, accIO) =>
+      accIO.map(acc => item + acc)
     }
   }
 
@@ -229,5 +289,33 @@ class CollectionOperationsBench extends FairBenchmarkBase {
       // Final reduction
       sum <- IO.pure(results.sum)
     } yield sum
+  }
+
+  // =============================================================================
+  // Partition Operations (Predicate-based)
+  // =============================================================================
+
+  @Benchmark
+  def eruPartition(): (List[Int], List[Int]) = runEru {
+    val items = (1 to COLLECTION_SIZE).toList
+    Eru.partition(items)(i => Eru.succeed(i % 2 == 0))
+  }
+
+  @Benchmark
+  def zioPartition(): (List[Int], List[Int]) = runZio {
+    val items = (1 to COLLECTION_SIZE).toList
+    ZIO.foreach(items)(i => ZIO.succeed((i, i % 2 == 0))).map { results =>
+      val (evens, odds) = results.partition(_._2)
+      (evens.map(_._1), odds.map(_._1))
+    }
+  }
+
+  @Benchmark
+  def ioPartition(): (List[Int], List[Int]) = runIO {
+    val items = (1 to COLLECTION_SIZE).toList
+    items.traverse(i => IO.pure(i % 2 == 0).map(pred => (i, pred))).map { results =>
+      val (evens, odds) = results.partition(_._2)
+      (evens.map(_._1), odds.map(_._1))
+    }
   }
 }

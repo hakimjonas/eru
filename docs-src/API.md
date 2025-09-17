@@ -22,6 +22,27 @@ Eru.unfold[E, A, B](seed: A)(f: A => Eru[E, Option[(B, A)]]): Eru[E, List[B]]
 Eru.sequence[E, A](effects: List[Eru[E, A]]): Eru[E, List[A]]
 Eru.traverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]]
 
+// Collection operations
+Eru.collectAll[E, A](effects: List[Eru[E, A]]): Eru[E, List[A]]
+Eru.collectAllDiscard[E, A](effects: List[Eru[E, A]]): Eru[E, Unit]
+Eru.foreach[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]]
+Eru.foreachDiscard[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, Unit]
+Eru.partition[E, A](effects: List[Eru[E, A]]): Eru[Nothing, (List[E], List[A])]
+
+// Aggregation operations
+Eru.foldLeft[E, A, B](start: B, effects: List[Eru[E, A]])(f: (B, A) => B): Eru[E, B]
+Eru.foldRight[E, A, B](effects: List[Eru[E, A]], start: B)(f: (A, B) => B): Eru[E, B]
+
+// Conditional operations
+Eru.when[E](condition: Boolean)(effect: => Eru[E, Unit]): Eru[E, Unit]
+Eru.unless[E](condition: Boolean)(effect: => Eru[E, Unit]): Eru[E, Unit]
+Eru.cond[E, A](condition: Boolean, ifTrue: => A, ifFalse: => A): Eru[E, A]
+
+// Control flow
+Eru.forever[E, A](effect: Eru[E, A]): Eru[E, Nothing]
+Eru.repeatN[E, A](n: Int)(effect: Eru[E, A]): Eru[E, List[A]]
+Eru.repeatUntil[E, A](effect: Eru[E, A])(condition: A => Boolean): Eru[E, A]
+
 // Transformation
 map[B](f: A => B): Eru[E, B]
 flatMap[E1 >: E, B](f: A => Eru[E1, B]): Eru[E1, B]
@@ -121,11 +142,27 @@ object EruRuntime {
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]]
   def raceAll[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, (A, Int)]
   
-  // Time-based operations  
+  // Time-based operations
   def sleep(duration: java.time.Duration): Eru[Nothing, Unit]
   def timeout[E, A](duration: java.time.Duration)(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A]
-  
-  
+
+  // Coordination primitives
+  def ref[A](initial: A): Eru[Nothing, Ref[A]]
+  def deferred[E, A]: Eru[Nothing, Deferred[E, A]]
+  def promise[E, A]: Eru[Nothing, Promise[E, A]]
+  def semaphore(permits: Int): Eru[Nothing, Semaphore]
+  def queue[A](capacity: Int): Eru[Nothing, Queue[A]]
+  def unboundedQueue[A]: Eru[Nothing, Queue[A]]
+  def hub[A](capacity: Int): Eru[Nothing, Hub[A]]
+  def unboundedHub[A]: Eru[Nothing, Hub[A]]
+  def countDownLatch(count: Int): Eru[Nothing, CountDownLatch]
+  def cyclicBarrier(parties: Int): Eru[Nothing, CyclicBarrier]
+
+  // Retry operations
+  def retry[E, A](effect: Eru[E, A])(policy: RetryPolicy): Eru[E, A]
+  def retryN[E, A](n: Int)(effect: Eru[E, A]): Eru[E, A]
+  def retryWithBackoff[E, A](base: Duration, maxRetries: Int)(effect: Eru[E, A]): Eru[E, A]
+
   // Async boundaries
   def suspend[E, A](register: (Either[E, A] => Unit) => Eru[Nothing, Unit]): Eru[E | Throwable, A]
   
