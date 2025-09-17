@@ -222,7 +222,7 @@ case $MODE in
         # State management - basic ref operations
         run_benchmark "State Management (CI)" "net.ghoula.eru.bench.fair.StateManagementBench.eruRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.zioRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.ioRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.eruRefContention|net.ghoula.eru.bench.fair.StateManagementBench.zioRefContention|net.ghoula.eru.bench.fair.StateManagementBench.ioRefContention"
         # Resource management - a category where performance might be closer
-        run_benchmark "Resource Management (CI)" "net.ghoula.eru.bench.fair.ResourceManagementBench.eruBasicBracket|net.ghoula.eru.bench.fair.ResourceManagementBench.zioBasicBracket|net.ghoula.eru.bench.fair.ResourceManagementBench.ioBasicBracket|net.ghoula.eru.bench.fair.ResourceManagementBench.eruNestedBrackets|net.ghoula.eru.bench.fair.ResourceManagementBench.zioNestedBrackets|net.ghoula.eru.bench.fair.ResourceManagementBench.ioNestedBrackets"
+        run_benchmark "Resource Management (CI)" "net.ghoula.eru.bench.fair.ResourceManagementBench.eruBracketSuccess|net.ghoula.eru.bench.fair.ResourceManagementBench.zioBracketSuccess|net.ghoula.eru.bench.fair.ResourceManagementBench.ioBracketSuccess|net.ghoula.eru.bench.fair.ResourceManagementBench.eruComplexResource|net.ghoula.eru.bench.fair.ResourceManagementBench.zioComplexResource|net.ghoula.eru.bench.fair.ResourceManagementBench.ioComplexResource"
         ;;
 
     comparative)
