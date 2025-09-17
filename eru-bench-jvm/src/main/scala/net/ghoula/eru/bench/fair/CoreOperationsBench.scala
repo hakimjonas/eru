@@ -115,4 +115,89 @@ class CoreOperationsBench extends FairBenchmarkBase {
       acc.flatMap(sum => IO.pure(sum + n))
     }
   }
+
+  // =============================================================================
+  // Conditional Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruWhen(): Unit = runEru {
+    Eru.when(TEST_VALUE > 20)(Eru.succeed(()))
+  }
+
+  @Benchmark
+  def zioWhen(): Unit = runZio {
+    ZIO.when(TEST_VALUE > 20)(ZIO.succeed(()))
+  }
+
+  @Benchmark
+  def ioWhen(): Unit = runIO {
+    if (TEST_VALUE > 20) IO.pure(()) else IO.pure(())
+  }
+
+  @Benchmark
+  def eruUnless(): Unit = runEru {
+    Eru.unless(TEST_VALUE < 20)(Eru.succeed(()))
+  }
+
+  @Benchmark
+  def zioUnless(): Unit = runZio {
+    ZIO.unless(TEST_VALUE < 20)(ZIO.succeed(()))
+  }
+
+  @Benchmark
+  def ioUnless(): Unit = runIO {
+    if (!(TEST_VALUE < 20)) IO.pure(()) else IO.pure(())
+  }
+
+  @Benchmark
+  def eruCond(): Int = runEru {
+    Eru.cond(TEST_VALUE > 20, TEST_VALUE * 2, TEST_VALUE)
+  }
+
+  @Benchmark
+  def zioCond(): Int = runZio {
+    ZIO.succeed(if (TEST_VALUE > 20) TEST_VALUE * 2 else TEST_VALUE)
+  }
+
+  @Benchmark
+  def ioCond(): Int = runIO {
+    IO.pure(if (TEST_VALUE > 20) TEST_VALUE * 2 else TEST_VALUE)
+  }
+
+  // =============================================================================
+  // Iterative Patterns
+  // =============================================================================
+
+  @Benchmark
+  def eruRepeatN(): Unit = runEru {
+    Eru.repeatN(5)(Eru.succeed(TEST_VALUE))
+  }
+
+  @Benchmark
+  def zioRepeatN(): List[Int] = runZio {
+    ZIO.succeed(TEST_VALUE).replicateZIO(5).map(_.toList)
+  }
+
+  @Benchmark
+  def ioRepeatN(): Unit = runIO {
+    List.fill(5)(IO.pure(TEST_VALUE)).sequence_
+  }
+
+  @Benchmark
+  def eruIterateN(): Int = runEru {
+    Eru.iterateN(0, 5)(n => Eru.succeed(n + 1))
+  }
+
+  @Benchmark
+  def zioIterateN(): Int = runZio {
+    ZIO.iterate(0)(_ < 5)(n => ZIO.succeed(n + 1))
+  }
+
+  @Benchmark
+  def ioIterateN(): Int = runIO {
+    def loop(n: Int): IO[Int] =
+      if (n < 5) IO.pure(n + 1).flatMap(loop) else IO.pure(n)
+    loop(0)
+  }
 }

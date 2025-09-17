@@ -166,11 +166,96 @@ class ConcurrencyBench extends FairBenchmarkBase {
   }
 
   // =============================================================================
-  // Complex Parallel Composition
+  // Complex Parallel Composition (FAIR: Bulk parallel operations)
   // =============================================================================
 
   @Benchmark
   def eruComplexParallel(): Int = runEru {
+    val effects = (1 to TEST_ITERATIONS).map(i => Eru.succeed(i)).toList
+    runtime.parSequence(effects).map(_.sum)
+  }
+
+  @Benchmark
+  def zioComplexParallel(): Int = runZio {
+    val effects = (1 to TEST_ITERATIONS).map(i => ZIO.succeed(i))
+    ZIO.collectAllPar(effects).map(_.sum)
+  }
+
+  @Benchmark
+  def ioComplexParallel(): Int = runIO {
+    val effects = (1 to TEST_ITERATIONS).map(i => IO.pure(i)).toList
+    effects.parSequence.map(_.sum)
+  }
+
+  // =============================================================================
+  // RaceAll Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruRaceAll(): (Int, Int) = runEru {
+    val effects = List(
+      Eru.succeed(10),
+      Eru.succeed(20),
+      Eru.succeed(30)
+    )
+    runtime.raceAll(effects)
+  }
+
+  @Benchmark
+  def zioRaceAll(): (Int, Int) = runZio {
+    val effects = List(
+      ZIO.succeed(10),
+      ZIO.succeed(20),
+      ZIO.succeed(30)
+    )
+    ZIO
+      .raceAll(effects(0), effects.tail)
+      .map(value => (value, 0)) // ZIO doesn't return index, simulate structure
+  }
+
+  @Benchmark
+  def ioRaceAll(): (Int, Int) = runIO {
+    val effects = List(
+      IO.pure(10),
+      IO.pure(20),
+      IO.pure(30)
+    )
+    // Cats Effect doesn't have raceAll, simulate with nested races
+    IO.race(effects(0), IO.race(effects(1), effects(2))).map {
+      case Left(v) => (v, 0)
+      case Right(Left(v)) => (v, 1)
+      case Right(Right(v)) => (v, 2)
+    }
+  }
+
+  // =============================================================================
+  // Timeout Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruTimeout(): Int = runEru {
+    Eru.succeed(TEST_VALUE).timeout(java.time.Duration.ofSeconds(1))
+  }
+
+  @Benchmark
+  def zioTimeout(): Int = runZio {
+    ZIO
+      .succeed(TEST_VALUE)
+      .timeout(zio.Duration.fromSeconds(1))
+      .map(_.getOrElse(0)) // Handle timeout as None
+  }
+
+  @Benchmark
+  def ioTimeout(): Int = runIO {
+    IO.pure(TEST_VALUE).timeout(scala.concurrent.duration.Duration(1, "second"))
+  }
+
+  // =============================================================================
+  // Direct zipPar Chaining (Unfavorable pattern comparison)
+  // =============================================================================
+
+  @Benchmark
+  def eruZipParChaining(): Int = runEru {
     val effects = (1 to TEST_ITERATIONS).map(i => Eru.succeed(i))
     val combined = effects.foldLeft(Eru.succeed(0)) { (acc, eff) =>
       acc.zipPar(eff).map { case (sum, value) => sum + value }
@@ -179,7 +264,7 @@ class ConcurrencyBench extends FairBenchmarkBase {
   }
 
   @Benchmark
-  def zioComplexParallel(): Int = runZio {
+  def zioZipParChaining(): Int = runZio {
     val effects = (1 to TEST_ITERATIONS).map(i => ZIO.succeed(i))
     val combined = effects.foldLeft(ZIO.succeed(0)) { (acc, eff) =>
       acc.zipPar(eff).map { case (sum, value) => sum + value }
@@ -188,10 +273,9 @@ class ConcurrencyBench extends FairBenchmarkBase {
   }
 
   @Benchmark
-  def ioComplexParallel(): Int = runIO {
+  def ioZipParChaining(): Int = runIO {
     val effects = (1 to TEST_ITERATIONS).map(i => IO.pure(i))
     val combined = effects.foldLeft(IO.pure(0)) { (acc, eff) =>
-      // Use parMapN to match the zipPar semantics of Eru/ZIO
       (acc, eff).parMapN((sum, value) => sum + value)
     }
     combined

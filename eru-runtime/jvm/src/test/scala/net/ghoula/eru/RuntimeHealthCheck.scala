@@ -3,12 +3,12 @@ package net.ghoula.eru
 import java.util.concurrent.atomic.AtomicInteger
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Standalone runtime health verification to prove the hanging is test infrastructure, not runtime
   * bugs
   */
-class RuntimeHealthCheck extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class RuntimeHealthCheck extends EruTestSuite {
 
   test("runtime can handle coordination primitives under load without hanging") {
     val latch = Eru.countDownLatch(5).unsafeRunSync()

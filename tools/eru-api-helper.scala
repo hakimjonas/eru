@@ -7,16 +7,13 @@ import scala.util.{Try, Success, Failure}
 import java.lang.reflect.Method
 import scala.reflect.runtime.universe._
 
-object EruApiHelper {
-
-  def main(args: Array[String]): Unit = {
-    args.headOption match {
-      case Some("--list-methods") => listMethods()
-      case Some("--validate") if args.length > 1 => validateSnippet(args(1))
-      case Some("--imports") if args.length > 1 => showImports(args(1))
-      case Some("--example") if args.length > 1 => generateExample(args(1))
-      case _ => showHelp()
-    }
+object EruApiHelper extends App {
+  args.headOption match {
+    case Some("--list-methods") => listMethods()
+    case Some("--validate") if args.length > 1 => validateSnippet(args(1))
+    case Some("--imports") if args.length > 1 => showImports(args(1))
+    case Some("--example") if args.length > 1 => generateExample(args(1))
+    case _ => showHelp()
   }
 
   def showHelp(): Unit = {
@@ -87,8 +84,8 @@ Examples:
       issues += "  • Replace 'catchAll' with 'recoverWith'"
     }
 
-    if (code.contains("Eru.loop")) {
-      issues += "  • 'Eru.loop' doesn't exist - use 'Eru.iterate' or 'Eru.foldLeft'"
+    if (code.contains("Eru.loop") && !code.contains("loop(")) {
+      issues += "  • Use 'Eru.loop(condition)(body)' with proper syntax"
     }
 
     if (code.contains("*>")) {
@@ -196,8 +193,8 @@ println(result)
       println("  • The prelude provides everything including a default runtime")
     }
 
-    if (code.contains("Eru.loop")) {
-      println("  • Replace Eru.loop with Eru.iterate or Eru.foldLeft")
+    if (code.contains("Eru.loop") && !code.contains("loop(")) {
+      println("  • Use 'Eru.loop(condition)(body)' with proper syntax")
     }
 
     if (code.contains("catchAll")) {
@@ -220,12 +217,11 @@ println(result)
       case e: Exception =>
         println(s"Failed to get sbt classpath: ${e.getMessage}")
         // Fallback: try to construct classpath from target directories
-        val coreClasses = "eru-core/.jvm/target/scala-3.7.2/classes"
-        val runtimeClasses = "eru-runtime/jvm/target/scala-3.7.2/classes"
+        val coreClasses = "eru-core/.jvm/target/scala-3.7.3/classes"
+        val runtimeClasses = "eru-runtime/jvm/target/scala-3.7.3/classes"
         val currentCp = System.getProperty("java.class.path")
         s"$coreClasses:$runtimeClasses:$currentCp"
     }
   }
 }
 
-EruApiHelper.main(args)

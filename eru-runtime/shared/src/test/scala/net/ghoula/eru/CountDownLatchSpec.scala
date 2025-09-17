@@ -1,9 +1,9 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
-class CountDownLatchSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class CountDownLatchSpec extends EruTestSuite {
 
   test("countdown latch creation succeeds") {
     val latch = Eru.countDownLatch(3).unsafeRunSync()

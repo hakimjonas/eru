@@ -4,6 +4,7 @@ import java.time.Duration
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Comprehensive tests for fiber interruption and cancellation scenarios.
@@ -11,7 +12,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * Tests complex interruption patterns to ensure cancellation is propagated correctly and
   * cooperative interruption works as expected in the unified fiber runtime.
   */
-class FiberInterruptionSpec extends munit.FunSuite {
+class FiberInterruptionSpec extends EruTestSuite {
 
   /** Helper to run operations with isolated runtime to prevent test interference */
   private def withIsolatedRuntime[A](f: IsolatedTestRunner.IsolatedRuntime => A): A = {

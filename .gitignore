@@ -74,6 +74,13 @@ Thumbs.db
 logs/
 *.log
 
+# Benchmark results (keep tracked ones, ignore new ones)
+benchmark-results/*.log
+benchmark-validation-results/*.log
+
+# Claude Code development files
+CLAUDE.md
+
 # node
 node_modules/
 package-lock.json

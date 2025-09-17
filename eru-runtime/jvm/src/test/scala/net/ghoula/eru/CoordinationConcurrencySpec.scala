@@ -1,13 +1,13 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Async concurrency tests for CountDownLatch and CyclicBarrier coordination.
   *
   * These tests validate proper async coordination behavior for synchronization primitives.
   */
-class CoordinationConcurrencySpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class CoordinationConcurrencySpec extends EruTestSuite {
 
   test("countdown latch coordinates multiple waiters") {
     val waiterCount = 3 // Reduced from 5 to minimize timing issues

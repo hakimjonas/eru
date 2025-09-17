@@ -3,6 +3,7 @@ package net.ghoula.eru
 import java.time.Duration
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Test suite for JVM-specific parallel execution functionality.
   *
@@ -11,8 +12,7 @@ import net.ghoula.eru.prelude.*
   * characteristics, and provide correct error handling semantics while leveraging the performance
   * benefits of the JVM's virtual thread implementation.
   */
-final class ParallelSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+final class ParallelSpec extends EruTestSuite {
 
   test("zipPar runs effects in parallel on JVM VT backend") {
     val a = sleep(Duration.ofMillis(30)).flatMap(_ => Eru.succeed(1))

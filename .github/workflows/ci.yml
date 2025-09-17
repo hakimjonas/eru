@@ -35,22 +35,72 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all tests on JVM (isolated)
-        run: |
-          echo "🧪 Cleaning before tests to ensure clean JVM state..."
-          sbt clean
-          echo "🧪 Running JVM Core Tests..."
-          timeout 180s sbt "eruCoreJVM/test"
-          echo "🧪 Running JVM Runtime Tests..."
-          timeout 180s sbt "eruRuntimeJVM/test"
-          echo "🧪 Running Integration Tests..."
-          timeout 120s sbt "eruIntegrationTest/test"
+      - name: Run JVM Core tests
+        run: sbt eruCoreJVM/test
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run all tests on Scala Native
-        run: sbt eruCoreNative/test eruRuntimeNative/test
+      - name: Run JVM Runtime tests (individual isolation)
+        run: |
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.PromiseSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.DeferredSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.QueueSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.CountDownLatchSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.CyclicBarrierSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.HubSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.ParallelSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.QueueAsyncSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.CollectAllDeadlockSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.CoordinationConcurrencySpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.PromiseConcurrencySpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.HubConcurrencySpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.QueueConcurrencySpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.ConcurrencyStressSpec'
+          timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.TimersSpec'
+          timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.SuspendSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.VTForkSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.RetryPolicyPropertySpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.ParallelDegreeLimitedSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.ValidationPatternsSpec'
+          timeout 30s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.RuntimeHealthCheck'
+          timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberStressSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberExecutionSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberErrorPropagationSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberInterruptionSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberLifecycleSpec'
+          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberPropertySpec'
+          timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberFinalizerIntegrationSpec'
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Prepare Native compilation
+        run: sbt eruCoreNative/compile eruRuntimeNative/compile
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Compile Native test sources
+        run: sbt eruCoreNative/Test/compile eruRuntimeNative/Test/compile
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run Native Core tests
+        run: sbt eruCoreNative/test
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run Native Runtime tests
+        run: sbt eruRuntimeNative/test
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+
+      - name: Run Integration tests
+        run: sbt eruIntegrationTest/test
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
@@ -67,8 +117,15 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run benchmarks (smoke test with structured JSON output)
-        run: ./tools/smoke-test.sh
+      - name: Run CI benchmarks (comprehensive sampling vs ZIO/Cats Effect)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "Running fast benchmarks for PR validation..."
+            timeout 8m ./tools/run-benchmarks.sh ci --quick --output=ci-results
+          else
+            echo "Running thorough benchmarks for main branch..."
+            timeout 12m ./tools/run-benchmarks.sh ci --thorough --output=ci-results
+          fi
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
@@ -77,11 +134,11 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: benchmark-results
+          name: ci-benchmark-results
           path: |
-            benchmark-validation-results/*.json
-            benchmark-validation-results/*.md
-            benchmark-validation-results/*.log
+            ci-results/*.json
+            ci-results/*.log
+            ci-results/system-info-*.json
           retention-days: 30
 
   # Publish job: Runs only on tag pushes, publishes to Sonatype, creates GitHub release

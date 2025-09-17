@@ -611,12 +611,7 @@ object Eru {
     *   an effect that executes the function for each element and succeeds with Unit
     */
   def foreachDiscard[E, A, B](as: Iterable[A])(f: A => Eru[E, B]): Eru[E, Unit] = {
-    def loop(remaining: List[A]): Eru[E, Unit] = remaining match {
-      case Nil => unit
-      case head :: tail =>
-        f(head).flatMap(_ => loop(tail))
-    }
-    loop(as.toList)
+    as.foldLeft(succeed(()))((accEru, element) => accEru.flatMap(_ => f(element).map(_ => ())))
   }
 
   /** Executes an effectful function for each element in a collection, collecting results.
@@ -638,12 +633,11 @@ object Eru {
     *   an effect that executes the function for each element and collects results
     */
   def foreach[E, A, B](as: Iterable[A])(f: A => Eru[E, B]): Eru[E, List[B]] = {
-    def loop(remaining: List[A], acc: List[B]): Eru[E, List[B]] = remaining match {
-      case Nil => succeed(acc.reverse)
-      case head :: tail =>
-        f(head).flatMap(result => loop(tail, result :: acc))
-    }
-    loop(as.toList, Nil)
+    as.foldLeft(succeed(List.empty[B])) { (accEru, element) =>
+      accEru.flatMap { acc =>
+        f(element).map(result => result :: acc)
+      }
+    }.map(_.reverse)
   }
 
   /** Collects all effects in a collection, executing them sequentially.
@@ -657,8 +651,13 @@ object Eru {
     * @return
     *   an effect that executes all effects and collects results
     */
-  def collectAll[E, A](as: Iterable[Eru[E, A]]): Eru[E, List[A]] =
-    foreach(as)(identity)
+  def collectAll[E, A](as: Iterable[Eru[E, A]]): Eru[E, List[A]] = {
+    as.foldLeft(succeed(List.empty[A])) { (accEru, effect) =>
+      accEru.flatMap { acc =>
+        effect.map(result => result :: acc)
+      }
+    }.map(_.reverse)
+  }
 
   /** Collects all effects in a collection, executing them sequentially and discarding results.
     *

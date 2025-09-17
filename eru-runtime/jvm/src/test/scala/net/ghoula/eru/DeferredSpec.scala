@@ -1,6 +1,7 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Test suite for Deferred concurrent primitive functionality.
@@ -10,8 +11,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * between concurrent fibers, supporting common patterns like producer-consumer communication and
   * synchronization barriers.
   */
-final class DeferredSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+final class DeferredSpec extends EruTestSuite {
 
   test("await blocks until completion and returns the value") {
     val d = Deferred.make[Int].unsafeRunSync()

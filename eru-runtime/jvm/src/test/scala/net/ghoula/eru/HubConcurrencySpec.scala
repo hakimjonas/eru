@@ -1,14 +1,14 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Async concurrency tests for Hub operations using proper coordination primitives.
   *
   * These tests demonstrate correct async behavior without relying on Thread.sleep or polling,
   * instead using Promise and CountDownLatch for deterministic coordination.
   */
-class HubConcurrencySpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class HubConcurrencySpec extends EruTestSuite {
 
   test("hub concurrent publishing maintains message delivery") {
     val hub = Eru.hub[String](10).unsafeRunSync() // Large capacity to avoid blocking

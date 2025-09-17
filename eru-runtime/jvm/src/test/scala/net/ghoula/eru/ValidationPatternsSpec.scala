@@ -1,6 +1,7 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Test suite for validation patterns with error accumulation.
   *
@@ -8,8 +9,7 @@ import net.ghoula.eru.prelude.*
   * enable flexible error handling strategies for domain modeling and validation scenarios. These
   * operations are essential for Valar integration and form validation workflows.
   */
-final class ValidationPatternsSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+final class ValidationPatternsSpec extends EruTestSuite {
 
   test("validatePar accumulates all errors when all effects fail") {
     val errors = List("error1", "error2", "error3")

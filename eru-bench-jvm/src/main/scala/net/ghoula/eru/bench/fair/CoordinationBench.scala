@@ -110,9 +110,7 @@ class CoordinationBench extends FairBenchmarkBase {
     for {
       sem <- Eru.semaphore(1)
       ref <- Eru.ref(0)
-      result <- sem
-        .withPermit(ref.update(_ + TEST_VALUE).flatMap(_ => ref.get))
-        .map(_.getOrElse(0))
+      result <- sem.withPermit(ref.update(_ + TEST_VALUE).flatMap(_ => ref.get)).map(_.get)
     } yield result
   }
 
@@ -175,5 +173,123 @@ class CoordinationBench extends FairBenchmarkBase {
       _ <- deferred.complete(current + 12)
       result <- deferred.get
     } yield result
+  }
+
+  // =============================================================================
+  // Queue Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruQueue(): Int = runEru {
+    for {
+      queue <- Eru.queue[Int](10)
+      _ <- queue.offer(TEST_VALUE)
+      result <- queue.take
+    } yield result
+  }
+
+  @Benchmark
+  def zioQueue(): Int = runZio {
+    for {
+      queue <- zio.Queue.bounded[Int](10)
+      _ <- queue.offer(TEST_VALUE)
+      result <- queue.take
+    } yield result
+  }
+
+  @Benchmark
+  def ioQueue(): Int = runIO {
+    for {
+      queue <- cats.effect.std.Queue.bounded[IO, Int](10)
+      _ <- queue.offer(TEST_VALUE)
+      result <- queue.take
+    } yield result
+  }
+
+  // =============================================================================
+  // Semaphore Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruSemaphore(): Boolean = runEru {
+    for {
+      semaphore <- Eru.semaphore(1)
+      acquired <- semaphore.tryAcquire
+      _ <- if (acquired) semaphore.release else Eru.succeed(())
+    } yield acquired
+  }
+
+  @Benchmark
+  def zioSemaphore(): Unit = runZio {
+    for {
+      semaphore <- zio.Semaphore.make(1)
+      _ <- semaphore.withPermit(ZIO.unit)
+    } yield ()
+  }
+
+  @Benchmark
+  def ioSemaphore(): Unit = runIO {
+    for {
+      semaphore <- cats.effect.std.Semaphore[IO](1)
+      _ <- semaphore.permit.use(_ => IO.unit)
+    } yield ()
+  }
+
+  // =============================================================================
+  // CountDownLatch Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruCountDownLatch(): Unit = runEru {
+    for {
+      latch <- Eru.countDownLatch(1)
+      _ <- latch.countDown
+      _ <- latch.await
+    } yield ()
+  }
+
+  @Benchmark
+  def zioCountDownLatch(): Unit = runZio {
+    // ZIO doesn't have CountDownLatch, simulate with Ref
+    for {
+      ref <- zio.Ref.make(1)
+      _ <- ref.update(_ - 1)
+      _ <- ref.get.flatMap(count => if (count <= 0) ZIO.unit else ZIO.unit)
+    } yield ()
+  }
+
+  @Benchmark
+  def ioCountDownLatch(): Unit = runIO {
+    for {
+      latch <- cats.effect.std.CountDownLatch[IO](1)
+      _ <- latch.release
+      _ <- latch.await
+    } yield ()
+  }
+
+  // =============================================================================
+  // CyclicBarrier Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruCyclicBarrier(): Unit = runEru {
+    for {
+      barrier <- Eru.cyclicBarrier(1)
+      _ <- barrier.await
+    } yield ()
+  }
+
+  @Benchmark
+  def zioCyclicBarrier(): Unit = runZio {
+    // ZIO doesn't have CyclicBarrier, simulate with simple operation
+    ZIO.unit
+  }
+
+  @Benchmark
+  def ioCyclicBarrier(): Unit = runIO {
+    for {
+      barrier <- cats.effect.std.CyclicBarrier[IO](1)
+      _ <- barrier.await
+    } yield ()
   }
 }

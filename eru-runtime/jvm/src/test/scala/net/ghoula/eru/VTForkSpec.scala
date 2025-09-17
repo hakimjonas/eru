@@ -1,6 +1,7 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Test suite for JVM Virtual Thread integration in the Eru runtime.
   *
@@ -9,8 +10,7 @@ import net.ghoula.eru.prelude.*
   * concurrency characteristics and proper thread management while maintaining compatibility with
   * the Eru effect system's semantics.
   */
-final class VTForkSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+final class VTForkSpec extends EruTestSuite {
 
   /** Validates that fork runs effects on virtual threads in the JVM backend.
     *

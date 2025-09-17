@@ -60,7 +60,10 @@ class ErrorHandlingBench extends FairBenchmarkBase {
 
   @Benchmark
   def zioSuccessfulEither(): Int = runZio {
-    ZIO.succeed(TEST_VALUE).map(identity)
+    ZIO.attempt(TEST_VALUE).either.map {
+      case Right(value) => value
+      case Left(_) => 0
+    }
   }
 
   @Benchmark
@@ -176,5 +179,66 @@ class ErrorHandlingBench extends FairBenchmarkBase {
       c <- effect3
       result <- IO.pure(a + b + c)
     } yield result
+  }
+
+  // =============================================================================
+  // Retry Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruRetryN(): Int = runEru {
+    var attempts = 0
+    val effect = Eru.effect {
+      attempts += 1
+      if (attempts < 3) throw new RuntimeException("retry me")
+      else TEST_VALUE
+    }
+    effect.retryN(3)
+  }
+
+  @Benchmark
+  def zioRetryN(): Int = runZio {
+    var attempts = 0
+    val effect = ZIO.attempt {
+      attempts += 1
+      if (attempts < 3) throw new RuntimeException("retry me")
+      else TEST_VALUE
+    }
+    effect.retry(zio.Schedule.recurs(3))
+  }
+
+  @Benchmark
+  def ioRetryN(): Int = runIO {
+    var attempts = 0
+    val effect = IO {
+      attempts += 1
+      if (attempts < 3) throw new RuntimeException("retry me")
+      else TEST_VALUE
+    }
+    // Cats Effect retry simulation
+    def retryLoop(n: Int): IO[Int] =
+      effect.handleErrorWith { _ =>
+        if (n > 0) retryLoop(n - 1) else effect
+      }
+    retryLoop(3)
+  }
+
+  // =============================================================================
+  // OrElse Operations
+  // =============================================================================
+
+  @Benchmark
+  def eruOrElse(): Int = runEru {
+    Eru.fail(TEST_ERROR).orElse(Eru.succeed(TEST_VALUE))
+  }
+
+  @Benchmark
+  def zioOrElse(): Int = runZio {
+    ZIO.fail(TEST_ERROR).orElse(ZIO.succeed(TEST_VALUE))
+  }
+
+  @Benchmark
+  def ioOrElse(): Int = runIO {
+    IO.raiseError[Int](new RuntimeException(TEST_ERROR)).handleErrorWith(_ => IO.pure(TEST_VALUE))
   }
 }

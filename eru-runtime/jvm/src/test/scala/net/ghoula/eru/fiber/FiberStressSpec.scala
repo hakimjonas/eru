@@ -6,6 +6,7 @@ import scala.jdk.CollectionConverters.*
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 import net.ghoula.eru.test.IsolatedTestRunner
 
 /** Stress tests to ensure fiber runtime stability under high load.
@@ -18,7 +19,7 @@ import net.ghoula.eru.test.IsolatedTestRunner
   * indicate race conditions or resource management issues that violate Eru's correctness
   * guarantees.
   */
-class FiberStressSpec extends munit.FunSuite {
+class FiberStressSpec extends EruTestSuite {
 
   override def munitTimeout: scala.concurrent.duration.Duration =
     scala.concurrent.duration.Duration(5, scala.concurrent.duration.MINUTES)
@@ -517,7 +518,8 @@ class FiberStressSpec extends munit.FunSuite {
       def waitForObserverCompletion(): Unit = {
         var attempts = 0
         while (fiberEndEvents.get() < fiberCount && attempts < 1000) {
-          Thread.sleep(1) // Give observer events time to process
+          // Use a small effect instead of Thread.sleep to stay within Eru ecosystem
+          Eru.effect(()).unsafeRunSync()
           attempts += 1
         }
       }

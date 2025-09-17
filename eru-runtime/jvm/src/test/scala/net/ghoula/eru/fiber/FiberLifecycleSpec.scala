@@ -2,14 +2,14 @@ package net.ghoula.eru.fiber
 
 import net.ghoula.eru.*
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
 /** Comprehensive tests for the complete fiber lifecycle.
   *
   * Tests the fundamental fiber operations (fork, await) across success, failure, and interruption
   * scenarios to ensure correct behavior in the unified fiber runtime.
   */
-class FiberLifecycleSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class FiberLifecycleSpec extends EruTestSuite {
 
   /** Validates that fiber fork creates new fibers with unique identifiers.
     *

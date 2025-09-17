@@ -1,9 +1,9 @@
 package net.ghoula.eru
 
 import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
 
-class PromiseSpec extends munit.FunSuite {
-  given EruRuntime = EruRuntime.shared
+class PromiseSpec extends EruTestSuite {
 
   test("promise creation succeeds") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
