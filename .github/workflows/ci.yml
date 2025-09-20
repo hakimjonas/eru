@@ -262,3 +262,13 @@ jobs:
           echo "Publishing signed SNAPSHOT version..."
           sbt +publishSigned
           echo "Signed SNAPSHOT published successfully!"
+
+      - name: Publish SNAPSHOT to GitHub Packages
+        env:
+          JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Publishing SNAPSHOT to GitHub Packages..."
+          sbt +githubPackagesPublish
+          echo "GitHub Packages SNAPSHOT published successfully!"

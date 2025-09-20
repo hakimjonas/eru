@@ -26,6 +26,11 @@ ThisBuild / scmInfo := Some(
   ScmInfo(url("https://github.com/hakimjonas/eru"), "scm:git@github.com:hakimjonas/eru.git")
 )
 
+// ===== GitHub Packages Publishing =====
+val githubPackagesResolver = "GitHub Packages" at "https://maven.pkg.github.com/hakimjonas/eru"
+ThisBuild / githubOwner := "hakimjonas"
+ThisBuild / githubRepository := "eru"
+
 // ===== Compiler Settings =====
 lazy val sharedScalacOptions = Seq(
   "-feature",
@@ -148,7 +153,9 @@ lazy val root = (project in file("."))
     addCommandAlias("docsWatch", "docs/mdoc --watch"),
     addCommandAlias("docsSite", "site/makeSite"),
     addCommandAlias("docsPublish", "site/ghpagesPushSite"),
-    addCommandAlias("docsApi", "site/unidoc")
+    addCommandAlias("docsApi", "site/unidoc"),
+    // GitHub Packages publishing
+    addCommandAlias("githubPackagesPublish", "+githubPackagesPublish")
   )
 
 // Custom clean task
