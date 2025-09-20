@@ -27,9 +27,17 @@ ThisBuild / scmInfo := Some(
 )
 
 // ===== GitHub Packages Publishing =====
-val githubPackagesResolver = "GitHub Packages" at "https://maven.pkg.github.com/hakimjonas/eru"
-ThisBuild / githubOwner := "hakimjonas"
-ThisBuild / githubRepository := "eru"
+// Only configure GitHub Packages when GITHUB_TOKEN is available
+lazy val githubPackagesSettings = if (sys.env.contains("GITHUB_TOKEN")) {
+  Seq(
+    ThisBuild / githubOwner := "hakimjonas",
+    ThisBuild / githubRepository := "eru"
+  )
+} else {
+  Seq.empty
+}
+
+githubPackagesSettings
 
 // ===== Compiler Settings =====
 lazy val sharedScalacOptions = Seq(
