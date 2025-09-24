@@ -216,48 +216,33 @@ class QueueSpec extends EruTestSuite {
     assert(queue.isEmpty.unsafeRunSync())
   }
 
-  test("bounded queue maintains consistency under stress") {
+  test("bounded queue maintains consistency with rapid fill/drain cycles") {
     val queue = Eru.queue[Int](10).unsafeRunSync()
-    val numOperations = 50
 
-    // Perform mixed operations that won't cause suspension
-    (1 to numOperations).foreach { i =>
-      if (i % 3 == 0 && queue.size.unsafeRunSync() > 0) {
-        queue.poll.unsafeRunSync() // Only poll when queue has items
-      } else if (queue.remainingCapacity.unsafeRunSync() > 0) {
-        queue.offer(i).unsafeRunSync() // Only offer when there's capacity
-        if (i % 5 == 0 && queue.size.unsafeRunSync() > 0) {
-          queue.take.unsafeRunSync() // Only take when queue has items
-        }
-      }
+    (1 to 50).foreach { _ =>
+      (1 to 8).foreach(queue.offer(_).unsafeRunSync())
+      assertEquals(queue.size.unsafeRunSync(), 8)
+
+      (1 to 5).foreach(_ => queue.poll.unsafeRunSync())
+      assertEquals(queue.size.unsafeRunSync(), 3)
+
+      (1 to 3).foreach(_ => queue.poll.unsafeRunSync())
+      assert(queue.isEmpty.unsafeRunSync())
+      assertEquals(queue.remainingCapacity.unsafeRunSync(), 10)
     }
-
-    // Queue should maintain valid invariants
-    val size = queue.size.unsafeRunSync()
-    val capacity = queue.remainingCapacity.unsafeRunSync()
-    assertEquals(capacity, 10 - size)
-    assert(size >= 0 && size <= 10)
   }
 
-  test("unbounded queue maintains consistency under stress") {
+  test("unbounded queue handles large volume operations") {
     val queue = Eru.unboundedQueue[Int].unsafeRunSync()
-    val numOperations = 100
 
-    var expectedSize = 0
-    (1 to numOperations).foreach { i =>
-      if (i % 4 == 0 && expectedSize > 0) {
-        queue.take.unsafeRunSync()
-        expectedSize -= 1
-      } else if (i % 7 == 0 && expectedSize > 0) {
-        queue.poll.unsafeRunSync()
-        expectedSize -= 1
-      } else {
-        queue.offer(i).unsafeRunSync()
-        expectedSize += 1
-      }
-    }
+    (1 to 10000).foreach(queue.offer(_).unsafeRunSync())
+    assertEquals(queue.size.unsafeRunSync(), 10000)
 
-    assertEquals(queue.size.unsafeRunSync(), expectedSize)
+    (1 to 7000).foreach(_ => queue.poll.unsafeRunSync())
+    assertEquals(queue.size.unsafeRunSync(), 3000)
+
+    (1 to 3000).foreach(_ => queue.poll.unsafeRunSync())
+    assert(queue.isEmpty.unsafeRunSync())
     assertEquals(queue.remainingCapacity.unsafeRunSync(), Int.MaxValue)
   }
 
@@ -287,60 +272,58 @@ class QueueSpec extends EruTestSuite {
   }
 
   test("bounded vs unbounded queue behavior comparison") {
-    val bounded = Eru.queue[Int](3).unsafeRunSync()
+    val bounded = Eru.queue[Int](5).unsafeRunSync()
     val unbounded = Eru.unboundedQueue[Int].unsafeRunSync()
 
-    // Same operations on both
     (1 to 5).foreach { i =>
       bounded.offer(i).unsafeRunSync()
       unbounded.offer(i).unsafeRunSync()
     }
 
-    // Both should maintain FIFO
     val boundedResults = (1 to 5).map(_ => bounded.take.unsafeRunSync()).toList
     val unboundedResults = (1 to 5).map(_ => unbounded.take.unsafeRunSync()).toList
 
     assertEquals(boundedResults, (1 to 5).toList)
     assertEquals(unboundedResults, (1 to 5).toList)
 
-    // Capacity should differ
-    assertEquals(bounded.remainingCapacity.unsafeRunSync(), 3)
+    assertEquals(bounded.remainingCapacity.unsafeRunSync(), 5)
     assertEquals(unbounded.remainingCapacity.unsafeRunSync(), Int.MaxValue)
   }
 
   test("queue isEmpty correctness across operations") {
     val queue = Eru.queue[String](2).unsafeRunSync()
 
-    assert(queue.isEmpty.unsafeRunSync(), "New queue should be empty")
+    assert(queue.isEmpty.unsafeRunSync())
 
     queue.offer("item").unsafeRunSync()
-    assert(!queue.isEmpty.unsafeRunSync(), "Queue with items should not be empty")
+    assert(!queue.isEmpty.unsafeRunSync())
 
-    queue.take.unsafeRunSync()
-    assert(queue.isEmpty.unsafeRunSync(), "Empty queue after take should be empty")
+    assertEquals(queue.poll.unsafeRunSync(), Some("item"))
+    assert(queue.isEmpty.unsafeRunSync())
 
     queue.offer("another").unsafeRunSync()
-    queue.poll.unsafeRunSync()
-    assert(queue.isEmpty.unsafeRunSync(), "Empty queue after poll should be empty")
+    assertEquals(queue.poll.unsafeRunSync(), Some("another"))
+    assert(queue.isEmpty.unsafeRunSync())
   }
 
-  test("queue size consistency with concurrent-like operations") {
+  test("queue size tracking with mixed operations") {
     val queue = Eru.queue[Int](5).unsafeRunSync()
 
-    // Simulate concurrent-like behavior with sequential operations
-    val operations = List(
-      () => { queue.offer(1).unsafeRunSync(); 1 },
-      () => { queue.offer(2).unsafeRunSync(); 1 },
-      () => { queue.take.unsafeRunSync(); -1 },
-      () => { queue.offer(3).unsafeRunSync(); 1 },
-      () => { queue.poll.unsafeRunSync(); if (queue.size.unsafeRunSync() > 0) -1 else 0 }
-    )
+    queue.offer(1).unsafeRunSync()
+    assertEquals(queue.size.unsafeRunSync(), 1)
 
-    var expectedSize = 0
-    operations.foreach { op =>
-      expectedSize += op()
-      assertEquals(queue.size.unsafeRunSync(), math.max(0, expectedSize))
-    }
+    queue.offer(2).unsafeRunSync()
+    assertEquals(queue.size.unsafeRunSync(), 2)
+
+    assertEquals(queue.poll.unsafeRunSync(), Some(1))
+    assertEquals(queue.size.unsafeRunSync(), 1)
+
+    queue.offer(3).unsafeRunSync()
+    assertEquals(queue.size.unsafeRunSync(), 2)
+
+    assertEquals(queue.poll.unsafeRunSync(), Some(2))
+    assertEquals(queue.poll.unsafeRunSync(), Some(3))
+    assertEquals(queue.size.unsafeRunSync(), 0)
   }
 
   test("queue large capacity handling") {
