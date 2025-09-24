@@ -31,7 +31,7 @@
 | Exit.scala | ✅ Complete | ✅ | ✅ | ✅ | Exit modeling + comprehensive tests |
 | Result.scala | ✅ Complete | ✅ | ✅ | ✅ | Result type + extensions |
 | EruException.scala | ✅ Complete | ✅ | ✅ | ✅ | Exception types + comprehensive tests |
-| CorePrelude.scala | ⏳ Pending | - | - | - | Core prelude |
+| CorePrelude.scala | ✅ Complete | ✅ | ✅ | ✅ | Core prelude + new comprehensive test suite |
 | EruFiber.scala | ⏳ Pending | - | - | - | Fiber abstraction |
 | UnifiedFiber.scala | ⏳ Pending | - | - | - | Unified fiber |
 | AsyncScheduler.scala | ⏳ Pending | - | - | - | Async scheduler |
@@ -135,7 +135,7 @@
 - eru-runtime/jvm: 5 files
 - eru-runtime/native: 2 files
 
-**Progress**: 5/43 files completed (12%)
+**Progress**: 6/43 files completed (14%)
 
 ## Notes and Observations
 
@@ -152,7 +152,7 @@
 - **Documentation Style**: Consistent use of examples, proper parameter documentation, structured explanations
 
 ### Improvements Made
-- **Enhanced Testing**: Added 4 comprehensive test suites (DomainTypes: 17 tests, Result extensions: 5 tests, Exit: 9 tests, EruException: 14 tests)
+- **Enhanced Testing**: Added 5 comprehensive test suites (DomainTypes: 17 tests, Result extensions: 5 tests, Exit: 9 tests, EruException: 14 tests, CorePrelude: 13 tests)
 - **API Enhancements**: Added toEru/toExit extension methods to Result for better discoverability
 - **Documentation**: Enhanced several class-level docs with better examples and explanations
 - **Type Coverage**: Improved test coverage for edge cases, covariance, and complex scenarios
