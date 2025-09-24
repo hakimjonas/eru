@@ -1,0 +1,521 @@
+package net.ghoula.eru
+
+import java.util.concurrent.TimeUnit
+
+import net.ghoula.eru.prelude.*
+import net.ghoula.eru.test.EruTestSuite
+
+/** Comprehensive test suite for Semaphore implementation.
+  *
+  * Validates permit-based resource coordination, atomic acquisition/release operations, concurrent
+  * access semantics, and resource bracketing behavior. Tests ensure that the semaphore correctly
+  * manages permits under high concurrency and provides proper resource safety guarantees.
+  */
+class SemaphoreSpec extends EruTestSuite {
+
+  test("Semaphore.make creates semaphore with specified permits") {
+    val semaphore = Semaphore.make(5).unsafeRunSync()
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 5L)
+  }
+
+  test("Semaphore.make handles negative initial permits") {
+    val semaphore = Semaphore.make(-3).unsafeRunSync()
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 0L)
+  }
+
+  test("Semaphore.make creates zero-permit semaphore") {
+    val semaphore = Semaphore.make(0).unsafeRunSync()
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 0L)
+  }
+
+  test("tryAcquire succeeds when permits available") {
+    val semaphore = Semaphore.make(2).unsafeRunSync()
+
+    val acquired1 = semaphore.tryAcquire.unsafeRunSync()
+    assert(acquired1, "First acquisition should succeed")
+
+    val available1 = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available1, 1L)
+
+    val acquired2 = semaphore.tryAcquire.unsafeRunSync()
+    assert(acquired2, "Second acquisition should succeed")
+
+    val available2 = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available2, 0L)
+  }
+
+  test("tryAcquire fails when no permits available") {
+    val semaphore = Semaphore.make(0).unsafeRunSync()
+
+    val acquired = semaphore.tryAcquire.unsafeRunSync()
+    assert(!acquired, "Acquisition should fail when no permits")
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 0L)
+  }
+
+  test("tryAcquireN succeeds when sufficient permits available") {
+    val semaphore = Semaphore.make(5).unsafeRunSync()
+
+    val acquired = semaphore.tryAcquireN(3).unsafeRunSync()
+    assert(acquired, "Acquisition of 3 permits should succeed")
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 2L)
+  }
+
+  test("tryAcquireN fails when insufficient permits available") {
+    val semaphore = Semaphore.make(2).unsafeRunSync()
+
+    val acquired = semaphore.tryAcquireN(5).unsafeRunSync()
+    assert(!acquired, "Acquisition of 5 permits should fail")
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 2L) // No permits consumed on failure
+  }
+
+  test("tryAcquireN with zero permits always succeeds") {
+    val semaphore = Semaphore.make(0).unsafeRunSync()
+
+    val acquired = semaphore.tryAcquireN(0).unsafeRunSync()
+    assert(acquired, "Acquisition of 0 permits should always succeed")
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 0L)
+  }
+
+  test("tryAcquireN with negative permits treated as zero") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+
+    val acquired = semaphore.tryAcquireN(-5).unsafeRunSync()
+    assert(acquired, "Acquisition of negative permits should succeed (treated as zero)")
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 1L) // No permits consumed
+  }
+
+  test("release adds single permit") {
+    val semaphore = Semaphore.make(0).unsafeRunSync()
+
+    semaphore.release.unsafeRunSync()
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 1L)
+
+    val acquired = semaphore.tryAcquire.unsafeRunSync()
+    assert(acquired, "Should be able to acquire released permit")
+  }
+
+  test("releaseN adds multiple permits") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+
+    semaphore.releaseN(4).unsafeRunSync()
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 5L)
+  }
+
+  test("releaseN with zero permits does nothing") {
+    val semaphore = Semaphore.make(2).unsafeRunSync()
+
+    semaphore.releaseN(0).unsafeRunSync()
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 2L)
+  }
+
+  test("releaseN with negative permits does nothing") {
+    val semaphore = Semaphore.make(2).unsafeRunSync()
+
+    semaphore.releaseN(-3).unsafeRunSync()
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 2L)
+  }
+
+  test("release can create more permits than initial") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+
+    semaphore.releaseN(10).unsafeRunSync()
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 11L)
+  }
+
+  test("withPermit succeeds when permit available") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+
+    val result = semaphore.withPermit {
+      Eru.succeed("executed")
+    }.unsafeRunSync()
+
+    assertEquals(result, Some("executed"))
+
+    // Permit should be released after execution
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 1L)
+  }
+
+  test("withPermit fails when no permit available") {
+    val semaphore = Semaphore.make(0).unsafeRunSync()
+
+    val result = semaphore.withPermit {
+      Eru.succeed("should not execute")
+    }.unsafeRunSync()
+
+    assertEquals(result, None)
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 0L)
+  }
+
+  test("withPermit releases permit even on failure") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+
+    val result = semaphore.withPermit {
+      Eru.fail("intentional failure")
+    }.attempt.unsafeRunSync()
+
+    result match {
+      case Result.Failure(error) => assertEquals(error, "intentional failure")
+      case other => munit.Assertions.fail(s"Expected failure, got: $other")
+    }
+
+    // Permit should still be released
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 1L)
+  }
+
+  test("withPermit releases permit even on exception") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+    val exception = new RuntimeException("test exception")
+
+    val caughtException = intercept[RuntimeException] {
+      semaphore.withPermit {
+        Eru.effect(throw exception)
+      }.unsafeRunSync()
+    }
+    assertEquals(caughtException, exception)
+
+    // Permit should still be released
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 1L)
+  }
+
+  test("withPermits succeeds when sufficient permits available") {
+    val semaphore = Semaphore.make(5).unsafeRunSync()
+
+    val result = semaphore
+      .withPermits(3) {
+        Eru.succeed("executed with 3 permits")
+      }
+      .unsafeRunSync()
+
+    assertEquals(result, Some("executed with 3 permits"))
+
+    // All permits should be released after execution
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 5L)
+  }
+
+  test("withPermits fails when insufficient permits available") {
+    val semaphore = Semaphore.make(2).unsafeRunSync()
+
+    val result = semaphore
+      .withPermits(5) {
+        Eru.succeed("should not execute")
+      }
+      .unsafeRunSync()
+
+    assertEquals(result, None)
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 2L)
+  }
+
+  test("withPermits with zero permits always succeeds") {
+    val semaphore = Semaphore.make(0).unsafeRunSync()
+
+    val result = semaphore
+      .withPermits(0) {
+        Eru.succeed("executed with 0 permits")
+      }
+      .unsafeRunSync()
+
+    assertEquals(result, Some("executed with 0 permits"))
+  }
+
+  test("semaphore handles concurrent acquisitions") {
+    import scala.concurrent.{Future, ExecutionContext}
+    implicit val ec: ExecutionContext = ExecutionContext.global
+
+    val semaphore = Semaphore.make(10).unsafeRunSync()
+    val numThreads = 20
+
+    val futures = (1 to numThreads).map { _ =>
+      Future {
+        semaphore.tryAcquire.unsafeRunSync()
+      }
+    }
+
+    import scala.concurrent.Await
+    import scala.concurrent.duration.Duration
+    val results = Await.result(Future.sequence(futures), Duration(5, TimeUnit.SECONDS))
+
+    // Exactly 10 acquisitions should succeed
+    val successes = results.count(identity)
+    assertEquals(successes, 10)
+
+    val failures = results.count(!_)
+    assertEquals(failures, 10)
+
+    // No permits should remain
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 0L)
+  }
+
+  test("semaphore handles concurrent releases") {
+    import scala.concurrent.{Future, ExecutionContext}
+    implicit val ec: ExecutionContext = ExecutionContext.global
+
+    val semaphore = Semaphore.make(0).unsafeRunSync()
+    val numThreads = 15
+
+    val futures = (1 to numThreads).map { _ =>
+      Future {
+        semaphore.release.unsafeRunSync()
+      }
+    }
+
+    import scala.concurrent.Await
+    import scala.concurrent.duration.Duration
+    Await.result(Future.sequence(futures), Duration(5, TimeUnit.SECONDS))
+
+    // Should have 15 permits after all releases
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 15L)
+  }
+
+  test("semaphore handles mixed concurrent operations") {
+    import scala.concurrent.{Future, ExecutionContext}
+    implicit val ec: ExecutionContext = ExecutionContext.global
+
+    val semaphore = Semaphore.make(5).unsafeRunSync()
+
+    val acquireFutures = (1 to 10).map { _ =>
+      Future { semaphore.tryAcquire.unsafeRunSync() }
+    }
+
+    val releaseFutures = (1 to 8).map { _ =>
+      Future { semaphore.release.unsafeRunSync() }
+    }
+
+    import scala.concurrent.Await
+    import scala.concurrent.duration.Duration
+    val acquireResults = Await.result(Future.sequence(acquireFutures), Duration(5, TimeUnit.SECONDS))
+    Await.result(Future.sequence(releaseFutures), Duration(5, TimeUnit.SECONDS))
+
+    // Should have more permits available due to releases
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    val successes = acquireResults.count(identity)
+
+    // Final permits = initial + releases - successful acquisitions
+    assertEquals(available, 5L + 8L - successes)
+  }
+
+  test("semaphore concurrent withPermit operations") {
+    import scala.concurrent.{Future, ExecutionContext}
+    implicit val ec: ExecutionContext = ExecutionContext.global
+
+    val semaphore = Semaphore.make(3).unsafeRunSync()
+    val numThreads = 6
+
+    val futures = (1 to numThreads).map { i =>
+      Future {
+        semaphore.withPermit {
+          Eru.succeed(s"executed-$i")
+        }.unsafeRunSync()
+      }
+    }
+
+    import scala.concurrent.Await
+    import scala.concurrent.duration.Duration
+    val results = Await.result(Future.sequence(futures), Duration(5, TimeUnit.SECONDS))
+
+    // Only 3 operations should have executed (permit limit)
+    val successes = results.collect { case Some(_) => () }
+    val failures = results.collect { case None => () }
+
+    assertEquals(successes.length, 3)
+    assertEquals(failures.length, 3)
+
+    // All permits should be released
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 3L)
+  }
+
+  test("semaphore atomic operations under high contention") {
+    import scala.concurrent.{Future, ExecutionContext}
+    implicit val ec: ExecutionContext = ExecutionContext.global
+
+    val semaphore = Semaphore.make(50).unsafeRunSync()
+    val numOperations = 100
+
+    val operations = (1 to numOperations).map { i =>
+      Future {
+        if (i % 2 == 0) {
+          semaphore.tryAcquireN(2).unsafeRunSync()
+        } else {
+          semaphore.releaseN(1).unsafeRunSync()
+          true // release always succeeds
+        }
+      }
+    }
+
+    import scala.concurrent.Await
+    import scala.concurrent.duration.Duration
+    val results = Await.result(Future.sequence(operations), Duration(10, TimeUnit.SECONDS))
+
+    // Count successful acquisitions
+    val successfulAcquisitions = results.zipWithIndex.count { case (success, i) =>
+      success && (i + 1) % 2 == 0 // Even indices (acquire operations)
+    }
+
+    val totalReleases = numOperations / 2 // All release operations succeed
+    val totalAcquired = successfulAcquisitions * 2 // Each successful acquire takes 2 permits
+
+    val expectedPermits = 50L + totalReleases - totalAcquired
+    val actualPermits = semaphore.permitsAvailable.unsafeRunSync()
+
+    assertEquals(actualPermits, expectedPermits)
+  }
+
+  test("semaphore nested withPermit operations") {
+    val semaphore = Semaphore.make(2).unsafeRunSync()
+
+    val result = semaphore.withPermit {
+      semaphore.withPermit {
+        Eru.succeed("nested execution")
+      }
+    }.unsafeRunSync()
+
+    assertEquals(result, Some(Some("nested execution")))
+
+    // Both permits should be released
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 2L)
+  }
+
+  test("semaphore nested withPermit fails when insufficient permits") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+
+    val result = semaphore.withPermit {
+      semaphore.withPermit {
+        Eru.succeed("should not reach here")
+      }
+    }.unsafeRunSync()
+
+    assertEquals(result, Some(None)) // Outer succeeds, inner fails
+
+    // Permit should be released
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 1L)
+  }
+
+  test("semaphore large permit counts") {
+    val largeCount = 1000000L
+    val semaphore = Semaphore.make(largeCount).unsafeRunSync()
+
+    val available1 = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available1, largeCount)
+
+    val acquired = semaphore.tryAcquireN(largeCount / 2).unsafeRunSync()
+    assert(acquired, "Should be able to acquire half of large permit count")
+
+    val available2 = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available2, largeCount / 2)
+
+    semaphore.releaseN(largeCount / 4).unsafeRunSync()
+    val available3 = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available3, (largeCount / 2) + (largeCount / 4))
+  }
+
+  test("semaphore resource cleanup with ensure") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+    var cleanupCalled = false
+
+    val result = semaphore.withPermit {
+      Eru
+        .succeed(42)
+        .ensure(Eru.effect {
+          cleanupCalled = true
+          ()
+        })
+    }.unsafeRunSync()
+
+    assertEquals(result, Some(42))
+    assert(cleanupCalled, "Resource cleanup should be called")
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 1L)
+  }
+
+  test("semaphore integration with for-comprehension") {
+    val semaphore = Semaphore.make(2).unsafeRunSync()
+
+    val result = for {
+      permit1 <- semaphore.withPermit(Eru.succeed("first"))
+      permit2 <- semaphore.withPermit(Eru.succeed("second"))
+      combined <- Eru.succeed((permit1, permit2))
+    } yield combined
+
+    val (first, second) = result.unsafeRunSync()
+    assertEquals(first, Some("first"))
+    assertEquals(second, Some("second"))
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 2L)
+  }
+
+  test("semaphore maintains invariants under stress") {
+    val semaphore = Semaphore.make(10).unsafeRunSync()
+    val operations = 1000
+
+    // Perform many acquire/release pairs
+    (1 to operations).foreach { _ =>
+      val acquired = semaphore.tryAcquire.unsafeRunSync()
+      if (acquired) {
+        semaphore.release.unsafeRunSync()
+      }
+    }
+
+    // Should return to original state
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 10L)
+  }
+
+  test("semaphore type safety with different error types") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+
+    // Test with String error type
+    val stringResult: Option[String] = semaphore.withPermit {
+      Eru.fail("string-error"): Eru[String, String]
+    }.attempt.unsafeRunSync() match {
+      case Result.Success(value) => value
+      case Result.Failure(_) => None
+    }
+
+    assertEquals(stringResult, None)
+
+    // Test with Throwable error type
+    val throwableResult: Option[Int] = semaphore.withPermit {
+      Eru.effect(throw new RuntimeException("error")): Eru[Throwable, Int]
+    }.attempt.unsafeRunSync() match {
+      case Result.Success(value) => value
+      case Result.Failure(_) => None
+    }
+
+    assertEquals(throwableResult, None)
+
+    val available = semaphore.permitsAvailable.unsafeRunSync()
+    assertEquals(available, 1L)
+  }
+}

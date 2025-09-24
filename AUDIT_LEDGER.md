@@ -56,7 +56,7 @@
 | PlatformBackend.scala | ✅ Complete | ✅ | ✅ | ✅ | Platform backend + comprehensive test suite (13 tests) |
 | RuntimeExtensions.scala | ✅ Complete | ✅ | ✅ | ✅ | Runtime extensions + comprehensive test suite (36 tests) |
 | Promise.scala | ✅ Complete | ✅ | ✅ | ✅ | Promise primitive + comprehensive test suite (27 tests) |
-| Semaphore.scala | ⏳ Pending | - | - | - | Semaphore primitive |
+| Semaphore.scala | ✅ Complete | ✅ | ✅ | ✅ | Semaphore primitive + comprehensive test suite (33 tests) |
 | Queue.scala | ⏳ Pending | - | - | - | Queue primitive |
 | Ref.scala | ⏳ Pending | - | - | - | Ref primitive |
 | Deferred.scala | ⏳ Pending | - | - | - | Deferred primitive |
@@ -135,7 +135,7 @@
 - eru-runtime/jvm: 5 files
 - eru-runtime/native: 2 files
 
-**Progress**: 23/43 files completed (53%)
+**Progress**: 24/43 files completed (56%)
 
 **eru-core**: 17/17 files completed (100%)
 **eru-runtime**: 0/26 files completed (0%)
@@ -155,7 +155,7 @@
 - **Documentation Style**: Consistent use of examples, proper parameter documentation, structured explanations
 
 ### Improvements Made
-- **Enhanced Testing**: Added 17 comprehensive test suites (DomainTypes: 17 tests, Result extensions: 5 tests, Exit: 9 tests, EruException: 14 tests, CorePrelude: 13 tests, UnifiedFiber: 18 tests, AsyncScheduler: 15 tests, EruObserver: 21 tests, PreludeApi: 11 tests, internal PreludeApi: 14 tests, Extensions: 17 tests, EruRuntime: 32 tests, Prelude: 17 tests, RuntimeBackend: 31 tests, PlatformBackend: 13 tests, RuntimeExtensions: 36 tests, Promise: 27 tests)
+- **Enhanced Testing**: Added 18 comprehensive test suites (DomainTypes: 17 tests, Result extensions: 5 tests, Exit: 9 tests, EruException: 14 tests, CorePrelude: 13 tests, UnifiedFiber: 18 tests, AsyncScheduler: 15 tests, EruObserver: 21 tests, PreludeApi: 11 tests, internal PreludeApi: 14 tests, Extensions: 17 tests, EruRuntime: 32 tests, Prelude: 17 tests, RuntimeBackend: 31 tests, PlatformBackend: 13 tests, RuntimeExtensions: 36 tests, Promise: 27 tests, Semaphore: 33 tests)
 - **API Enhancements**: Added toEru/toExit extension methods to Result for better discoverability
 - **Documentation**: Enhanced several class-level docs with better examples and explanations
 - **Type Coverage**: Improved test coverage for edge cases, covariance, and complex scenarios
