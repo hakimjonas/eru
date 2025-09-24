@@ -2,9 +2,9 @@ package net.ghoula.eru
 
 /** Exception thrown when a computation fails with a typed error.
   *
-  * This exception serves as a bridge between Eru's typed error system and the JVM's
-  * exception-based error handling, allowing typed errors to be propagated through
-  * exception-based APIs while preserving type information.
+  * This exception serves as a bridge between Eru's typed error system and the JVM's exception-based
+  * error handling, allowing typed errors to be propagated through exception-based APIs while
+  * preserving type information.
   *
   * @param error
   *   the error that caused the computation to fail

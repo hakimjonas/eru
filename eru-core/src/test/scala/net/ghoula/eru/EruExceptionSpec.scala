@@ -4,9 +4,9 @@ import net.ghoula.eru.CorePrelude.*
 
 /** Comprehensive test suite for the EruException wrapper class.
   *
-  * Validates all functionality of EruException including construction, error wrapping,
-  * string representation, message handling, and companion object factory methods.
-  * EruException serves as the bridge between typed errors and the JVM exception system.
+  * Validates all functionality of EruException including construction, error wrapping, string
+  * representation, message handling, and companion object factory methods. EruException serves as
+  * the bridge between typed errors and the JVM exception system.
   */
 class EruExceptionSpec extends munit.FunSuite {
 
@@ -22,7 +22,8 @@ class EruExceptionSpec extends munit.FunSuite {
     val exception = EruException(error)
 
     assertEquals(exception.error, error)
-    assert(exception.isInstanceOf[EruException[Int]])
+    // Type is verified at compile time - EruException[Int]
+    val _: EruException[Int] = exception
   }
 
   test("EruException toString includes wrapped error") {
@@ -46,10 +47,10 @@ class EruExceptionSpec extends munit.FunSuite {
     assertEquals(exception.getMessage, "validation failed")
   }
 
-  test("EruException getMessage handles null error") {
-    val exception = new EruException[String](null)
+  test("EruException getMessage handles None as error") {
+    val exception = new EruException[Option[String]](None)
 
-    assertEquals(exception.getMessage, "null")
+    assertEquals(exception.getMessage, "None")
   }
 
   test("EruException getMessage handles complex error objects") {
@@ -63,9 +64,19 @@ class EruExceptionSpec extends munit.FunSuite {
   test("EruException is a RuntimeException") {
     val exception = EruException("test")
 
-    assert(exception.isInstanceOf[RuntimeException])
-    assert(exception.isInstanceOf[Exception])
-    assert(exception.isInstanceOf[Throwable])
+    // Type hierarchy is verified at compile time
+    val _: RuntimeException = exception
+    val _: Exception = exception
+    val _: Throwable = exception
+
+    // Runtime verification through successful catch blocks
+    val caught1 =
+      try {
+        throw exception
+      } catch {
+        case _: RuntimeException => true
+      }
+    assert(caught1, "Should be caught as RuntimeException")
   }
 
   test("EruException maintains type information") {
@@ -73,9 +84,14 @@ class EruExceptionSpec extends munit.FunSuite {
     val intException = EruException(42)
     val listException = EruException(List(1, 2, 3))
 
-    assert(stringException.error.isInstanceOf[String])
-    assert(intException.error.isInstanceOf[Int])
-    assert(listException.error.isInstanceOf[List[Int]])
+    // Type information is preserved at compile time
+    val stringError: String = stringException.error
+    val intError: Int = intException.error
+    val listError: List[Int] = listException.error
+
+    assertEquals(stringError, "string error")
+    assertEquals(intError, 42)
+    assertEquals(listError, List(1, 2, 3))
   }
 
   test("EruException with unit error") {
@@ -118,8 +134,9 @@ class EruExceptionSpec extends munit.FunSuite {
     val exception = EruException("stack trace test")
 
     // Should have stack trace like any other exception
-    assert(exception.getStackTrace != null)
-    assert(exception.getStackTrace.nonEmpty)
+    val stackTrace = Option(exception.getStackTrace)
+    assert(stackTrace.isDefined, "Stack trace should be present")
+    assert(stackTrace.exists(_.nonEmpty), "Stack trace should not be empty")
   }
 
   test("EruException equality based on error content") {
