@@ -319,4 +319,37 @@ class ResultSpec extends munit.FunSuite {
     assertEquals(throwableExit, Exit.Die(exception))
     assertEquals(successExit, Exit.Success(42))
   }
+
+  test("Result extension method toEru converts Success to successful Eru") {
+    val result = Result.succeed(42)
+    val eru = result.toEru
+    assertEquals(eru.unsafeRunSync(), 42)
+  }
+
+  test("Result extension method toEru converts Failure to failed Eru") {
+    val result = Result.fail("error")
+    val eru = result.toEru
+    intercept[RuntimeException] {
+      eru.unsafeRunSync()
+    }
+  }
+
+  test("Result extension method toExit converts Success to Exit.Success") {
+    val result = Result.succeed(42)
+    val exit = result.toExit
+    assertEquals(exit, Exit.Success(42))
+  }
+
+  test("Result extension method toExit converts typed Failure to Exit.Failure") {
+    val result = Result.fail("error")
+    val exit = result.toExit
+    assertEquals(exit, Exit.Failure("error"))
+  }
+
+  test("Result extension method toExit converts Throwable Failure to Exit.Die") {
+    val throwable = new RuntimeException("boom")
+    val result = Result.fail(throwable)
+    val exit = result.toExit
+    assertEquals(exit, Exit.Die(throwable))
+  }
 }
