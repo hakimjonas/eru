@@ -41,9 +41,9 @@
 | api/PreludeApi.scala | ✅ Complete | ✅ | ✅ | ✅ | API prelude + comprehensive test suite (11 tests) |
 | internal/PreludeApi.scala | ✅ Complete | ✅ | ✅ | ✅ | Internal prelude + comprehensive test suite (14 tests) |
 | internal/extensions.scala | ✅ Complete | ✅ | ✅ | ✅ | Extension methods + comprehensive test suite (17 tests) |
-| meta/EruMacros.scala | ⏳ Pending | - | - | - | Macro utilities |
-| patterns/ErrorHandling.scala | ⏳ Pending | - | - | - | Error patterns |
-| trace/EruTrace.scala | ⏳ Pending | - | - | - | Tracing support |
+| meta/EruMacros.scala | ✅ Complete | ✅ | ✅ | ✅ | Macro utilities + existing comprehensive tests (14 tests) |
+| patterns/ErrorHandling.scala | ✅ Complete | ✅ | ✅ | ✅ | Error patterns + existing comprehensive tests (22 tests) |
+| trace/EruTrace.scala | ✅ Complete | ✅ | ✅ | ✅ | Tracing support + existing comprehensive tests (20 tests) |
 
 ### Module: eru-runtime
 
@@ -135,9 +135,9 @@
 - eru-runtime/jvm: 5 files
 - eru-runtime/native: 2 files
 
-**Progress**: 13/43 files completed (30%)
+**Progress**: 17/43 files completed (40%)
 
-**eru-core**: 13/17 files completed (76%)
+**eru-core**: 17/17 files completed (100%)
 **eru-runtime**: 0/26 files completed (0%)
 
 ## Notes and Observations
@@ -154,7 +154,7 @@
 - **Error Modeling**: Sophisticated structured error handling with comprehensive InterruptCause system
 - **Documentation Style**: Consistent use of examples, proper parameter documentation, structured explanations
 
-### Improvements Made (eru-core)
+### Improvements Made
 - **Enhanced Testing**: Added 11 comprehensive test suites (DomainTypes: 17 tests, Result extensions: 5 tests, Exit: 9 tests, EruException: 14 tests, CorePrelude: 13 tests, UnifiedFiber: 18 tests, AsyncScheduler: 15 tests, EruObserver: 21 tests, PreludeApi: 11 tests, internal PreludeApi: 14 tests, Extensions: 17 tests)
 - **API Enhancements**: Added toEru/toExit extension methods to Result for better discoverability
 - **Documentation**: Enhanced several class-level docs with better examples and explanations
