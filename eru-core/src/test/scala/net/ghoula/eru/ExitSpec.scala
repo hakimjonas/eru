@@ -66,4 +66,159 @@ class ExitSpec extends munit.FunSuite {
       case _ => fail("expected Interrupt")
     }
   }
+
+  test("FiberId.fresh generates unique identifiers") {
+    val id1 = FiberId.fresh()
+    val id2 = FiberId.fresh()
+    val id3 = FiberId.fresh()
+
+    assertNotEquals(id1, id2)
+    assertNotEquals(id2, id3)
+    assertNotEquals(id1, id3)
+  }
+
+  test("FiberId.toLong returns underlying Long value") {
+    val id = FiberId.fresh()
+    val longValue = id.toLong
+
+    // Should be a positive Long (MSB is 0 due to implementation)
+    assert(longValue >= 0L)
+  }
+
+  test("InterruptCause.Cancelled with optional reason") {
+    val cause1 = InterruptCause.Cancelled()
+    val cause2 = InterruptCause.Cancelled(Some("User requested"))
+
+    cause1 match {
+      case InterruptCause.Cancelled(reason) => assert(reason.isEmpty)
+      case _ => fail("expected Cancelled")
+    }
+
+    cause2 match {
+      case InterruptCause.Cancelled(reason) => assertEquals(reason, Some("User requested"))
+      case _ => fail("expected Cancelled")
+    }
+  }
+
+  test("InterruptCause.Timeout with duration and optional operation") {
+    import java.time.Duration
+
+    val duration = Duration.ofSeconds(30)
+    val cause1 = InterruptCause.Timeout(duration)
+    val cause2 = InterruptCause.Timeout(duration, Some("database query"))
+
+    cause1 match {
+      case InterruptCause.Timeout(d, operation) =>
+        assertEquals(d, duration)
+        assert(operation.isEmpty)
+      case _ => fail("expected Timeout")
+    }
+
+    cause2 match {
+      case InterruptCause.Timeout(d, operation) =>
+        assertEquals(d, duration)
+        assertEquals(operation, Some("database query"))
+      case _ => fail("expected Timeout")
+    }
+  }
+
+  test("InterruptCause.ParentTerminated with parent info") {
+    val parentId = FiberId.fresh()
+    val parentExit = Exit.Success(42)
+    val cause = InterruptCause.ParentTerminated(parentId, parentExit)
+
+    cause match {
+      case InterruptCause.ParentTerminated(pid, pexit) =>
+        assertEquals(pid, parentId)
+        assertEquals(pexit, parentExit)
+      case _ => fail("expected ParentTerminated")
+    }
+  }
+
+  test("InterruptCause.ResourceExhausted with resource and optional details") {
+    val cause1 = InterruptCause.ResourceExhausted("memory")
+    val cause2 = InterruptCause.ResourceExhausted("memory", Some("JVM heap usage exceeded 90%"))
+
+    cause1 match {
+      case InterruptCause.ResourceExhausted(resource, details) =>
+        assertEquals(resource, "memory")
+        assert(details.isEmpty)
+      case _ => fail("expected ResourceExhausted")
+    }
+
+    cause2 match {
+      case InterruptCause.ResourceExhausted(resource, details) =>
+        assertEquals(resource, "memory")
+        assertEquals(details, Some("JVM heap usage exceeded 90%"))
+      case _ => fail("expected ResourceExhausted")
+    }
+  }
+
+  test("InterruptCause.Custom with name, context, and metadata") {
+    val cause1 = InterruptCause.Custom("circuit_breaker_open")
+    val cause2 = InterruptCause.Custom(
+      name = "scheduled_maintenance",
+      context = Some("System entering maintenance window"),
+      metadata = Map("maintenance_id" -> "MAINT-2023-001", "scheduled_time" -> "2023-01-15T02:00:00Z")
+    )
+
+    cause1 match {
+      case InterruptCause.Custom(name, context, metadata) =>
+        assertEquals(name, "circuit_breaker_open")
+        assert(context.isEmpty)
+        assert(metadata.isEmpty)
+      case _ => fail("expected Custom")
+    }
+
+    cause2 match {
+      case InterruptCause.Custom(name, context, metadata) =>
+        assertEquals(name, "scheduled_maintenance")
+        assertEquals(context, Some("System entering maintenance window"))
+        assertEquals(metadata.size, 2)
+        assertEquals(metadata("maintenance_id"), "MAINT-2023-001")
+      case _ => fail("expected Custom")
+    }
+  }
+
+  test("Exit types maintain covariance") {
+    val stringExit: Exit[String, Int] = Exit.Success(42)
+    val anyExit: Exit[Any, Any] = stringExit // Should compile due to covariance
+
+    anyExit match {
+      case Exit.Success(value) => assertEquals(value, 42)
+      case _ => fail("expected Success")
+    }
+  }
+
+  test("Complex InterruptCause pattern matching") {
+    import java.time.Duration
+
+    val causes = List(
+      InterruptCause.Cancelled(Some("user request")),
+      InterruptCause.Timeout(Duration.ofMinutes(5), Some("API call")),
+      InterruptCause.ResourceExhausted("file descriptors", Some("limit reached")),
+      InterruptCause.Custom("custom_reason", Some("context"), Map("key" -> "value"))
+    )
+
+    val results = causes.map {
+      case InterruptCause.Cancelled(reason) => s"cancelled: ${reason.getOrElse("none")}"
+      case InterruptCause.Timeout(duration, operation) =>
+        s"timeout: ${duration.toSeconds}s, op: ${operation.getOrElse("unknown")}"
+      case InterruptCause.ResourceExhausted(resource, details) =>
+        s"resource: $resource, details: ${details.getOrElse("none")}"
+      case InterruptCause.Custom(name, context, metadata) =>
+        s"custom: $name, ctx: ${context.getOrElse("none")}, meta: ${metadata.size}"
+      case InterruptCause.ParentTerminated(_, _) => "parent terminated"
+    }
+
+    assertEquals(
+      results,
+      List(
+        "cancelled: user request",
+        "timeout: 300s, op: API call",
+        "resource: file descriptors, details: limit reached",
+        "custom: custom_reason, ctx: context, meta: 1"
+      )
+    )
+  }
 }
