@@ -221,13 +221,14 @@ jobs:
   #          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
   #        run: sbt docsPublish
 
-  # SNAPSHOT publishing job: Publishes SNAPSHOT versions on pushes to main branch only
-  publish-snapshot:
+  # Publishing job: Publishes to GitHub Packages on pushes to main branch
+  publish-github:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -245,20 +246,12 @@ jobs:
       - name: Set up sbt launcher
         uses: sbt/setup-sbt@v1
 
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.PGP_SECRET }}
-          passphrase: ${{ secrets.PGP_PASSPHRASE }}
-
-      - name: Publish SNAPSHOT to Sonatype
+      - name: Publish to GitHub Packages
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
-          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Publishing signed SNAPSHOT version..."
-          sbt +publishSigned
-          echo "Signed SNAPSHOT published successfully!"
+          echo "Publishing to GitHub Packages..."
+          sbt +publish
+          echo "Published successfully to GitHub Packages!"
