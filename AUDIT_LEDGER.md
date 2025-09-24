@@ -34,7 +34,7 @@
 | CorePrelude.scala | ✅ Complete | ✅ | ✅ | ✅ | Core prelude + new comprehensive test suite |
 | EruFiber.scala | ✅ Complete | ✅ | ✅ | ✅ | Fiber abstraction + existing comprehensive tests |
 | UnifiedFiber.scala | ✅ Complete | ✅ | ✅ | ✅ | Unified fiber + new comprehensive test suite |
-| AsyncScheduler.scala | ⏳ Pending | - | - | - | Async scheduler |
+| AsyncScheduler.scala | ✅ Complete | ✅ | ✅ | ✅ | Async scheduler + new comprehensive test suite |
 | DomainTypes.scala | ✅ Complete | ✅ | ✅ | ✅ | Domain types + test suite |
 | EruObserver.scala | ⏳ Pending | - | - | - | Observer pattern |
 | FiberContext.scala | ⏳ Pending | - | - | - | Fiber context |
@@ -135,7 +135,7 @@
 - eru-runtime/jvm: 5 files
 - eru-runtime/native: 2 files
 
-**Progress**: 8/43 files completed (19%)
+**Progress**: 9/43 files completed (21%)
 
 ## Notes and Observations
 
@@ -152,7 +152,7 @@
 - **Documentation Style**: Consistent use of examples, proper parameter documentation, structured explanations
 
 ### Improvements Made
-- **Enhanced Testing**: Added 6 comprehensive test suites (DomainTypes: 17 tests, Result extensions: 5 tests, Exit: 9 tests, EruException: 14 tests, CorePrelude: 13 tests, UnifiedFiber: 18 tests)
+- **Enhanced Testing**: Added 7 comprehensive test suites (DomainTypes: 17 tests, Result extensions: 5 tests, Exit: 9 tests, EruException: 14 tests, CorePrelude: 13 tests, UnifiedFiber: 18 tests, AsyncScheduler: 15 tests)
 - **API Enhancements**: Added toEru/toExit extension methods to Result for better discoverability
 - **Documentation**: Enhanced several class-level docs with better examples and explanations
 - **Type Coverage**: Improved test coverage for edge cases, covariance, and complex scenarios
