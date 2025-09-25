@@ -23,7 +23,6 @@ class CorePreludeSpec extends munit.FunSuite {
     assertEquals(exception.error, "error")
   }
 
-
   test("CorePrelude exports Eru factory methods directly") {
     // Direct access to factory methods without Eru prefix
     val s = succeed(42)
@@ -52,8 +51,6 @@ class CorePreludeSpec extends munit.FunSuite {
     assertEquals(u.unsafeRunSync(), ())
   }
 
-
-
   test("CorePrelude provides access to extension methods") {
     // Resource safety extensions should be available through PreludeApi
     val effect = succeed(42)
@@ -71,7 +68,6 @@ class CorePreludeSpec extends munit.FunSuite {
     val debugged = effect.debug("test label")
     assertEquals(debugged.unsafeRunSync(), 42)
   }
-
 
   test("CorePrelude provides complete prelude for typical usage") {
     // Simulates typical user code using only CorePrelude import

@@ -4,9 +4,9 @@ import net.ghoula.eru.CorePrelude.*
 
 /** Test suite for EruObserver functionality and integration behavior.
   *
-  * Focuses on testing meaningful observer behavior: integration with program execution,
-  * observer composition, and performance characteristics. Does not test basic language
-  * features like case class field access or pattern matching.
+  * Focuses on testing meaningful observer behavior: integration with program execution, observer
+  * composition, and performance characteristics. Does not test basic language features like case
+  * class field access or pattern matching.
   */
 class EruObserverComprehensiveSpec extends munit.FunSuite {
 

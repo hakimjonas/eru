@@ -95,10 +95,12 @@ final class EruResourceDefectSpec extends munit.FunSuite {
     var cleanupOrder = List.empty[String]
 
     val outerAcquire = Eru.succeed("outer")
-    val outerRelease = (res: String) => Eru.effect { cleanupOrder = res :: cleanupOrder; () }.attempt.flatMap(_ => Eru.unit)
+    val outerRelease =
+      (res: String) => Eru.effect { cleanupOrder = res :: cleanupOrder; () }.attempt.flatMap(_ => Eru.unit)
 
     val innerAcquire = Eru.succeed("inner")
-    val innerRelease = (res: String) => Eru.effect { cleanupOrder = res :: cleanupOrder; () }.attempt.flatMap(_ => Eru.unit)
+    val innerRelease =
+      (res: String) => Eru.effect { cleanupOrder = res :: cleanupOrder; () }.attempt.flatMap(_ => Eru.unit)
 
     val boom = new RuntimeException("nested boom")
 
@@ -125,9 +127,15 @@ final class EruResourceDefectSpec extends munit.FunSuite {
     var resource3Released = false
 
     val chain = for {
-      r1 <- Eru.succeed("res1").autoCleanup(_ => Eru.effect { resource1Released = true; () }.attempt.flatMap(_ => Eru.unit))
-      r2 <- Eru.succeed("res2").autoCleanup(_ => Eru.effect { resource2Released = true; () }.attempt.flatMap(_ => Eru.unit))
-      r3 <- Eru.succeed("res3").autoCleanup(_ => Eru.effect { resource3Released = true; () }.attempt.flatMap(_ => Eru.unit))
+      r1 <- Eru
+        .succeed("res1")
+        .autoCleanup(_ => Eru.effect { resource1Released = true; () }.attempt.flatMap(_ => Eru.unit))
+      r2 <- Eru
+        .succeed("res2")
+        .autoCleanup(_ => Eru.effect { resource2Released = true; () }.attempt.flatMap(_ => Eru.unit))
+      r3 <- Eru
+        .succeed("res3")
+        .autoCleanup(_ => Eru.effect { resource3Released = true; () }.attempt.flatMap(_ => Eru.unit))
       _ <- Eru.effect[Unit](throw new RuntimeException("chain defect"))
     } yield (r1, r2, r3)
 
@@ -149,7 +157,8 @@ final class EruResourceDefectSpec extends munit.FunSuite {
     val originalError = "original failure"
     val recoveryDefect = new RuntimeException("recovery defect")
 
-    val prog = Eru.fail(originalError)
+    val prog = Eru
+      .fail(originalError)
       .ensure(Eru.effect { cleaned = true; () }.attempt.flatMap(_ => Eru.unit))
       .recoverWith { case _ => Eru.effect[Int](throw recoveryDefect) }
 

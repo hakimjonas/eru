@@ -123,7 +123,6 @@ class UnifiedFiberSpec extends munit.FunSuite {
     }
   }
 
-
   test("UnifiedFiber handles Exit.Failure correctly") {
     val id = FiberId.fresh()
     val error = "test error"
@@ -153,7 +152,6 @@ class UnifiedFiberSpec extends munit.FunSuite {
     val result = fiber.await.unsafeRunSync()
     assertEquals(result, exit)
   }
-
 
   test("UnifiedFiberState.Active stores coordination primitives correctly") {
     val latch = new CountDownLatch(1)

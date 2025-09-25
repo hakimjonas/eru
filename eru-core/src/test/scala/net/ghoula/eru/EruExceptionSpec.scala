@@ -26,7 +26,6 @@ class EruExceptionSpec extends munit.FunSuite {
     val _: EruException[Int] = exception
   }
 
-
   test("EruException can be thrown and caught") {
     val error = "thrown error"
 
