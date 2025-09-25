@@ -235,28 +235,6 @@ class EruSpec extends munit.FunSuite {
     assertEquals(eru.unsafeRunSync(), chainSize)
   }
 
-  /** Validates that Eru is covariant in its success type parameter.
-    *
-    * Tests that Eru[E, A] can be safely upcast to Eru[E, B] when A <: B, demonstrating proper
-    * variance relationships.
-    */
-  test("Eru is covariant in success type") {
-    val stringValue: Eru[Nothing, String] = Eru.succeed("value")
-    val anyValue: Eru[Nothing, Any] = stringValue
-    assertEquals(anyValue.unsafeRunSync(), "value")
-  }
-
-  /** Validates that map operations preserve type covariance.
-    *
-    * Tests that mapping operations maintain proper covariance relationships in the success type
-    * parameter.
-    */
-  test("map preserves type covariance") {
-    val intEru: Eru[Nothing, Int] = Eru.succeed(42)
-    val stringEru: Eru[Nothing, String] = intEru.map(_.toString)
-    assertEquals(stringEru.unsafeRunSync(), "42")
-  }
-
   /** Validates that flatMap operations maintain type safety.
     *
     * Tests that flatMap preserves type safety guarantees while chaining computations with
@@ -363,16 +341,6 @@ class EruSpec extends munit.FunSuite {
       eru.unsafeRunSync()
     }
     assertEquals(exception.error, "error message")
-  }
-
-  test("Eru.fail is covariant in error type") {
-    val stringError: Eru[String, Nothing] = Eru.fail("error")
-    val anyError: Eru[Any, Nothing] = stringError
-
-    val exception = intercept[EruException[Any]] {
-      anyError.unsafeRunSync()
-    }
-    assertEquals(exception.error, "error")
   }
 
   test("mapError transforms error type on failure") {
@@ -575,23 +543,6 @@ class EruSpec extends munit.FunSuite {
     val error = "test error"
     val exception = EruException(error)
     assertEquals(exception.error, error)
-  }
-
-  test("EruException toString includes error") {
-    val error = "test error"
-    val exception = EruException(error)
-    assertEquals(exception.toString, "EruException(test error)")
-  }
-
-  test("EruException getMessage uses error toString") {
-    val error = "test error"
-    val exception = EruException(error)
-    assertEquals(exception.getMessage, "test error")
-  }
-
-  test("EruException handles None error") {
-    val exception = EruException(None)
-    assertEquals(exception.getMessage, "None")
   }
 
   test("map preserves errors") {

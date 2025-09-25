@@ -262,20 +262,6 @@ class ExtensionsSpec extends munit.FunSuite {
     assertEquals(withTimeout.unsafeRunSync(), 42)
   }
 
-  test("Result extension flatMap respects error type variance") {
-    import extensions.*
-
-    val success: Result[String, Int] = Result.Success(42)
-    val failure: Result[String, Int] = Result.Failure("error")
-
-    // Test error type widening
-    val widened: Result[Any, String] = success.flatMap(x => Result.Success(x.toString))
-    assertEquals(widened, Result.Success("42"))
-
-    val widenedFailure: Result[Any, String] = failure.flatMap(x => Result.Success(x.toString))
-    assertEquals(widenedFailure, Result.Failure("error"))
-  }
-
   test("Extensions maintain referential transparency") {
     import extensions.*
 

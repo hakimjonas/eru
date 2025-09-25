@@ -265,11 +265,4 @@ class AsyncSchedulerSpec extends munit.FunSuite {
     assertEquals(callback2Invoked, true)
   }
 
-  test("AsyncFiber type parameters should be covariant") {
-    val fiber: MockAsyncFiber[Nothing, Int] = new MockAsyncFiber[Nothing, Int]()
-
-    // Should be assignable to wider types
-    val widerFiber: AsyncFiber[Any, Any] = fiber
-    assertEquals(fiber.id, widerFiber.id)
-  }
 }

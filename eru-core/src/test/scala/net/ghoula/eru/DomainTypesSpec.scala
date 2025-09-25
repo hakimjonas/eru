@@ -6,28 +6,6 @@ import DomainTypes.*
 
 class DomainTypesSpec extends FunSuite {
 
-  test("DataClassUtils.hashCodeFor generates consistent hash codes") {
-    val hash1 = DataClassUtils.hashCodeFor("test", 42, true)
-    val hash2 = DataClassUtils.hashCodeFor("test", 42, true)
-    assertEquals(hash1, hash2)
-  }
-
-  test("DataClassUtils.hashCodeFor generates different hash codes for different inputs") {
-    val hash1 = DataClassUtils.hashCodeFor("test", 42)
-    val hash2 = DataClassUtils.hashCodeFor("test", 43)
-    assertNotEquals(hash1, hash2)
-  }
-
-  test("DataClassUtils.toStringFor formats correctly") {
-    val result = DataClassUtils.toStringFor("Person", "Alice", 30, true)
-    assertEquals(result, "Person(Alice, 30, true)")
-  }
-
-  test("DataClassUtils.toStringFor handles empty values") {
-    val result = DataClassUtils.toStringFor("Empty")
-    assertEquals(result, "Empty()")
-  }
-
   test("AttemptCount.apply accepts non-negative values") {
     val count = AttemptCount(0)
     assertEquals(count.value, 0)

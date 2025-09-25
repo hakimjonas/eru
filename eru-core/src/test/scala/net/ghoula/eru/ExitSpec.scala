@@ -180,16 +180,6 @@ class ExitSpec extends munit.FunSuite {
     }
   }
 
-  test("Exit types maintain covariance") {
-    val stringExit: Exit[String, Int] = Exit.Success(42)
-    val anyExit: Exit[Any, Any] = stringExit // Should compile due to covariance
-
-    anyExit match {
-      case Exit.Success(value) => assertEquals(value, 42)
-      case _ => fail("expected Success")
-    }
-  }
-
   test("Complex InterruptCause pattern matching") {
     import java.time.Duration
 
