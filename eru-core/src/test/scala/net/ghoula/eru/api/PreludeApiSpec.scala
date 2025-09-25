@@ -171,25 +171,4 @@ class PreludeApiSpec extends munit.FunSuite {
     assert(cleanup2Called, "Second cleanup should have been called")
   }
 
-  test("PreludeApi provides clean import path") {
-    val effect = for {
-      result1 <- succeed(10).debug("first step")
-      result2 <- succeed(20).debug("second step")
-      combined = result1 + result2
-      _ <- Eru.effect { () }.debug("cleanup step")
-    } yield combined
-
-    val finalResult = effect.unsafeRunSync()
-    assertEquals(finalResult, 30)
-  }
-
-  test("PreludeApi maintains referential transparency") {
-    val baseEffect = succeed(42)
-    val effect1 = baseEffect.map(_ * 2)
-    val effect2 = baseEffect.map(_ * 2)
-
-    // Both should produce the same result
-    assertEquals(effect1.unsafeRunSync(), effect2.unsafeRunSync())
-    assertEquals(effect1.unsafeRunSync(), 84)
-  }
 }

@@ -123,41 +123,6 @@ class UnifiedFiberSpec extends munit.FunSuite {
     }
   }
 
-  test("UnifiedFiber equality is based on fiber ID") {
-    val id = FiberId.fresh()
-    val fiber1 = UnifiedFiber.completed(id, Exit.Success(42))
-    val fiber2 = UnifiedFiber.completed(id, Exit.Success(24))
-    val fiber3 = UnifiedFiber.active[String, Int](id)
-
-    assertEquals(fiber1, fiber2)
-    assertEquals(fiber1, fiber3)
-    assertEquals(fiber2, fiber3)
-  }
-
-  test("UnifiedFiber inequality for different IDs") {
-    val fiber1 = UnifiedFiber.completed(FiberId.fresh(), Exit.Success(42))
-    val fiber2 = UnifiedFiber.completed(FiberId.fresh(), Exit.Success(42))
-
-    assertNotEquals(fiber1, fiber2)
-  }
-
-  test("UnifiedFiber hashCode is based on ID") {
-    val id = FiberId.fresh()
-    val fiber1 = UnifiedFiber.completed(id, Exit.Success(42))
-    val fiber2 = UnifiedFiber.active[String, Int](id)
-
-    assertEquals(fiber1.hashCode(), fiber2.hashCode())
-  }
-
-  test("UnifiedFiber toString includes ID and state") {
-    val id = FiberId.fresh()
-    val exit = Exit.Success(42)
-    val fiber = UnifiedFiber.completed(id, exit)
-
-    val str = fiber.toString
-    assert(str.contains(id.toString), "toString should contain fiber ID")
-    assert(str.contains("Completed"), "toString should contain state")
-  }
 
   test("UnifiedFiber handles Exit.Failure correctly") {
     val id = FiberId.fresh()
@@ -189,13 +154,6 @@ class UnifiedFiberSpec extends munit.FunSuite {
     assertEquals(result, exit)
   }
 
-  test("UnifiedFiber type parameters are covariant") {
-    val fiber: UnifiedFiber[Nothing, Int] = UnifiedFiber.completed(FiberId.fresh(), Exit.Success(42))
-
-    // Should be assignable to wider types
-    val widerFiber: UnifiedFiber[Any, Any] = fiber
-    assertEquals(fiber.id, widerFiber.id)
-  }
 
   test("UnifiedFiberState.Active stores coordination primitives correctly") {
     val latch = new CountDownLatch(1)

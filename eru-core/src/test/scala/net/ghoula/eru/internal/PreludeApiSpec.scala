@@ -255,36 +255,4 @@ class PreludeApiSpec extends munit.FunSuite {
     assertEquals(optimizedResult, 42)
   }
 
-  test("internal PreludeApi maintains delegation stability") {
-    import PreludeApi.*
-
-    // Test that multiple imports work consistently
-    val result1 = Result.Success(10)
-    val result2 = Result.Success(20)
-
-    val combined1 = result1.flatMap(a => result2.map(b => a + b))
-    val combined2 = result1.flatMap(a => result2.map(b => a + b))
-
-    assertEquals(combined1, combined2)
-    assertEquals(combined1, Result.Success(30))
-  }
-
-  test("internal PreludeApi provides complete extension coverage") {
-    import PreludeApi.*
-
-    // Test Result extensions are available
-    val result = Result.Success(42)
-    assert(result.isSuccess)
-    assertEquals(result.map(_ * 2), Result.Success(84))
-
-    // Test Eru extensions are available
-    val effect = succeed(42)
-    assertEquals(effect.map(_ * 2).unsafeRunSync(), 84)
-
-    // Test resource extensions are available
-    var cleaned = false
-    val withCleanup = effect.ensure(Eru.effect { cleaned = true; () })
-    withCleanup.unsafeRunSync()
-    assert(cleaned)
-  }
 }

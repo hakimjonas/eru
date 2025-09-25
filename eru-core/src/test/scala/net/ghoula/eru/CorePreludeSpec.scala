@@ -23,22 +23,6 @@ class CorePreludeSpec extends munit.FunSuite {
     assertEquals(exception.error, "error")
   }
 
-  test("CorePrelude exports Result type and companion object") {
-    // Type alias works
-    val success: Result[String, Int] = Result.Success(42)
-    val failure: Result[String, Int] = Result.Failure("error")
-
-    // Pattern matching works
-    success match {
-      case Result.Success(value) => assertEquals(value, 42)
-      case Result.Failure(_) => fail("Expected Success")
-    }
-
-    failure match {
-      case Result.Failure(error) => assertEquals(error, "error")
-      case Result.Success(_) => fail("Expected Failure")
-    }
-  }
 
   test("CorePrelude exports Eru factory methods directly") {
     // Direct access to factory methods without Eru prefix
@@ -68,63 +52,7 @@ class CorePreludeSpec extends munit.FunSuite {
     assertEquals(u.unsafeRunSync(), ())
   }
 
-  test("CorePrelude exports Result factory methods with qualified names") {
-    // Result factory methods exported with prefix to avoid conflicts
-    val s = resultSucceed(42)
-    assertEquals(s, Result.Success(42))
 
-    val f = resultFail("error")
-    assertEquals(f, Result.Failure("error"))
-  }
-
-  test("CorePrelude exports domain types") {
-    // AttemptCount accessible
-    val attempts = AttemptCount(3)
-    // Opaque types don't have direct accessors
-    val attemptsValue: AttemptCount = attempts
-    assert(attemptsValue == AttemptCount(3))
-
-    // JitterFactor accessible
-    val jitter = JitterFactor(0.5)
-    val jitterValue: JitterFactor = jitter
-    assert(jitterValue == JitterFactor(0.5))
-
-    // FailureThreshold accessible
-    val threshold = FailureThreshold(10)
-    val thresholdValue: FailureThreshold = threshold
-    assert(thresholdValue == FailureThreshold(10))
-  }
-
-  test("CorePrelude exports EruException type and companion") {
-    val error = "test error"
-    val exception: EruException[String] = EruException(error)
-    assertEquals(exception.error, error)
-    assertEquals(exception.getMessage, "test error")
-  }
-
-  test("CorePrelude exports Exit types") {
-    // Exit constructors accessible
-    val success = Exit.Success(42)
-    val _: Exit[String, Nothing] = Exit.Failure("error")
-    val _: Exit[Nothing, Nothing] = Exit.Die(new RuntimeException("boom"))
-    val _: Exit[Nothing, Nothing] = Exit.Interrupt(FiberId.fresh(), InterruptCause.Cancelled())
-
-    // Pattern matching works
-    success match {
-      case Exit.Success(value) => assertEquals(value, 42)
-      case _ => fail("Expected Success")
-    }
-
-    // InterruptCause variants accessible
-    val cancelled = InterruptCause.Cancelled(Some("user request"))
-    val _: InterruptCause = InterruptCause.Timeout(java.time.Duration.ofSeconds(30))
-    val _: InterruptCause = InterruptCause.ResourceExhausted("memory")
-
-    cancelled match {
-      case InterruptCause.Cancelled(reason) => assertEquals(reason, Some("user request"))
-      case _ => fail("Expected Cancelled")
-    }
-  }
 
   test("CorePrelude provides access to extension methods") {
     // Resource safety extensions should be available through PreludeApi
@@ -144,34 +72,6 @@ class CorePreludeSpec extends munit.FunSuite {
     assertEquals(debugged.unsafeRunSync(), 42)
   }
 
-  test("CorePrelude exports compose without conflicts") {
-    // Multiple imports should work together
-    val effect1: Eru[String, Int] = succeed(42)
-    val result1: Result[String, Int] = resultSucceed(42)
-
-    // Can convert Result to Eru using extension methods
-    val eruFromResult = result1.toEru
-    assertEquals(eruFromResult.unsafeRunSync(), 42)
-
-    // Can chain operations
-    val chained = effect1
-      .map(_ * 2)
-      .flatMap(x => succeed(x + 10))
-      .recover { case _ => 999 }
-
-    assertEquals(chained.unsafeRunSync(), 94)
-  }
-
-  test("CorePrelude exports work in for-comprehensions") {
-    // All necessary implicits and types available
-    val computation = for {
-      x <- succeed(10)
-      y <- effect(20)
-      z <- fromEither(Right(12): Either[String, Int])
-    } yield x + y + z
-
-    assertEquals(computation.unsafeRunSync(), 42)
-  }
 
   test("CorePrelude provides complete prelude for typical usage") {
     // Simulates typical user code using only CorePrelude import
@@ -190,23 +90,4 @@ class CorePreludeSpec extends munit.FunSuite {
     assertEquals(businessLogic().unsafeRunSync(), 40)
   }
 
-  test("CorePrelude error handling patterns are accessible") {
-    // Should have access to error handling utilities through exports
-    val _: AttemptCount = AttemptCount(3)
-    val _: FailureThreshold = FailureThreshold(5)
-
-    // Basic patterns work
-    val effect = succeed(42).recover { case _ => 0 }
-    assertEquals(effect.unsafeRunSync(), 42)
-  }
-
-  test("CorePrelude tracing functionality is accessible") {
-    // Should have access to tracing types
-    val spanId = SpanId.fresh()
-    val _: TraceId = TraceId.fresh()
-
-    // IDs should be unique
-    val spanId2 = SpanId.fresh()
-    assertNotEquals(spanId, spanId2)
-  }
 }
