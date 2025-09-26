@@ -75,7 +75,9 @@ object Hub {
     */
   def bounded[A](capacity: Int)(using runtime: EruRuntime): Eru[Nothing, Hub[A]] = {
     require(capacity > 0, "Hub capacity must be positive")
-    Eru.succeed(new BoundedHub[A](capacity, runtime))
+    for {
+      stateRef <- Ref.make(HubState[A](Map.empty, 0L))
+    } yield new BoundedHub[A](capacity, stateRef, runtime)
   }
 
   /** Creates an unbounded hub.
@@ -88,23 +90,22 @@ object Hub {
     *   an effect that yields a new unbounded hub
     */
   def unbounded[A](using runtime: EruRuntime): Eru[Nothing, Hub[A]] =
-    Eru.succeed(new UnboundedHub[A](runtime))
+    for {
+      stateRef <- Ref.make(HubState[A](Map.empty, 0L))
+    } yield new UnboundedHub[A](stateRef, runtime)
+
+  // Shared state representation for both hub types
+  private case class HubState[A](subscribers: Map[Long, Queue[A]], nextId: Long)
 
   // Implementation for bounded hubs using pure FP patterns
-  private final class BoundedHub[A](queueCapacity: Int, runtime: EruRuntime) extends Hub[A] {
-    import java.util.concurrent.atomic.AtomicReference
-    import scala.annotation.tailrec
-
-    // Immutable state representation
-    private case class HubState(subscribers: Map[Long, Queue[A]], nextId: Long)
-
-    private val state = new AtomicReference(HubState(Map.empty, 0L))
+  private final class BoundedHub[A](queueCapacity: Int, stateRef: Ref[HubState[A]], runtime: EruRuntime)
+      extends Hub[A] {
 
     def publish(message: A): Eru[Nothing, Unit] =
       getCurrentSubscribers.flatMap { queues =>
         queues.headOption.fold(Eru.unit) { _ =>
           // Publish to all subscribers, treating individual failures gracefully
-          Eru.collectAllDiscard(queues.map(_.offer(message).attempt))
+          Eru.collectAllDiscard(queues.map(_.put(message).attempt))
         }
       }
 
@@ -115,44 +116,31 @@ object Hub {
       } yield queue
 
     def subscriberCount: Eru[Nothing, Int] =
-      Eru.succeed(state.get().subscribers.size)
+      stateRef.get.map(_.subscribers.size)
 
     def capacity: Eru[Nothing, Int] =
       Eru.succeed(queueCapacity)
 
     private def getCurrentSubscribers: Eru[Nothing, List[Queue[A]]] =
-      Eru.succeed(state.get().subscribers.values.toList)
+      stateRef.get.map(_.subscribers.values.toList)
 
-    private def addSubscriber(queue: Queue[A]): Eru[Nothing, Unit] = {
-      @tailrec
-      def tryAdd(): Unit = {
-        val current = state.get()
-        val newState = current.copy(
-          subscribers = current.subscribers + (current.nextId -> queue),
-          nextId = current.nextId + 1
+    private def addSubscriber(queue: Queue[A]): Eru[Nothing, Unit] =
+      stateRef.update { state =>
+        state.copy(
+          subscribers = state.subscribers + (state.nextId -> queue),
+          nextId = state.nextId + 1
         )
-        if (!state.compareAndSet(current, newState)) tryAdd()
-      }
-
-      Eru.succeed(tryAdd())
-    }
+      }.map(_ => ())
   }
 
   // Implementation for unbounded hubs using pure FP patterns
-  private final class UnboundedHub[A](runtime: EruRuntime) extends Hub[A] {
-    import java.util.concurrent.atomic.AtomicReference
-    import scala.annotation.tailrec
-
-    // Immutable state representation
-    private case class HubState(subscribers: Map[Long, Queue[A]], nextId: Long)
-
-    private val state = new AtomicReference(HubState(Map.empty, 0L))
+  private final class UnboundedHub[A](stateRef: Ref[HubState[A]], runtime: EruRuntime) extends Hub[A] {
 
     def publish(message: A): Eru[Nothing, Unit] =
       getCurrentSubscribers.flatMap { queues =>
         queues.headOption.fold(Eru.unit) { _ =>
           // Publish to all subscribers, treating individual failures gracefully
-          Eru.collectAllDiscard(queues.map(_.offer(message).attempt))
+          Eru.collectAllDiscard(queues.map(_.put(message).attempt))
         }
       }
 
@@ -163,26 +151,20 @@ object Hub {
       } yield queue
 
     def subscriberCount: Eru[Nothing, Int] =
-      Eru.succeed(state.get().subscribers.size)
+      stateRef.get.map(_.subscribers.size)
 
     def capacity: Eru[Nothing, Int] =
       Eru.succeed(Int.MaxValue)
 
     private def getCurrentSubscribers: Eru[Nothing, List[Queue[A]]] =
-      Eru.succeed(state.get().subscribers.values.toList)
+      stateRef.get.map(_.subscribers.values.toList)
 
-    private def addSubscriber(queue: Queue[A]): Eru[Nothing, Unit] = {
-      @tailrec
-      def tryAdd(): Unit = {
-        val current = state.get()
-        val newState = current.copy(
-          subscribers = current.subscribers + (current.nextId -> queue),
-          nextId = current.nextId + 1
+    private def addSubscriber(queue: Queue[A]): Eru[Nothing, Unit] =
+      stateRef.update { state =>
+        state.copy(
+          subscribers = state.subscribers + (state.nextId -> queue),
+          nextId = state.nextId + 1
         )
-        if (!state.compareAndSet(current, newState)) tryAdd()
-      }
-
-      Eru.succeed(tryAdd())
-    }
+      }.map(_ => ())
   }
 }

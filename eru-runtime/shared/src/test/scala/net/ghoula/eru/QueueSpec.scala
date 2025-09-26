@@ -32,14 +32,14 @@ class QueueSpec extends EruTestSuite {
     }
   }
 
-  test("bounded queue offer and take basic operations") {
+  test("bounded queue put and take basic operations") {
     val queue = Eru.queue[String](2).unsafeRunSync()
 
-    queue.offer("first").unsafeRunSync()
+    queue.put("first").unsafeRunSync()
     assertEquals(queue.size.unsafeRunSync(), 1)
     assertEquals(queue.remainingCapacity.unsafeRunSync(), 1)
 
-    queue.offer("second").unsafeRunSync()
+    queue.put("second").unsafeRunSync()
     assertEquals(queue.size.unsafeRunSync(), 2)
     assertEquals(queue.remainingCapacity.unsafeRunSync(), 0)
 
@@ -55,7 +55,7 @@ class QueueSpec extends EruTestSuite {
 
   test("bounded queue poll returns Some when elements available") {
     val queue = Eru.queue[Int](2).unsafeRunSync()
-    queue.offer(42).unsafeRunSync()
+    queue.put(42).unsafeRunSync()
 
     val result = queue.poll.unsafeRunSync()
     assertEquals(result, Some(42))
@@ -72,7 +72,7 @@ class QueueSpec extends EruTestSuite {
     val queue = Eru.queue[Int](5).unsafeRunSync()
     val items = List(1, 2, 3, 4, 5)
 
-    items.foreach(i => queue.offer(i).unsafeRunSync())
+    items.foreach(i => queue.put(i).unsafeRunSync())
 
     val results = (1 to 5).map(_ => queue.take.unsafeRunSync()).toList
     assertEquals(results, items)
@@ -81,8 +81,8 @@ class QueueSpec extends EruTestSuite {
   test("bounded queue sequential operations") {
     val queue = Eru.queue[Int](5).unsafeRunSync()
 
-    // Sequential offer and take (Native-compatible)
-    Eru.foreach(1 to 5)(queue.offer).unsafeRunSync()
+    // Sequential put and take (Native-compatible)
+    Eru.foreach(1 to 5)(queue.put).unsafeRunSync()
     val results = Eru.collectAll((1 to 5).map(_ => queue.take)).unsafeRunSync()
     assertEquals(results, List(1, 2, 3, 4, 5))
   }
@@ -101,7 +101,7 @@ class QueueSpec extends EruTestSuite {
   test("unbounded queue offer and take basic operations") {
     val queue = Eru.unboundedQueue[String].unsafeRunSync()
 
-    queue.offer("test").unsafeRunSync()
+    queue.put("test").unsafeRunSync()
     assertEquals(queue.size.unsafeRunSync(), 1)
     assertEquals(queue.isEmpty.unsafeRunSync(), false)
 
@@ -114,7 +114,7 @@ class QueueSpec extends EruTestSuite {
     val queue = Eru.unboundedQueue[Int].unsafeRunSync()
     val items = 1 to 1000
 
-    items.foreach(i => queue.offer(i).unsafeRunSync())
+    items.foreach(i => queue.put(i).unsafeRunSync())
     assertEquals(queue.size.unsafeRunSync(), 1000)
 
     val results = (1 to 1000).map(_ => queue.take.unsafeRunSync()).toList
@@ -125,7 +125,7 @@ class QueueSpec extends EruTestSuite {
     val queue = Eru.unboundedQueue[Int].unsafeRunSync()
 
     // Sequential operations (Native-compatible)
-    Eru.foreach(1 to 100)(queue.offer).unsafeRunSync()
+    Eru.foreach(1 to 100)(queue.put).unsafeRunSync()
     val results = Eru.collectAll((1 to 100).map(_ => queue.take)).unsafeRunSync()
     assertEquals(results, (1 to 100).toList)
   }
@@ -143,7 +143,7 @@ class QueueSpec extends EruTestSuite {
     assertEquals(unbounded.poll.unsafeRunSync(), None)
 
     // After offering and taking, should be empty again
-    bounded.offer(42).unsafeRunSync()
+    bounded.put(42).unsafeRunSync()
     bounded.take.unsafeRunSync()
     assertEquals(bounded.poll.unsafeRunSync(), None)
   }
@@ -156,8 +156,8 @@ class QueueSpec extends EruTestSuite {
     val bounded = Eru.queue[String](5).unsafeRunSync()
     val unbounded = Eru.unboundedQueue[String].unsafeRunSync()
 
-    bounded.offer("bounded").unsafeRunSync()
-    unbounded.offer("unbounded").unsafeRunSync()
+    bounded.put("bounded").unsafeRunSync()
+    unbounded.put("unbounded").unsafeRunSync()
 
     assertEquals(bounded.take.unsafeRunSync(), "bounded")
     assertEquals(unbounded.take.unsafeRunSync(), "unbounded")
@@ -167,10 +167,11 @@ class QueueSpec extends EruTestSuite {
     val queue = Eru.queue[String](3).unsafeRunSync()
 
     val program = for {
-      _ <- queue.offer("first")
-      _ <- queue.offer("second")
+      _ <- queue.put("first")
+      _ <- queue.put("second")
       size <- queue.size
-      _ <- Eru.when(size > 0)(queue.offer("third"))
+      // Use tryPut for conditional operation (non-suspending)
+      _ <- Eru.when(size > 0)(queue.tryPut("third").map(_ => ()))
       results <- Eru.collectAll(List(queue.take, queue.take, queue.take))
     } yield results
 
@@ -187,7 +188,7 @@ class QueueSpec extends EruTestSuite {
     val queue = Eru.queue[Int](capacity).unsafeRunSync()
 
     (1 to capacity).foreach { i =>
-      queue.offer(i).unsafeRunSync()
+      queue.put(i).unsafeRunSync()
       assertEquals(queue.size.unsafeRunSync(), i)
       assertEquals(queue.remainingCapacity.unsafeRunSync(), capacity - i)
     }
@@ -202,12 +203,12 @@ class QueueSpec extends EruTestSuite {
   test("queue handles mixed offer/take/poll operations") {
     val queue = Eru.queue[String](4).unsafeRunSync()
 
-    queue.offer("a").unsafeRunSync()
+    queue.put("a").unsafeRunSync()
     assertEquals(queue.poll.unsafeRunSync(), Some("a"))
     assertEquals(queue.size.unsafeRunSync(), 0)
 
-    queue.offer("b").unsafeRunSync()
-    queue.offer("c").unsafeRunSync()
+    queue.put("b").unsafeRunSync()
+    queue.put("c").unsafeRunSync()
     assertEquals(queue.size.unsafeRunSync(), 2)
 
     assertEquals(queue.take.unsafeRunSync(), "b")
@@ -220,7 +221,7 @@ class QueueSpec extends EruTestSuite {
     val queue = Eru.queue[Int](10).unsafeRunSync()
 
     (1 to 50).foreach { _ =>
-      (1 to 8).foreach(queue.offer(_).unsafeRunSync())
+      (1 to 8).foreach(queue.put(_).unsafeRunSync())
       assertEquals(queue.size.unsafeRunSync(), 8)
 
       (1 to 5).foreach(_ => queue.poll.unsafeRunSync())
@@ -235,7 +236,7 @@ class QueueSpec extends EruTestSuite {
   test("unbounded queue handles large volume operations") {
     val queue = Eru.unboundedQueue[Int].unsafeRunSync()
 
-    (1 to 10000).foreach(queue.offer(_).unsafeRunSync())
+    (1 to 10000).foreach(queue.put(_).unsafeRunSync())
     assertEquals(queue.size.unsafeRunSync(), 10000)
 
     (1 to 7000).foreach(_ => queue.poll.unsafeRunSync())
@@ -256,7 +257,7 @@ class QueueSpec extends EruTestSuite {
       Message(3, "test")
     )
 
-    messages.foreach(queue.offer(_).unsafeRunSync())
+    messages.foreach(queue.put(_).unsafeRunSync())
     val retrieved = messages.map(_ => queue.take.unsafeRunSync())
     assertEquals(retrieved, messages)
   }
@@ -264,8 +265,8 @@ class QueueSpec extends EruTestSuite {
   test("queue operations with Option types") {
     val queue = Eru.queue[Option[String]](2).unsafeRunSync()
 
-    queue.offer(Some("value")).unsafeRunSync()
-    queue.offer(None).unsafeRunSync()
+    queue.put(Some("value")).unsafeRunSync()
+    queue.put(None).unsafeRunSync()
 
     assertEquals(queue.take.unsafeRunSync(), Some("value"))
     assertEquals(queue.take.unsafeRunSync(), None)
@@ -276,8 +277,8 @@ class QueueSpec extends EruTestSuite {
     val unbounded = Eru.unboundedQueue[Int].unsafeRunSync()
 
     (1 to 5).foreach { i =>
-      bounded.offer(i).unsafeRunSync()
-      unbounded.offer(i).unsafeRunSync()
+      bounded.put(i).unsafeRunSync()
+      unbounded.put(i).unsafeRunSync()
     }
 
     val boundedResults = (1 to 5).map(_ => bounded.take.unsafeRunSync()).toList
@@ -295,13 +296,13 @@ class QueueSpec extends EruTestSuite {
 
     assert(queue.isEmpty.unsafeRunSync())
 
-    queue.offer("item").unsafeRunSync()
+    queue.put("item").unsafeRunSync()
     assert(!queue.isEmpty.unsafeRunSync())
 
     assertEquals(queue.poll.unsafeRunSync(), Some("item"))
     assert(queue.isEmpty.unsafeRunSync())
 
-    queue.offer("another").unsafeRunSync()
+    queue.put("another").unsafeRunSync()
     assertEquals(queue.poll.unsafeRunSync(), Some("another"))
     assert(queue.isEmpty.unsafeRunSync())
   }
@@ -309,16 +310,16 @@ class QueueSpec extends EruTestSuite {
   test("queue size tracking with mixed operations") {
     val queue = Eru.queue[Int](5).unsafeRunSync()
 
-    queue.offer(1).unsafeRunSync()
+    queue.put(1).unsafeRunSync()
     assertEquals(queue.size.unsafeRunSync(), 1)
 
-    queue.offer(2).unsafeRunSync()
+    queue.put(2).unsafeRunSync()
     assertEquals(queue.size.unsafeRunSync(), 2)
 
     assertEquals(queue.poll.unsafeRunSync(), Some(1))
     assertEquals(queue.size.unsafeRunSync(), 1)
 
-    queue.offer(3).unsafeRunSync()
+    queue.put(3).unsafeRunSync()
     assertEquals(queue.size.unsafeRunSync(), 2)
 
     assertEquals(queue.poll.unsafeRunSync(), Some(2))
@@ -333,7 +334,7 @@ class QueueSpec extends EruTestSuite {
     assertEquals(queue.remainingCapacity.unsafeRunSync(), largeCapacity)
 
     // Fill partially
-    (1 to 100).foreach(queue.offer(_).unsafeRunSync())
+    (1 to 100).foreach(queue.put(_).unsafeRunSync())
     assertEquals(queue.size.unsafeRunSync(), 100)
     assertEquals(queue.remainingCapacity.unsafeRunSync(), largeCapacity - 100)
   }
@@ -343,15 +344,15 @@ class QueueSpec extends EruTestSuite {
     val numItems = 500L
 
     // Add many items
-    (1L to numItems).foreach(queue.offer(_).unsafeRunSync())
+    (1L to numItems).foreach(queue.put(_).unsafeRunSync())
     assertEquals(queue.size.unsafeRunSync(), numItems.toInt)
 
     // Remove half
     (1L to numItems / 2).foreach(_ => queue.take.unsafeRunSync())
     assertEquals(queue.size.unsafeRunSync(), (numItems / 2).toInt)
 
-    // Capacity should remain max
-    assertEquals(queue.remainingCapacity.unsafeRunSync(), Int.MaxValue)
+    // Remaining capacity should be MaxValue minus current size
+    assertEquals(queue.remainingCapacity.unsafeRunSync(), Int.MaxValue - (numItems / 2).toInt)
   }
 
   test("queue memory and resource efficiency") {
@@ -359,7 +360,7 @@ class QueueSpec extends EruTestSuite {
 
     // Perform many cycles to test resource cleanup
     (1 to 20).foreach { cycle =>
-      (1 to 10).foreach(i => queue.offer(s"cycle-$cycle-item-$i").unsafeRunSync())
+      (1 to 10).foreach(i => queue.put(s"cycle-$cycle-item-$i").unsafeRunSync())
       (1 to 10).foreach(_ => queue.take.unsafeRunSync())
       assert(queue.isEmpty.unsafeRunSync(), s"Queue should be empty after cycle $cycle")
     }
@@ -373,15 +374,15 @@ class QueueSpec extends EruTestSuite {
     val queue = Eru.queue[String](2).unsafeRunSync()
 
     // Normal operations should continue to work
-    queue.offer("first").unsafeRunSync()
-    queue.offer("second").unsafeRunSync()
+    queue.put("first").unsafeRunSync()
+    queue.put("second").unsafeRunSync()
 
     assertEquals(queue.take.unsafeRunSync(), "first")
     assertEquals(queue.poll.unsafeRunSync(), Some("second"))
     assertEquals(queue.poll.unsafeRunSync(), None)
 
     // Queue should still be functional
-    queue.offer("recovery").unsafeRunSync()
+    queue.put("recovery").unsafeRunSync()
     assertEquals(queue.take.unsafeRunSync(), "recovery")
   }
 
@@ -390,12 +391,12 @@ class QueueSpec extends EruTestSuite {
     val queue2 = Eru.queue[String](2).unsafeRunSync()
 
     val workflow = for {
-      _ <- queue1.offer(42)
-      _ <- queue2.offer("hello")
+      _ <- queue1.put(42)
+      _ <- queue2.put("hello")
       num <- queue1.take
       str <- queue2.take
-      _ <- queue1.offer(num * 2)
-      _ <- queue2.offer(str.toUpperCase)
+      _ <- queue1.put(num * 2)
+      _ <- queue2.put(str.toUpperCase)
       result1 <- queue1.take
       result2 <- queue2.take
     } yield (result1, result2)
@@ -408,14 +409,14 @@ class QueueSpec extends EruTestSuite {
   test("queue boundary conditions") {
     // Minimum capacity
     val minQueue = Eru.queue[Int](1).unsafeRunSync()
-    minQueue.offer(123).unsafeRunSync()
+    minQueue.put(123).unsafeRunSync()
     assertEquals(minQueue.remainingCapacity.unsafeRunSync(), 0)
     assertEquals(minQueue.take.unsafeRunSync(), 123)
 
     // Edge case values
     val edgeQueue = Eru.queue[Option[Int]](3).unsafeRunSync()
     val values = List(Some(0), None, Some(Int.MaxValue))
-    values.foreach(edgeQueue.offer(_).unsafeRunSync())
+    values.foreach(edgeQueue.put(_).unsafeRunSync())
 
     val results = values.map(_ => edgeQueue.take.unsafeRunSync())
     assertEquals(results, values)

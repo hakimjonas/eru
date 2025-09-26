@@ -21,7 +21,7 @@ class QueueAsyncSpec extends EruTestSuite {
     val result = runtime
       .zipPar(
         queue.take, // This will suspend
-        queue.offer("value") // This will unblock the take
+        queue.put("value") // This will unblock the take
       )
       .unsafeRunSync()
 
@@ -35,7 +35,7 @@ class QueueAsyncSpec extends EruTestSuite {
     val result = runtime
       .zipPar(
         queue.take, // This will suspend
-        queue.offer("value") // This will unblock the take
+        queue.put("value") // This will unblock the take
       )
       .unsafeRunSync()
 
@@ -46,7 +46,7 @@ class QueueAsyncSpec extends EruTestSuite {
     val queue = Eru.queue[Int](3).unsafeRunSync()
 
     // Sequential offers followed by sequential takes - no timing dependencies
-    val offerAll = Eru.foreachDiscard(List(1, 2, 3))(queue.offer)
+    val offerAll = Eru.foreachDiscard(List(1, 2, 3))(queue.put)
     val takeAll = Eru.collectAll(List.fill(3)(queue.take))
 
     val result = runtime.zipPar(offerAll, takeAll).unsafeRunSync()
@@ -58,13 +58,13 @@ class QueueAsyncSpec extends EruTestSuite {
     val queue = Eru.queue[Int](2).unsafeRunSync()
 
     // Fill queue to capacity
-    queue.offer(1).unsafeRunSync()
-    queue.offer(2).unsafeRunSync()
+    queue.put(1).unsafeRunSync()
+    queue.put(2).unsafeRunSync()
 
     // Use zipPar to coordinate blocked offer with take that unblocks it
     val result = runtime
       .zipPar(
-        queue.offer(3), // This will suspend since queue is full
+        queue.put(3), // This will suspend since queue is full
         queue.take // This will unblock the offer
       )
       .unsafeRunSync()
@@ -82,7 +82,7 @@ class QueueAsyncSpec extends EruTestSuite {
     // Simplified producer-consumer with deterministic coordination
     val items = List(1, 2, 3, 4, 5)
 
-    val producer = Eru.foreachDiscard(items)(queue.offer)
+    val producer = Eru.foreachDiscard(items)(queue.put)
     val consumer = Eru.collectAll(items.map(_ => queue.take))
 
     val result = runtime.zipPar(producer, consumer).unsafeRunSync()

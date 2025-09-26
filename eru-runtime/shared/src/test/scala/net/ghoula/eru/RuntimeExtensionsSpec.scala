@@ -291,9 +291,9 @@ class RuntimeExtensionsSpec extends EruTestSuite {
     val queueEffect = Eru.queue[String](3)
     val queue = queueEffect.unsafeRunSync()
 
-    // Offer elements
-    queue.offer("first").unsafeRunSync()
-    queue.offer("second").unsafeRunSync()
+    // Put elements
+    queue.put("first").unsafeRunSync()
+    queue.put("second").unsafeRunSync()
     val size = queue.size.unsafeRunSync()
     assertEquals(size, 2)
 
@@ -309,9 +309,9 @@ class RuntimeExtensionsSpec extends EruTestSuite {
     val queueEffect = Eru.unboundedQueue[Int]
     val queue = queueEffect.unsafeRunSync()
 
-    // Should be able to offer many elements
+    // Should be able to put many elements
     (1 to 100).foreach { i =>
-      queue.offer(i).unsafeRunSync()
+      queue.put(i).unsafeRunSync()
     }
 
     val size = queue.size.unsafeRunSync()

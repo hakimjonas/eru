@@ -19,7 +19,7 @@ class RuntimeHealthCheck extends EruTestSuite {
     val producers = (1 to 3).map { i =>
       (for {
         _ <- latch.countDown
-        _ <- queue.offer(s"msg-$i")
+        _ <- queue.put(s"msg-$i")
         _ <- barrier.await // This would hang if runtime was broken
       } yield s"producer-$i-done").fork.unsafeRunSync()
     }

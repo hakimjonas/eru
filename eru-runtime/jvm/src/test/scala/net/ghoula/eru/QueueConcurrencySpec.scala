@@ -21,7 +21,7 @@ class QueueConcurrencySpec extends EruTestSuite {
       _ <- producerReady.succeed(())
       _ <- consumerReady.await
       _ <- Eru.foreach(1 to itemCount) { i =>
-        queue.offer(s"item$i")
+        queue.put(s"item$i")
       }
     } yield "producer-done").fork.unsafeRunSync()
 
@@ -64,7 +64,7 @@ class QueueConcurrencySpec extends EruTestSuite {
         _ <- allReady.countDown
         _ <- allReady.await
         _ <- Eru.foreach(1 to itemsPerProducer) { i =>
-          queue.offer(s"P$producerId-I$i")
+          queue.put(s"P$producerId-I$i")
         }
       } yield s"producer$producerId-done").fork.unsafeRunSync()
     }
@@ -106,14 +106,14 @@ class QueueConcurrencySpec extends EruTestSuite {
     val takeReady = Eru.promise[Nothing, Unit].unsafeRunSync()
 
     // Fill queue to capacity
-    queue.offer(1).unsafeRunSync()
-    queue.offer(2).unsafeRunSync()
+    queue.put(1).unsafeRunSync()
+    queue.put(2).unsafeRunSync()
 
     // This offer should block
     val blockedOffer = (for {
       _ <- offerStarted.succeed(())
       _ <- takeReady.await
-      _ <- queue.offer(3) // Should block until take
+      _ <- queue.put(3) // Should block until take
     } yield "offer-completed").fork.unsafeRunSync()
 
     // Wait for offer to start
@@ -142,7 +142,7 @@ class QueueConcurrencySpec extends EruTestSuite {
 
     // Simple sequential test: first produce, then consume
     (for {
-      _ <- Eru.foreach(1 to itemCount)(queue.offer)
+      _ <- Eru.foreach(1 to itemCount)(queue.put)
     } yield ()).unsafeRunSync()
 
     val items = Eru.collectAll((1 to itemCount).map(_ => queue.take)).unsafeRunSync()

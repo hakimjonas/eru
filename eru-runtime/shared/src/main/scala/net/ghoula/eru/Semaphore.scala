@@ -54,47 +54,35 @@ object Semaphore {
 
   /** Creates a new semaphore initialized with `n` permits. */
   def make(n: Long): Eru[Nothing, Semaphore] =
-    Eru.succeed(new RuntimeSemaphore(if (n < 0) 0L else n))
+    for {
+      permitsRef <- Ref.make(if (n < 0) 0L else n)
+    } yield new RuntimeSemaphore(permitsRef)
 
-  private final class RuntimeSemaphore(init: Long) extends Semaphore {
-    private val permits = new java.util.concurrent.atomic.AtomicLong(init)
+  private final class RuntimeSemaphore(permitsRef: Ref[Long]) extends Semaphore {
 
-    def permitsAvailable: Eru[Nothing, Long] = Eru.succeed(permits.get())
+    def permitsAvailable: Eru[Nothing, Long] =
+      permitsRef.get
 
     def tryAcquire: Eru[Nothing, Boolean] =
-      Eru.succeed {
-        @annotation.tailrec
-        def loop(): Boolean = {
-          val current = permits.get()
-          if (current > 0) {
-            if (permits.compareAndSet(current, current - 1)) true
-            else loop()
-          } else false
-        }
-        loop()
+      permitsRef.modify { current =>
+        if (current > 0) (current - 1, true)
+        else (current, false)
       }
 
     def tryAcquireN(n: Long): Eru[Nothing, Boolean] =
       if (n <= 0) Eru.succeed(true)
       else
-        Eru.succeed {
-          @annotation.tailrec
-          def loop(): Boolean = {
-            val current = permits.get()
-            if (current >= n) {
-              if (permits.compareAndSet(current, current - n)) true
-              else loop()
-            } else false
-          }
-          loop()
+        permitsRef.modify { current =>
+          if (current >= n) (current - n, true)
+          else (current, false)
         }
 
     def release: Eru[Nothing, Unit] =
-      Eru.succeed { permits.getAndAdd(1); () }
+      permitsRef.update(_ + 1).map(_ => ())
 
     def releaseN(n: Long): Eru[Nothing, Unit] =
       if (n <= 0) Eru.unit
-      else Eru.effect { permits.getAndAdd(n); () }.attempt.map(_ => ())
+      else permitsRef.update(_ + n).map(_ => ())
 
     def withPermit[E, A](fa: => Eru[E, A]): Eru[E, Option[A]] =
       withPermits(1)(fa)

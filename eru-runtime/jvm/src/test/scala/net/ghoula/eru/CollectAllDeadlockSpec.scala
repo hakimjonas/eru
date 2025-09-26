@@ -15,8 +15,8 @@ class CollectAllDeadlockSpec extends EruTestSuite {
     val queue = Eru.queue[String](5).unsafeRunSync()
 
     // Pre-populate with fewer items than we'll try to take
-    queue.offer("item1").unsafeRunSync()
-    queue.offer("item2").unsafeRunSync()
+    queue.put("item1").unsafeRunSync()
+    queue.put("item2").unsafeRunSync()
 
     // This should timeout because collectAll executes sequentially
     // and the third take will block waiting for an item that never comes
@@ -50,7 +50,7 @@ class CollectAllDeadlockSpec extends EruTestSuite {
         _ <- allReady.countDown
         _ <- allReady.await
         _ <- Eru.foreach(1 to 5) { i =>
-          queue.offer(s"P$producerId-I$i")
+          queue.put(s"P$producerId-I$i")
         }
       } yield s"producer$producerId-done").fork.unsafeRunSync()
     }
@@ -90,7 +90,7 @@ class CollectAllDeadlockSpec extends EruTestSuite {
 
     // Pre-populate the queue with items
     (1 to itemCount).foreach { i =>
-      queue.offer(s"item-$i").unsafeRunSync()
+      queue.put(s"item-$i").unsafeRunSync()
     }
 
     // traverse should work fine (sequential execution)
@@ -115,9 +115,9 @@ class CollectAllDeadlockSpec extends EruTestSuite {
     val queue = Eru.queue[Int](5).unsafeRunSync()
 
     // Pre-populate with fewer items to make debugging easier
-    queue.offer(1).unsafeRunSync()
-    queue.offer(2).unsafeRunSync()
-    queue.offer(3).unsafeRunSync()
+    queue.put(1).unsafeRunSync()
+    queue.put(2).unsafeRunSync()
+    queue.put(3).unsafeRunSync()
 
     // This minimal case should also demonstrate the deadlock
     val takes = List(queue.take, queue.take, queue.take)

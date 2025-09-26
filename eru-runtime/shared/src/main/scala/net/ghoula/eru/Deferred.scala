@@ -6,6 +6,10 @@ import net.ghoula.eru.prelude.*
   *
   * A `Deferred[A]` starts empty and can be completed exactly once with a value of type `A`. Once
   * completed, all waiters are notified and subsequent await calls return immediately.
+  *
+  * This implementation is built entirely on Eru primitives (Ref), demonstrating pure functional
+  * concurrency without any Java concurrent utilities. Deferred is essentially a simplified Promise
+  * that only supports successful completion.
   */
 trait Deferred[A] {
 
@@ -28,6 +32,20 @@ trait Deferred[A] {
     *   an effect that yields the completed value
     */
   def await: Eru[Nothing, A]
+
+  /** Checks whether this deferred has been completed.
+    *
+    * @return
+    *   an effect that yields `true` if the deferred is completed, `false` otherwise
+    */
+  def isDone: Eru[Nothing, Boolean]
+
+  /** Attempts to retrieve the current value without suspending.
+    *
+    * @return
+    *   an effect that yields `Some(value)` if completed, or `None` if still pending
+    */
+  def poll: Eru[Nothing, Option[A]]
 }
 
 object Deferred {
@@ -39,80 +57,104 @@ object Deferred {
     *   an effect that yields the created deferred
     */
   def make[A](using runtime: EruRuntime): Eru[Nothing, Deferred[A]] =
-    Eru.succeed(new RuntimeDeferred[A](runtime))
+    for {
+      stateRef <- Ref.make(DeferredState.empty[A])
+    } yield new RuntimeDeferred[A](stateRef, runtime)
 
-  private final class RuntimeDeferred[A](runtime: EruRuntime) extends Deferred[A] {
-    import java.util.concurrent.ConcurrentLinkedQueue
-    import java.util.concurrent.atomic.AtomicReference
+  /** Internal state representation for Deferred. */
+  private sealed trait DeferredState[A] {
+    def isCompleted: Boolean
+    def value: Option[A]
+    def waiters: List[A => Unit]
+  }
 
-    private val state = new AtomicReference[Option[A]](None)
-    private val waiters = new ConcurrentLinkedQueue[Either[Nothing, A] => Unit]()
+  private object DeferredState {
+
+    /** An empty deferred with no value and potentially waiting callbacks. */
+    case class Pending[A](waiters: List[A => Unit]) extends DeferredState[A] {
+      def isCompleted: Boolean = false
+      def value: Option[A] = None
+    }
+
+    /** A completed deferred with a value and no waiters. */
+    case class Completed[A](result: A) extends DeferredState[A] {
+      def isCompleted: Boolean = true
+      def value: Option[A] = Some(result)
+      def waiters: List[A => Unit] = Nil
+    }
+
+    def empty[A]: DeferredState[A] = Pending(Nil)
+  }
+
+  private final class RuntimeDeferred[A](stateRef: Ref[DeferredState[A]], runtime: EruRuntime) extends Deferred[A] {
+    import DeferredState.*
 
     def complete(a: A): Eru[Nothing, Boolean] = {
-      if (state.get().isDefined) {
-        Eru.succeed(false)
-      } else {
-        Eru.effect {
-          if (state.compareAndSet(None, Some(a))) {
-            val waitersToNotify = {
-              @annotation.tailrec
-              def drainWaiters(acc: List[Either[Nothing, A] => Unit]): List[Either[Nothing, A] => Unit] = {
-                Option(waiters.poll()) match {
-                  case Some(waiter) => drainWaiters(waiter :: acc)
-                  case None => acc
-                }
-              }
-              drainWaiters(Nil)
-            }
-            waitersToNotify.foreach { callback =>
-              try callback(Right(a))
-              catch { case _: Throwable => () }
-            }
-            true
-          } else {
-            false
-          }
-        }.attempt.map {
-          case Result.Success(result) => result
-          case Result.Failure(_) => false
+      stateRef.modify {
+        case Pending(waiters) =>
+          // Transition to completed and return waiters to notify
+          (Completed(a), (true, waiters))
+        case completed: Completed[A] =>
+          // Already completed, no change
+          (completed, (false, Nil))
+      }.flatMap { case (wasCompleted, waitersToNotify) =>
+        if (wasCompleted && waitersToNotify.nonEmpty) {
+          // Notify all waiters
+          Eru.effect {
+            waitersToNotify.foreach(_(a))
+          }.attempt.map(_ => true)
+        } else {
+          Eru.succeed(wasCompleted)
         }
       }
     }
 
-    /** Pure function to register a callback with proper race condition handling. */
-    private def safeRegisterCallback(callback: Either[Nothing, A] => Unit): Eru[Nothing, Unit] = {
-      def checkAndRegister: Eru[Nothing, Unit] =
-        Eru.succeed(state.get()).flatMap {
-          case Some(value) =>
-            Eru.effect(callback(Right(value))).attempt.map(_ => ())
-          case None =>
-            val registerEffect = Eru.effect(waiters.offer(callback)).attempt.map(_ => ())
-            val doubleCheck = Eru.succeed(state.get()).flatMap {
-              case Some(value) =>
-                Eru.effect {
-                  if (waiters.remove(callback)) {
-                    callback(Right(value))
-                  }
-                }.attempt.map(_ => ())
-              case None =>
-                Eru.unit
-            }
-            registerEffect.flatMap(_ => doubleCheck)
-        }
+    def isDone: Eru[Nothing, Boolean] =
+      stateRef.get.map(_.isCompleted)
 
-      checkAndRegister
-    }
+    def poll: Eru[Nothing, Option[A]] =
+      stateRef.get.map(_.value)
 
-    def await: Eru[Nothing, A] =
-      state.get() match {
-        case Some(value) =>
+    def await: Eru[Nothing, A] = {
+      // First check if already completed
+      stateRef.get.flatMap {
+        case Completed(value) =>
+          // Already completed - return immediately without suspension
           Eru.succeed(value)
-        case None =>
-          runtime.suspend[Nothing, A](safeRegisterCallback).attempt.map {
-            case Result.Success(value) => value
-            case Result.Failure(throwable) =>
-              throw new IllegalStateException("Deferred await encountered unexpected error", throwable)
-          }
+        case Pending(_) =>
+          // Not completed - need to suspend
+          runtime
+            .suspend[Nothing, A] { callback =>
+              // Create a wrapper callback that matches the expected type
+              val wrappedCallback: A => Unit = (value: A) => callback(Right(value))
+
+              // Register callback in a pure way
+              val registerCallback = stateRef.modify {
+                case Pending(waiters) =>
+                  // Add callback to waiters
+                  (Pending(wrappedCallback :: waiters), None)
+                case Completed(value) =>
+                  // Race condition: completed while registering
+                  // Return the value to invoke callback immediately
+                  (Completed(value), Some(value))
+              }
+
+              registerCallback.flatMap {
+                case Some(value) =>
+                  // Deferred was completed during registration
+                  Eru.effect(wrappedCallback(value)).attempt.map(_ => ())
+                case None =>
+                  // Successfully registered, will be called on completion
+                  Eru.unit
+              }
+            }
+            .attempt
+            .map {
+              case Result.Success(value) => value
+              case Result.Failure(throwable) =>
+                throw new IllegalStateException("Deferred await encountered unexpected error", throwable)
+            }
       }
+    }
   }
 }

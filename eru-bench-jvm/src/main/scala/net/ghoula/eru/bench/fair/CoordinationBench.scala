@@ -183,7 +183,7 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruQueue(): Int = runEru {
     for {
       queue <- Eru.queue[Int](10)
-      _ <- queue.offer(TEST_VALUE)
+      _ <- queue.put(TEST_VALUE)
       result <- queue.take
     } yield result
   }
