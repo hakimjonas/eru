@@ -18,10 +18,10 @@ trait Deferred[A] {
     * @param a
     *   the value to complete the deferred with
     * @return
-    *   an effect that yields `true` if this invocation completed the deferred, or `false` if it was
+    *   an immediate effect that yields `true` if this invocation completed the deferred, or `false` if it was
     *   already completed
     */
-  def complete(a: A): Eru[Nothing, Boolean]
+  def complete(a: A): Immediate[Nothing, Boolean]
 
   /** Awaits completion, returning the value when available.
     *
@@ -29,23 +29,23 @@ trait Deferred[A] {
     * support for efficient, platform-appropriate blocking semantics.
     *
     * @return
-    *   an effect that yields the completed value
+    *   a suspending effect that yields the completed value
     */
-  def await: Eru[Nothing, A]
+  def await: Suspending[Nothing, A]
 
   /** Checks whether this deferred has been completed.
     *
     * @return
-    *   an effect that yields `true` if the deferred is completed, `false` otherwise
+    *   an immediate effect that yields `true` if the deferred is completed, `false` otherwise
     */
-  def isDone: Eru[Nothing, Boolean]
+  def isDone: Immediate[Nothing, Boolean]
 
   /** Attempts to retrieve the current value without suspending.
     *
     * @return
-    *   an effect that yields `Some(value)` if completed, or `None` if still pending
+    *   an immediate effect that yields `Some(value)` if completed, or `None` if still pending
     */
-  def poll: Eru[Nothing, Option[A]]
+  def poll: Immediate[Nothing, Option[A]]
 }
 
 object Deferred {
@@ -89,7 +89,7 @@ object Deferred {
   private final class RuntimeDeferred[A](stateRef: Ref[DeferredState[A]], runtime: EruRuntime) extends Deferred[A] {
     import DeferredState.*
 
-    def complete(a: A): Eru[Nothing, Boolean] = {
+    def complete(a: A): Immediate[Nothing, Boolean] = new Immediate({
       stateRef.modify {
         case Pending(waiters) =>
           // Transition to completed and return waiters to notify
@@ -107,15 +107,15 @@ object Deferred {
           Eru.succeed(wasCompleted)
         }
       }
-    }
+    })
 
-    def isDone: Eru[Nothing, Boolean] =
-      stateRef.get.map(_.isCompleted)
+    def isDone: Immediate[Nothing, Boolean] =
+      new Immediate(stateRef.get.map(_.isCompleted))
 
-    def poll: Eru[Nothing, Option[A]] =
-      stateRef.get.map(_.value)
+    def poll: Immediate[Nothing, Option[A]] =
+      new Immediate(stateRef.get.map(_.value))
 
-    def await: Eru[Nothing, A] = {
+    def await: Suspending[Nothing, A] = new Suspending({
       // First check if already completed
       stateRef.get.flatMap {
         case Completed(value) =>
@@ -155,6 +155,6 @@ object Deferred {
                 throw new IllegalStateException("Deferred await encountered unexpected error", throwable)
             }
       }
-    }
+    })
   }
 }

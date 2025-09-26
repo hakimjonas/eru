@@ -47,6 +47,12 @@
 
 ### Module: eru-runtime
 
+#### Suspension Type System Implementation
+- **Status**: ✅ Complete
+- **Design**: Value classes (Suspending[E,A] and Immediate[E,A]) for zero-overhead compile-time safety
+- **Implementation**: All concurrent primitives updated to use suspension types
+- **Test Impact**: Tests need .eru accessor or tryX methods to compile
+
 #### Shared Runtime (19 files)
 | File | Status | Impl | Docs | Tests | Notes |
 |------|--------|------|------|-------|-------|
@@ -57,12 +63,13 @@
 | RuntimeExtensions.scala | ✅ Complete | ✅ | ✅ | ✅ | Runtime extensions + comprehensive test suite (36 tests) |
 | Promise.scala | ✅ Complete | ✅ | ✅ | ✅ | Promise primitive + comprehensive test suite (27 tests) |
 | Semaphore.scala | ✅ Complete | ✅ | ✅ | ✅ | Semaphore primitive + comprehensive test suite (33 tests) |
-| Queue.scala | ✅ Complete | ✅ | ✅ | ✅ | Queue primitive + comprehensive test suite (39 tests) |
-| Ref.scala | ⏳ Pending | - | - | - | Ref primitive |
-| Deferred.scala | ⏳ Pending | - | - | - | Deferred primitive |
-| CountDownLatch.scala | ⏳ Pending | - | - | - | CountDownLatch |
-| CyclicBarrier.scala | ⏳ Pending | - | - | - | CyclicBarrier |
-| Hub.scala | ⏳ Pending | - | - | - | Hub primitive |
+| Queue.scala | ✅ Complete | ✅ | ✅ | ✅ | Queue primitive + suspension types + comprehensive test suite (39 tests) |
+| Ref.scala | ✅ Complete | ✅ | ✅ | ✅ | Ref primitive (unchanged - foundation for all) |
+| Deferred.scala | ✅ Complete | ✅ | ✅ | ⚠️ | Deferred primitive + suspension types (tests need fixing) |
+| CountDownLatch.scala | ✅ Complete | ✅ | ✅ | ⚠️ | CountDownLatch + suspension types (tests need fixing) |
+| CyclicBarrier.scala | ✅ Complete | ✅ | ✅ | ⚠️ | CyclicBarrier + suspension types (tests need fixing) |
+| Hub.scala | ✅ Complete | ✅ | ✅ | ⚠️ | Hub primitive + suspension types (tests need fixing) |
+| SuspensionTypes.scala | ✅ Complete | ✅ | ✅ | ⚠️ | Value classes for compile-time deadlock prevention |
 | internal/BackendProvider.scala | ⏳ Pending | - | - | - | Backend provider |
 | internal/ConcurrencyBackend.scala | ⏳ Pending | - | - | - | Concurrency backend |
 | test/EruTest.scala | ⏳ Pending | - | - | - | Test utilities |

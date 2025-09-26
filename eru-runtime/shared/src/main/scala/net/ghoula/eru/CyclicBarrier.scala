@@ -25,16 +25,16 @@ trait CyclicBarrier {
     * After all parties are released, the barrier is reset for the next cycle.
     *
     * @return
-    *   an effect that succeeds when all parties have reached the barrier
+    *   a suspending effect that succeeds when all parties have reached the barrier
     */
-  def await: Eru[Nothing, Unit]
+  def await: Suspending[Nothing, Unit]
 
   /** Returns the number of parties required to trip this barrier.
     *
     * @return
-    *   an effect that yields the number of parties
+    *   an immediate effect that yields the number of parties
     */
-  def getParties: Eru[Nothing, Int]
+  def getParties: Immediate[Nothing, Int]
 
   /** Returns the number of parties currently waiting at the barrier.
     *
@@ -42,9 +42,9 @@ trait CyclicBarrier {
     * value may change immediately after this call returns.
     *
     * @return
-    *   an effect that yields the number of waiting parties
+    *   an immediate effect that yields the number of waiting parties
     */
-  def getNumberWaiting: Eru[Nothing, Int]
+  def getNumberWaiting: Immediate[Nothing, Int]
 
   /** Checks whether the barrier is currently broken.
     *
@@ -52,9 +52,9 @@ trait CyclicBarrier {
     * This implementation doesn't support barrier breaking, so this always returns false.
     *
     * @return
-    *   an effect that yields false (barriers don't break in this implementation)
+    *   an immediate effect that yields false (barriers don't break in this implementation)
     */
-  def isBroken: Eru[Nothing, Boolean] = Eru.succeed(false)
+  def isBroken: Immediate[Nothing, Boolean] = new Immediate(Eru.succeed(false))
 }
 
 object CyclicBarrier {
@@ -85,13 +85,13 @@ object CyclicBarrier {
   private final class RuntimeCyclicBarrier(parties: Int, stateRef: Ref[BarrierState], runtime: EruRuntime)
       extends CyclicBarrier {
 
-    def getParties: Eru[Nothing, Int] =
-      Eru.succeed(parties)
+    def getParties: Immediate[Nothing, Int] =
+      new Immediate(Eru.succeed(parties))
 
-    def getNumberWaiting: Eru[Nothing, Int] =
-      stateRef.get.map(_.waiting)
+    def getNumberWaiting: Immediate[Nothing, Int] =
+      new Immediate(stateRef.get.map(_.waiting))
 
-    def await: Eru[Nothing, Unit] = {
+    def await: Suspending[Nothing, Unit] = new Suspending({
       if (parties == 1) {
         // Single party - no need to wait
         Eru.unit
@@ -143,6 +143,6 @@ object CyclicBarrier {
               throw new IllegalStateException("CyclicBarrier await encountered unexpected error")
           }
       }
-    }
+    })
   }
 }

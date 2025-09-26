@@ -39,8 +39,8 @@ private[eru] final class QueueImpl[A](
   // Strategy will be used when implementing dropping/sliding behavior
   private val _ = strategy
 
-  override def put(a: A): Eru[Nothing, Unit] = {
-    tryPut(a).flatMap { success =>
+  override def put(a: A): Suspending[Nothing, Unit] = new Suspending({
+    tryPut(a).eru.flatMap { success =>
       if (success) {
         Eru.unit
       } else {
@@ -66,19 +66,19 @@ private[eru] final class QueueImpl[A](
           }
           result <- registered match {
             case Right((unit, Some((takerPromise, elem)))) =>
-              takerPromise.succeed(elem).map(_ => unit)
+              takerPromise.succeed(elem).eru.map(_ => unit)
             case Right((unit, None)) =>
               Eru.succeed(unit)
             case Left(promise) =>
-              promise.await
+              promise.await.eru
           }
         } yield result
       }
     }
-  }
+  })
 
-  override def take: Eru[Nothing, A] = {
-    tryTake.flatMap {
+  override def take: Suspending[Nothing, A] = new Suspending({
+    tryTake.eru.flatMap {
       case Some(elem) => Eru.succeed(elem)
       case None =>
         // Must suspend - queue is empty
@@ -103,39 +103,39 @@ private[eru] final class QueueImpl[A](
             }
           }.flatMap {
             case Right((elem, Some(putter))) =>
-              putter.succeed(()).map(_ => elem)
+              putter.succeed(()).eru.map(_ => elem)
             case Right((elem, None)) =>
               Eru.succeed(elem)
             case Left(promise) =>
-              promise.await
+              promise.await.eru
           }
         } yield result
     }
-  }
+  })
 
-  override def putAll(as: Seq[A]): Eru[Nothing, Unit] = {
+  override def putAll(as: Seq[A]): Suspending[Nothing, Unit] = new Suspending({
     as.foldLeft(Eru.unit) { (acc, a) =>
-      acc.flatMap(_ => put(a))
+      acc.flatMap(_ => put(a).eru)
     }
-  }
+  })
 
-  override def takeUpTo(n: Int): Eru[Nothing, List[A]] = {
+  override def takeUpTo(n: Int): Suspending[Nothing, List[A]] = new Suspending({
     def loop(remaining: Int, acc: List[A]): Eru[Nothing, List[A]] = {
       if (remaining <= 0) {
         Eru.succeed(acc.reverse)
       } else if (acc.nonEmpty) {
-        tryTake.flatMap {
+        tryTake.eru.flatMap {
           case Some(a) => loop(remaining - 1, a :: acc)
           case None => Eru.succeed(acc.reverse)
         }
       } else {
-        take.flatMap(a => loop(remaining - 1, a :: acc))
+        take.eru.flatMap(a => loop(remaining - 1, a :: acc))
       }
     }
     loop(n, Nil)
-  }
+  })
 
-  override def tryPut(a: A): Eru[Nothing, Boolean] = {
+  override def tryPut(a: A): Immediate[Nothing, Boolean] = new Immediate({
     stateRef.modify { state =>
       if (state.size < maxCapacity) {
         state.waitingTakers match {
@@ -157,13 +157,13 @@ private[eru] final class QueueImpl[A](
       }
     }.flatMap {
       case Some((promise, elem)) =>
-        promise.succeed(elem).map(_ => true)
+        promise.succeed(elem).eru.map(_ => true)
       case None =>
         stateRef.get.map(_.elements.contains(a))
     }
-  }
+  })
 
-  override def tryTake: Eru[Nothing, Option[A]] = {
+  override def tryTake: Immediate[Nothing, Option[A]] = new Immediate({
     stateRef.modify { state =>
       state.elements match {
         case head :: tail =>
@@ -178,13 +178,13 @@ private[eru] final class QueueImpl[A](
       }
     }.flatMap { case (result, putterToComplete) =>
       putterToComplete match {
-        case Some(promise) => promise.succeed(()).map(_ => result)
+        case Some(promise) => promise.succeed(()).eru.map(_ => result)
         case None => Eru.succeed(result)
       }
     }
-  }
+  })
 
-  override def tryPutAll(as: Seq[A]): Eru[Nothing, Int] = {
+  override def tryPutAll(as: Seq[A]): Immediate[Nothing, Int] = new Immediate({
     stateRef.modify { state =>
       val available = maxCapacity - state.size
       val toAdd = as.take(available)
@@ -202,13 +202,13 @@ private[eru] final class QueueImpl[A](
     }.flatMap { case (added, takersToComplete) =>
       Eru
         .traverse(takersToComplete) { case (promise, elem) =>
-          promise.succeed(elem)
+          promise.succeed(elem).eru
         }
         .map(_ => added)
     }
-  }
+  })
 
-  override def tryTakeUpTo(n: Int): Eru[Nothing, List[A]] = {
+  override def tryTakeUpTo(n: Int): Immediate[Nothing, List[A]] = new Immediate({
     stateRef.modify { state =>
       val toTake = state.elements.take(n)
       val remaining = state.elements.drop(n)
@@ -224,37 +224,37 @@ private[eru] final class QueueImpl[A](
 
       (newState, (toTake, puttersToComplete))
     }.flatMap { case (taken, puttersToComplete) =>
-      Eru.traverse(puttersToComplete)(_.succeed(())).map(_ => taken)
+      Eru.traverse(puttersToComplete)(_.succeed(()).eru).map(_ => taken)
     }
-  }
+  })
 
-  override def putWithin(a: A, timeout: Duration): Eru[Throwable, Boolean] = {
-    tryPut(a).flatMap { success =>
+  override def putWithin(a: A, timeout: Duration): Immediate[Throwable, Boolean] = new Immediate({
+    tryPut(a).eru.flatMap { success =>
       if (success) {
         Eru.succeed(true)
       } else {
-        val putEffect = put(a).map(_ => true)
+        val putEffect = put(a).eru.map(_ => true)
         val timeoutEffect = runtime.sleep(timeout).map(_ => false)
         runtime
           .race(putEffect, timeoutEffect)
           .map[Boolean](_.merge)
       }
     }
-  }
+  })
 
-  override def takeWithin(timeout: Duration): Eru[Throwable, Option[A]] = {
-    tryTake.flatMap {
+  override def takeWithin(timeout: Duration): Immediate[Throwable, Option[A]] = new Immediate({
+    tryTake.eru.flatMap {
       case some @ Some(_) => Eru.succeed(some)
       case None =>
-        val takeEffect = take.map(a => Some(a))
+        val takeEffect = take.eru.map(a => Some(a))
         val timeoutEffect = runtime.sleep(timeout).map(_ => None)
         runtime
           .race(takeEffect, timeoutEffect)
           .map[Option[A]](_.merge)
     }
-  }
+  })
 
-  override def putAllWithin(as: Seq[A], timeout: Duration): Eru[Throwable, Int] = {
+  override def putAllWithin(as: Seq[A], timeout: Duration): Immediate[Throwable, Int] = new Immediate({
     val deadline = System.nanoTime() + timeout.toNanos
 
     def loop(remaining: Seq[A], added: Int): Eru[Throwable, Int] = {
@@ -266,7 +266,7 @@ private[eru] final class QueueImpl[A](
           Eru.succeed(added)
         } else {
           val remainingTimeout = Duration.ofNanos(remainingNanos)
-          putWithin(remaining.head, remainingTimeout).flatMap { success =>
+          putWithin(remaining.head, remainingTimeout).eru.flatMap { success =>
             if (success) loop(remaining.tail, added + 1)
             else Eru.succeed(added)
           }
@@ -275,9 +275,9 @@ private[eru] final class QueueImpl[A](
     }
 
     loop(as, 0)
-  }
+  })
 
-  override def takeUpToWithin(n: Int, timeout: Duration): Eru[Throwable, List[A]] = {
+  override def takeUpToWithin(n: Int, timeout: Duration): Immediate[Throwable, List[A]] = new Immediate({
     val deadline = System.nanoTime() + timeout.toNanos
 
     def loop(remaining: Int, acc: List[A]): Eru[Throwable, List[A]] = {
@@ -289,7 +289,7 @@ private[eru] final class QueueImpl[A](
           Eru.succeed(acc.reverse)
         } else {
           val remainingTimeout = Duration.ofNanos(remainingNanos)
-          takeWithin(remainingTimeout).flatMap {
+          takeWithin(remainingTimeout).eru.flatMap {
             case Some(elem) => loop(remaining - 1, elem :: acc)
             case None => Eru.succeed(acc.reverse)
           }
@@ -298,25 +298,25 @@ private[eru] final class QueueImpl[A](
     }
 
     loop(n, Nil)
-  }
+  })
 
-  override def size: Eru[Nothing, Int] =
-    stateRef.get.map(_.size)
+  override def size: Immediate[Nothing, Int] =
+    new Immediate(stateRef.get.map(_.size))
 
-  override def isEmpty: Eru[Nothing, Boolean] =
-    stateRef.get.map(_.elements.isEmpty)
+  override def isEmpty: Immediate[Nothing, Boolean] =
+    new Immediate(stateRef.get.map(_.elements.isEmpty))
 
-  override def isFull: Eru[Nothing, Boolean] =
-    stateRef.get.map(state => capacityLimit.exists(state.size >= _))
+  override def isFull: Immediate[Nothing, Boolean] =
+    new Immediate(stateRef.get.map(state => capacityLimit.exists(state.size >= _)))
 
-  override def remainingCapacity: Eru[Nothing, Int] =
-    stateRef.get.map(state => maxCapacity - state.size)
+  override def remainingCapacity: Immediate[Nothing, Int] =
+    new Immediate(stateRef.get.map(state => maxCapacity - state.size))
 
-  override def peek: Eru[Nothing, Option[A]] =
-    stateRef.get.map(_.elements.headOption)
+  override def peek: Immediate[Nothing, Option[A]] =
+    new Immediate(stateRef.get.map(_.elements.headOption))
 
-  override def capacity: Eru[Nothing, Option[Int]] =
-    Eru.succeed(capacityLimit)
+  override def capacity: Immediate[Nothing, Option[Int]] =
+    new Immediate(Eru.succeed(capacityLimit))
 
   // Helper methods
 

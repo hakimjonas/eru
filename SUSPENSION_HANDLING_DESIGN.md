@@ -54,9 +54,9 @@ final class Suspending[+E, +A](val eru: Eru[E, A]) extends AnyVal {
 
   /** Race with a timeout. */
   def timeout(duration: Duration)(using runtime: EruRuntime):
-    Immediate[E | TimeoutError, A] = {
-    val timeoutEru = runtime.sleep(duration).map(_ =>
-      throw TimeoutError(s"Operation timed out after $duration"))
+    Immediate[E | Throwable, A] = {
+    val timeoutEru = runtime.sleep(duration).flatMap(_ =>
+      Eru.fail(TimeoutError(s"Operation timed out after $duration")))
     new Immediate(runtime.race(eru, timeoutEru).map(_.merge))
   }
 

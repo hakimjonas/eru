@@ -19,53 +19,52 @@ import java.time.Duration
 trait Queue[A] {
 
   // ============================================================================
-  // BLOCKING OPERATIONS (Type-safe + naming convention)
+  // SUSPENDING OPERATIONS
   // These operations may suspend indefinitely and must be used carefully
   // ============================================================================
 
   /** Adds an element to the queue, suspending if full.
     *
     * This operation will suspend indefinitely if the queue is at capacity, waiting until space
-    * becomes available. The type marker `CanSuspend` ensures this cannot be called in synchronous
-    * contexts without proper handling.
+    * becomes available. The Suspending type ensures this cannot be called with unsafeRunSync.
     *
     * @param a
     *   the element to add
     * @return
-    *   an effect that completes when the element is added
+    *   a suspending effect that completes when the element is added
     */
-  def put(a: A): Eru[Nothing, Unit]
+  def put(a: A): Suspending[Nothing, Unit]
 
   /** Removes and returns an element, suspending if empty.
     *
     * This operation will suspend indefinitely if the queue is empty, waiting until an element
-    * becomes available. The type marker `CanSuspend` ensures safe usage in concurrent contexts.
+    * becomes available. The Suspending type prevents deadlocks at compile-time.
     *
     * @return
-    *   an effect that yields the next element
+    *   a suspending effect that yields the next element
     */
-  def take: Eru[Nothing, A]
+  def take: Suspending[Nothing, A]
 
   /** Adds multiple elements, suspending if insufficient space.
     *
     * @param as
     *   the elements to add
     * @return
-    *   an effect that completes when all elements are added
+    *   a suspending effect that completes when all elements are added
     */
-  def putAll(as: Seq[A]): Eru[Nothing, Unit]
+  def putAll(as: Seq[A]): Suspending[Nothing, Unit]
 
   /** Removes up to n elements, suspending until at least one is available.
     *
     * @param n
     *   the maximum number of elements to take
     * @return
-    *   an effect that yields the taken elements (at least 1, up to n)
+    *   a suspending effect that yields the taken elements (at least 1, up to n)
     */
-  def takeUpTo(n: Int): Eru[Nothing, List[A]]
+  def takeUpTo(n: Int): Suspending[Nothing, List[A]]
 
   // ============================================================================
-  // NON-BLOCKING OPERATIONS (Type-safe + naming convention)
+  // IMMEDIATE OPERATIONS
   // These operations complete immediately without suspension
   // ============================================================================
 
@@ -76,21 +75,21 @@ trait Queue[A] {
     * @return
     *   true if the element was added, false if the queue was full
     */
-  def tryPut(a: A): Eru[Nothing, Boolean]
+  def tryPut(a: A): Immediate[Nothing, Boolean]
 
   /** Attempts to remove an element without blocking.
     *
     * @return
     *   Some(element) if available, None if the queue was empty
     */
-  def tryTake: Eru[Nothing, Option[A]]
+  def tryTake: Immediate[Nothing, Option[A]]
 
   /** Alias for tryTake for backward compatibility.
     *
     * @return
     *   Some(element) if available, None if the queue was empty
     */
-  def poll: Eru[Nothing, Option[A]] = tryTake
+  def poll: Immediate[Nothing, Option[A]] = tryTake
 
   /** Attempts to add multiple elements without blocking.
     *
@@ -99,7 +98,7 @@ trait Queue[A] {
     * @return
     *   the number of elements successfully added
     */
-  def tryPutAll(as: Seq[A]): Eru[Nothing, Int]
+  def tryPutAll(as: Seq[A]): Immediate[Nothing, Int]
 
   /** Attempts to remove up to n elements without blocking.
     *
@@ -108,11 +107,11 @@ trait Queue[A] {
     * @return
     *   the list of elements taken (may be empty)
     */
-  def tryTakeUpTo(n: Int): Eru[Nothing, List[A]]
+  def tryTakeUpTo(n: Int): Immediate[Nothing, List[A]]
 
   // ============================================================================
-  // TIMEOUT OPERATIONS (Bounded suspension, hence safe)
-  // These operations have bounded wait times and won't hang indefinitely
+  // BOUNDED OPERATIONS
+  // These operations have bounded wait times and complete immediately
   // ============================================================================
 
   /** Attempts to add an element within the timeout period.
@@ -124,7 +123,7 @@ trait Queue[A] {
     * @return
     *   true if successful, false if timeout expired
     */
-  def putWithin(a: A, timeout: Duration): Eru[Throwable, Boolean]
+  def putWithin(a: A, timeout: Duration): Immediate[Throwable, Boolean]
 
   /** Attempts to remove an element within the timeout period.
     *
@@ -133,7 +132,7 @@ trait Queue[A] {
     * @return
     *   Some(element) if available within timeout, None otherwise
     */
-  def takeWithin(timeout: Duration): Eru[Throwable, Option[A]]
+  def takeWithin(timeout: Duration): Immediate[Throwable, Option[A]]
 
   /** Attempts to add multiple elements within the timeout period.
     *
@@ -144,7 +143,7 @@ trait Queue[A] {
     * @return
     *   the number of elements successfully added before timeout
     */
-  def putAllWithin(as: Seq[A], timeout: Duration): Eru[Throwable, Int]
+  def putAllWithin(as: Seq[A], timeout: Duration): Immediate[Throwable, Int]
 
   /** Attempts to remove up to n elements within the timeout period.
     *
@@ -155,10 +154,10 @@ trait Queue[A] {
     * @return
     *   the list of elements taken before timeout (may be empty)
     */
-  def takeUpToWithin(n: Int, timeout: Duration): Eru[Throwable, List[A]]
+  def takeUpToWithin(n: Int, timeout: Duration): Immediate[Throwable, List[A]]
 
   // ============================================================================
-  // STATUS OPERATIONS (Always non-blocking)
+  // STATUS OPERATIONS
   // These operations query queue state without modifying it
   // ============================================================================
 
@@ -169,14 +168,14 @@ trait Queue[A] {
     * @return
     *   the current queue size
     */
-  def size: Eru[Nothing, Int]
+  def size: Immediate[Nothing, Int]
 
   /** Checks if the queue is currently empty.
     *
     * @return
     *   true if empty, false otherwise
     */
-  def isEmpty: Eru[Nothing, Boolean]
+  def isEmpty: Immediate[Nothing, Boolean]
 
   /** Checks if the queue is currently at capacity.
     *
@@ -185,7 +184,7 @@ trait Queue[A] {
     * @return
     *   true if full, false otherwise
     */
-  def isFull: Eru[Nothing, Boolean]
+  def isFull: Immediate[Nothing, Boolean]
 
   /** Returns the remaining capacity of the queue.
     *
@@ -194,21 +193,21 @@ trait Queue[A] {
     * @return
     *   the number of additional elements that can be added without blocking
     */
-  def remainingCapacity: Eru[Nothing, Int]
+  def remainingCapacity: Immediate[Nothing, Int]
 
   /** Peeks at the next element without removing it.
     *
     * @return
     *   Some(element) if available, None if empty
     */
-  def peek: Eru[Nothing, Option[A]]
+  def peek: Immediate[Nothing, Option[A]]
 
   /** Returns the queue's capacity limit.
     *
     * @return
     *   Some(capacity) for bounded queues, None for unbounded
     */
-  def capacity: Eru[Nothing, Option[Int]]
+  def capacity: Immediate[Nothing, Option[Int]]
 
 }
 

@@ -25,7 +25,7 @@ trait Promise[E, A] {
     *   an effect that yields `true` if this invocation completed the promise, or `false` if it was
     *   already completed
     */
-  def succeed(value: A): Eru[Nothing, Boolean]
+  def succeed(value: A): Immediate[Nothing, Boolean]
 
   /** Completes this `Promise` with a failure value if it has not been completed yet.
     *
@@ -35,7 +35,7 @@ trait Promise[E, A] {
     *   an effect that yields `true` if this invocation completed the promise, or `false` if it was
     *   already completed
     */
-  def fail(error: E): Eru[Nothing, Boolean]
+  def fail(error: E): Immediate[Nothing, Boolean]
 
   /** Completes this `Promise` with the result of another effect if it has not been completed yet.
     *
@@ -45,11 +45,10 @@ trait Promise[E, A] {
     *   an effect that yields `true` if this invocation completed the promise, or `false` if it was
     *   already completed
     */
-  def complete(effect: Eru[E, A]): Eru[Nothing, Boolean] =
-    effect.attempt.flatMap {
-      case Result.Success(value) => succeed(value)
-      case Result.Failure(error) => fail(error)
-    }
+  def complete(effect: Eru[E, A]): Immediate[Nothing, Boolean] = new Immediate(effect.attempt.flatMap {
+    case Result.Success(value) => succeed(value).eru
+    case Result.Failure(error) => fail(error).eru
+  })
 
   /** Awaits completion, returning the result when available.
     *
@@ -59,21 +58,28 @@ trait Promise[E, A] {
     * @return
     *   an effect that yields the completed result (success or failure)
     */
-  def await: Eru[E, A]
+  def await: Suspending[E, A]
 
   /** Checks whether this promise has been completed.
     *
     * @return
     *   an effect that yields `true` if the promise is completed, `false` otherwise
     */
-  def isDone: Eru[Nothing, Boolean]
+  def isDone: Immediate[Nothing, Boolean]
 
   /** Attempts to retrieve the current result without suspending.
     *
     * @return
-    *   an effect that yields `Some(result)` if completed, or `None` if still pending
+    *   an immediate effect that yields `Some(result)` if completed, or `None` if still pending
     */
-  def poll: Eru[Nothing, Option[Exit[E, A]]]
+  def poll: Immediate[Nothing, Option[Exit[E, A]]]
+
+  /** Alias for poll for consistency with suspension naming conventions.
+    *
+    * @return
+    *   an immediate effect that yields `Some(result)` if completed, or `None` if still pending
+    */
+  def tryGet: Immediate[Nothing, Option[Exit[E, A]]] = poll
 }
 
 object Promise {
@@ -151,19 +157,15 @@ object Promise {
       }
     }
 
-    def succeed(value: A): Eru[Nothing, Boolean] =
-      attemptComplete(Exit.Success(value))
+    def succeed(value: A): Immediate[Nothing, Boolean] = new Immediate(attemptComplete(Exit.Success(value)))
 
-    def fail(error: E): Eru[Nothing, Boolean] =
-      attemptComplete(Exit.Failure(error))
+    def fail(error: E): Immediate[Nothing, Boolean] = new Immediate(attemptComplete(Exit.Failure(error)))
 
-    def isDone: Eru[Nothing, Boolean] =
-      stateRef.get.map(_.isCompleted)
+    def isDone: Immediate[Nothing, Boolean] = new Immediate(stateRef.get.map(_.isCompleted))
 
-    def poll: Eru[Nothing, Option[Exit[E, A]]] =
-      stateRef.get.map(_.result)
+    def poll: Immediate[Nothing, Option[Exit[E, A]]] = new Immediate(stateRef.get.map(_.result))
 
-    def await: Eru[E, A] = {
+    def await: Suspending[E, A] = new Suspending({
       // First check if already completed
       stateRef.get.flatMap {
         case Completed(exit) =>
@@ -213,6 +215,6 @@ object Promise {
                 throw new IllegalStateException("Promise await encountered unexpected error")
             }
       }
-    }
+    })
   }
 }

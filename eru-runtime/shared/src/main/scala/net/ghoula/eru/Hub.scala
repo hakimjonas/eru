@@ -19,9 +19,9 @@ trait Hub[A] {
     * @param message
     *   the message to publish to all subscribers
     * @return
-    *   an effect that succeeds when the message has been published to all subscribers
+    *   a suspending effect that succeeds when the message has been published to all subscribers
     */
-  def publish(message: A): Eru[Nothing, Unit]
+  def publish(message: A): Suspending[Nothing, Unit]
 
   /** Creates a new subscription to this hub.
     *
@@ -29,9 +29,9 @@ trait Hub[A] {
     * only receive messages published after their subscription was created.
     *
     * @return
-    *   an effect that yields a queue for receiving published messages
+    *   an immediate effect that yields a queue for receiving published messages
     */
-  def subscribe: Eru[Nothing, Queue[A]]
+  def subscribe: Immediate[Nothing, Queue[A]]
 
   /** Returns the current number of active subscribers.
     *
@@ -39,24 +39,24 @@ trait Hub[A] {
     * subscription operations.
     *
     * @return
-    *   an effect that yields the current subscriber count
+    *   an immediate effect that yields the current subscriber count
     */
-  def subscriberCount: Eru[Nothing, Int]
+  def subscriberCount: Immediate[Nothing, Int]
 
   /** Checks whether the hub currently has any subscribers.
     *
     * @return
     *   an effect that yields true if there are active subscribers, false otherwise
     */
-  def hasSubscribers: Eru[Nothing, Boolean] = subscriberCount.map(_ > 0)
+  def hasSubscribers: Immediate[Nothing, Boolean] = new Immediate(subscriberCount.eru.map(_ > 0))
 
   /** For bounded hubs, returns the capacity per subscriber queue. For unbounded hubs, returns
     * Int.MaxValue.
     *
     * @return
-    *   an effect that yields the queue capacity for each subscriber
+    *   an immediate effect that yields the queue capacity for each subscriber
     */
-  def capacity: Eru[Nothing, Int]
+  def capacity: Immediate[Nothing, Int]
 }
 
 object Hub {
@@ -101,25 +101,25 @@ object Hub {
   private final class BoundedHub[A](queueCapacity: Int, stateRef: Ref[HubState[A]], runtime: EruRuntime)
       extends Hub[A] {
 
-    def publish(message: A): Eru[Nothing, Unit] =
+    def publish(message: A): Suspending[Nothing, Unit] = new Suspending(
       getCurrentSubscribers.flatMap { queues =>
         queues.headOption.fold(Eru.unit) { _ =>
           // Publish to all subscribers, treating individual failures gracefully
-          Eru.collectAllDiscard(queues.map(_.put(message).attempt))
+          Eru.collectAllDiscard(queues.map(_.put(message).eru.attempt))
         }
-      }
+      })
 
-    def subscribe: Eru[Nothing, Queue[A]] =
+    def subscribe: Immediate[Nothing, Queue[A]] = new Immediate(
       for {
         queue <- Queue.bounded[A](queueCapacity)(using runtime)
         _ <- addSubscriber(queue)
-      } yield queue
+      } yield queue)
 
-    def subscriberCount: Eru[Nothing, Int] =
-      stateRef.get.map(_.subscribers.size)
+    def subscriberCount: Immediate[Nothing, Int] =
+      new Immediate(stateRef.get.map(_.subscribers.size))
 
-    def capacity: Eru[Nothing, Int] =
-      Eru.succeed(queueCapacity)
+    def capacity: Immediate[Nothing, Int] =
+      new Immediate(Eru.succeed(queueCapacity))
 
     private def getCurrentSubscribers: Eru[Nothing, List[Queue[A]]] =
       stateRef.get.map(_.subscribers.values.toList)
@@ -136,25 +136,25 @@ object Hub {
   // Implementation for unbounded hubs using pure FP patterns
   private final class UnboundedHub[A](stateRef: Ref[HubState[A]], runtime: EruRuntime) extends Hub[A] {
 
-    def publish(message: A): Eru[Nothing, Unit] =
+    def publish(message: A): Suspending[Nothing, Unit] = new Suspending(
       getCurrentSubscribers.flatMap { queues =>
         queues.headOption.fold(Eru.unit) { _ =>
           // Publish to all subscribers, treating individual failures gracefully
-          Eru.collectAllDiscard(queues.map(_.put(message).attempt))
+          Eru.collectAllDiscard(queues.map(_.put(message).eru.attempt))
         }
-      }
+      })
 
-    def subscribe: Eru[Nothing, Queue[A]] =
+    def subscribe: Immediate[Nothing, Queue[A]] = new Immediate(
       for {
         queue <- Queue.unbounded[A](using runtime)
         _ <- addSubscriber(queue)
-      } yield queue
+      } yield queue)
 
-    def subscriberCount: Eru[Nothing, Int] =
-      stateRef.get.map(_.subscribers.size)
+    def subscriberCount: Immediate[Nothing, Int] =
+      new Immediate(stateRef.get.map(_.subscribers.size))
 
-    def capacity: Eru[Nothing, Int] =
-      Eru.succeed(Int.MaxValue)
+    def capacity: Immediate[Nothing, Int] =
+      new Immediate(Eru.succeed(Int.MaxValue))
 
     private def getCurrentSubscribers: Eru[Nothing, List[Queue[A]]] =
       stateRef.get.map(_.subscribers.values.toList)

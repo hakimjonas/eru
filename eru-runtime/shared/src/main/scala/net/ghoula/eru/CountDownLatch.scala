@@ -23,7 +23,7 @@ trait CountDownLatch {
     * @return
     *   an effect that succeeds when the count is decremented
     */
-  def countDown: Eru[Nothing, Unit]
+  def countDown: Immediate[Nothing, Unit]
 
   /** Awaits until the latch count reaches zero.
     *
@@ -33,7 +33,7 @@ trait CountDownLatch {
     * @return
     *   an effect that succeeds when the count reaches zero
     */
-  def await: Eru[Nothing, Unit]
+  def await: Suspending[Nothing, Unit]
 
   /** Returns the current count value.
     *
@@ -43,14 +43,14 @@ trait CountDownLatch {
     * @return
     *   an effect that yields the current count
     */
-  def getCount: Eru[Nothing, Int]
+  def getCount: Immediate[Nothing, Int]
 
   /** Checks whether the count has reached zero.
     *
     * @return
     *   an effect that yields `true` if the count is zero, `false` otherwise
     */
-  def isZero: Eru[Nothing, Boolean] = getCount.map(_ == 0)
+  def isZero: Immediate[Nothing, Boolean] = new Immediate(getCount.eru.map(_ == 0))
 }
 
 object CountDownLatch {
@@ -79,7 +79,7 @@ object CountDownLatch {
 
   private final class RuntimeCountDownLatch(stateRef: Ref[LatchState], runtime: EruRuntime) extends CountDownLatch {
 
-    def countDown: Eru[Nothing, Unit] = {
+    def countDown: Immediate[Nothing, Unit] = new Immediate({
       stateRef.modify { state =>
         if (state.count <= 0) {
           // Already at zero, no change
@@ -104,12 +104,11 @@ object CountDownLatch {
           Eru.unit
         }
       }
-    }
+    })
 
-    def getCount: Eru[Nothing, Int] =
-      stateRef.get.map(_.count)
+    def getCount: Immediate[Nothing, Int] = new Immediate(stateRef.get.map(_.count))
 
-    def await: Eru[Nothing, Unit] = {
+    def await: Suspending[Nothing, Unit] = new Suspending({
       // First check if already at zero
       stateRef.get.flatMap { state =>
         if (state.count == 0) {
@@ -152,7 +151,7 @@ object CountDownLatch {
             }
         }
       }
-    }
+    })
 
     /** Polling fallback for backends that don't support suspend. */
     private def pollUntilZero(): Eru[Nothing, Unit] = {

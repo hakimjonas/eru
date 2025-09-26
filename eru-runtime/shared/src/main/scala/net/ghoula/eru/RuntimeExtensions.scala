@@ -170,7 +170,7 @@ object RuntimeExtensions {
       * @return
       *   an effect that produces the Semaphore
       */
-    def semaphore(n: Long): Eru[Nothing, Semaphore] = Semaphore.make(n)
+    def semaphore(n: Long)(using runtime: EruRuntime): Eru[Nothing, Semaphore] = Semaphore.make(n)
 
     /** Creates a bounded queue with the specified capacity.
       *
