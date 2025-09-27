@@ -97,9 +97,10 @@ object Deferred {
           (completed, (false, Nil))
       }.flatMap { case (wasCompleted, waitersToNotify) =>
         if (wasCompleted && waitersToNotify.nonEmpty) {
-          Eru.effect {
+          Eru.effectTotal {
             waitersToNotify.foreach(_(a))
-          }.attempt.map(_ => true)
+            true
+          }
         } else {
           Eru.succeed(wasCompleted)
         }
@@ -130,7 +131,9 @@ object Deferred {
 
               registerCallback.flatMap {
                 case Some(value) =>
-                  Eru.effect(wrappedCallback(value)).attempt.map(_ => ())
+                  Eru.effectTotal {
+                    wrappedCallback(value)
+                  }
                 case None =>
                   Eru.unit
               }

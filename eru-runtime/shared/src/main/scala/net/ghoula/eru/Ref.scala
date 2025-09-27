@@ -62,13 +62,13 @@ object Ref {
     private val state = new java.util.concurrent.atomic.AtomicReference(init)
 
     def get: Eru[Nothing, A] =
-      Eru.effect(state.get()).mapError(_ => throw new AssertionError("Ref.get should never fail"))
+      Eru.effectTotal(state.get())
 
     def set(a: A): Eru[Nothing, Unit] =
-      Eru.effect { state.set(a); () }.mapError(_ => throw new AssertionError("Ref.set should never fail"))
+      Eru.effectTotal { state.set(a); () }
 
     def update(f: A => A): Eru[Nothing, A] =
-      Eru.effect {
+      Eru.effectTotal {
         @annotation.tailrec
         def loop(): A = {
           val current = state.get()
@@ -77,10 +77,10 @@ object Ref {
           else loop()
         }
         loop()
-      }.mapError(_ => throw new AssertionError("Ref.update should never fail"))
+      }
 
     def modify[B](f: A => (A, B)): Eru[Nothing, B] =
-      Eru.effect {
+      Eru.effectTotal {
         @annotation.tailrec
         def loop(): B = {
           val current = state.get()
@@ -89,6 +89,6 @@ object Ref {
           else loop()
         }
         loop()
-      }.mapError(_ => throw new AssertionError("Ref.modify should never fail"))
+      }
   }
 }

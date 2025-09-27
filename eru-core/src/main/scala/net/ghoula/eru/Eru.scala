@@ -33,6 +33,9 @@ enum Eru[+E, +A] {
   /** Represents a synchronous, side-effecting computation suspended in a thunk. */
   private case Effect(thunk: () => Either[Throwable, A]) extends Eru[Throwable, A]
 
+  /** Represents an infallible synchronous computation that cannot fail. */
+  private case EffectTotal[A0](thunk: () => A0) extends Eru[Nothing, A0]
+
   /** Represents a chained computation with a continuation stack. The continuation stack is
     * represented by a GADT that maintains type safety across the chain of operations.
     */
@@ -466,6 +469,20 @@ object Eru {
       try Right(computation)
       catch { case NonFatal(t) => Left(t) }
     )
+
+  /** Creates an infallible effect that cannot fail.
+    *
+    * This is an optimization for effects that are guaranteed not to throw exceptions, avoiding the
+    * overhead of error handling. Use with caution - if the computation does throw, it will
+    * propagate uncaught.
+    *
+    * @param computation
+    *   the infallible computation to suspend (by-name)
+    * @return
+    *   an `Eru[Nothing, A]` representing the suspended computation
+    */
+  private[eru] def effectTotal[A](computation: => A): Eru[Nothing, A] =
+    new EffectTotal(() => computation)
 
   /** Executes a synchronous computation in a blocking region.
     *
@@ -1253,6 +1270,9 @@ object Eru {
         case Effect(thunk) =>
           done((thunk(), fins))
 
+        case EffectTotal(thunk) =>
+          done((Right(thunk()), fins))
+
         case Chain(source, cont) =>
           tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).flatMap {
             case (Right(value), fs) =>
@@ -1615,6 +1635,7 @@ object Eru {
       case VSucceed(value: A)
       case VFail(error: E)
       case VEffect(thunk: () => Either[Throwable, A])
+      case VEffectTotal(thunk: () => A)
       case VChain[E0, From, To](source: Eru[E0, From], cont: Continuation[E0, From, To]) extends View[E0, To]
       case VMapChain[E0, From, To](source: Eru[E0, From], f: From => To) extends View[E0, To]
       case VRecoverWith[E0, A0, E2, A1 >: A0](source: Eru[E0, A0], pf: PartialFunction[E0, Eru[E2, A1]])
@@ -1635,6 +1656,7 @@ object Eru {
       case Succeed(value) => VSucceed(value)
       case Fail(error) => VFail(error)
       case Effect(thunk) => VEffect(thunk)
+      case EffectTotal(thunk) => VEffectTotal(thunk)
       case Chain(source, cont) => VChain(source, cont)
       case MapChain(source, f) => VMapChain(source, f)
       case RecoverWith(source, pf) => VRecoverWith(source, pf)

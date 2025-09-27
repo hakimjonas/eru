@@ -93,9 +93,9 @@ object CountDownLatch {
         }
       }.flatMap { case (hitZero, waitersToNotify) =>
         if (hitZero && waitersToNotify.nonEmpty) {
-          Eru.effect {
+          Eru.effectTotal {
             waitersToNotify.foreach(callback => callback(()))
-          }.attempt.map(_ => ())
+          }
         } else {
           Eru.unit
         }
@@ -123,7 +123,9 @@ object CountDownLatch {
 
               registerCallback.flatMap { reachedZero =>
                 if (reachedZero) {
-                  Eru.effect(wrappedCallback(())).attempt.map(_ => ())
+                  Eru.effectTotal {
+                    wrappedCallback(())
+                  }
                 } else {
                   Eru.unit
                 }

@@ -126,10 +126,10 @@ object CyclicBarrier {
             }.flatMap { case (isLastParty, waitersToNotify) =>
               if (isLastParty) {
                 // Notify all waiters and ourselves
-                Eru.effect {
+                Eru.effectTotal {
                   waitersToNotify.foreach(callback => callback(()))
                   wrappedCallback(())
-                }.attempt.map(_ => ())
+                }
               } else {
                 // Successfully registered, will be notified when barrier trips
                 Eru.unit

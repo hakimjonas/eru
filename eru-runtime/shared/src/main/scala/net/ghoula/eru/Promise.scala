@@ -145,9 +145,10 @@ object Promise {
       }.flatMap { case (wasCompleted, waitersToNotify) =>
         if (wasCompleted && waitersToNotify.nonEmpty) {
           val result = exitToEither(exit)
-          Eru.effect {
+          Eru.effectTotal {
             waitersToNotify.foreach(_(result))
-          }.attempt.map(_ => true)
+            true
+          }
         } else {
           Eru.succeed(wasCompleted)
         }
@@ -185,7 +186,9 @@ object Promise {
 
               registerCallback.flatMap {
                 case Some(result) =>
-                  Eru.effect(wrappedCallback(result)).attempt.map(_ => ())
+                  Eru.effectTotal {
+                    wrappedCallback(result)
+                  }
                 case None =>
                   Eru.unit
               }
