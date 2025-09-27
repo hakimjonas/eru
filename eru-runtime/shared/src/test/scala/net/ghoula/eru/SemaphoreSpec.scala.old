@@ -322,34 +322,64 @@ class SemaphoreSpec extends EruTestSuite {
   }
 
   test("semaphore concurrent withPermit operations") {
-    import scala.concurrent.{Future, ExecutionContext}
-    implicit val ec: ExecutionContext = ExecutionContext.global
-
     val semaphore = Semaphore.make(3).unsafeRunSync()
-    val numThreads = 6
+    val numOperations = 6
 
-    val futures = (1 to numThreads).map { i =>
-      Future {
+    // Run operations concurrently using fibers
+    // withPermit is Suspending, so only 3 can run at once
+    val program = for {
+      fibers <- Eru.foreach(1 to numOperations) { i =>
         semaphore.withPermit {
-          Eru.succeed(s"executed-$i")
-        }.unsafeRunSync()
+          // Simulate some work - this will run for only 3 fibers at a time
+          Eru.sleep(java.time.Duration.ofMillis(10)).flatMap(_ =>
+            Eru.succeed(s"executed-$i")
+          )
+        }.eru.fork
       }
+      results <- Eru.foreach(fibers)(_.await)
+    } yield results
+
+    val results = program.unsafeRunSync()
+
+    // All operations should complete successfully
+    // The blocking withPermit ensures proper serialization
+    assertEquals(results.length, 6)
+    results.foreach {
+      case Exit.Success(value) =>
+        assert(value.startsWith("executed-"))
+      case other =>
+        fail(s"Expected successful execution, got: $other")
     }
-
-    import scala.concurrent.Await
-    import scala.concurrent.duration.Duration
-    val results = Await.result(Future.sequence(futures), Duration(5, TimeUnit.SECONDS))
-
-    // Only 3 operations should have executed (permit limit)
-    val successes = results.collect { case Some(_) => () }
-    val failures = results.collect { case None => () }
-
-    assertEquals(successes.length, 3)
-    assertEquals(failures.length, 3)
 
     // All permits should be released
     val available = semaphore.permitsAvailable.unsafeRunSync()
     assertEquals(available, 3L)
+  }
+
+  test("semaphore withPermitTry non-blocking behavior") {
+    val semaphore = Semaphore.make(1).unsafeRunSync()
+
+    // Acquire the only permit
+    assertEquals(semaphore.tryAcquire.unsafeRunSync(), true)
+
+    // Try to run with permit - should fail immediately
+    val result = semaphore.withPermitTry {
+      Eru.succeed("should-not-run")
+    }.unsafeRunSync()
+
+    assertEquals(result, None)
+
+    // Release and try again
+    semaphore.release.unsafeRunSync()
+
+    val result2 = semaphore.withPermitTry {
+      Eru.succeed("should-run")
+    }.unsafeRunSync()
+
+    assertEquals(result2, Some("should-run"))
+
+    // Permit should be released
+    assertEquals(semaphore.permitsAvailable.unsafeRunSync(), 1L)
   }
 
   test("semaphore atomic operations under high contention") {

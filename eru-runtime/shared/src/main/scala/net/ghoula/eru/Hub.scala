@@ -101,19 +101,17 @@ object Hub {
   private final class BoundedHub[A](queueCapacity: Int, stateRef: Ref[HubState[A]], runtime: EruRuntime)
       extends Hub[A] {
 
-    def publish(message: A): Suspending[Nothing, Unit] = new Suspending(
-      getCurrentSubscribers.flatMap { queues =>
-        queues.headOption.fold(Eru.unit) { _ =>
-          // Publish to all subscribers, treating individual failures gracefully
-          Eru.collectAllDiscard(queues.map(_.put(message).eru.attempt))
-        }
-      })
+    def publish(message: A): Suspending[Nothing, Unit] = new Suspending(getCurrentSubscribers.flatMap { queues =>
+      queues.headOption.fold(Eru.unit) { _ =>
+        // Publish to all subscribers, treating individual failures gracefully
+        Eru.collectAllDiscard(queues.map(_.put(message).eru.attempt))
+      }
+    })
 
-    def subscribe: Immediate[Nothing, Queue[A]] = new Immediate(
-      for {
-        queue <- Queue.bounded[A](queueCapacity)(using runtime)
-        _ <- addSubscriber(queue)
-      } yield queue)
+    def subscribe: Immediate[Nothing, Queue[A]] = new Immediate(for {
+      queue <- Queue.bounded[A](queueCapacity)(using runtime)
+      _ <- addSubscriber(queue)
+    } yield queue)
 
     def subscriberCount: Immediate[Nothing, Int] =
       new Immediate(stateRef.get.map(_.subscribers.size))
@@ -136,19 +134,17 @@ object Hub {
   // Implementation for unbounded hubs using pure FP patterns
   private final class UnboundedHub[A](stateRef: Ref[HubState[A]], runtime: EruRuntime) extends Hub[A] {
 
-    def publish(message: A): Suspending[Nothing, Unit] = new Suspending(
-      getCurrentSubscribers.flatMap { queues =>
-        queues.headOption.fold(Eru.unit) { _ =>
-          // Publish to all subscribers, treating individual failures gracefully
-          Eru.collectAllDiscard(queues.map(_.put(message).eru.attempt))
-        }
-      })
+    def publish(message: A): Suspending[Nothing, Unit] = new Suspending(getCurrentSubscribers.flatMap { queues =>
+      queues.headOption.fold(Eru.unit) { _ =>
+        // Publish to all subscribers, treating individual failures gracefully
+        Eru.collectAllDiscard(queues.map(_.put(message).eru.attempt))
+      }
+    })
 
-    def subscribe: Immediate[Nothing, Queue[A]] = new Immediate(
-      for {
-        queue <- Queue.unbounded[A](using runtime)
-        _ <- addSubscriber(queue)
-      } yield queue)
+    def subscribe: Immediate[Nothing, Queue[A]] = new Immediate(for {
+      queue <- Queue.unbounded[A](using runtime)
+      _ <- addSubscriber(queue)
+    } yield queue)
 
     def subscriberCount: Immediate[Nothing, Int] =
       new Immediate(stateRef.get.map(_.subscribers.size))

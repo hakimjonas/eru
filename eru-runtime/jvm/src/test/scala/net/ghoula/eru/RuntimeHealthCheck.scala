@@ -18,15 +18,15 @@ class RuntimeHealthCheck extends EruTestSuite {
     // If runtime had fundamental bugs, these would deadlock
     val producers = (1 to 3).map { i =>
       (for {
-        _ <- latch.countDown
-        _ <- queue.put(s"msg-$i")
-        _ <- barrier.await // This would hang if runtime was broken
+        _ <- latch.countDown.eru
+        _ <- queue.put(s"msg-$i").eru
+        _ <- barrier.await.eru // This would hang if runtime was broken
       } yield s"producer-$i-done").fork.unsafeRunSync()
     }
 
     // Complete the latch from separate fibers
     (1 to 2).foreach { _ =>
-      latch.countDown.fork.unsafeRunSync()
+      latch.countDown.eru.fork.unsafeRunSync()
     }
 
     // All should complete without hanging
@@ -41,7 +41,7 @@ class RuntimeHealthCheck extends EruTestSuite {
     assert(results.forall(_.endsWith("-done")))
 
     // Verify messages were queued
-    val messages = (1 to 3).map(_ => queue.take.unsafeRunSync())
+    val messages = (1 to 3).map(_ => queue.take.eru.unsafeRunSync())
     assertEquals(messages.toSet, Set("msg-1", "msg-2", "msg-3"))
   }
 

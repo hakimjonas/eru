@@ -52,7 +52,7 @@ final class VTForkSpec extends EruTestSuite {
     assertEquals(exit, Exit.Success(42))
 
     // Wait for the FiberCompleted event to be recorded
-    completionPromise.await.unsafeRunSync()
+    completionPromise.await.eru.unsafeRunSync()
 
     import scala.jdk.CollectionConverters.*
     val eventList = events.asScala.toList

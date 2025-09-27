@@ -19,12 +19,12 @@ final class DeferredSpec extends EruTestSuite {
     // Fork a fiber that completes the deferred after a short delay
     val completingFiber = (
       sleep(java.time.Duration.ofMillis(10)).flatMap { _ =>
-        d.complete(42)
+        d.complete(42).eru
       }
     ).fork.unsafeRunSync()
 
     // Await should block until completion
-    val value = d.await.unsafeRunSync()
+    val value = d.await.eru.unsafeRunSync()
     assertEquals(value, 42)
 
     // Verify the completing fiber succeeded
@@ -38,7 +38,7 @@ final class DeferredSpec extends EruTestSuite {
     assertEquals(completed, true)
 
     // Await should return immediately since already completed
-    val value = d.await.unsafeRunSync()
+    val value = d.await.eru.unsafeRunSync()
     assertEquals(value, "immediate")
   }
 
@@ -50,7 +50,7 @@ final class DeferredSpec extends EruTestSuite {
     assertEquals(second, false)
 
     // Value should be from first completion
-    val value = d.await.unsafeRunSync()
+    val value = d.await.eru.unsafeRunSync()
     assertEquals(value, "ok")
   }
 
@@ -59,7 +59,7 @@ final class DeferredSpec extends EruTestSuite {
 
     // Fork multiple fibers that all await the same deferred
     val waitingFibers = (1 to 5).map { _ =>
-      d.await.fork.unsafeRunSync()
+      d.await.eru.fork.unsafeRunSync()
     }.toList
 
     // Complete the deferred
@@ -82,13 +82,13 @@ final class DeferredSpec extends EruTestSuite {
         // Fork a fiber that completes the deferred after a delay
         completingFiber <- isolatedRuntime.fork {
           isolatedRuntime.sleep(java.time.Duration.ofMillis(10)).flatMap { _ =>
-            d.complete(42)
+            d.complete(42).eru
           }
         }
         // Advance TestClock to allow the fiber to execute
         _ <- Eru.effect(clock.advance(java.time.Duration.ofMillis(15)))
         // Now await the deferred - should complete deterministically
-        value <- d.await
+        value <- d.await.eru
         // Verify the completing fiber succeeded
         completed <- completingFiber.await
       } yield (value, completed)

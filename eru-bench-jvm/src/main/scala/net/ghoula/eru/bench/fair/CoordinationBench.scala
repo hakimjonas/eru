@@ -26,8 +26,8 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruDeferredBasic(): Int = runEru {
     for {
       deferred <- Eru.deferred[Int]
-      _ <- deferred.complete(TEST_VALUE)
-      result <- deferred.await
+      _ <- deferred.complete(TEST_VALUE).eru
+      result <- deferred.await.eru
     } yield result
   }
 
@@ -59,12 +59,12 @@ class CoordinationBench extends FairBenchmarkBase {
       d1 <- Eru.deferred[Int]
       d2 <- Eru.deferred[Int]
       d3 <- Eru.deferred[Int]
-      _ <- d1.complete(10)
-      _ <- d2.complete(20)
-      _ <- d3.complete(12)
-      a <- d1.await
-      b <- d2.await
-      c <- d3.await
+      _ <- d1.complete(10).eru
+      _ <- d2.complete(20).eru
+      _ <- d3.complete(12).eru
+      a <- d1.await.eru
+      b <- d2.await.eru
+      c <- d3.await.eru
       result <- Eru.succeed(a + b + c)
     } yield result
   }
@@ -110,7 +110,10 @@ class CoordinationBench extends FairBenchmarkBase {
     for {
       sem <- Eru.semaphore(1)
       ref <- Eru.ref(0)
-      result <- sem.withPermit(ref.update(_ + TEST_VALUE).flatMap(_ => ref.get)).map(_.get)
+      _ <- sem.acquire.eru
+      _ <- ref.update(_ + TEST_VALUE)
+      result <- ref.get
+      _ <- sem.release.eru
     } yield result
   }
 
@@ -144,8 +147,8 @@ class CoordinationBench extends FairBenchmarkBase {
       _ <- ref.update(_ + 10)
       _ <- ref.update(_ + 20)
       current <- ref.get
-      _ <- deferred.complete(current + 12)
-      result <- deferred.await
+      _ <- deferred.complete(current + 12).eru
+      result <- deferred.await.eru
     } yield result
   }
 
@@ -183,8 +186,8 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruQueue(): Int = runEru {
     for {
       queue <- Eru.queue[Int](10)
-      _ <- queue.put(TEST_VALUE)
-      result <- queue.take
+      _ <- queue.put(TEST_VALUE).eru
+      result <- queue.take.eru
     } yield result
   }
 
@@ -214,8 +217,8 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruSemaphore(): Boolean = runEru {
     for {
       semaphore <- Eru.semaphore(1)
-      acquired <- semaphore.tryAcquire
-      _ <- if (acquired) semaphore.release else Eru.succeed(())
+      acquired <- semaphore.tryAcquire.eru
+      _ <- if (acquired) semaphore.release.eru else Eru.succeed(())
     } yield acquired
   }
 
@@ -243,8 +246,8 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruCountDownLatch(): Unit = runEru {
     for {
       latch <- Eru.countDownLatch(1)
-      _ <- latch.countDown
-      _ <- latch.await
+      _ <- latch.countDown.eru
+      _ <- latch.await.eru
     } yield ()
   }
 
@@ -275,7 +278,7 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruCyclicBarrier(): Unit = runEru {
     for {
       barrier <- Eru.cyclicBarrier(1)
-      _ <- barrier.await
+      _ <- barrier.await.eru
     } yield ()
   }
 

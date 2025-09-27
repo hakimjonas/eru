@@ -17,12 +17,12 @@ class CoordinationConcurrencySpec extends EruTestSuite {
 
       // Create waiters that will wait for the latch
       waiters <- parSequence((1 to waiterCount).map { i =>
-        latch.await.map(_ => s"waiter$i-completed").fork
+        latch.await.eru.map(_ => s"waiter$i-completed").fork
       }.toList)
 
       // Count down the latch from the main fiber
       _ <- parSequence((1 to waiterCount).map { i =>
-        latch.countDown.map(_ => s"countdown$i").fork
+        latch.countDown.eru.map(_ => s"countdown$i").fork
       }.toList)
 
       // Collect waiter results
@@ -45,8 +45,8 @@ class CoordinationConcurrencySpec extends EruTestSuite {
     // Simple test that doesn't involve actual coordination to avoid deadlocks
     val result = for {
       barrier <- Eru.cyclicBarrier(3)
-      parties <- barrier.getParties
-      waiting <- barrier.getNumberWaiting
+      parties <- barrier.getParties.eru
+      waiting <- barrier.getNumberWaiting.eru
     } yield (parties, waiting)
 
     val (parties, waiting) = result.unsafeRunSync()
@@ -61,10 +61,10 @@ class CoordinationConcurrencySpec extends EruTestSuite {
       latch <- Eru.countDownLatch(count)
 
       // Single waiter
-      waiter <- latch.await.map(_ => "waiter-completed").fork
+      waiter <- latch.await.eru.map(_ => "waiter-completed").fork
 
       // Multiple countdown operations
-      _ <- parSequence((1 to count).map { _ => latch.countDown }.toList)
+      _ <- parSequence((1 to count).map { _ => latch.countDown.eru }.toList)
 
       // Get waiter result
       waiterResult <- waiter.await.flatMap {
@@ -72,7 +72,7 @@ class CoordinationConcurrencySpec extends EruTestSuite {
         case other => Eru.fail(s"Expected success but got: $other")
       }
 
-      finalCount <- latch.getCount
+      finalCount <- latch.getCount.eru
     } yield (waiterResult, finalCount)
 
     val result = coordinated.attempt.unsafeRunSync()

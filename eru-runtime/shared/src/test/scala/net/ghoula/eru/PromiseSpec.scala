@@ -1,6 +1,6 @@
 package net.ghoula.eru
 
-import java.util.concurrent.{CountDownLatch, TimeUnit}
+import java.util.concurrent.TimeUnit
 
 import net.ghoula.eru.prelude.*
 import net.ghoula.eru.test.EruTestSuite
@@ -16,26 +16,26 @@ class PromiseSpec extends EruTestSuite {
 
   test("promise creation succeeds") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    assertEquals(promise.isDone.unsafeRunSync(), false)
+    assertEquals(promise.isDone.eru.unsafeRunSync(), false)
   }
 
   test("promise succeed completes with success value") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    val completed = promise.succeed(42).unsafeRunSync()
+    val completed = promise.succeed(42).eru.unsafeRunSync()
     assertEquals(completed, true)
-    assertEquals(promise.isDone.unsafeRunSync(), true)
+    assertEquals(promise.isDone.eru.unsafeRunSync(), true)
 
-    val result = promise.await.unsafeRunSync()
+    val result = promise.await.eru.unsafeRunSync()
     assertEquals(result, 42)
   }
 
   test("promise fail completes with failure value") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    val completed = promise.fail("error").unsafeRunSync()
+    val completed = promise.fail("error").eru.unsafeRunSync()
     assertEquals(completed, true)
-    assertEquals(promise.isDone.unsafeRunSync(), true)
+    assertEquals(promise.isDone.eru.unsafeRunSync(), true)
 
-    val result = promise.await.attempt.unsafeRunSync()
+    val result = promise.await.eru.attempt.unsafeRunSync()
     result match {
       case Result.Success(_) => fail("Expected failure but got success")
       case Result.Failure(error) => assertEquals(error, "error")
@@ -45,20 +45,20 @@ class PromiseSpec extends EruTestSuite {
   test("promise complete with effect result succeeds") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
     val effect = Eru.succeed(100)
-    val completed = promise.complete(effect).unsafeRunSync()
+    val completed = promise.complete(effect).eru.unsafeRunSync()
     assertEquals(completed, true)
 
-    val result = promise.await.unsafeRunSync()
+    val result = promise.await.eru.unsafeRunSync()
     assertEquals(result, 100)
   }
 
   test("promise complete with effect failure fails") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
     val effect = Eru.fail("failure")
-    val completed = promise.complete(effect).unsafeRunSync()
+    val completed = promise.complete(effect).eru.unsafeRunSync()
     assertEquals(completed, true)
 
-    val result = promise.await.attempt.unsafeRunSync()
+    val result = promise.await.eru.attempt.unsafeRunSync()
     result match {
       case Result.Success(_) => fail("Expected failure but got success")
       case Result.Failure(error) => assertEquals(error, "failure")
@@ -67,29 +67,29 @@ class PromiseSpec extends EruTestSuite {
 
   test("promise can only be completed once - succeed first") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    val first = promise.succeed(1).unsafeRunSync()
-    val second = promise.succeed(2).unsafeRunSync()
-    val third = promise.fail("error").unsafeRunSync()
+    val first = promise.succeed(1).eru.unsafeRunSync()
+    val second = promise.succeed(2).eru.unsafeRunSync()
+    val third = promise.fail("error").eru.unsafeRunSync()
 
     assertEquals(first, true)
     assertEquals(second, false)
     assertEquals(third, false)
 
-    val result = promise.await.unsafeRunSync()
+    val result = promise.await.eru.unsafeRunSync()
     assertEquals(result, 1)
   }
 
   test("promise can only be completed once - fail first") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    val first = promise.fail("error1").unsafeRunSync()
-    val second = promise.fail("error2").unsafeRunSync()
-    val third = promise.succeed(42).unsafeRunSync()
+    val first = promise.fail("error1").eru.unsafeRunSync()
+    val second = promise.fail("error2").eru.unsafeRunSync()
+    val third = promise.succeed(42).eru.unsafeRunSync()
 
     assertEquals(first, true)
     assertEquals(second, false)
     assertEquals(third, false)
 
-    val result = promise.await.attempt.unsafeRunSync()
+    val result = promise.await.eru.attempt.unsafeRunSync()
     result match {
       case Result.Success(_) => fail("Expected failure but got success")
       case Result.Failure(error) => assertEquals(error, "error1")
@@ -98,14 +98,14 @@ class PromiseSpec extends EruTestSuite {
 
   test("promise poll returns None when pending") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    val poll = promise.poll.unsafeRunSync()
+    val poll = promise.poll.eru.unsafeRunSync()
     assertEquals(poll, None)
   }
 
   test("promise poll returns Some(Success) when completed with success") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    promise.succeed(42).unsafeRunSync()
-    val poll = promise.poll.unsafeRunSync()
+    promise.succeed(42).eru.unsafeRunSync()
+    val poll = promise.poll.eru.unsafeRunSync()
     poll match {
       case Some(Exit.Success(value)) => assertEquals(value, 42)
       case other => fail(s"Expected Some(Success(42)) but got: $other")
@@ -114,8 +114,8 @@ class PromiseSpec extends EruTestSuite {
 
   test("promise poll returns Some(Failure) when completed with failure") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    promise.fail("error").unsafeRunSync()
-    val poll = promise.poll.unsafeRunSync()
+    promise.fail("error").eru.unsafeRunSync()
+    val poll = promise.poll.eru.unsafeRunSync()
     poll match {
       case Some(Exit.Failure(error)) => assertEquals(error, "error")
       case other => fail(s"Expected Some(Failure(error)) but got: $other")
@@ -124,17 +124,17 @@ class PromiseSpec extends EruTestSuite {
 
   test("promise await returns immediately when already completed with success") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    promise.succeed(99).unsafeRunSync()
+    promise.succeed(99).eru.unsafeRunSync()
 
-    val result = promise.await.unsafeRunSync()
+    val result = promise.await.eru.unsafeRunSync()
     assertEquals(result, 99)
   }
 
   test("promise await returns immediately when already completed with failure") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    promise.fail("immediate").unsafeRunSync()
+    promise.fail("immediate").eru.unsafeRunSync()
 
-    val result = promise.await.attempt.unsafeRunSync()
+    val result = promise.await.eru.attempt.unsafeRunSync()
     result match {
       case Result.Success(_) => fail("Expected failure but got success")
       case Result.Failure(error) => assertEquals(error, "immediate")
@@ -143,14 +143,14 @@ class PromiseSpec extends EruTestSuite {
 
   test("promise constructor is available via Eru companion") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    assertEquals(promise.isDone.unsafeRunSync(), false)
+    assertEquals(promise.isDone.eru.unsafeRunSync(), false)
   }
 
   test("promise operations compose with other Eru effects") {
     val program = for {
       promise <- Eru.promise[String, Int]
-      _ <- promise.succeed(42)
-      result <- promise.await
+      _ <- promise.succeed(42).eru
+      result <- promise.await.eru
       doubled <- Eru.succeed(result * 2)
     } yield doubled
 
@@ -167,7 +167,7 @@ class PromiseSpec extends EruTestSuite {
 
     val futures = (1 to numThreads).map { i =>
       Future {
-        promise.succeed(i).unsafeRunSync()
+        promise.succeed(i).eru.unsafeRunSync()
       }
     }
 
@@ -180,7 +180,7 @@ class PromiseSpec extends EruTestSuite {
     assertEquals(successes, 1)
 
     // Promise should be completed with one of the values
-    val finalResult = promise.await.unsafeRunSync()
+    val finalResult = promise.await.eru.unsafeRunSync()
     assert((1 to numThreads).contains(finalResult), s"Value $finalResult should be in range 1-$numThreads")
   }
 
@@ -191,9 +191,9 @@ class PromiseSpec extends EruTestSuite {
     val promise = Eru.promise[String, Int].unsafeRunSync()
 
     val futures = List(
-      Future { promise.succeed(1).unsafeRunSync() },
-      Future { promise.fail("error").unsafeRunSync() },
-      Future { promise.succeed(2).unsafeRunSync() }
+      Future { promise.succeed(1).eru.unsafeRunSync() },
+      Future { promise.fail("error").eru.unsafeRunSync() },
+      Future { promise.succeed(2).eru.unsafeRunSync() }
     )
 
     import scala.concurrent.Await
@@ -205,37 +205,11 @@ class PromiseSpec extends EruTestSuite {
     assertEquals(successes, 1)
 
     // Promise should be completed
-    val isDone = promise.isDone.unsafeRunSync()
+    val isDone = promise.isDone.eru.unsafeRunSync()
     assert(isDone, "Promise should be completed after race")
   }
 
-  test("promise await blocks until completion") {
-    val promise = Eru.promise[String, String].unsafeRunSync()
-    val latch = new CountDownLatch(1)
-
-    // Start awaiting in separate thread
-    val awaitFuture = {
-      import scala.concurrent.{Future, ExecutionContext}
-      implicit val ec: ExecutionContext = ExecutionContext.global
-      Future {
-        latch.countDown() // Signal that await has started
-        promise.await.unsafeRunSync()
-      }
-    }
-
-    // Wait for await to start
-    assert(latch.await(1, TimeUnit.SECONDS), "Await should start within timeout")
-
-    // Complete the promise
-    Thread.sleep(10) // Small delay to ensure await is blocked
-    promise.succeed("completed").unsafeRunSync()
-
-    // Await should now complete
-    import scala.concurrent.Await
-    import scala.concurrent.duration.Duration
-    val result = Await.result(awaitFuture, Duration(1, TimeUnit.SECONDS))
-    assertEquals(result, "completed")
-  }
+  // Test moved to PromiseConcurrentSpec (JVM-only) as it requires Future/real threads
 
   test("promise resource cleanup on completion") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
@@ -243,6 +217,7 @@ class PromiseSpec extends EruTestSuite {
 
     val effect = promise
       .succeed(42)
+      .eru
       .ensure(Eru.effect {
         cleanupCalled = true
         ()
@@ -251,7 +226,7 @@ class PromiseSpec extends EruTestSuite {
     effect.unsafeRunSync()
     assert(cleanupCalled, "Resource cleanup should be called")
 
-    val result = promise.await.unsafeRunSync()
+    val result = promise.await.eru.unsafeRunSync()
     assertEquals(result, 42)
   }
 
@@ -259,8 +234,8 @@ class PromiseSpec extends EruTestSuite {
     // Test that Promise works with different type parameters
     val stringPromise: Promise[String, String] = Eru.promise[String, String].unsafeRunSync()
 
-    stringPromise.succeed("test").unsafeRunSync()
-    val result = stringPromise.await.unsafeRunSync()
+    stringPromise.succeed("test").eru.unsafeRunSync()
+    val result = stringPromise.await.eru.unsafeRunSync()
     assertEquals(result, "test")
   }
 
@@ -268,10 +243,10 @@ class PromiseSpec extends EruTestSuite {
     val result = for {
       promise1 <- Eru.promise[String, Int]
       promise2 <- Eru.promise[String, String]
-      _ <- promise1.succeed(123)
-      _ <- promise2.succeed("hello")
-      value1 <- promise1.await
-      value2 <- promise2.await
+      _ <- promise1.succeed(123).eru
+      _ <- promise2.succeed("hello").eru
+      value1 <- promise1.await.eru
+      value2 <- promise2.await.eru
     } yield (value1, value2)
 
     assertEquals(result.unsafeRunSync(), (123, "hello"))
@@ -282,25 +257,25 @@ class PromiseSpec extends EruTestSuite {
     val exception = new RuntimeException("effect-error")
     val effect = Eru.effect(throw exception)
 
-    val completed = promise.complete(effect).unsafeRunSync()
+    val completed = promise.complete(effect).eru.unsafeRunSync()
     assert(completed, "CompleteWith should succeed even for dying source")
 
     val caughtException = intercept[RuntimeException] {
-      promise.await.unsafeRunSync()
+      promise.await.eru.unsafeRunSync()
     }
     assertEquals(caughtException.getMessage, "effect-error")
   }
 
   test("promise concurrent access to poll") {
     val promise = Eru.promise[String, Int].unsafeRunSync()
-    promise.succeed(999).unsafeRunSync()
+    promise.succeed(999).eru.unsafeRunSync()
 
     import scala.concurrent.{Future, ExecutionContext}
     implicit val ec: ExecutionContext = ExecutionContext.global
 
     val futures = (1 to 20).map { _ =>
       Future {
-        promise.poll.unsafeRunSync()
+        promise.poll.eru.unsafeRunSync()
       }
     }
 
@@ -317,9 +292,9 @@ class PromiseSpec extends EruTestSuite {
 
   test("promise error handling maintains type safety") {
     val promise: Promise[String, Int] = Eru.promise[String, Int].unsafeRunSync()
-    promise.fail("typed-error").unsafeRunSync()
+    promise.fail("typed-error").eru.unsafeRunSync()
 
-    val result = promise.await.attempt.unsafeRunSync()
+    val result = promise.await.eru.attempt.unsafeRunSync()
     result match {
       case Result.Success(_) => munit.Assertions.fail("Expected failure")
       case Result.Failure(error) => assertEquals(error, "typed-error")
@@ -333,10 +308,10 @@ class PromiseSpec extends EruTestSuite {
 
     // Register many callbacks
     (1 to numCallbacks).foreach { _ =>
-      promise.complete(Eru.unit).map(_ => callbackCount += 1).unsafeRunSync()
+      promise.complete(Eru.unit).eru.map(_ => callbackCount += 1).unsafeRunSync()
     }
 
-    promise.succeed(()).unsafeRunSync()
+    promise.succeed(()).eru.unsafeRunSync()
     assertEquals(callbackCount, numCallbacks)
   }
 
@@ -349,10 +324,10 @@ class PromiseSpec extends EruTestSuite {
       c <- Eru.effect(a + b + 12)
     } yield c
 
-    val completed = promise.complete(complexEffect).unsafeRunSync()
+    val completed = promise.complete(complexEffect).eru.unsafeRunSync()
     assert(completed, "Complex effect completion should succeed")
 
-    val result = promise.await.unsafeRunSync()
+    val result = promise.await.eru.unsafeRunSync()
     assertEquals(result, 42)
   }
 
@@ -360,43 +335,13 @@ class PromiseSpec extends EruTestSuite {
     val promise1 = Eru.promise[String, Int].unsafeRunSync()
     val promise2 = Eru.promise[String, Int].unsafeRunSync()
 
-    promise1.succeed(111).unsafeRunSync()
-    promise2.succeed(222).unsafeRunSync()
+    promise1.succeed(111).eru.unsafeRunSync()
+    promise2.succeed(222).eru.unsafeRunSync()
 
-    assertEquals(promise1.await.unsafeRunSync(), 111)
-    assertEquals(promise2.await.unsafeRunSync(), 222)
+    assertEquals(promise1.await.eru.unsafeRunSync(), 111)
+    assertEquals(promise2.await.eru.unsafeRunSync(), 222)
     assert(promise1 ne promise2, "Promises should be different instances")
   }
 
-  test("promise handles completion during await") {
-    val promise = Eru.promise[String, Int].unsafeRunSync()
-    val latch1 = new CountDownLatch(1)
-    val latch2 = new CountDownLatch(1)
-
-    import scala.concurrent.{Future, ExecutionContext}
-    implicit val ec: ExecutionContext = ExecutionContext.global
-
-    // Start await in background
-    val awaitFuture = Future {
-      latch1.countDown()
-      promise.await.unsafeRunSync()
-    }
-
-    // Complete after await starts
-    val completeFuture = Future {
-      latch1.await(1, TimeUnit.SECONDS)
-      Thread.sleep(10) // Small delay
-      promise.succeed(555).unsafeRunSync()
-      latch2.countDown()
-    }
-
-    // Wait for both operations
-    import scala.concurrent.Await
-    import scala.concurrent.duration.Duration
-    latch2.await(2, TimeUnit.SECONDS)
-    val result = Await.result(awaitFuture, Duration(2, TimeUnit.SECONDS))
-    Await.result(completeFuture, Duration(1, TimeUnit.SECONDS))
-
-    assertEquals(result, 555)
-  }
+  // Test moved to PromiseConcurrentSpec (JVM-only) as it requires Future/real threads
 }

@@ -306,7 +306,7 @@ class PreludeSpec extends EruTestSuite {
       deferred <- Eru.deferred[String]
       fiber <- deferred.complete("done").fork
       _ <- fiber.await
-      result <- deferred.await
+      result <- deferred.await.eru
     } yield (value, result)
 
     // This may not run if coordination primitives aren't implemented yet

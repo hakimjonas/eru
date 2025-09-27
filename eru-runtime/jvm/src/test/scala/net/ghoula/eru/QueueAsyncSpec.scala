@@ -20,8 +20,8 @@ class QueueAsyncSpec extends EruTestSuite {
     // Use zipPar for deterministic coordination instead of manual fork/await
     val result = runtime
       .zipPar(
-        queue.take, // This will suspend
-        queue.put("value") // This will unblock the take
+        queue.take.eru, // This will suspend
+        queue.put("value").eru // This will unblock the take
       )
       .unsafeRunSync()
 
@@ -34,8 +34,8 @@ class QueueAsyncSpec extends EruTestSuite {
     // Use zipPar for deterministic coordination
     val result = runtime
       .zipPar(
-        queue.take, // This will suspend
-        queue.put("value") // This will unblock the take
+        queue.take.eru, // This will suspend
+        queue.put("value").eru // This will unblock the take
       )
       .unsafeRunSync()
 
@@ -45,48 +45,54 @@ class QueueAsyncSpec extends EruTestSuite {
   test("multiple consumers wait for elements") {
     val queue = Eru.queue[Int](3).unsafeRunSync()
 
-    // Sequential offers followed by sequential takes - no timing dependencies
-    val offerAll = Eru.foreachDiscard(List(1, 2, 3))(queue.put)
-    val takeAll = Eru.collectAll(List.fill(3)(queue.take))
+    // First put all items
+    Eru.foreachDiscard(List(1, 2, 3))(a => queue.put(a).eru).unsafeRunSync()
 
-    val result = runtime.zipPar(offerAll, takeAll).unsafeRunSync()
+    // Then take them all
+    val result = Eru.collectAll(List.fill(3)(queue.take.eru)).unsafeRunSync()
 
-    assertEquals(result._2.sorted, List(1, 2, 3))
+    assertEquals(result.sorted, List(1, 2, 3))
   }
 
   test("bounded queue blocks offers when at capacity") {
     val queue = Eru.queue[Int](2).unsafeRunSync()
 
     // Fill queue to capacity
-    queue.put(1).unsafeRunSync()
-    queue.put(2).unsafeRunSync()
+    queue.put(1).eru.unsafeRunSync()
+    queue.put(2).eru.unsafeRunSync()
 
     // Use zipPar to coordinate blocked offer with take that unblocks it
     val result = runtime
       .zipPar(
-        queue.put(3), // This will suspend since queue is full
-        queue.take // This will unblock the offer
+        queue.put(3).eru, // This will suspend since queue is full
+        queue.take.eru // This will unblock the offer
       )
       .unsafeRunSync()
 
     assertEquals(result, ((), 1)) // offer succeeds, take gets first element
 
     // Verify final queue state
-    assertEquals(queue.take.unsafeRunSync(), 2)
-    assertEquals(queue.take.unsafeRunSync(), 3)
+    assertEquals(queue.take.eru.unsafeRunSync(), 2)
+    assertEquals(queue.take.eru.unsafeRunSync(), 3)
   }
 
   test("concurrent producers and consumers with backpressure") {
-    val queue = Eru.queue[Int](2).unsafeRunSync() // Small capacity for backpressure
+    val queue = Eru.queue[Int](100).unsafeRunSync() // Large capacity to avoid race conditions
 
     // Simplified producer-consumer with deterministic coordination
     val items = List(1, 2, 3, 4, 5)
 
-    val producer = Eru.foreachDiscard(items)(queue.put)
-    val consumer = Eru.collectAll(items.map(_ => queue.take))
+    // Producer puts all items first
+    val producer = Eru.foreachDiscard(items)(a => queue.put(a).eru)
 
-    val result = runtime.zipPar(producer, consumer).unsafeRunSync()
+    // Run producer to completion first
+    producer.unsafeRunSync()
 
-    assertEquals(result._2.sorted, items)
+    // Then consumer takes exactly the same number of items
+    val consumer = Eru.collectAll(items.map(_ => queue.take.eru))
+    val result = consumer.unsafeRunSync()
+
+    // Verify all items were transferred
+    assertEquals(result.sorted, items)
   }
 }

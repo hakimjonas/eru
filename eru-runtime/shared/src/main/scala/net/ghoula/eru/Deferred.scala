@@ -18,8 +18,8 @@ trait Deferred[A] {
     * @param a
     *   the value to complete the deferred with
     * @return
-    *   an immediate effect that yields `true` if this invocation completed the deferred, or `false` if it was
-    *   already completed
+    *   an immediate effect that yields `true` if this invocation completed the deferred, or `false`
+    *   if it was already completed
     */
   def complete(a: A): Immediate[Nothing, Boolean]
 

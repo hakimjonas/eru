@@ -52,8 +52,8 @@ final class ConcurrencySpec extends munit.FunSuite {
     val program = for {
       d <- Eru.deferred[Int]
       f <- Eru.succeed(42).fork
-      _ <- d.complete(99)
-      v <- d.await
+      _ <- d.complete(99).eru
+      v <- d.await.eru
       x <- f.await.flatMap {
         case Exit.Success(a) => Eru.succeed(a)
         case _ => Eru.succeed(-1)

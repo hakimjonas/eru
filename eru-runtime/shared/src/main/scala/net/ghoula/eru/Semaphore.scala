@@ -1,9 +1,10 @@
 package net.ghoula.eru
 
-/** A permit-based coordination primitive that controls access to a limited number of resources.
+import net.ghoula.eru.prelude.*
+
+/** A counting semaphore that controls access to a finite number of permits.
   *
-  * This implementation provides both blocking and non-blocking operations with compile-time safety
-  * through the suspension type system. Blocking operations return Suspending types that cannot be
+  * Operations are properly typed with Suspending/Immediate to ensure blocking operations cannot be
   * called with unsafeRunSync, preventing deadlocks.
   */
 trait Semaphore {
@@ -34,9 +35,9 @@ trait Semaphore {
     */
   def tryAcquire: Immediate[Nothing, Boolean]
 
-  /** Attempts to acquire `n` permits.
+  /** Attempts to acquire n permits.
     * @param n
-    *   number of permits to acquire (non-negative)
+    *   number of permits to acquire
     * @return
     *   an effect that yields true if all permits were acquired, false otherwise
     */
@@ -45,26 +46,37 @@ trait Semaphore {
   /** Releases a single permit. */
   def release: Immediate[Nothing, Unit]
 
-  /** Releases `n` permits. */
+  /** Releases n permits. */
   def releaseN(n: Long): Immediate[Nothing, Unit]
 
-  /** Runs `fa` if a permit can be acquired, ensuring the permit is released afterward.
+  /** Acquires a permit, runs `fa`, and releases the permit afterward. This operation suspends until
+    * a permit is available.
     * @param fa
     *   the effect to run under a single permit
     * @return
-    *   an effect that yields Some(result) if acquired, or None if acquisition failed
+    *   a suspending effect that yields the result of fa
     */
-  def withPermit[E, A](fa: => Eru[E, A]): Eru[E, Option[A]]
+  def withPermit[E, A](fa: => Eru[E, A]): Suspending[E, A]
 
-  /** Runs `fa` if `n` permits can be acquired, ensuring they are released afterward.
+  /** Acquires `n` permits, runs `fa`, and releases the permits afterward. This operation suspends
+    * until all permits are available.
     * @param n
     *   number of permits required
     * @param fa
     *   the effect to run
     * @return
-    *   an effect that yields Some(result) if acquired, or None if acquisition failed
+    *   a suspending effect that yields the result of fa
     */
-  def withPermits[E, A](n: Long)(fa: => Eru[E, A]): Eru[E, Option[A]]
+  def withPermits[E, A](n: Long)(fa: => Eru[E, A]): Suspending[E, A]
+
+  /** Tries to acquire a permit and run `fa` if successful, releasing afterward. This operation
+    * never blocks.
+    * @param fa
+    *   the effect to run if a permit is acquired
+    * @return
+    *   an immediate effect yielding Some(result) if acquired, None otherwise
+    */
+  def withPermitTry[E, A](fa: => Eru[E, A]): Immediate[E, Option[A]]
 }
 
 object Semaphore {
@@ -72,74 +84,138 @@ object Semaphore {
   /** Creates a new semaphore initialized with `n` permits. */
   def make(n: Long)(using runtime: EruRuntime): Eru[Nothing, Semaphore] =
     for {
-      permitsRef <- Ref.make(if (n < 0) 0L else n)
-    } yield new RuntimeSemaphore(permitsRef, runtime)
+      stateRef <- Ref.make(State(if (n < 0) 0L else n, List.empty))
+    } yield new RuntimeSemaphore(stateRef, runtime)
 
-  private final class RuntimeSemaphore(permitsRef: Ref[Long], runtime: EruRuntime) extends Semaphore {
+  private case class State(permits: Long, waiters: List[Promise[Nothing, Unit]])
+
+  private final class RuntimeSemaphore(stateRef: Ref[State], runtime: EruRuntime) extends Semaphore {
 
     def acquire: Suspending[Nothing, Unit] = new Suspending({
-      tryAcquire.eru.flatMap { acquired =>
-        if (acquired) Eru.unit
-        else {
-          // Need to suspend and wait for a permit
+      // First try to acquire without creating a promise
+      stateRef.modify { state =>
+        if (state.permits > 0) {
+          // Permit available, acquire it immediately
+          (state.copy(permits = state.permits - 1), true)
+        } else {
+          // No permits available, need to wait
+          (state, false)
+        }
+      }.flatMap { acquired =>
+        if (acquired) {
+          // Got permit immediately
+          Eru.unit
+        } else {
+          // Need to wait - create promise and register it
           for {
             promise <- Promise.make[Nothing, Unit](using runtime)
-            registered <- permitsRef.modify { current =>
-              if (current > 0) {
-                // Permit became available during registration
-                (current - 1, Right(()))
+            registered <- stateRef.modify { state =>
+              if (state.permits > 0) {
+                // Permit became available while creating promise
+                (state.copy(permits = state.permits - 1), false)
               } else {
-                // Register to wait - simplified for now, proper impl would track waiters
-                (current, Left(promise))
+                // Still need to wait, add to waiters
+                (state.copy(waiters = state.waiters :+ promise), true)
               }
             }
-            result <- registered match {
-              case Right(()) => Eru.unit
-              case Left(p) => p.await.eru
-            }
-          } yield result
+            _ <-
+              if (registered) {
+                promise.await.eru
+              } else {
+                // Got permit during registration
+                Eru.unit
+              }
+          } yield ()
         }
       }
     })
 
-    def acquireN(n: Long): Suspending[Nothing, Unit] = new Suspending({
-      tryAcquireN(n).eru.flatMap { acquired =>
-        if (acquired) Eru.unit
-        else acquire.eru.flatMap(_ => acquireN(n - 1).eru) // Simplified recursive implementation
+    def acquireN(n: Long): Suspending[Nothing, Unit] = new Suspending(
+      if (n <= 0) Eru.unit
+      else if (n == 1) acquire.eru
+      else {
+        // For simplicity, acquire permits one by one
+        // A more efficient implementation would acquire all at once
+        Eru.foreach(1L to n)(_ => acquire.eru).map(_ => ())
       }
-    })
+    )
 
-    def permitsAvailable: Immediate[Nothing, Long] = new Immediate(permitsRef.get)
+    def permitsAvailable: Immediate[Nothing, Long] = new Immediate(
+      stateRef.get.map(_.permits)
+    )
 
-    def tryAcquire: Immediate[Nothing, Boolean] = new Immediate(permitsRef.modify { current =>
-      if (current > 0) (current - 1, true)
-      else (current, false)
-    })
+    def tryAcquire: Immediate[Nothing, Boolean] = new Immediate(
+      stateRef.modify { state =>
+        if (state.permits > 0) {
+          (state.copy(permits = state.permits - 1), true)
+        } else {
+          (state, false)
+        }
+      }
+    )
 
     def tryAcquireN(n: Long): Immediate[Nothing, Boolean] = new Immediate(
       if (n <= 0) Eru.succeed(true)
-      else
-        permitsRef.modify { current =>
-          if (current >= n) (current - n, true)
-          else (current, false)
+      else {
+        stateRef.modify { state =>
+          if (state.permits >= n) {
+            (state.copy(permits = state.permits - n), true)
+          } else {
+            (state, false)
+          }
         }
+      }
     )
 
-    def release: Immediate[Nothing, Unit] = new Immediate(permitsRef.update(_ + 1).map(_ => ()))
+    def release: Immediate[Nothing, Unit] = new Immediate(
+      stateRef.modify { state =>
+        state.waiters match {
+          case waiter :: rest =>
+            // Wake up first waiter
+            (state.copy(waiters = rest), Some(waiter))
+          case Nil =>
+            // No waiters, increase permit count
+            (state.copy(permits = state.permits + 1), None)
+        }
+      }.flatMap {
+        case Some(waiter) =>
+          // Complete the waiting promise
+          waiter.succeed(()).eru.map(_ => ())
+        case None =>
+          Eru.unit
+      }
+    )
 
     def releaseN(n: Long): Immediate[Nothing, Unit] = new Immediate(
       if (n <= 0) Eru.unit
-      else permitsRef.update(_ + n).map(_ => ())
+      else {
+        stateRef.modify { state =>
+          val toWake = math.min(n, state.waiters.length).toInt
+          val (wakingUp, stillWaiting) = state.waiters.splitAt(toWake)
+          val extraPermits = n - toWake
+          (state.copy(permits = state.permits + extraPermits, waiters = stillWaiting), wakingUp)
+        }.flatMap { waitersToWake =>
+          // Wake up all the waiters
+          Eru.foreach(waitersToWake)(_.succeed(()).eru).map(_ => ())
+        }
+      }
     )
 
-    def withPermit[E, A](fa: => Eru[E, A]): Eru[E, Option[A]] =
+    def withPermit[E, A](fa: => Eru[E, A]): Suspending[E, A] =
       withPermits(1)(fa)
 
-    def withPermits[E, A](n: Long)(fa: => Eru[E, A]): Eru[E, Option[A]] =
-      tryAcquireN(n).eru.flatMap { acquired =>
-        if (acquired)
-          fa.ensure(releaseN(n).eru).map(a => Some(a))
-        else Eru.succeed(None)
+    def withPermits[E, A](n: Long)(fa: => Eru[E, A]): Suspending[E, A] = new Suspending(
+      acquireN(n).eru.bracket(_ => releaseN(n).eru)(_ => fa)
+    )
+
+    def withPermitTry[E, A](fa: => Eru[E, A]): Immediate[E, Option[A]] = new Immediate(
+      tryAcquire.eru.flatMap { acquired =>
+        if (acquired) {
+          fa.map(Some(_)).ensure(release.eru)
+        } else {
+          Eru.succeed(None)
+        }
       }
+    )
   }
 }

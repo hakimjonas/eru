@@ -18,16 +18,16 @@ class PromiseConcurrencySpec extends EruTestSuite {
     // Multiple waiters
     val waiters = (1 to waiterCount).map { i =>
       (for {
-        _ <- waiterReady.countDown
-        result <- promise.await
+        _ <- waiterReady.countDown.eru
+        result <- promise.await.eru
       } yield s"waiter$i: $result").fork.unsafeRunSync()
     }
 
     // Wait for all waiters to be ready
-    waiterReady.await.unsafeRunSync()
+    waiterReady.await.eru.unsafeRunSync()
 
     // Complete the promise
-    promise.succeed(42).unsafeRunSync()
+    promise.succeed(42).eru.unsafeRunSync()
 
     // All waiters should receive the same result
     val results = waiters.map { waiter =>
@@ -48,15 +48,15 @@ class PromiseConcurrencySpec extends EruTestSuite {
 
     // Producer
     val producer = (for {
-      _ <- workPromise.succeed("work-data")
-      result <- resultPromise.await
+      _ <- workPromise.succeed("work-data").eru
+      result <- resultPromise.await.eru
     } yield s"Producer received: $result").fork.unsafeRunSync()
 
     // Consumer
     val consumer = (for {
-      work <- workPromise.await
+      work <- workPromise.await.eru
       processed = work.toUpperCase
-      _ <- resultPromise.succeed(processed)
+      _ <- resultPromise.succeed(processed).eru
     } yield s"Consumer processed: $processed").fork.unsafeRunSync()
 
     val (producerResult, consumerResult) = (
@@ -83,16 +83,16 @@ class PromiseConcurrencySpec extends EruTestSuite {
     // Multiple waiters
     val waiters = (1 to waiterCount).map { _ =>
       (for {
-        _ <- allReady.countDown
-        result <- promise.await.attempt
+        _ <- allReady.countDown.eru
+        result <- promise.await.eru.attempt
       } yield result).fork.unsafeRunSync()
     }
 
     // Wait for all waiters
-    allReady.await.unsafeRunSync()
+    allReady.await.eru.unsafeRunSync()
 
     // Fail the promise
-    promise.fail("error-occurred").unsafeRunSync()
+    promise.fail("error-occurred").eru.unsafeRunSync()
 
     // All waiters should receive the same error
     waiters.foreach { waiter =>
@@ -112,9 +112,9 @@ class PromiseConcurrencySpec extends EruTestSuite {
     // Multiple competitors trying to complete the promise
     val competitors = (1 to competitorCount).map { i =>
       (for {
-        _ <- allReady.countDown
-        _ <- allReady.await // Wait for all to be ready
-        completed <- promise.succeed(i)
+        _ <- allReady.countDown.eru
+        _ <- allReady.await.eru // Wait for all to be ready
+        completed <- promise.succeed(i).eru
       } yield if (completed) Some(i) else None).fork.unsafeRunSync()
     }
 
@@ -130,7 +130,7 @@ class PromiseConcurrencySpec extends EruTestSuite {
     assertEquals(successful.size, 1, "Exactly one competitor should succeed")
 
     // Promise should be completed with the winning value
-    val finalValue = promise.await.unsafeRunSync()
+    val finalValue = promise.await.eru.unsafeRunSync()
     assertEquals(finalValue, successful.head)
   }
 }
