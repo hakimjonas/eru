@@ -444,50 +444,62 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     effects match {
       case Nil => Eru.succeed(List.empty[A])
       case _ =>
-        def forkAll(remaining: List[Eru[E, A]], acc: List[Fiber[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
-          remaining match {
-            case Nil => Eru.succeed(acc.reverse)
-            case head :: tail =>
-              fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
+        // Fast path: if all effects are pure values, sequence them directly
+        if (effects.forall(Eru.isPureValue)) {
+          // All are pure, just sequence them without forking
+          effects.foldRight(Eru.succeed(List.empty[A]): Eru[E | Throwable, List[A]]) { (effect, acc) =>
+            for {
+              value <- effect
+              rest <- acc
+            } yield value :: rest
+          }
+        } else {
+          // At least one is effectful, use parallel execution
+          def forkAll(remaining: List[Eru[E, A]], acc: List[Fiber[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
+            remaining match {
+              case Nil => Eru.succeed(acc.reverse)
+              case head :: tail =>
+                fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
+            }
+
+          def awaitAll(fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
+            fibers match {
+              case Nil => Eru.succeed(Nil)
+              case head :: tail =>
+                for {
+                  exit <- head.await
+                  rest <- awaitAll(tail)
+                } yield exit :: rest
+            }
+
+          def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
+            exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
+              case Some((fiberId, cause)) =>
+                Eru.interruptibleBlocking {
+                  throw new InterruptedException(s"ParSequence interrupted due to fiber $fiberId: $cause")
+                }
+              case None =>
+                val firstError = exits.collectFirst {
+                  case Exit.Failure(error) => Left(error)
+                  case Exit.Die(throwable) => Right(throwable)
+                }
+
+                firstError match {
+                  case Some(Left(error)) => Eru.fail(error)
+                  case Some(Right(throwable)) => Eru.effect(throw throwable)
+                  case None =>
+                    val results = exits.collect { case Exit.Success(value) => value }
+                    Eru.succeed(results)
+                }
+            }
           }
 
-        def awaitAll(fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
-          fibers match {
-            case Nil => Eru.succeed(Nil)
-            case head :: tail =>
-              for {
-                exit <- head.await
-                rest <- awaitAll(tail)
-              } yield exit :: rest
-          }
-
-        def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
-          exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
-            case Some((fiberId, cause)) =>
-              Eru.interruptibleBlocking {
-                throw new InterruptedException(s"ParSequence interrupted due to fiber $fiberId: $cause")
-              }
-            case None =>
-              val firstError = exits.collectFirst {
-                case Exit.Failure(error) => Left(error)
-                case Exit.Die(throwable) => Right(throwable)
-              }
-
-              firstError match {
-                case Some(Left(error)) => Eru.fail(error)
-                case Some(Right(throwable)) => Eru.effect(throw throwable)
-                case None =>
-                  val results = exits.collect { case Exit.Success(value) => value }
-                  Eru.succeed(results)
-              }
-          }
+          for {
+            fibers <- forkAll(effects, Nil)
+            exits <- awaitAll(fibers)
+            results <- processExits(exits)
+          } yield results
         }
-
-        for {
-          fibers <- forkAll(effects, Nil)
-          exits <- awaitAll(fibers)
-          results <- processExits(exits)
-        } yield results
     }
 
   /** Executes effects derived from a collection of inputs in parallel.
@@ -570,17 +582,25 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
       case single :: Nil =>
         single.map(a => (a, 0))
       case _ =>
-        def raceWithIndex(remaining: List[Eru[E, A]], currentIndex: Int): Eru[E | Throwable, (A, Int)] =
-          remaining match {
-            case Nil => Eru.effect(throw new IllegalStateException("raceAll: unexpected empty list"))
-            case single :: Nil => single.map(a => (a, currentIndex))
-            case current :: rest =>
-              race(current, raceWithIndex(rest, currentIndex + 1)).flatMap {
-                case Left(value) => Eru.succeed((value, currentIndex))
-                case Right((value, index)) => Eru.succeed((value, index))
+        // Fast path: find the first pure value and return it immediately
+        effects.zipWithIndex.find { case (effect, _) => Eru.isPureValue(effect) } match {
+          case Some((pureEffect, index)) =>
+            // Found a pure value, it wins immediately
+            pureEffect.map(a => (a, index))
+          case None =>
+            // All are effectful, use the recursive race
+            def raceWithIndex(remaining: List[Eru[E, A]], currentIndex: Int): Eru[E | Throwable, (A, Int)] =
+              remaining match {
+                case Nil => Eru.effect(throw new IllegalStateException("raceAll: unexpected empty list"))
+                case single :: Nil => single.map(a => (a, currentIndex))
+                case current :: rest =>
+                  race(current, raceWithIndex(rest, currentIndex + 1)).flatMap {
+                    case Left(value) => Eru.succeed((value, currentIndex))
+                    case Right((value, index)) => Eru.succeed((value, index))
+                  }
               }
-          }
-        raceWithIndex(effects, 0)
+            raceWithIndex(effects, 0)
+        }
     }
 
   /** Executes effects derived from a collection of inputs in parallel with bounded concurrency.
