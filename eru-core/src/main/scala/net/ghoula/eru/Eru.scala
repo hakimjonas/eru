@@ -343,6 +343,29 @@ enum Eru[+E, +A] {
 
 object Eru {
 
+  /** Internal method to check if an Eru is a pure value (no effects). This is used for
+    * optimizations in runtime operations like zipPar.
+    *
+    * This method enables significant performance improvements by detecting when an effect is
+    * already computed and doesn't need to be scheduled for execution. Pure values can be combined
+    * directly without creating fibers or involving the runtime scheduler. This optimization is
+    * particularly effective in tight loops or recursive patterns where effects are chained with
+    * already-computed values, such as in benchmark scenarios or certain algorithmic patterns.
+    *
+    * @param eru
+    *   the effect to check
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the success type
+    * @return
+    *   true if this is Succeed or Fail, false otherwise
+    */
+  private[eru] def isPureValue[E, A](eru: Eru[E, A]): Boolean = eru match {
+    case Succeed(_) | Fail(_) => true
+    case _ => false
+  }
+
   /** GADT representing a stack of continuations in a flatMap chain.
     *
     * This data type maintains complete type safety by linking the output type of one function to

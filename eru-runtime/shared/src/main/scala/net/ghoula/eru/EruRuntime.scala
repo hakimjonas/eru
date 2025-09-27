@@ -61,9 +61,14 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 
   /** Executes two effects in parallel and combines their results into a pair.
     *
-    * Both effects execute concurrently and run to completion to ensure all resources are properly
-    * cleaned up. If either effect fails, the first error encountered is propagated after both
-    * effects have finished executing, guaranteeing that all finalizers run correctly.
+    * This method intelligently optimizes execution based on the input effects:
+    *   - If both effects are pure values (Succeed/Fail), combines them without creating fibers
+    *   - If one effect is pure, only forks the other effect
+    *   - If both effects are computations, forks both into new fibers for parallel execution
+    *
+    * Both effects execute concurrently (when forked) and run to completion to ensure all resources
+    * are properly cleaned up. If either effect fails, the first error encountered is propagated
+    * after both effects have finished executing, guaranteeing that all finalizers run correctly.
     *
     * This approach provides stronger structured concurrency guarantees than immediate cancellation
     * by ensuring resource cleanup always completes, even under failure conditions.
@@ -101,25 +106,62 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     *   }}}
     */
   def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, (A, B)] =
-    for {
-      fiberA <- fork(fa)
-      fiberB <- fork(fb)
-      exitA <- fiberA.await
-      exitB <- fiberB.await
-      result <- (exitA, exitB) match {
-        case (Exit.Success(a), Exit.Success(b)) => Eru.succeed((a, b))
-        case (Exit.Failure(e), _) => Eru.fail(e)
-        case (_, Exit.Failure(e)) => Eru.fail(e)
-        case (Exit.Die(t), _) => Eru.effect(throw t)
-        case (_, Exit.Die(t)) => Eru.effect(throw t)
-        case (Exit.Interrupt(_, _), Exit.Interrupt(_, _)) =>
-          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: both fibers interrupted") }
-        case (Exit.Interrupt(_, _), Exit.Success(_)) =>
-          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber A interrupted") }
-        case (Exit.Success(_), Exit.Interrupt(_, _)) =>
-          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber B interrupted") }
-      }
-    } yield result
+    // Fast path: if both are pure values, just combine them without forking
+    if (Eru.isPureValue(fa) && Eru.isPureValue(fb)) {
+      for {
+        a <- fa
+        b <- fb
+      } yield (a, b)
+    } else if (Eru.isPureValue(fa)) {
+      // Only fb needs to be forked
+      for {
+        a <- fa
+        fiberB <- fork(fb)
+        exitB <- fiberB.await
+        b <- exitB match {
+          case Exit.Success(value) => Eru.succeed(value)
+          case Exit.Failure(error) => Eru.fail(error)
+          case Exit.Die(t) => Eru.effect(throw t)
+          case Exit.Interrupt(_, _) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber interrupted") }
+        }
+      } yield (a, b)
+    } else if (Eru.isPureValue(fb)) {
+      // Only fa needs to be forked
+      for {
+        fiberA <- fork(fa)
+        b <- fb
+        exitA <- fiberA.await
+        a <- exitA match {
+          case Exit.Success(value) => Eru.succeed(value)
+          case Exit.Failure(error) => Eru.fail(error)
+          case Exit.Die(t) => Eru.effect(throw t)
+          case Exit.Interrupt(_, _) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber interrupted") }
+        }
+      } yield (a, b)
+    } else {
+      // Both need to be forked - original implementation
+      for {
+        fiberA <- fork(fa)
+        fiberB <- fork(fb)
+        exitA <- fiberA.await
+        exitB <- fiberB.await
+        result <- (exitA, exitB) match {
+          case (Exit.Success(a), Exit.Success(b)) => Eru.succeed((a, b))
+          case (Exit.Failure(e), _) => Eru.fail(e)
+          case (_, Exit.Failure(e)) => Eru.fail(e)
+          case (Exit.Die(t), _) => Eru.effect(throw t)
+          case (_, Exit.Die(t)) => Eru.effect(throw t)
+          case (Exit.Interrupt(_, _), Exit.Interrupt(_, _)) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: both fibers interrupted") }
+          case (Exit.Interrupt(_, _), Exit.Success(_)) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber A interrupted") }
+          case (Exit.Success(_), Exit.Interrupt(_, _)) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber B interrupted") }
+        }
+      } yield result
+    }
 
   /** Races two effects, returning the result of whichever completes first.
     *
