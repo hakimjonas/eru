@@ -9,7 +9,6 @@ package net.ghoula.eru.internal
   * Implements BackendFactory to support creating fresh isolated backends for each runtime instance.
   */
 private[eru] final class JvmBackendProvider extends BackendFactory {
-  // Singleton backend for shared runtime
   lazy val backend: ConcurrencyBackend = RuntimeBackendAdapter.virtualThreads()
 
   /** Creates a fresh backend for isolated runtime instances. */

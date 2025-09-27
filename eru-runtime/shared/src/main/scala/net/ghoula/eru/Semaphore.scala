@@ -92,29 +92,22 @@ object Semaphore {
   private final class RuntimeSemaphore(stateRef: Ref[State], runtime: EruRuntime) extends Semaphore {
 
     def acquire: Suspending[Nothing, Unit] = new Suspending({
-      // First try to acquire without creating a promise
       stateRef.modify { state =>
         if (state.permits > 0) {
-          // Permit available, acquire it immediately
           (state.copy(permits = state.permits - 1), true)
         } else {
-          // No permits available, need to wait
           (state, false)
         }
       }.flatMap { acquired =>
         if (acquired) {
-          // Got permit immediately
           Eru.unit
         } else {
-          // Need to wait - create promise and register it
           for {
             promise <- Promise.make[Nothing, Unit](using runtime)
             registered <- stateRef.modify { state =>
               if (state.permits > 0) {
-                // Permit became available while creating promise
                 (state.copy(permits = state.permits - 1), false)
               } else {
-                // Still need to wait, add to waiters
                 (state.copy(waiters = state.waiters :+ promise), true)
               }
             }
@@ -122,7 +115,6 @@ object Semaphore {
               if (registered) {
                 promise.await.eru
               } else {
-                // Got permit during registration
                 Eru.unit
               }
           } yield ()
@@ -134,8 +126,6 @@ object Semaphore {
       if (n <= 0) Eru.unit
       else if (n == 1) acquire.eru
       else {
-        // For simplicity, acquire permits one by one
-        // A more efficient implementation would acquire all at once
         Eru.foreach(1L to n)(_ => acquire.eru).map(_ => ())
       }
     )
@@ -171,15 +161,12 @@ object Semaphore {
       stateRef.modify { state =>
         state.waiters match {
           case waiter :: rest =>
-            // Wake up first waiter
             (state.copy(waiters = rest), Some(waiter))
           case Nil =>
-            // No waiters, increase permit count
             (state.copy(permits = state.permits + 1), None)
         }
       }.flatMap {
         case Some(waiter) =>
-          // Complete the waiting promise
           waiter.succeed(()).eru.map(_ => ())
         case None =>
           Eru.unit
@@ -195,7 +182,6 @@ object Semaphore {
           val extraPermits = n - toWake
           (state.copy(permits = state.permits + extraPermits, waiters = stillWaiting), wakingUp)
         }.flatMap { waitersToWake =>
-          // Wake up all the waiters
           Eru.foreach(waitersToWake)(_.succeed(()).eru).map(_ => ())
         }
       }

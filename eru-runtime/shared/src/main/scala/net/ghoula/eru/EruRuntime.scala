@@ -268,7 +268,6 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
   )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
     backend.timeout(duration)(fa)
 
-  // Policy type alias for convenience
   private type Policy = EruRuntime.Policy
 
   /** Retries on typed failure according to the provided policy. Defects (Throwables) are propagated
@@ -406,15 +405,12 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
           }
 
         def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
-          // Check for interruptions first - if any fiber was interrupted, interrupt this computation
           exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
             case Some((fiberId, cause)) =>
-              // Use interruptibleBlocking to trigger interruption through the interpreter
               Eru.interruptibleBlocking {
                 throw new InterruptedException(s"ParSequence interrupted due to fiber $fiberId: $cause")
               }
             case None =>
-              // No interruptions, handle errors normally
               val firstError = exits.collectFirst {
                 case Exit.Failure(error) => Left(error)
                 case Exit.Die(throwable) => Right(throwable)
@@ -688,18 +684,15 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
           }
 
         def processExits(exits: List[Exit[E, A]]): Eru[Throwable, Either[List[E], List[A]]] = {
-          // Check for interruptions first
           exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
             case Some((fiberId, cause)) =>
               Eru.interruptibleBlocking {
                 throw new InterruptedException(s"ValidatePar interrupted due to fiber $fiberId: $cause")
               }
             case None =>
-              // Collect all errors and successes
               val errors = exits.collect { case Exit.Failure(error) => error }
               val defects = exits.collect { case Exit.Die(throwable) => throwable }
 
-              // If there are defects, propagate the first one
               defects.headOption match {
                 case Some(throwable) => Eru.effect(throw throwable)
                 case None =>
@@ -784,7 +777,6 @@ object EruRuntime {
     *   - Testing scenarios that require complete runtime isolation
     */
   def create(): EruRuntime = {
-    // Create a fresh backend for true isolation
     val freshBackend = createFreshBackend()
     new EruRuntime(freshBackend)
   }
@@ -795,7 +787,6 @@ object EruRuntime {
     * state issues with coordination primitives.
     */
   private def createFreshBackend(): internal.ConcurrencyBackend = {
-    // Platform-specific fresh backend creation without casting
     PlatformBackend.createFreshBackend()
   }
 

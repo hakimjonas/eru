@@ -21,7 +21,6 @@ private[eru] object PlatformBackend {
     * This delegates to platform-specific factory methods to avoid casting.
     */
   def createFreshBackend(): ConcurrencyBackend = {
-    // Let each platform provide its own fresh backend creation
     val provider = discoverProvider()
     provider match {
       case factory: BackendFactory => factory.createFresh()

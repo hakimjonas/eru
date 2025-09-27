@@ -82,21 +82,17 @@ object CountDownLatch {
     def countDown: Immediate[Nothing, Unit] = new Immediate({
       stateRef.modify { state =>
         if (state.count <= 0) {
-          // Already at zero, no change
           (state, (false, Nil))
         } else {
           val newCount = state.count - 1
           if (newCount == 0) {
-            // Just hit zero - clear waiters and return them to notify
             (LatchState(0, Nil), (true, state.waiters))
           } else {
-            // Just decrement
             (state.copy(count = newCount), (false, Nil))
           }
         }
       }.flatMap { case (hitZero, waitersToNotify) =>
         if (hitZero && waitersToNotify.nonEmpty) {
-          // Notify all waiters
           Eru.effect {
             waitersToNotify.foreach(callback => callback(()))
           }.attempt.map(_ => ())
@@ -109,35 +105,26 @@ object CountDownLatch {
     def getCount: Immediate[Nothing, Int] = new Immediate(stateRef.get.map(_.count))
 
     def await: Suspending[Nothing, Unit] = new Suspending({
-      // First check if already at zero
       stateRef.get.flatMap { state =>
         if (state.count == 0) {
-          // Already at zero - return immediately
           Eru.unit
         } else {
-          // Not at zero - suspend until countdown reaches zero
           runtime
             .suspend[Nothing, Unit] { callback =>
-              // Create a wrapper callback
               val wrappedCallback: Unit => Unit = (_: Unit) => callback(Right(()))
 
-              // Register callback in a pure way
               val registerCallback = stateRef.modify { state =>
                 if (state.count == 0) {
-                  // Race condition: reached zero while registering
                   (state, true)
                 } else {
-                  // Add callback to waiters
                   (state.copy(waiters = wrappedCallback :: state.waiters), false)
                 }
               }
 
               registerCallback.flatMap { reachedZero =>
                 if (reachedZero) {
-                  // Latch reached zero during registration
                   Eru.effect(wrappedCallback(())).attempt.map(_ => ())
                 } else {
-                  // Successfully registered, will be called when count reaches zero
                   Eru.unit
                 }
               }
@@ -146,7 +133,6 @@ object CountDownLatch {
             .flatMap {
               case Result.Success(_) => Eru.unit
               case Result.Failure(_) =>
-                // Fall back to polling mode when suspend fails
                 pollUntilZero()
             }
         }
@@ -160,7 +146,6 @@ object CountDownLatch {
           if (state.count == 0) {
             Eru.unit
           } else {
-            // Small delay to avoid busy-waiting, then check again
             Eru.effect(Thread.`yield`()).attempt.flatMap(_ => checkAndRepeat)
           }
         }

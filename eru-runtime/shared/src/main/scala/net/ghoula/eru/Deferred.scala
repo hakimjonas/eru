@@ -92,14 +92,11 @@ object Deferred {
     def complete(a: A): Immediate[Nothing, Boolean] = new Immediate({
       stateRef.modify {
         case Pending(waiters) =>
-          // Transition to completed and return waiters to notify
           (Completed(a), (true, waiters))
         case completed: Completed[A] =>
-          // Already completed, no change
           (completed, (false, Nil))
       }.flatMap { case (wasCompleted, waitersToNotify) =>
         if (wasCompleted && waitersToNotify.nonEmpty) {
-          // Notify all waiters
           Eru.effect {
             waitersToNotify.foreach(_(a))
           }.attempt.map(_ => true)
@@ -116,35 +113,25 @@ object Deferred {
       new Immediate(stateRef.get.map(_.value))
 
     def await: Suspending[Nothing, A] = new Suspending({
-      // First check if already completed
       stateRef.get.flatMap {
         case Completed(value) =>
-          // Already completed - return immediately without suspension
           Eru.succeed(value)
         case Pending(_) =>
-          // Not completed - need to suspend
           runtime
             .suspend[Nothing, A] { callback =>
-              // Create a wrapper callback that matches the expected type
               val wrappedCallback: A => Unit = (value: A) => callback(Right(value))
 
-              // Register callback in a pure way
               val registerCallback = stateRef.modify {
                 case Pending(waiters) =>
-                  // Add callback to waiters
                   (Pending(wrappedCallback :: waiters), None)
                 case Completed(value) =>
-                  // Race condition: completed while registering
-                  // Return the value to invoke callback immediately
                   (Completed(value), Some(value))
               }
 
               registerCallback.flatMap {
                 case Some(value) =>
-                  // Deferred was completed during registration
                   Eru.effect(wrappedCallback(value)).attempt.map(_ => ())
                 case None =>
-                  // Successfully registered, will be called on completion
                   Eru.unit
               }
             }

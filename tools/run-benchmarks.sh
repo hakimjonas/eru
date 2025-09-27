@@ -183,7 +183,13 @@ run_benchmark() {
     # Generate structured JSON output with unambiguous number formatting
     local json_file="$(pwd)/$OUTPUT_DIR/$(echo "$bench_name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -d '()' | tr -d ',')-$TIMESTAMP.json"
 
-    if timeout ${timeout_duration} bash -c "LANG=C LC_ALL=C sbt 'eruBenchJVM/Jmh/run -rf json -rff $json_file -i $MEASUREMENT_ITERATIONS -wi $WARMUP_ITERATIONS -f1 -t1 $gc_option $bench_class'" 2>&1 | tee "$log_file"; then
+    # Determine which project to use based on the benchmark class
+    local project="eruBenchJVM"
+    if [[ "$bench_class" == *"matrix"* ]]; then
+        project="eruBenchMatrix"
+    fi
+
+    if timeout ${timeout_duration} bash -c "LANG=C LC_ALL=C sbt '$project/Jmh/run -rf json -rff $json_file -i $MEASUREMENT_ITERATIONS -wi $WARMUP_ITERATIONS -f1 -t1 $gc_option $bench_class'" 2>&1 | tee "$log_file"; then
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
         echo -e "\n${BOLD}${GREEN}✅ COMPLETED${NC} - ${duration}s"

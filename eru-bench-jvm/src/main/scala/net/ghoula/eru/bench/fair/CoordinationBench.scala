@@ -32,6 +32,15 @@ class CoordinationBench extends FairBenchmarkBase {
   }
 
   @Benchmark
+  def eruPromiseBasic(): Int = runEru {
+    for {
+      promise <- Eru.promise[Nothing, Int]
+      _ <- promise.succeed(TEST_VALUE).eru
+      result <- promise.await.eru
+    } yield result
+  }
+
+  @Benchmark
   def zioPromiseBasic(): Int = runZio {
     for {
       promise <- zio.Promise.make[Nothing, Int]
@@ -65,6 +74,22 @@ class CoordinationBench extends FairBenchmarkBase {
       a <- d1.await.eru
       b <- d2.await.eru
       c <- d3.await.eru
+      result <- Eru.succeed(a + b + c)
+    } yield result
+  }
+
+  @Benchmark
+  def eruMultiplePromise(): Int = runEru {
+    for {
+      p1 <- Eru.promise[Nothing, Int]
+      p2 <- Eru.promise[Nothing, Int]
+      p3 <- Eru.promise[Nothing, Int]
+      _ <- p1.succeed(10).eru
+      _ <- p2.succeed(20).eru
+      _ <- p3.succeed(12).eru
+      a <- p1.await.eru
+      b <- p2.await.eru
+      c <- p3.await.eru
       result <- Eru.succeed(a + b + c)
     } yield result
   }
@@ -214,12 +239,12 @@ class CoordinationBench extends FairBenchmarkBase {
   // =============================================================================
 
   @Benchmark
-  def eruSemaphore(): Boolean = runEru {
+  def eruSemaphore(): Unit = runEru {
     for {
       semaphore <- Eru.semaphore(1)
-      acquired <- semaphore.tryAcquire.eru
-      _ <- if (acquired) semaphore.release.eru else Eru.succeed(())
-    } yield acquired
+      _ <- semaphore.acquire.eru
+      _ <- semaphore.release.eru
+    } yield ()
   }
 
   @Benchmark
@@ -284,8 +309,13 @@ class CoordinationBench extends FairBenchmarkBase {
 
   @Benchmark
   def zioCyclicBarrier(): Unit = runZio {
-    // ZIO doesn't have CyclicBarrier, simulate with simple operation
-    ZIO.unit
+    // ZIO doesn't have CyclicBarrier, simulate with equivalent coordination using Ref
+    for {
+      counter <- zio.Ref.make(1)
+      _ <- counter.updateAndGet(_ - 1)
+      finalCount <- counter.get
+      _ <- if (finalCount <= 0) ZIO.unit else ZIO.unit
+    } yield ()
   }
 
   @Benchmark

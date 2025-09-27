@@ -407,12 +407,9 @@ object Platform {
     * Uses a simple heuristic based on system properties that differ between platforms.
     */
   val isJVM: Boolean = {
-    // Check if we're running on Native by looking for the absence of JVM-specific properties
     val javaVersion = Option(System.getProperty("java.version"))
     val javaVendor = Option(System.getProperty("java.vendor"))
 
-    // Scala Native doesn't set these properties in the same way
-    // JVM will have values like "21" or "17" for version and vendor like "Oracle Corporation"
     javaVersion.isDefined && javaVendor.isDefined &&
     javaVersion.exists(v => v.contains(".") || v.toIntOption.exists(_ >= 8)) &&
     javaVendor.exists(v => !v.toLowerCase.contains("scala"))

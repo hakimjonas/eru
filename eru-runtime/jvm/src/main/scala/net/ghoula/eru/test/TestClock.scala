@@ -120,7 +120,6 @@ trait TestClock {
   def completeAll: Int = {
     val pending = pendingCount
     if (pending > 0) {
-      // Find the maximum scheduled time and advance to it
       val allScheduled = getAllScheduled
       if (allScheduled.nonEmpty) {
         setTime(allScheduled.max)
@@ -200,12 +199,9 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
   import java.util.concurrent.atomic.AtomicReference
   import scala.jdk.CollectionConverters.*
 
-  // Thread-safe storage for scheduled operations
-  // Key: target completion time, Value: list of callbacks to complete at that time
   private val scheduledOps = new ConcurrentSkipListMap[Instant, java.util.concurrent.CopyOnWriteArrayList[() => Unit]]()
   private val _currentTimeRef = new AtomicReference[Instant](startTime)
 
-  // Fiber scheduler for coordination primitives
   private val readyFibers = new java.util.concurrent.ConcurrentLinkedQueue[() => Unit]()
   private val suspendedFibers = new java.util.concurrent.ConcurrentHashMap[String, () => Unit]()
 
@@ -215,7 +211,6 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
     _currentTimeRef.set(instant)
     var completed = 0
 
-    // Complete all operations scheduled at or before the new time
     val toComplete = scheduledOps.headMap(instant, true).asScala.toList
 
     for ((scheduledTime, _) <- toComplete) {
@@ -227,11 +222,10 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
               completed += 1
             } catch {
               case _: Throwable =>
-                // Callback execution errors are handled by the effect system
                 completed += 1
             }
           }
-        case None => // No callbacks for this time
+        case None =>
       }
     }
 
@@ -268,7 +262,6 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
     var executed = 0
     var continue = true
 
-    // Execute all ready fibers
     while (continue) {
       Option(readyFibers.poll()) match {
         case Some(nextFiber) =>
@@ -277,11 +270,9 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
             executed += 1
           } catch {
             case _: Throwable =>
-              // Fiber execution errors are handled by the effect system
               executed += 1
           }
         case None =>
-          // No more ready fibers
           continue = false
       }
     }
@@ -323,30 +314,23 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
     effect: Eru[E, A],
     observer: Option[EruObserver]
   ): Unit = {
-    // Schedule fiber execution to happen immediately on next clock advancement
-    // This mimics Cats Effect TestControl behavior where fibers execute on tick()
     val executionTime = currentTime.plusNanos(1)
 
     schedule(
       executionTime,
       () => {
-        // Try to execute the effect
         val exitOption =
           try {
             Some(Result.toExit(effect.attempt.unsafeRunSync()))
           } catch {
             case e: RuntimeException if e.getMessage.contains("TestClock suspend operation") =>
-              // Effect contains suspend operations - it's not ready to complete yet
-              // Don't complete the fiber, let it remain pending
               None
             case t: Throwable =>
               Some(Exit.Die(t))
           }
 
-        // Complete the fiber with the result if execution succeeded
         exitOption.foreach { exit =>
           UnifiedFiber.complete(fiber, exit)
-          // Emit completion event
           observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(fiber.id, exit)))
         }
       }
@@ -412,18 +396,13 @@ private[test] final class TestClockImpl(startTime: Instant) extends TestClock {
     *   the logical time to wait for
     */
   private[test] def waitUntil(targetTime: Instant): Unit = {
-    // Create a latch that will be released when time advances to target
     val latch = new java.util.concurrent.CountDownLatch(1)
 
-    // If target time already reached, don't wait
     if (!currentTime.isBefore(targetTime)) {
-      () // Exit early
+      ()
     } else {
 
-      // Schedule a callback to release the latch when target time is reached
       schedule(targetTime, () => latch.countDown())
-
-      // Wait for the latch to be released (when TestClock.setTime() is called)
       try {
         latch.await()
       } catch {

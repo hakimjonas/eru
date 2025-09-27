@@ -18,11 +18,6 @@ import java.time.Duration
   */
 trait Queue[A] {
 
-  // ============================================================================
-  // SUSPENDING OPERATIONS
-  // These operations may suspend indefinitely and must be used carefully
-  // ============================================================================
-
   /** Adds an element to the queue, suspending if full.
     *
     * This operation will suspend indefinitely if the queue is at capacity, waiting until space
@@ -62,11 +57,6 @@ trait Queue[A] {
     *   a suspending effect that yields the taken elements (at least 1, up to n)
     */
   def takeUpTo(n: Int): Suspending[Nothing, List[A]]
-
-  // ============================================================================
-  // IMMEDIATE OPERATIONS
-  // These operations complete immediately without suspension
-  // ============================================================================
 
   /** Attempts to add an element without blocking.
     *
@@ -109,11 +99,6 @@ trait Queue[A] {
     */
   def tryTakeUpTo(n: Int): Immediate[Nothing, List[A]]
 
-  // ============================================================================
-  // BOUNDED OPERATIONS
-  // These operations have bounded wait times and complete immediately
-  // ============================================================================
-
   /** Attempts to add an element within the timeout period.
     *
     * @param a
@@ -155,11 +140,6 @@ trait Queue[A] {
     *   the list of elements taken before timeout (may be empty)
     */
   def takeUpToWithin(n: Int, timeout: Duration): Immediate[Throwable, List[A]]
-
-  // ============================================================================
-  // STATUS OPERATIONS
-  // These operations query queue state without modifying it
-  // ============================================================================
 
   /** Returns the current number of elements in the queue.
     *

@@ -63,13 +63,9 @@ final class TestClockBackend(testClock: TestClock) extends ConcurrencyBackend {
     Eru.succeed {
       val fiberId = FiberId.fresh()
 
-      // Emit FiberStarted event if observer present
       observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(fiberId)))
 
-      // For TestClock: execute on virtual threads to allow coordination
       val activeFiber = UnifiedFiber.active[E, A](fiberId)
-
-      // Use a separate thread for execution to allow coordination
       java.util.concurrent.CompletableFuture.supplyAsync { () =>
         val exit =
           try {
@@ -78,12 +74,10 @@ final class TestClockBackend(testClock: TestClock) extends ConcurrencyBackend {
             case t: Throwable => Exit.Die(t)
           }
 
-        // Complete the fiber and emit event
         UnifiedFiber.complete(activeFiber, exit)
         observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(fiberId, exit)))
       }
 
-      // Don't wait for completion - return the active fiber immediately
       activeFiber
     }
 
@@ -94,30 +88,18 @@ final class TestClockBackend(testClock: TestClock) extends ConcurrencyBackend {
     * first, and if it can't complete immediately, try fb.
     */
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] = {
-    // For TestClock, operations that can complete immediately should win
-    // Operations that need time advancement will suspend (throw exceptions)
-
-    // Try fa first - if it completes immediately, it wins
     fa.attempt.flatMap {
       case Result.Success(a) => Eru.succeed(Left(a))
       case Result.Failure(e1) =>
-        // fa failed or needs time advancement - try fb
         fb.attempt.flatMap {
           case Result.Success(b) => Eru.succeed(Right(b))
           case Result.Failure(e2) =>
-            // Both failed - in timeout context, this means timeout should occur
-            // Check if we're in a timeout scenario (fb is a sleep operation)
             e1 match {
               case r1: RuntimeException if Option(r1.getMessage).exists(_.contains("TestClock suspend operation")) =>
                 e2 match {
                   case r2: RuntimeException
                       if Option(r2.getMessage).exists(_.contains("TestClock suspend operation")) =>
-                    // Both operations need time advancement
-                    // In timeout context, this means the timeout timer (fb) should win
-                    // since we're in a situation where the main operation can't complete immediately
-                    // But we can't return a valid Right value without knowing B's type
-                    // So instead, indicate that the timeout should occur by propagating the suspension
-                    throw r2 // Re-throw fb's suspension to indicate timeout should occur
+                    throw r2
                   case t2: Throwable => Eru.fail(t2)
                   case _ => Eru.fail(new RuntimeException(s"Race participant B failed: $e2"))
                 }
@@ -139,26 +121,21 @@ final class TestClockBackend(testClock: TestClock) extends ConcurrencyBackend {
     } else {
       testClock match {
         case impl: TestClockImpl =>
-          // Create a suspend operation that waits for TestClock advancement
           val currentTime = testClock.currentTime
           val targetTime = currentTime.plus(duration)
 
-          // Check if target time has already been reached
           if (currentTime.isAfter(targetTime) || currentTime.equals(targetTime)) {
-            // Sleep duration already elapsed - complete immediately
             Eru.unit
           } else {
-            // Sleep needs to wait for TestClock advancement
             handleSuspend[Nothing, Unit] { callback =>
               impl.schedule(targetTime, () => callback(Right(())))
               Eru.unit
             }.map {
               case Right(unit) => unit
-              case Left(_) => () // Should not happen for sleep
+              case Left(_) => ()
             }
           }
         case _ =>
-          // For non-TestClockImpl instances, just return immediately
           Eru.unit
       }
     }
@@ -173,7 +150,6 @@ final class TestClockBackend(testClock: TestClock) extends ConcurrencyBackend {
   ): Eru[E | TimeoutException | Throwable, A] = {
     import java.util.concurrent.TimeoutException
 
-    // Use race implementation for timeout semantics
     race(fa, sleep(duration)).flatMap {
       case Left(a) => Eru.succeed(a)
       case Right(_) => Eru.fail(new TimeoutException(s"Operation timed out after $duration"))
@@ -219,7 +195,6 @@ final class TestClockBackend(testClock: TestClock) extends ConcurrencyBackend {
       val completionLatch = new java.util.concurrent.CountDownLatch(1)
 
       val callback: Either[E, A] => Unit = ea => {
-        // Only accept the first callback invocation (idempotency)
         if (resultBox.compareAndSet(None, Some(ea))) {
           completionLatch.countDown()
         }
@@ -227,14 +202,11 @@ final class TestClockBackend(testClock: TestClock) extends ConcurrencyBackend {
 
       val registrationExit = register(callback).attempt.unsafeRunSync()
 
-      // Check if callback was invoked synchronously during registration
       resultBox.get() match {
         case Some(result) => result // Synchronous completion
         case None =>
           registrationExit match {
             case Result.Success(_) =>
-              // Use different timeouts based on operation type
-              // First try a short timeout for regular operations
               val quickCompleted = completionLatch.await(100, java.util.concurrent.TimeUnit.MILLISECONDS)
 
               if (quickCompleted) {
@@ -242,8 +214,6 @@ final class TestClockBackend(testClock: TestClock) extends ConcurrencyBackend {
                   .get()
                   .getOrElse(throw new IllegalStateException("Operation completed but no result available"))
               } else {
-                // For operations that didn't complete quickly, try longer timeout
-                // This handles coordination primitives that need more time
                 val longCompleted = completionLatch.await(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
 
                 if (longCompleted) {

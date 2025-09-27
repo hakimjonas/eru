@@ -139,14 +139,11 @@ object Promise {
     private def attemptComplete(exit: Exit[E, A]): Eru[Nothing, Boolean] = {
       stateRef.modify {
         case Pending(waiters) =>
-          // Transition to completed and return waiters to notify
           (Completed(exit), (true, waiters))
         case completed: Completed[E, A] =>
-          // Already completed, no change
           (completed, (false, Nil))
       }.flatMap { case (wasCompleted, waitersToNotify) =>
         if (wasCompleted && waitersToNotify.nonEmpty) {
-          // Notify all waiters
           val result = exitToEither(exit)
           Eru.effect {
             waitersToNotify.foreach(_(result))
@@ -166,10 +163,8 @@ object Promise {
     def poll: Immediate[Nothing, Option[Exit[E, A]]] = new Immediate(stateRef.get.map(_.result))
 
     def await: Suspending[E, A] = new Suspending({
-      // First check if already completed
       stateRef.get.flatMap {
         case Completed(exit) =>
-          // Already completed - return immediately without suspension
           exit match {
             case Exit.Success(value) => Eru.succeed(value)
             case Exit.Failure(error) => Eru.fail(error)
@@ -177,29 +172,21 @@ object Promise {
               throw new IllegalStateException("Promise completed with unexpected exit type")
           }
         case Pending(_) =>
-          // Not completed - need to suspend
           runtime
             .suspend[Nothing, Either[E, A]] { callback =>
-              // Create a wrapper callback that matches the expected type
               val wrappedCallback: Either[E, A] => Unit = (result: Either[E, A]) => callback(Right(result))
 
-              // Register callback in a pure way
               val registerCallback = stateRef.modify {
                 case Pending(waiters) =>
-                  // Add callback to waiters
                   (Pending(wrappedCallback :: waiters), None)
                 case completed @ Completed(exit) =>
-                  // Race condition: completed while registering
-                  // Return the result to invoke callback immediately
                   (completed, Some(exitToEither(exit)))
               }
 
               registerCallback.flatMap {
                 case Some(result) =>
-                  // Promise was completed during registration
                   Eru.effect(wrappedCallback(result)).attempt.map(_ => ())
                 case None =>
-                  // Successfully registered, will be called on completion
                   Eru.unit
               }
             }
@@ -211,7 +198,6 @@ object Promise {
                   case Right(value) => Eru.succeed(value)
                 }
               case Result.Failure(_) =>
-                // This should never happen in a correctly implemented Promise
                 throw new IllegalStateException("Promise await encountered unexpected error")
             }
       }

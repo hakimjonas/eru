@@ -27,8 +27,8 @@ import net.ghoula.eru.prelude.*
 @Fork(value = 1) // Single fork for consistency
 abstract class FairBenchmarkBase {
 
-  // Shared runtime setup for all benchmarks
-  protected val runtime: EruRuntime = EruRuntime.create()
+  // Shared runtime setup for all benchmarks - using shared for optimal performance
+  protected val runtime: EruRuntime = EruRuntime.shared
   implicit protected val implicitRuntime: EruRuntime = runtime
 
   // Standard test values used across benchmarks for consistency

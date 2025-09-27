@@ -11,7 +11,6 @@ package net.ghoula.eru.internal
   * across multiple runtimes.
   */
 private[eru] final class NativeBackendProvider extends BackendFactory {
-  // Native backend is stateless, so sharing is safe
   val backend: ConcurrencyBackend = NativeSynchronousBackend
 
   /** Returns the same stateless backend for Native platform. */

@@ -29,7 +29,6 @@ final class Suspending[+E, +A](val eru: Eru[E, A]) extends AnyVal {
     new Immediate(runtime.race(eru, timeoutEru).map(_.merge))
   }
 
-  // DELIBERATELY NO unsafeRunSync - this prevents deadlocks at compile time
 }
 
 /** A computation that completes immediately without suspension.

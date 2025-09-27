@@ -85,7 +85,6 @@ object EruTest {
     try {
       test(clock)
     } finally {
-      // Complete any remaining pending operations for cleanup
       clock.completeAll
     }
   }
@@ -292,7 +291,6 @@ object EruTest {
               throw new AssertionError(s"Effect interrupted with wrong cause. Expected: $expected, Actual: $cause")
             }
           case None =>
-          // Any interruption cause is acceptable
         }
       case Exit.Success(value) =>
         throw new AssertionError(s"Effect succeeded unexpectedly with value: $value")
