@@ -165,12 +165,17 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 
   /** Races two effects, returning the result of whichever completes first.
     *
-    * Races two effects and returns the result of whichever completes first. The loser is signaled
-    * to cancel and its finalizers are guaranteed to run, ensuring proper resource cleanup.
+    * This method intelligently optimizes execution based on the input effects:
+    *   - If the first effect is a pure value, it wins immediately without racing
+    *   - If only the second effect is pure, it wins immediately
+    *   - If both effects are computations, they race concurrently
     *
-    * Race semantics are intentionally non-deterministic - either effect may win depending on
-    * execution timing, system load, and scheduling decisions. This makes race suitable for timeout
-    * patterns and competitive computations.
+    * When actual racing occurs, both effects execute concurrently and the loser is signaled to
+    * cancel with its finalizers guaranteed to run, ensuring proper resource cleanup.
+    *
+    * Race semantics are intentionally non-deterministic when both effects are computations - either
+    * effect may win depending on execution timing, system load, and scheduling decisions. This
+    * makes race suitable for timeout patterns and competitive computations.
     *
     * @param fa
     *   the first effect to race
@@ -209,7 +214,17 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     *   }}}
     */
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
-    backend.race(fa, fb)
+    // Fast path: if either or both are pure values, we can decide the winner immediately
+    if (Eru.isPureValue(fa)) {
+      // fa is pure, it wins immediately
+      fa.map(Left.apply)
+    } else if (Eru.isPureValue(fb)) {
+      // fb is pure but fa is not, fb wins
+      fb.map(Right.apply)
+    } else {
+      // Both are effectful, use the backend implementation
+      backend.race(fa, fb)
+    }
 
   /** Suspends execution for the specified duration.
     *
