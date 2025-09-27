@@ -13,32 +13,32 @@ class QueueConcurrencySpec extends EruTestSuite {
   test("bounded queue producer-consumer coordination") {
     val queue = Eru.queue[String](10).unsafeRunSync() // Match capacity to item count
     val itemCount = 10
-    val producerReady = Eru.promise[Nothing, Unit].unsafeRunSync()
-    val consumerReady = Eru.promise[Nothing, Unit].unsafeRunSync()
+    val startSignal = Eru.countDownLatch(2).unsafeRunSync()
 
-    // Producer
+    // Producer puts items sequentially
     val producer = (for {
-      _ <- producerReady.succeed(()).eru
-      _ <- consumerReady.await.eru
-      _ <- Eru.foreach(1 to itemCount) { i =>
-        queue.put(s"item$i").eru
+      _ <- startSignal.countDown.eru
+      _ <- startSignal.await.eru // Wait for both to be ready
+      results <- (1 to itemCount).foldLeft(Eru.succeed(List.empty[Unit])) { (acc, i) =>
+        acc.flatMap(list => queue.put(s"item$i").eru.map(unit => list :+ unit))
       }
-    } yield "producer-done").fork.unsafeRunSync()
+    } yield results.size).fork.unsafeRunSync()
 
-    // Consumer
+    // Consumer takes items sequentially
     val consumer = (for {
-      _ <- producerReady.await.eru
-      _ <- consumerReady.succeed(()).eru
-      items <- Eru.collectAll((1 to itemCount).map(_ => queue.take.eru))
+      _ <- startSignal.countDown.eru
+      _ <- startSignal.await.eru // Wait for both to be ready
+      items <- (1 to itemCount).foldLeft(Eru.succeed(List.empty[String])) { (acc, _) =>
+        acc.flatMap(list => queue.take.eru.map(item => list :+ item))
+      }
     } yield items).fork.unsafeRunSync()
 
-    val (producerResult, consumerResult) = (
-      producer.await.unsafeRunSync(),
-      consumer.await.unsafeRunSync()
-    )
+    // Wait for both to complete
+    val producerResult = producer.await.unsafeRunSync()
+    val consumerResult = consumer.await.unsafeRunSync()
 
     producerResult match {
-      case Exit.Success(value) => assertEquals(value, "producer-done")
+      case Exit.Success(count) => assertEquals(count, itemCount, "Producer should put all items")
       case other => fail(s"Producer expected success but got: $other")
     }
 
@@ -46,8 +46,8 @@ class QueueConcurrencySpec extends EruTestSuite {
       case Exit.Success(items) =>
         // Verify all items received (order may vary due to concurrency)
         val expectedItems = (1 to itemCount).map(i => s"item$i").toSet
-        assertEquals(items.toSet, expectedItems)
-        assertEquals(items.size, itemCount)
+        assertEquals(items.toSet, expectedItems, "Should receive all items")
+        assertEquals(items.size, itemCount, "Should receive correct count")
       case other => fail(s"Consumer expected success but got: $other")
     }
   }
@@ -63,8 +63,8 @@ class QueueConcurrencySpec extends EruTestSuite {
       (for {
         _ <- allReady.countDown.eru
         _ <- allReady.await.eru
-        _ <- Eru.foreach(1 to itemsPerProducer) { i =>
-          queue.put(s"P$producerId-I$i").eru
+        _ <- (1 to itemsPerProducer).foldLeft(Eru.unit) { (acc, i) =>
+          acc.flatMap(_ => queue.put(s"P$producerId-I$i").eru)
         }
       } yield s"producer$producerId-done").fork.unsafeRunSync()
     }
@@ -73,7 +73,9 @@ class QueueConcurrencySpec extends EruTestSuite {
     val consumer = (for {
       _ <- allReady.countDown.eru
       _ <- allReady.await.eru
-      items <- Eru.collectAll((1 to (producerCount * itemsPerProducer)).map(_ => queue.take.eru))
+      items <- (1 to (producerCount * itemsPerProducer)).foldLeft(Eru.succeed(List.empty[String])) { (acc, _) =>
+        acc.flatMap(list => queue.take.eru.map(item => list :+ item))
+      }
     } yield items).fork.unsafeRunSync()
 
     // Wait for all producers
