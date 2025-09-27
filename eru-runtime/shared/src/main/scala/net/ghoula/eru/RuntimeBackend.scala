@@ -379,10 +379,20 @@ enum RuntimeBackend {
   def timeout[E, A](
     duration: java.time.Duration
   )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] = {
-    race(fa, sleep(duration)).flatMap {
-      case Left(a) => Eru.succeed(a)
-      case Right(_) =>
-        Eru.effect(throw new java.util.concurrent.TimeoutException(s"Operation timed out after $duration"))
+    // Fast path: pure values complete instantly and never timeout
+    import Eru.Internals.View.*
+    Eru.Internals.view(fa) match {
+      case VSucceed(value) =>
+        Eru.succeed(value)
+      case VFail(error) =>
+        Eru.fail(error)
+      case _ =>
+        // Effectful computation, use race against sleep
+        race(fa, sleep(duration)).flatMap {
+          case Left(a) => Eru.succeed(a)
+          case Right(_) =>
+            Eru.effect(throw new java.util.concurrent.TimeoutException(s"Operation timed out after $duration"))
+        }
     }
   }
 
