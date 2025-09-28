@@ -318,12 +318,17 @@ class CoordinationBench extends FairBenchmarkBase {
 
   @Benchmark
   def zioCyclicBarrier(): Unit = runZio {
-    // ZIO doesn't have CyclicBarrier, simulate with equivalent coordination using Ref
+    // ZIO doesn't have CyclicBarrier, simulate with Promise-based synchronization
+    // This is equivalent to what CyclicBarrier does with parties=1
     for {
+      promise <- zio.Promise.make[Nothing, Unit]
       counter <- zio.Ref.make(1)
-      _ <- counter.updateAndGet(_ - 1)
-      finalCount <- counter.get
-      _ <- if (finalCount <= 0) ZIO.unit else ZIO.unit
+      _ <- counter.modify { count =>
+        val newCount = count - 1
+        (newCount <= 0, newCount)
+      }.flatMap { reachedZero =>
+        if (reachedZero) promise.succeed(()) else promise.await
+      }
     } yield ()
   }
 
