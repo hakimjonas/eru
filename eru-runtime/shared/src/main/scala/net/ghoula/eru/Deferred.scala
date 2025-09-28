@@ -115,6 +115,7 @@ object Deferred {
 
     def await: Suspending[Nothing, A] = new Suspending({
       stateRef.get.flatMap {
+        // Fast path: optimize for already-completed case
         case Completed(value) =>
           Eru.succeed(value)
         case Pending(_) =>

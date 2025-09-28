@@ -165,13 +165,14 @@ object Promise {
 
     def await: Suspending[E, A] = new Suspending({
       stateRef.get.flatMap {
+        // Fast path: optimize for the common Success case
+        case Completed(Exit.Success(value)) =>
+          Eru.succeed(value)
+        case Completed(Exit.Failure(error)) =>
+          Eru.fail(error)
         case Completed(exit) =>
-          exit match {
-            case Exit.Success(value) => Eru.succeed(value)
-            case Exit.Failure(error) => Eru.fail(error)
-            case Exit.Die(_) | Exit.Interrupt(_, _) =>
-              throw new IllegalStateException("Promise completed with unexpected exit type")
-          }
+          // Rare case: Die or Interrupt
+          throw new IllegalStateException(s"Promise completed with unexpected exit type: $exit")
         case Pending(_) =>
           runtime
             .suspend[Nothing, Either[E, A]] { callback =>

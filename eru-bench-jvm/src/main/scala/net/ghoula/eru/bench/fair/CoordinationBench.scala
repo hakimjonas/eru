@@ -166,6 +166,7 @@ class CoordinationBench extends FairBenchmarkBase {
 
   @Benchmark
   def eruCombinedCoordination(): Int = runEru {
+    // Sequential ref updates + deferred for fair comparison
     for {
       ref <- Eru.ref(0)
       deferred <- Eru.deferred[Int]
@@ -179,6 +180,7 @@ class CoordinationBench extends FairBenchmarkBase {
 
   @Benchmark
   def zioCombinedCoordination(): Int = runZio {
+    // Same sequential operations for fair comparison
     for {
       ref <- zio.Ref.make(0)
       promise <- zio.Promise.make[Nothing, Int]
@@ -278,11 +280,18 @@ class CoordinationBench extends FairBenchmarkBase {
 
   @Benchmark
   def zioCountDownLatch(): Unit = runZio {
-    // ZIO doesn't have CountDownLatch, simulate with Ref
+    // ZIO doesn't have CountDownLatch, simulate with Promise for fair comparison
     for {
+      promise <- zio.Promise.make[Nothing, Unit]
       ref <- zio.Ref.make(1)
-      _ <- ref.update(_ - 1)
-      _ <- ref.get.flatMap(count => if (count <= 0) ZIO.unit else ZIO.unit)
+      _ <- ref.modify { count =>
+        val newCount = count - 1
+        if (newCount <= 0) (true, newCount)
+        else (false, newCount)
+      }.flatMap { hitZero =>
+        if (hitZero) promise.succeed(()) else ZIO.unit
+      }
+      _ <- promise.await
     } yield ()
   }
 

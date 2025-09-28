@@ -111,7 +111,7 @@ enum RuntimeBackend {
   ): Eru[Nothing, Fiber[E, A]] =
     this match {
       case Synchronous =>
-        Eru.effect {
+        Eru.effectTotal {
           val id = FiberId.fresh()
           observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
 
@@ -137,7 +137,7 @@ enum RuntimeBackend {
         import Eru.Internals.View.*
         Eru.Internals.view(fa) match {
           case VSucceed(value) =>
-            Eru.effect {
+            Eru.effectTotal {
               val id = FiberId.fresh()
               observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
               val exit = Exit.Success(value)
@@ -153,7 +153,7 @@ enum RuntimeBackend {
             }
 
           case VFail(error) =>
-            Eru.effect {
+            Eru.effectTotal {
               val id = FiberId.fresh()
               observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
               val exit = Exit.Failure(error)
@@ -171,7 +171,7 @@ enum RuntimeBackend {
           case VMapChain(source, f) =>
             Eru.Internals.view(source) match {
               case VSucceed(value) =>
-                Eru.effect {
+                Eru.effectTotal {
                   val id = FiberId.fresh()
                   observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
                   val mappedValue = f(value)
@@ -187,7 +187,7 @@ enum RuntimeBackend {
                     UnifiedFiber.completed(id, exit)
                 }
               case _ =>
-                Eru.effect {
+                Eru.effectTotal {
                   val id = FiberId.fresh()
                   val fiber = UnifiedFiber.active[E, A](id)
 
@@ -223,7 +223,7 @@ enum RuntimeBackend {
             }
 
           case _ =>
-            Eru.effect {
+            Eru.effectTotal {
               val id = FiberId.fresh()
               val fiber = UnifiedFiber.active[E, A](id)
 
@@ -274,7 +274,7 @@ enum RuntimeBackend {
         fa.map(Left.apply)
 
       case VirtualThreads =>
-        Eru.effect {
+        Eru.effectTotal {
           import java.util.concurrent.atomic.AtomicReference
           import java.util.concurrent.CountDownLatch
 
@@ -302,7 +302,7 @@ enum RuntimeBackend {
               case Exit.Failure(e1) =>
                 trySet(() => Eru.fail(e1), () => rightThreadRef.get().foreach(_.interrupt()))
               case Exit.Die(t) =>
-                trySet(() => Eru.effect(throw t), () => rightThreadRef.get().foreach(_.interrupt()))
+                trySet(() => Eru.effectTotal(throw t), () => rightThreadRef.get().foreach(_.interrupt()))
               case Exit.Interrupt(_, _) =>
                 ()
             }
@@ -321,7 +321,7 @@ enum RuntimeBackend {
               case Exit.Failure(e2) =>
                 trySet(() => Eru.fail(e2), () => leftThreadRef.get().foreach(_.interrupt()))
               case Exit.Die(t) =>
-                trySet(() => Eru.effect(throw t), () => leftThreadRef.get().foreach(_.interrupt()))
+                trySet(() => Eru.effectTotal(throw t), () => leftThreadRef.get().foreach(_.interrupt()))
               case Exit.Interrupt(_, _) =>
                 ()
             }
@@ -342,8 +342,8 @@ enum RuntimeBackend {
           }
         }.attempt.flatMap {
           case Result.Success(Some(thunk)) => thunk()
-          case Result.Success(None) => Eru.effect(throw new IllegalStateException("race: no result set"))
-          case Result.Failure(t) => Eru.effect(throw t)
+          case Result.Success(None) => Eru.effectTotal(throw new IllegalStateException("race: no result set"))
+          case Result.Failure(t) => Eru.effectTotal(throw t)
         }
     }
 
@@ -357,9 +357,9 @@ enum RuntimeBackend {
   def sleep(duration: java.time.Duration): Eru[Nothing, Unit] =
     this match {
       case Synchronous =>
-        Eru.effect {
+        Eru.effectTotal {
           Thread.sleep(duration.toMillis)
-        }.attempt.flatMap(_ => Eru.unit)
+        }
 
       case VirtualThreads =>
         Eru.interruptibleBlocking {
@@ -391,7 +391,7 @@ enum RuntimeBackend {
         race(fa, sleep(duration)).flatMap {
           case Left(a) => Eru.succeed(a)
           case Right(_) =>
-            Eru.effect(throw new java.util.concurrent.TimeoutException(s"Operation timed out after $duration"))
+            Eru.fail(new java.util.concurrent.TimeoutException(s"Operation timed out after $duration"))
         }
     }
   }

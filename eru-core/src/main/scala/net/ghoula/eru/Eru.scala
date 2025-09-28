@@ -140,6 +140,11 @@ enum Eru[+E, +A] {
           case NonFatal(ex) => Chain(this, Eru.Continuation.Step((_: A) => throw ex, Eru.Continuation.End()))
         }
 
+      // For now, EffectTotal uses standard Chain
+      // TODO: Optimize common patterns like EffectTotal.flatMap(x => Succeed(...))
+      case EffectTotal(_) =>
+        Chain(this, Eru.Continuation.Step(f, Eru.Continuation.End()))
+
       case MapChain(Succeed(sourceValue), g) =>
         try {
           val mapped = g(sourceValue)

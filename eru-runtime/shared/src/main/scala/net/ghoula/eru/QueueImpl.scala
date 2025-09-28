@@ -6,9 +6,9 @@ import net.ghoula.eru.prelude.*
 
 /** Queue state for pure functional implementation. */
 private[eru] final case class QueueState[A](
-  elements: List[A],
-  waitingTakers: List[Promise[Nothing, A]],
-  waitingPutters: List[(A, Promise[Nothing, Unit])],
+  elements: scala.collection.immutable.Queue[A],
+  waitingTakers: scala.collection.immutable.Queue[Promise[Nothing, A]],
+  waitingPutters: scala.collection.immutable.Queue[(A, Promise[Nothing, Unit])],
   size: Int
 )
 
@@ -36,44 +36,75 @@ private[eru] final class QueueImpl[A](
 
   private val maxCapacity = capacityLimit.getOrElse(Int.MaxValue)
 
-  // Strategy will be used when implementing dropping/sliding behavior
-  private val _ = strategy
-
   override def put(a: A): Suspending[Nothing, Unit] = new Suspending({
-    tryPut(a).eru.flatMap { success =>
-      if (success) {
-        Eru.unit
-      } else {
-        // Must suspend - queue is full
-        for {
-          promise <- Promise.make[Nothing, Unit](using runtime)
-          registered <- stateRef.modify { state =>
-            if (state.size < maxCapacity) {
-              // Space became available during registration
-              val newState = state.copy(
-                elements = state.elements :+ a,
-                size = state.size + 1
-              )
-              val (finalState, takerCompleted) = wakeNextTaker(newState)
-              (finalState, Right(((), takerCompleted)))
-            } else {
-              // Register as waiting putter
-              val newState = state.copy(
-                waitingPutters = state.waitingPutters :+ ((a, promise))
-              )
-              (newState, Left(promise))
+    strategy match {
+      case QueueStrategy.Dropping =>
+        // Dropping strategy: silently drop if full, never suspend
+        tryPut(a).eru.map(_ => ())
+
+      case QueueStrategy.Sliding =>
+        // Sliding strategy: remove oldest to make room, never suspend
+        stateRef.modify { state =>
+          if (state.size < maxCapacity) {
+            // Has space, just add
+            val newState = state.copy(
+              elements = state.elements.enqueue(a),
+              size = state.size + 1
+            )
+            (newState, ())
+          } else {
+            // Full - drop oldest element and add new one
+            state.elements.dequeueOption match {
+              case Some((_, tail)) =>
+                val newState = state.copy(
+                  elements = tail.enqueue(a)
+                  // size stays the same
+                )
+                (newState, ())
+              case None =>
+                // Shouldn't happen but handle gracefully
+                (state, ())
             }
           }
-          result <- registered match {
-            case Right((unit, Some((takerPromise, elem)))) =>
-              takerPromise.succeed(elem).eru.map(_ => unit)
-            case Right((unit, None)) =>
-              Eru.succeed(unit)
-            case Left(promise) =>
-              promise.await.eru
+        }
+
+      case QueueStrategy.Blocking =>
+        // Blocking strategy: suspend if full (original behavior)
+        tryPut(a).eru.flatMap { success =>
+          if (success) {
+            Eru.unit
+          } else {
+            // Must suspend - queue is full
+            for {
+              promise <- Promise.make[Nothing, Unit](using runtime)
+              registered <- stateRef.modify { state =>
+                if (state.size < maxCapacity) {
+                  // Space became available during registration
+                  val newState = state.copy(
+                    elements = state.elements.enqueue(a),
+                    size = state.size + 1
+                  )
+                  val (finalState, takerCompleted) = wakeNextTaker(newState)
+                  (finalState, Right(((), takerCompleted)))
+                } else {
+                  // Register as waiting putter
+                  val newState = state.copy(
+                    waitingPutters = state.waitingPutters.enqueue((a, promise))
+                  )
+                  (newState, Left(promise))
+                }
+              }
+              result <- registered match {
+                case Right((unit, Some((takerPromise, elem)))) =>
+                  takerPromise.succeed(elem).eru.map(_ => unit)
+                case Right((unit, None)) =>
+                  Eru.succeed(unit)
+                case Left(promise) =>
+                  promise.await.eru
+              }
+            } yield result
           }
-        } yield result
-      }
+        }
     }
   })
 
@@ -85,8 +116,8 @@ private[eru] final class QueueImpl[A](
         for {
           promise <- Promise.make[Nothing, A](using runtime)
           result <- stateRef.modify { state =>
-            state.elements match {
-              case head :: tail =>
+            state.elements.dequeueOption match {
+              case Some((head, tail)) =>
                 // Element became available during registration
                 val newState = state.copy(
                   elements = tail,
@@ -94,10 +125,10 @@ private[eru] final class QueueImpl[A](
                 )
                 val (finalState, putterCompleted) = wakeNextPutter(newState)
                 (finalState, Right((head, putterCompleted)))
-              case Nil =>
+              case None =>
                 // Register as waiting taker
                 val newState = state.copy(
-                  waitingTakers = state.waitingTakers :+ promise
+                  waitingTakers = state.waitingTakers.enqueue(promise)
                 )
                 (newState, Left(promise))
             }
@@ -138,42 +169,44 @@ private[eru] final class QueueImpl[A](
   override def tryPut(a: A): Immediate[Nothing, Boolean] = new Immediate({
     stateRef.modify { state =>
       if (state.size < maxCapacity) {
-        state.waitingTakers match {
-          case taker :: remainingTakers =>
+        state.waitingTakers.dequeueOption match {
+          case Some((taker, remainingTakers)) =>
             // Give directly to waiting taker
             val newState = state.copy(waitingTakers = remainingTakers)
-            (newState, Some((taker, a)))
-          case Nil =>
+            (newState, (true, Some((taker, a))))
+          case None =>
             // Add to queue
             val newState = state.copy(
-              elements = state.elements :+ a,
+              elements = state.elements.enqueue(a),
               size = state.size + 1
             )
-            (newState, None)
+            (newState, (true, None))
         }
       } else {
         // Queue is full
-        (state, None)
+        (state, (false, None))
       }
-    }.flatMap {
-      case Some((promise, elem)) =>
-        promise.succeed(elem).eru.map(_ => true)
-      case None =>
-        stateRef.get.map(_.elements.contains(a))
+    }.flatMap { case (success, promiseToComplete) =>
+      promiseToComplete match {
+        case Some((promise, elem)) =>
+          promise.succeed(elem).eru.map(_ => success)
+        case None =>
+          Eru.succeed(success)
+      }
     }
   })
 
   override def tryTake: Immediate[Nothing, Option[A]] = new Immediate({
     stateRef.modify { state =>
-      state.elements match {
-        case head :: tail =>
+      state.elements.dequeueOption match {
+        case Some((head, tail)) =>
           val newState = state.copy(
             elements = tail,
             size = state.size - 1
           )
           val (finalState, putterCompleted) = wakeNextPutter(newState)
           (finalState, (Some(head), putterCompleted))
-        case Nil =>
+        case None =>
           (state, (None, None))
       }
     }.flatMap { case (result, putterToComplete) =>
@@ -193,25 +226,30 @@ private[eru] final class QueueImpl[A](
         satisfyWaitingTakers(toAdd.toList, state.waitingTakers)
 
       val newState = state.copy(
-        elements = state.elements ++ remainingElements,
+        elements = state.elements.enqueueAll(remainingElements),
         waitingTakers = remainingTakers,
         size = state.size + toAdd.size
       )
 
       (newState, (toAdd.size, takersToComplete))
     }.flatMap { case (added, takersToComplete) =>
-      Eru
-        .traverse(takersToComplete) { case (promise, elem) =>
-          promise.succeed(elem).eru
+      if (takersToComplete.isEmpty) {
+        Eru.succeed(added)
+      } else {
+        Eru.effectTotal {
+          takersToComplete.foreach { case (promise, elem) =>
+            promise.succeed(elem)
+          }
+          added
         }
-        .map(_ => added)
+      }
     }
   })
 
   override def tryTakeUpTo(n: Int): Immediate[Nothing, List[A]] = new Immediate({
     stateRef.modify { state =>
-      val toTake = state.elements.take(n)
-      val remaining = state.elements.drop(n)
+      val (toTake, remaining) = state.elements.splitAt(n)
+      val toTakeList = toTake.toList
 
       val (newElements, remainingPutters, puttersToComplete) =
         acceptWaitingPutters(remaining, state.waitingPutters, maxCapacity)
@@ -222,9 +260,16 @@ private[eru] final class QueueImpl[A](
         size = newElements.size
       )
 
-      (newState, (toTake, puttersToComplete))
+      (newState, (toTakeList, puttersToComplete))
     }.flatMap { case (taken, puttersToComplete) =>
-      Eru.traverse(puttersToComplete)(_.succeed(()).eru).map(_ => taken)
+      if (puttersToComplete.isEmpty) {
+        Eru.succeed(taken)
+      } else {
+        Eru.effectTotal {
+          puttersToComplete.foreach(_.succeed(()))
+          taken
+        }
+      }
     }
   })
 
@@ -321,29 +366,32 @@ private[eru] final class QueueImpl[A](
   // Helper methods
 
   private def wakeNextTaker(state: QueueState[A]): (QueueState[A], Option[(Promise[Nothing, A], A)]) = {
-    state.elements match {
-      case head :: tail if state.waitingTakers.nonEmpty =>
-        val taker :: remainingTakers = state.waitingTakers: @unchecked
+    (state.elements.dequeueOption, state.waitingTakers.dequeueOption) match {
+      case (Some((elem, remainingElements)), Some((taker, remainingTakers))) =>
         val newState = state.copy(
-          elements = tail,
+          elements = remainingElements,
           waitingTakers = remainingTakers,
           size = state.size - 1
         )
-        (newState, Some((taker, head)))
+        (newState, Some((taker, elem)))
       case _ =>
         (state, None)
     }
   }
 
   private def wakeNextPutter(state: QueueState[A]): (QueueState[A], Option[Promise[Nothing, Unit]]) = {
-    if (state.size < maxCapacity && state.waitingPutters.nonEmpty) {
-      val (elem, promise) :: remainingPutters = state.waitingPutters: @unchecked
-      val newState = state.copy(
-        elements = state.elements :+ elem,
-        waitingPutters = remainingPutters,
-        size = state.size + 1
-      )
-      (newState, Some(promise))
+    if (state.size < maxCapacity) {
+      state.waitingPutters.dequeueOption match {
+        case Some(((elem, promise), remainingPutters)) =>
+          val newState = state.copy(
+            elements = state.elements.enqueue(elem),
+            waitingPutters = remainingPutters,
+            size = state.size + 1
+          )
+          (newState, Some(promise))
+        case None =>
+          (state, None)
+      }
     } else {
       (state, None)
     }
@@ -351,30 +399,54 @@ private[eru] final class QueueImpl[A](
 
   private def satisfyWaitingTakers(
     elements: List[A],
-    takers: List[Promise[Nothing, A]]
-  ): (List[A], List[Promise[Nothing, A]], List[(Promise[Nothing, A], A)]) = {
-    (elements, takers) match {
-      case (Nil, _) => (Nil, takers, Nil)
-      case (_, Nil) => (elements, Nil, Nil)
-      case (elem :: restElems, taker :: restTakers) =>
-        val (finalElems, finalTakers, toComplete) = satisfyWaitingTakers(restElems, restTakers)
-        (finalElems, finalTakers, (taker, elem) :: toComplete)
+    takers: scala.collection.immutable.Queue[Promise[Nothing, A]]
+  ): (List[A], scala.collection.immutable.Queue[Promise[Nothing, A]], List[(Promise[Nothing, A], A)]) = {
+    @annotation.tailrec
+    def loop(
+      elems: List[A],
+      ts: scala.collection.immutable.Queue[Promise[Nothing, A]],
+      acc: List[(Promise[Nothing, A], A)]
+    ): (List[A], scala.collection.immutable.Queue[Promise[Nothing, A]], List[(Promise[Nothing, A], A)]) = {
+      (elems, ts.dequeueOption) match {
+        case (Nil, _) => (Nil, ts, acc.reverse)
+        case (_, None) => (elems, ts, acc.reverse)
+        case (elem :: restElems, Some((taker, restTakers))) =>
+          loop(restElems, restTakers, (taker, elem) :: acc)
+      }
     }
+    loop(elements, takers, Nil)
   }
 
   private def acceptWaitingPutters(
-    elements: List[A],
-    putters: List[(A, Promise[Nothing, Unit])],
+    elements: scala.collection.immutable.Queue[A],
+    putters: scala.collection.immutable.Queue[(A, Promise[Nothing, Unit])],
     capacity: Int
-  ): (List[A], List[(A, Promise[Nothing, Unit])], List[Promise[Nothing, Unit]]) = {
-    if (elements.size >= capacity || putters.isEmpty) {
-      (elements, putters, Nil)
-    } else {
-      val (elem, promise) :: restPutters = putters: @unchecked
-      val (finalElements, finalPutters, toComplete) =
-        acceptWaitingPutters(elements :+ elem, restPutters, capacity)
-      (finalElements, finalPutters, promise :: toComplete)
+  ): (
+    scala.collection.immutable.Queue[A],
+    scala.collection.immutable.Queue[(A, Promise[Nothing, Unit])],
+    List[Promise[Nothing, Unit]]
+  ) = {
+    @annotation.tailrec
+    def loop(
+      elems: scala.collection.immutable.Queue[A],
+      ps: scala.collection.immutable.Queue[(A, Promise[Nothing, Unit])],
+      acc: List[Promise[Nothing, Unit]]
+    ): (
+      scala.collection.immutable.Queue[A],
+      scala.collection.immutable.Queue[(A, Promise[Nothing, Unit])],
+      List[Promise[Nothing, Unit]]
+    ) = {
+      if (elems.size >= capacity) {
+        (elems, ps, acc.reverse)
+      } else {
+        ps.dequeueOption match {
+          case None => (elems, ps, acc.reverse)
+          case Some(((elem, promise), restPutters)) =>
+            loop(elems.enqueue(elem), restPutters, promise :: acc)
+        }
+      }
     }
+    loop(elements, putters, Nil)
   }
 }
 
@@ -383,14 +455,28 @@ private[eru] object QueueImpl {
   def bounded[A](capacity: Int, runtime: EruRuntime): Eru[Nothing, Queue[A]] = {
     require(capacity > 0, "Capacity must be positive")
     for {
-      initialState <- Eru.succeed(QueueState[A](Nil, Nil, Nil, 0))
+      initialState <- Eru.succeed(
+        QueueState[A](
+          scala.collection.immutable.Queue.empty,
+          scala.collection.immutable.Queue.empty,
+          scala.collection.immutable.Queue.empty,
+          0
+        )
+      )
       stateRef <- Ref.make(initialState)
     } yield new QueueImpl[A](stateRef, Some(capacity), QueueStrategy.Blocking, runtime)
   }
 
   def unbounded[A](runtime: EruRuntime): Eru[Nothing, Queue[A]] = {
     for {
-      initialState <- Eru.succeed(QueueState[A](Nil, Nil, Nil, 0))
+      initialState <- Eru.succeed(
+        QueueState[A](
+          scala.collection.immutable.Queue.empty,
+          scala.collection.immutable.Queue.empty,
+          scala.collection.immutable.Queue.empty,
+          0
+        )
+      )
       stateRef <- Ref.make(initialState)
     } yield new QueueImpl[A](stateRef, None, QueueStrategy.Blocking, runtime)
   }
@@ -398,7 +484,14 @@ private[eru] object QueueImpl {
   def dropping[A](capacity: Int, runtime: EruRuntime): Eru[Nothing, Queue[A]] = {
     require(capacity > 0, "Capacity must be positive")
     for {
-      initialState <- Eru.succeed(QueueState[A](Nil, Nil, Nil, 0))
+      initialState <- Eru.succeed(
+        QueueState[A](
+          scala.collection.immutable.Queue.empty,
+          scala.collection.immutable.Queue.empty,
+          scala.collection.immutable.Queue.empty,
+          0
+        )
+      )
       stateRef <- Ref.make(initialState)
     } yield new QueueImpl[A](stateRef, Some(capacity), QueueStrategy.Dropping, runtime)
   }
@@ -406,7 +499,14 @@ private[eru] object QueueImpl {
   def sliding[A](capacity: Int, runtime: EruRuntime): Eru[Nothing, Queue[A]] = {
     require(capacity > 0, "Capacity must be positive")
     for {
-      initialState <- Eru.succeed(QueueState[A](Nil, Nil, Nil, 0))
+      initialState <- Eru.succeed(
+        QueueState[A](
+          scala.collection.immutable.Queue.empty,
+          scala.collection.immutable.Queue.empty,
+          scala.collection.immutable.Queue.empty,
+          0
+        )
+      )
       stateRef <- Ref.make(initialState)
     } yield new QueueImpl[A](stateRef, Some(capacity), QueueStrategy.Sliding, runtime)
   }
