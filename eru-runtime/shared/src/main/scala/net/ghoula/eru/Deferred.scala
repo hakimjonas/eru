@@ -114,37 +114,39 @@ object Deferred {
       new Immediate(stateRef.get.map(_.value))
 
     def await: Suspending[Nothing, A] = new Suspending({
-      stateRef.get.flatMap {
-        // Fast path: optimize for already-completed case
-        case Completed(value) =>
-          Eru.succeed(value)
-        case Pending(_) =>
-          runtime
-            .suspend[Nothing, A] { callback =>
-              val wrappedCallback: A => Unit = (value: A) => callback(Right(value))
+      Eru.defer {
+        stateRef.get.flatMap {
+          // Fast path: optimize for already-completed case
+          case Completed(value) =>
+            Eru.succeed(value)
+          case Pending(_) =>
+            runtime
+              .suspend[Nothing, A] { callback =>
+                val wrappedCallback: A => Unit = (value: A) => callback(Right(value))
 
-              val registerCallback = stateRef.modify {
-                case Pending(waiters) =>
-                  (Pending(wrappedCallback :: waiters), None)
-                case Completed(value) =>
-                  (Completed(value), Some(value))
-              }
+                val registerCallback = stateRef.modify {
+                  case Pending(waiters) =>
+                    (Pending(wrappedCallback :: waiters), None)
+                  case Completed(value) =>
+                    (Completed(value), Some(value))
+                }
 
-              registerCallback.flatMap {
-                case Some(value) =>
-                  Eru.effectTotal {
-                    wrappedCallback(value)
-                  }
-                case None =>
-                  Eru.unit
+                registerCallback.flatMap {
+                  case Some(value) =>
+                    Eru.effectTotal {
+                      wrappedCallback(value)
+                    }
+                  case None =>
+                    Eru.unit
+                }
               }
-            }
-            .attempt
-            .map {
-              case Result.Success(value) => value
-              case Result.Failure(throwable) =>
-                throw new IllegalStateException("Deferred await encountered unexpected error", throwable)
-            }
+              .attempt
+              .map {
+                case Result.Success(value) => value
+                case Result.Failure(throwable) =>
+                  throw new IllegalStateException("Deferred await encountered unexpected error", throwable)
+              }
+        }
       }
     })
   }

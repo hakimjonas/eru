@@ -475,6 +475,20 @@ object Eru {
       catch { case NonFatal(t) => Left(t) }
     )
 
+  /** Defers the construction of an Eru effect, useful for optimizing cases where the effect
+    * construction itself needs to be delayed.
+    *
+    * This combinator is similar to ZIO's suspendSucceed - it delays the entire computation until
+    * it's actually needed, which can reduce allocations when effects are created but never run.
+    *
+    * @param eru
+    *   the effect to defer (by-name)
+    * @return
+    *   an effect that will construct and run the given effect when executed
+    */
+  def defer[E, A](eru: => Eru[E, A]): Eru[E, A] =
+    effectTotal(eru).flatMap(identity)
+
   /** Creates an infallible effect that cannot fail.
     *
     * This is an optimization for effects that are guaranteed not to throw exceptions, avoiding the
