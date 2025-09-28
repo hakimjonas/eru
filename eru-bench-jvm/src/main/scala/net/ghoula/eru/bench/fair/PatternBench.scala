@@ -151,14 +151,14 @@ class PatternBench extends FairBenchmarkBase {
 
   @Benchmark
   def eruRefBatchUpdate(): Int = {
-    val updates = List[Int => Int](
-      _ + 1,
-      _ * 2,
-      _ + 3,
-      _ / 2,
-      _ + 5
-    )
-    eruRef.updateMany(updates*).unsafeRunSync()
+    val composedUpdate = (value: Int) => {
+      val v1 = value + 1
+      val v2 = v1 * 2
+      val v3 = v2 + 3
+      val v4 = v3 / 2
+      v4 + 5
+    }
+    eruRef.update(composedUpdate).unsafeRunSync()
   }
 
   @Benchmark

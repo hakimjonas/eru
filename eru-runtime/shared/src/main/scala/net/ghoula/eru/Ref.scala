@@ -2,9 +2,8 @@ package net.ghoula.eru
 
 /** A fiber-safe, mutable reference that provides atomic read and update operations.
   *
-  * Instances are created in the `eru-runtime` module, and all operations are described as `Eru`
-  * programs. The current runtime is single-threaded; however, the public API is designed to remain
-  * compatible with a possible future multithreaded scheduler.
+  * All operations are guaranteed to be atomic and thread-safe, using compare-and-swap semantics
+  * internally. The reference is safe to use across multiple fibers running on Virtual Threads.
   */
 trait Ref[A] {
 
@@ -44,48 +43,6 @@ trait Ref[A] {
     */
   def modify[B](f: A => (A, B)): Eru[Nothing, B]
 
-  /** Applies multiple update functions in sequence, returning the final value.
-    *
-    * This is more efficient than chaining multiple update calls as it uses a single effectTotal
-    * operation instead of creating multiple Chain structures.
-    *
-    * @param fs
-    *   the update functions to apply in sequence
-    * @return
-    *   an effect that yields the final updated value
-    */
-  def updateMany(fs: (A => A)*): Eru[Nothing, A]
-
-  /** Gets the current value then updates it.
-    *
-    * @param f
-    *   the update function
-    * @return
-    *   an effect that yields the value before the update
-    */
-  def getAndUpdate(f: A => A): Eru[Nothing, A]
-
-  /** Updates the value and returns the new value.
-    *
-    * This is just an alias for update for clarity.
-    *
-    * @param f
-    *   the update function
-    * @return
-    *   an effect that yields the updated value
-    */
-  def updateAndGet(f: A => A): Eru[Nothing, A]
-
-  /** Applies multiple modifications in sequence, collecting all results.
-    *
-    * @param fs
-    *   the modification functions to apply
-    * @tparam B
-    *   the type of the auxiliary results
-    * @return
-    *   an effect that yields all auxiliary results
-    */
-  def modifyMany[B](fs: (A => (A, B))*): Eru[Nothing, List[B]]
 }
 
 object Ref {
@@ -105,7 +62,7 @@ object Ref {
     private val state = new java.util.concurrent.atomic.AtomicReference(init)
 
     def get: Eru[Nothing, A] =
-      Eru.effectTotal(state.get())
+      Eru.succeed(state.get())
 
     def set(a: A): Eru[Nothing, Unit] =
       Eru.effectTotal { state.set(a); () }
@@ -134,52 +91,5 @@ object Ref {
         loop()
       }
 
-    def updateMany(fs: (A => A)*): Eru[Nothing, A] =
-      if (fs.isEmpty) get
-      else
-        Eru.effectTotal {
-          @annotation.tailrec
-          def loop(): A = {
-            val current = state.get()
-            val next = fs.foldLeft(current)((acc, f) => f(acc))
-            if (state.compareAndSet(current, next)) next
-            else loop()
-          }
-          loop()
-        }
-
-    def getAndUpdate(f: A => A): Eru[Nothing, A] =
-      Eru.effectTotal {
-        @annotation.tailrec
-        def loop(): A = {
-          val current = state.get()
-          val next = f(current)
-          if (state.compareAndSet(current, next)) current
-          else loop()
-        }
-        loop()
-      }
-
-    def updateAndGet(f: A => A): Eru[Nothing, A] =
-      update(f)
-
-    def modifyMany[B](fs: (A => (A, B))*): Eru[Nothing, List[B]] =
-      if (fs.isEmpty) Eru.succeed(Nil)
-      else
-        Eru.effectTotal {
-          @annotation.tailrec
-          def loop(): List[B] = {
-            val current = state.get()
-            val results = scala.collection.mutable.ListBuffer.empty[B]
-            val next = fs.foldLeft(current) { (acc, f) =>
-              val (newAcc, b) = f(acc)
-              results += b
-              newAcc
-            }
-            if (state.compareAndSet(current, next)) results.toList
-            else loop()
-          }
-          loop()
-        }
   }
 }
