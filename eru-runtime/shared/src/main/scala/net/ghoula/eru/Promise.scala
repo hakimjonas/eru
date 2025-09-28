@@ -94,9 +94,7 @@ object Promise {
     *   an effect that yields the created promise
     */
   def make[E, A](using runtime: EruRuntime): Eru[Nothing, Promise[E, A]] =
-    for {
-      stateRef <- Ref.make(PromiseState.empty[E, A])
-    } yield new RuntimePromise[E, A](stateRef, runtime)
+    Ref.make(PromiseState.empty[E, A]).map(stateRef => new RuntimePromise[E, A](stateRef, runtime))
 
   /** Internal state representation for Promise. */
   private sealed trait PromiseState[E, A] {
@@ -176,50 +174,49 @@ object Promise {
     def poll: Immediate[Nothing, Option[Exit[E, A]]] = new Immediate(stateRef.get.map(_.result))
 
     def await: Suspending[E, A] = new Suspending({
-      Eru.defer {
-        stateRef.get.flatMap {
-          // Direct return for success case - no wrapping needed!
-          case CompletedSuccess(value) =>
-            Eru.succeed(value)
-          case CompletedFailure(Exit.Failure(error)) =>
-            Eru.fail(error)
-          case CompletedFailure(exit) =>
-            // Rare case: Die or Interrupt
-            throw new IllegalStateException(s"Promise completed with unexpected exit type: $exit")
-          case Pending(_) =>
-            runtime
-              .suspend[Nothing, Either[E, A]] { callback =>
-                val wrappedCallback: Either[E, A] => Unit = (result: Either[E, A]) => callback(Right(result))
+      // Fast path: check state first without defer
+      stateRef.get.flatMap {
+        // Direct return for success case - no wrapping needed!
+        case CompletedSuccess(value) =>
+          Eru.succeed(value)
+        case CompletedFailure(Exit.Failure(error)) =>
+          Eru.fail(error)
+        case CompletedFailure(exit) =>
+          // Rare case: Die or Interrupt
+          throw new IllegalStateException(s"Promise completed with unexpected exit type: $exit")
+        case Pending(_) =>
+          runtime
+            .suspend[Nothing, Either[E, A]] { callback =>
+              val wrappedCallback: Either[E, A] => Unit = (result: Either[E, A]) => callback(Right(result))
 
-                val registerCallback = stateRef.modify {
-                  case Pending(waiters) =>
-                    (Pending(wrappedCallback :: waiters), None)
-                  case completed @ CompletedSuccess(value) =>
-                    (completed, Some(Right(value)))
-                  case completed @ CompletedFailure(exit) =>
-                    (completed, Some(exitToEither(exit)))
-                }
-
-                registerCallback.flatMap {
-                  case Some(result) =>
-                    Eru.effectTotal {
-                      wrappedCallback(result)
-                    }
-                  case None =>
-                    Eru.unit
-                }
+              val registerCallback = stateRef.modify {
+                case Pending(waiters) =>
+                  (Pending(wrappedCallback :: waiters), None)
+                case completed @ CompletedSuccess(value) =>
+                  (completed, Some(Right(value)))
+                case completed @ CompletedFailure(exit) =>
+                  (completed, Some(exitToEither(exit)))
               }
-              .attempt
-              .flatMap {
-                case Result.Success(either) =>
-                  either match {
-                    case Left(error) => Eru.fail(error)
-                    case Right(value) => Eru.succeed(value)
+
+              registerCallback.flatMap {
+                case Some(result) =>
+                  Eru.effectTotal {
+                    wrappedCallback(result)
                   }
-                case Result.Failure(_) =>
-                  throw new IllegalStateException("Promise await encountered unexpected error")
+                case None =>
+                  Eru.unit
               }
-        }
+            }
+            .attempt
+            .flatMap {
+              case Result.Success(either) =>
+                either match {
+                  case Left(error) => Eru.fail(error)
+                  case Right(value) => Eru.succeed(value)
+                }
+              case Result.Failure(_) =>
+                throw new IllegalStateException("Promise await encountered unexpected error")
+            }
       }
     })
   }
