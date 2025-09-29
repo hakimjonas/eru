@@ -145,8 +145,52 @@ private[eru] final class QueueImpl[A](
   })
 
   override def putAll(as: Seq[A]): Suspending[Nothing, Unit] = new Suspending({
-    as.foldLeft(Eru.unit) { (acc, a) =>
-      acc.flatMap(_ => put(a).eru)
+    // Optimized: batch insert all elements that fit, then handle overflow
+    if (as.isEmpty) {
+      Eru.unit
+    } else {
+      strategy match {
+        case QueueStrategy.Dropping =>
+          // Dropping: try to add what fits, drop the rest
+          tryPutAll(as).eru.map(_ => ())
+
+        case QueueStrategy.Sliding =>
+          // Sliding: always succeeds by dropping oldest if needed
+          stateRef.modify { state =>
+            val totalSpace = maxCapacity
+            val toAdd = as.take(totalSpace) // Never add more than capacity
+
+            if (toAdd.size <= maxCapacity - state.size) {
+              // Everything fits
+              val newState = state.copy(
+                elements = state.elements.enqueueAll(toAdd),
+                size = state.size + toAdd.size
+              )
+              (newState, ())
+            } else {
+              // Need to drop some old elements
+              val toDrop = (state.size + toAdd.size) - maxCapacity
+              val afterDrop = (1 to toDrop).foldLeft(state.elements) { (q, _) =>
+                q.dequeueOption.map(_._2).getOrElse(q)
+              }
+              val newState = state.copy(
+                elements = afterDrop.enqueueAll(toAdd),
+                size = math.min(maxCapacity, afterDrop.size + toAdd.size)
+              )
+              (newState, ())
+            }
+          }
+
+        case QueueStrategy.Blocking =>
+          // For blocking, we still need sequential behavior to maintain order
+          // But we can optimize by batching what fits immediately
+          tryPutAll(as).eru.flatMap { added =>
+            val remaining = as.drop(added)
+            remaining.foldLeft(Eru.unit) { (acc, a) =>
+              acc.flatMap(_ => put(a).eru)
+            }
+          }
+      }
     }
   })
 

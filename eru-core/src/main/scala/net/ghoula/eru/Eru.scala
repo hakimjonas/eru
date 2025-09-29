@@ -1102,6 +1102,8 @@ object Eru {
     *   }}}
     */
   def traverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]] = {
+    // Original implementation - we can't avoid the chaining for sequential semantics
+    // without breaking the monadic laws. The optimization must happen at runtime level.
     inputs
       .foldLeft(succeed(List.empty[B])) { (accEru, input) =>
         accEru.flatMap { acc =>

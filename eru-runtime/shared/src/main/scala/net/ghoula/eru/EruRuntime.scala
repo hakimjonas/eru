@@ -545,7 +545,7 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
         // Fork all fibers in a single batch to minimize sequential overhead
         // While we can't avoid sequencing entirely, we can minimize the cost
         forkAll(effects).flatMap { fibers =>
-          // Now await all fibers and collect their exits
+          // Await all fibers - traverse is unavoidable here but fibers complete quickly
           Eru.traverse(fibers)(_.await).flatMap { exits =>
             exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
               case Some((fiberId, cause)) =>
@@ -614,7 +614,7 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
         // Fork all fibers in a single batch to minimize sequential overhead
         // While we can't avoid sequencing entirely, we can minimize the cost
         forkAll(effects).flatMap { fibers =>
-          // Now await all fibers and collect their exits
+          // Await all fibers - traverse is unavoidable here but fibers complete quickly
           Eru.traverse(fibers)(_.await)
         }.flatMap { exits =>
           // Process exits to collect errors or return results

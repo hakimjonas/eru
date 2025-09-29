@@ -59,6 +59,12 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, observer, Some(rootFibers))
 
+  override def forkBatch[E, A](effects: List[Eru[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
+    backend.forkBatch(effects, Some(rootFibers))
+
+  override def awaitAll[E, A](fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
+    backend.awaitAll(fibers)
+
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
     backend.race(fa, fb)
 
