@@ -280,4 +280,95 @@ class ConcurrencyBench extends FairBenchmarkBase {
     }
     combined
   }
+
+  // =============================================================================
+  // Race Operations with Actual Work
+  // =============================================================================
+
+  @Benchmark
+  def eruRaceWithWork(): String = runEru {
+    val fast = Eru.interruptibleBlocking { Thread.sleep(1); "fast" }
+    val slow = Eru.interruptibleBlocking { Thread.sleep(2); "slow" }
+    fast.race(slow).map {
+      case Left(result) => result
+      case Right(result) => result
+    }
+  }
+
+  @Benchmark
+  def zioRaceWithWork(): String = runZio {
+    val fast = ZIO.attemptBlockingInterrupt { Thread.sleep(1); "fast" }
+    val slow = ZIO.attemptBlockingInterrupt { Thread.sleep(2); "slow" }
+    fast.raceEither(slow).map {
+      case Left(result) => result
+      case Right(result) => result
+    }
+  }
+
+  @Benchmark
+  def ioRaceWithWork(): String = runIO {
+    val fast = IO.interruptible { Thread.sleep(1); "fast" }
+    val slow = IO.interruptible { Thread.sleep(2); "slow" }
+    IO.race(fast, slow).map {
+      case Left(result) => result
+      case Right(result) => result
+    }
+  }
+
+  // =============================================================================
+  // ZipPar Operations with Actual Work
+  // =============================================================================
+
+  @Benchmark
+  def eruZipParWithWork(): Int = runEru {
+    val left = Eru.effect { Thread.sleep(1); TEST_VALUE }
+    val right = Eru.effect { Thread.sleep(1); TEST_VALUE }
+    left.zipPar(right).map { case (a, b) => a + b }
+  }
+
+  @Benchmark
+  def zioZipParWithWork(): Int = runZio {
+    val left = ZIO.attempt { Thread.sleep(1); TEST_VALUE }
+    val right = ZIO.attempt { Thread.sleep(1); TEST_VALUE }
+    left.zipPar(right).map { case (a, b) => a + b }
+  }
+
+  @Benchmark
+  def ioZipParWithWork(): Int = runIO {
+    val left = IO.delay { Thread.sleep(1); TEST_VALUE }
+    val right = IO.delay { Thread.sleep(1); TEST_VALUE }
+    (left, right).parMapN(_ + _)
+  }
+
+  // =============================================================================
+  // Fork/Await with Actual Work
+  // =============================================================================
+
+  @Benchmark
+  def eruForkAwaitWithWork(): Int = runEru {
+    for {
+      fiber <- Eru.effect { Thread.sleep(1); TEST_VALUE }.fork
+      result <- fiber.await.flatMap(Eru.fromExit(_))
+    } yield result
+  }
+
+  @Benchmark
+  def zioForkAwaitWithWork(): Int = runZio {
+    for {
+      fiber <- ZIO.attempt { Thread.sleep(1); TEST_VALUE }.fork
+      exit <- fiber.await
+      result <- exit match {
+        case zio.Exit.Success(value) => ZIO.succeed(value)
+        case zio.Exit.Failure(cause) => ZIO.failCause(cause)
+      }
+    } yield result
+  }
+
+  @Benchmark
+  def ioForkAwaitWithWork(): Int = runIO {
+    for {
+      fiber <- IO.delay { Thread.sleep(1); TEST_VALUE }.start
+      result <- fiber.joinWithNever
+    } yield result
+  }
 }

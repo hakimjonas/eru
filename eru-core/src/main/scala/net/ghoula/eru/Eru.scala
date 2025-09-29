@@ -1691,4 +1691,46 @@ object Eru {
     }
 
   }
+
+  /** Checks if the current fiber has been interrupted and yields control if needed.
+    *
+    * This is a cooperative cancellation point for CPU-bound operations. Insert this in long-running
+    * loops to allow the fiber to be interrupted.
+    *
+    * @return
+    *   an effect that checks for interruption
+    *
+    * @example
+    *   {{{
+    * def cpuIntensive(n: Int): Eru[Nothing, Int] =
+    *   Eru.iterate(0) { i =>
+    *     for {
+    *       _ <- if (i % 1000 == 0) Eru.yieldIfInterrupted else Eru.unit
+    *       next <- Eru.succeed(i + 1)
+    *     } yield next
+    *   }(_ >= n)
+    *   }}}
+    */
+  def yieldIfInterrupted: Eru[Nothing, Unit] =
+    Eru.interruptibleBlocking {
+      if (Thread.currentThread().isInterrupted) {
+        throw new InterruptedException("Cooperative cancellation")
+      }
+    }.attempt.map(_ => ())
+
+  /** Checks a condition and yields if interrupted.
+    *
+    * Combines a condition check with cooperative cancellation. Useful for long-running loops that
+    * need both a termination condition and cancellation.
+    *
+    * @param shouldContinue
+    *   the condition to check
+    * @return
+    *   an effect that succeeds if should continue, fails if interrupted or condition false
+    */
+  def checkAndYield(shouldContinue: => Boolean): Eru[String, Unit] =
+    for {
+      _ <- yieldIfInterrupted
+      _ <- if (shouldContinue) Eru.unit else Eru.fail("Condition false")
+    } yield ()
 }

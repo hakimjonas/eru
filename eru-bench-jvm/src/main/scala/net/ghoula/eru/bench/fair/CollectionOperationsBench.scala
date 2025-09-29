@@ -318,4 +318,70 @@ class CollectionOperationsBench extends FairBenchmarkBase {
       (evens.map(_._1), odds.map(_._1))
     }
   }
+
+  // =============================================================================
+  // Parallel Operations with Actual Work
+  // =============================================================================
+
+  @Benchmark
+  def eruParSequenceWithWork(): List[Int] = runEru {
+    val effects = (1 to COLLECTION_SIZE).map { i =>
+      Eru.effect {
+        // Simple work - the issue is sequential forking, not the work type
+        scala.util.Random.nextInt(100) + i
+      }
+    }.toList
+    runtime.parSequence(effects)
+  }
+
+  @Benchmark
+  def zioParSequenceWithWork(): List[Int] = runZio {
+    val effects = (1 to COLLECTION_SIZE).map { i =>
+      ZIO.attempt {
+        scala.util.Random.nextInt(100) + i
+      }
+    }.toList
+    ZIO.collectAllPar(effects)
+  }
+
+  @Benchmark
+  def ioParSequenceWithWork(): List[Int] = runIO {
+    val effects = (1 to COLLECTION_SIZE).map { i =>
+      IO.delay {
+        scala.util.Random.nextInt(100) + i
+      }
+    }.toList
+    effects.parSequence
+  }
+
+  @Benchmark
+  def eruParTraverseWithWork(): List[Int] = runEru {
+    val items = (1 to COLLECTION_SIZE).toList
+    runtime.parTraverse(items) { x =>
+      Eru.effect {
+        // Simple work - the issue is sequential forking, not the work type
+        scala.util.Random.nextInt(100) + x * 2
+      }
+    }
+  }
+
+  @Benchmark
+  def zioParTraverseWithWork(): List[Int] = runZio {
+    val items = (1 to COLLECTION_SIZE).toList
+    ZIO.foreachPar(items) { x =>
+      ZIO.attempt {
+        scala.util.Random.nextInt(100) + x * 2
+      }
+    }
+  }
+
+  @Benchmark
+  def ioParTraverseWithWork(): List[Int] = runIO {
+    val items = (1 to COLLECTION_SIZE).toList
+    items.parTraverse { x =>
+      IO.delay {
+        scala.util.Random.nextInt(100) + x * 2
+      }
+    }
+  }
 }

@@ -339,4 +339,165 @@ class CoordinationBench extends FairBenchmarkBase {
       _ <- barrier.await
     } yield ()
   }
+
+  // =============================================================================
+  // Concurrent Coordination (Actual concurrent scenarios)
+  // =============================================================================
+
+  @Benchmark
+  def eruConcurrentPromise(): Int = runEru {
+    for {
+      promise <- Eru.promise[Nothing, Int]
+      fiber <- Eru.effect {
+        Thread.sleep(1)
+        TEST_VALUE
+      }.flatMap(v => promise.succeed(v).eru).fork
+      result <- promise.await.eru
+      _ <- fiber.await
+    } yield result
+  }
+
+  @Benchmark
+  def zioConcurrentPromise(): Int = runZio {
+    for {
+      promise <- zio.Promise.make[Nothing, Int]
+      fiber <- ZIO.attempt {
+        Thread.sleep(1)
+        TEST_VALUE
+      }.flatMap(v => promise.succeed(v)).fork
+      result <- promise.await
+      _ <- fiber.await
+    } yield result
+  }
+
+  @Benchmark
+  def ioConcurrentDeferred(): Int = runIO {
+    for {
+      deferred <- cats.effect.Deferred[IO, Int]
+      fiber <- IO.delay {
+        Thread.sleep(1)
+        TEST_VALUE
+      }.flatMap(v => deferred.complete(v)).start
+      result <- deferred.get
+      _ <- fiber.joinWithNever
+    } yield result
+  }
+
+  @Benchmark
+  def eruConcurrentSemaphore(): Int = runEru {
+    for {
+      sem <- Eru.semaphore(1)
+      counter <- Eru.ref(0)
+      fiber1 <- sem
+        .withPermit(
+          counter.update(_ + 1).flatMap(_ => Eru.effect(Thread.sleep(1)))
+        )
+        .fork
+      fiber2 <- sem
+        .withPermit(
+          counter.update(_ + 1).flatMap(_ => Eru.effect(Thread.sleep(1)))
+        )
+        .fork
+      _ <- fiber1.await
+      _ <- fiber2.await
+      result <- counter.get
+    } yield result
+  }
+
+  @Benchmark
+  def zioConcurrentSemaphore(): Int = runZio {
+    for {
+      sem <- zio.Semaphore.make(1)
+      counter <- zio.Ref.make(0)
+      fiber1 <- sem
+        .withPermit(
+          counter.update(_ + 1) *> ZIO.attempt(Thread.sleep(1))
+        )
+        .fork
+      fiber2 <- sem
+        .withPermit(
+          counter.update(_ + 1) *> ZIO.attempt(Thread.sleep(1))
+        )
+        .fork
+      _ <- fiber1.await
+      _ <- fiber2.await
+      result <- counter.get
+    } yield result
+  }
+
+  @Benchmark
+  def ioConcurrentSemaphore(): Int = runIO {
+    for {
+      sem <- cats.effect.std.Semaphore[IO](1)
+      counter <- cats.effect.Ref[IO].of(0)
+      fiber1 <- sem.permit
+        .surround(
+          counter.update(_ + 1) >> IO.delay(Thread.sleep(1))
+        )
+        .start
+      fiber2 <- sem.permit
+        .surround(
+          counter.update(_ + 1) >> IO.delay(Thread.sleep(1))
+        )
+        .start
+      _ <- fiber1.joinWithNever
+      _ <- fiber2.joinWithNever
+      result <- counter.get
+    } yield result
+  }
+
+  @Benchmark
+  def eruConcurrentQueue(): Int = runEru {
+    for {
+      queue <- Eru.queue[Int](2)
+      producer <- (
+        queue.put(1).eru.flatMap(_ => Eru.effect(Thread.sleep(1)).flatMap(_ => queue.put(2).eru))
+      ).fork
+      consumer <- (
+        queue.take.eru.flatMap(_ => queue.take.eru)
+      ).fork
+      _ <- producer.await
+      result <- consumer.await.flatMap(Eru.fromExit(_))
+    } yield result
+  }
+
+  @Benchmark
+  def zioConcurrentQueue(): Int = runZio {
+    for {
+      queue <- zio.Queue.bounded[Int](2)
+      producer <- (
+        queue.offer(1) *>
+          ZIO.attempt(Thread.sleep(1)) *>
+          queue.offer(2)
+      ).fork
+      consumer <- (
+        queue.take *>
+          queue.take
+      ).fork
+      _ <- producer.await
+      exit <- consumer.await
+      result <- exit match {
+        case zio.Exit.Success(value) => ZIO.succeed(value)
+        case zio.Exit.Failure(cause) => ZIO.failCause(cause)
+      }
+    } yield result
+  }
+
+  @Benchmark
+  def ioConcurrentQueue(): Int = runIO {
+    for {
+      queue <- cats.effect.std.Queue.bounded[IO, Int](2)
+      producer <- (
+        queue.offer(1) >>
+          IO.delay(Thread.sleep(1)) >>
+          queue.offer(2)
+      ).start
+      consumer <- (
+        queue.take >>
+          queue.take
+      ).start
+      _ <- producer.joinWithNever
+      result <- consumer.joinWithNever
+    } yield result
+  }
 }

@@ -50,6 +50,10 @@ object CorePrelude {
   /** Export error handling patterns and types. */
   export net.ghoula.eru.patterns.ErrorHandling.*
 
+  /** Export ParallelErrors for error aggregation in parallel operations. */
+  type ParallelErrors[+E] = net.ghoula.eru.ParallelErrors[E]
+  val ParallelErrors = net.ghoula.eru.ParallelErrors
+
   /** Export all tracing types and functionality. */
   export net.ghoula.eru.trace.EruTrace.*
 

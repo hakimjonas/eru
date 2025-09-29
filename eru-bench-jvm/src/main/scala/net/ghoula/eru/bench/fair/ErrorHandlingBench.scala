@@ -4,6 +4,7 @@ import cats.effect.IO
 import org.openjdk.jmh.annotations.*
 import zio.ZIO
 
+import net.ghoula.eru.ParallelErrors
 import net.ghoula.eru.prelude.*
 
 /** Category 2: Error Handling Benchmarks
@@ -240,5 +241,165 @@ class ErrorHandlingBench extends FairBenchmarkBase {
   @Benchmark
   def ioOrElse(): Int = runIO {
     IO.raiseError[Int](new RuntimeException(TEST_ERROR)).handleErrorWith(_ => IO.pure(TEST_VALUE))
+  }
+
+  // =============================================================================
+  // Parallel Error Collection (New)
+  // =============================================================================
+
+  @Benchmark
+  def eruZipParAllBothFail(): (Int, Int) = runEru {
+    runtime.zipParAll(
+      Eru.fail("error1").orElse(Eru.succeed(10)),
+      Eru.fail("error2").orElse(Eru.succeed(20))
+    )
+  }
+
+  @Benchmark
+  def eruZipParAllOneFails(): (Int, Int) = runEru {
+    runtime.zipParAll(
+      Eru.succeed(10),
+      Eru.fail("error2").orElse(Eru.succeed(20))
+    )
+  }
+
+  @Benchmark
+  def eruParSequenceAllSuccess(): List[Int] = runEru {
+    val effects = List(
+      Eru.succeed(1),
+      Eru.succeed(2),
+      Eru.succeed(3),
+      Eru.succeed(4),
+      Eru.succeed(5)
+    )
+    runtime.parSequenceAll(effects)
+  }
+
+  @Benchmark
+  def eruParSequenceSuccess(): List[Int] = runEru {
+    val effects = List(
+      Eru.succeed(1),
+      Eru.succeed(2),
+      Eru.succeed(3),
+      Eru.succeed(4),
+      Eru.succeed(5)
+    )
+    runtime.parSequence(effects)
+  }
+
+  @Benchmark
+  def zioParallelSuccess(): List[Int] = runZio {
+    import zio.ZIO.collectAllPar
+    val effects = List(
+      ZIO.succeed(1),
+      ZIO.succeed(2),
+      ZIO.succeed(3),
+      ZIO.succeed(4),
+      ZIO.succeed(5)
+    )
+    collectAllPar(effects)
+  }
+
+  @Benchmark
+  def ioParallelSuccess(): List[Int] = runIO {
+    import cats.implicits._
+    val effects = List(
+      IO.pure(1),
+      IO.pure(2),
+      IO.pure(3),
+      IO.pure(4),
+      IO.pure(5)
+    )
+    effects.parSequence
+  }
+
+  // =============================================================================
+  // Parallel with Actual Work (Realistic Scenarios)
+  // =============================================================================
+
+  @Benchmark
+  def eruParSequenceWithWork(): List[Int] = runEru {
+    val effects = List(
+      Eru.effect { Thread.sleep(1); 1 },
+      Eru.effect { Thread.sleep(1); 2 },
+      Eru.effect { Thread.sleep(1); 3 },
+      Eru.effect { Thread.sleep(1); 4 },
+      Eru.effect { Thread.sleep(1); 5 }
+    )
+    runtime.parSequence(effects)
+  }
+
+  @Benchmark
+  def eruParSequenceAllWithWork(): List[Int] = runEru {
+    val effects = List(
+      Eru.effect { Thread.sleep(1); 1 },
+      Eru.effect { Thread.sleep(1); 2 },
+      Eru.effect { Thread.sleep(1); 3 },
+      Eru.effect { Thread.sleep(1); 4 },
+      Eru.effect { Thread.sleep(1); 5 }
+    )
+    runtime.parSequenceAll(effects)
+  }
+
+  @Benchmark
+  def zioParallelWithWork(): List[Int] = runZio {
+    import zio.ZIO.collectAllPar
+    val effects = List(
+      ZIO.attempt { Thread.sleep(1); 1 },
+      ZIO.attempt { Thread.sleep(1); 2 },
+      ZIO.attempt { Thread.sleep(1); 3 },
+      ZIO.attempt { Thread.sleep(1); 4 },
+      ZIO.attempt { Thread.sleep(1); 5 }
+    )
+    collectAllPar(effects)
+  }
+
+  @Benchmark
+  def ioParallelWithWork(): List[Int] = runIO {
+    import cats.implicits._
+    val effects = List(
+      IO { Thread.sleep(1); 1 },
+      IO { Thread.sleep(1); 2 },
+      IO { Thread.sleep(1); 3 },
+      IO { Thread.sleep(1); 4 },
+      IO { Thread.sleep(1); 5 }
+    )
+    effects.parSequence
+  }
+
+  // =============================================================================
+  // Parallel with Mixed Success/Failure
+  // =============================================================================
+
+  @Benchmark
+  def eruParSequenceAllMixed(): Either[Any, List[Int]] = runEru {
+    val effects = List(
+      Eru.succeed(1),
+      Eru.effect { Thread.sleep(1); 2 },
+      Eru.fail("error1"),
+      Eru.effect { Thread.sleep(1); 4 },
+      Eru.fail("error2")
+    )
+    runtime.parSequenceAll(effects).attempt.map {
+      case Result.Success(list) => Right(list)
+      case Result.Failure(ParallelErrors(first, rest)) => Left(s"Errors: $first, ${rest.mkString(", ")}")
+      case Result.Failure(e) => Left(s"Error: $e")
+    }
+  }
+
+  @Benchmark
+  def eruParSequenceMixed(): Either[String, List[Int]] = runEru {
+    val effects = List(
+      Eru.succeed(1),
+      Eru.effect { Thread.sleep(1); 2 },
+      Eru.fail("error1"),
+      Eru.effect { Thread.sleep(1); 4 },
+      Eru.fail("error2")
+    )
+    runtime.parSequence(effects).attempt.map {
+      case Result.Success(list) => Right(list)
+      case Result.Failure(e: String) => Left(e)
+      case Result.Failure(e) => Left(e.toString)
+    }
   }
 }

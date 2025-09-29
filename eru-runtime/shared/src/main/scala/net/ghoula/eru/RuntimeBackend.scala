@@ -41,10 +41,28 @@ private object StructuredConcurrency {
       case Some(scope) => scope.childFibers.offer(fiber)
       case None =>
         rootFibers match {
-          case Some(queue) => queue.offer(fiber)
+          case Some(queue) =>
+            queue.offer(fiber)
+            // More aggressive cleanup: clean every 20 fibers
+            if (queue.size() > 20) {
+              cleanupCompletedFibers(queue)
+            }
           case None => ()
         }
     }
+  }
+
+  private def cleanupCompletedFibers(queue: ConcurrentLinkedQueue[UnifiedFiber[?, ?]]): Unit = {
+    val active = scala.collection.mutable.ListBuffer.empty[UnifiedFiber[?, ?]]
+    var fiber = Option(queue.poll())
+    while (fiber.nonEmpty) {
+      fiber.get.currentState match {
+        case UnifiedFiberState.Completed(_) => () // Discard completed
+        case UnifiedFiberState.Active(_, _, _) => active += fiber.get // Keep active
+      }
+      fiber = Option(queue.poll())
+    }
+    active.foreach(queue.offer)
   }
 
   def cleanupRootFibers(rootFibers: Option[ConcurrentLinkedQueue[UnifiedFiber[?, ?]]]): Unit = {
@@ -190,6 +208,7 @@ enum RuntimeBackend {
                 Eru.effectTotal {
                   val id = FiberId.fresh()
                   val fiber = UnifiedFiber.active[E, A](id)
+                  val parentScope = StructuredConcurrency.getCurrentScope()
 
                   StructuredConcurrency.addChildFiber(fiber, rootFibers)
 
@@ -197,6 +216,8 @@ enum RuntimeBackend {
 
                   Thread.startVirtualThread { () =>
                     UnifiedFiber.setThread(fiber, Thread.currentThread())
+                    // Restore parent scope in new thread
+                    StructuredConcurrency.setCurrentScope(parentScope)
 
                     StructuredConcurrency.withNewScope { _ =>
                       val (exit, finalizers) = Eru.executeWithFinalizers(fa)
@@ -226,6 +247,7 @@ enum RuntimeBackend {
             Eru.effectTotal {
               val id = FiberId.fresh()
               val fiber = UnifiedFiber.active[E, A](id)
+              val parentScope = StructuredConcurrency.getCurrentScope()
 
               StructuredConcurrency.addChildFiber(fiber, rootFibers)
 
@@ -233,6 +255,8 @@ enum RuntimeBackend {
 
               Thread.startVirtualThread { () =>
                 UnifiedFiber.setThread(fiber, Thread.currentThread())
+                // Restore parent scope in new thread
+                StructuredConcurrency.setCurrentScope(parentScope)
 
                 StructuredConcurrency.withNewScope { _ =>
                   val (exit, finalizers) = Eru.executeWithFinalizers(fa)
@@ -282,6 +306,7 @@ enum RuntimeBackend {
           val latch = new CountDownLatch(1)
           val leftThreadRef = new AtomicReference[Option[Thread]](None)
           val rightThreadRef = new AtomicReference[Option[Thread]](None)
+          val parentScope = StructuredConcurrency.getCurrentScope()
 
           def trySet(thunk: () => Eru[E1 | E2 | Throwable, Either[A, B]], cancelOther: () => Unit): Unit =
             if (resultRef.compareAndSet(None, Some(thunk))) {
@@ -291,6 +316,8 @@ enum RuntimeBackend {
 
           val runLeft: Runnable = () => {
             leftThreadRef.set(Some(Thread.currentThread()))
+            // Restore parent scope in race thread
+            StructuredConcurrency.setCurrentScope(parentScope)
             val (exit, finalizers) = Eru.executeWithFinalizers(fa)
             finalizers.foreach { finalizer =>
               try finalizer().unsafeRunSync()
@@ -310,6 +337,8 @@ enum RuntimeBackend {
 
           val runRight: Runnable = () => {
             rightThreadRef.set(Some(Thread.currentThread()))
+            // Restore parent scope in race thread
+            StructuredConcurrency.setCurrentScope(parentScope)
             val (exit, finalizers) = Eru.executeWithFinalizers(fb)
             finalizers.foreach { finalizer =>
               try finalizer().unsafeRunSync()
