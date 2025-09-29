@@ -528,18 +528,14 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     *   }}}
     */
   private def forkAll[E, A](effects: List[Eru[E, A]]): Eru[Nothing, List[Fiber[E, A]]] = {
-    @annotation.tailrec
-    def loop(remaining: List[Eru[E, A]], acc: List[Eru[Nothing, Fiber[E, A]]]): List[Eru[Nothing, Fiber[E, A]]] =
-      remaining match {
-        case Nil => acc.reverse
-        case head :: tail => loop(tail, fork(head) :: acc)
+    // Create all fibers in a single effectTotal to avoid deep chaining
+    // This reduces memory allocation from O(n²) to O(n)
+    Eru.effectTotal {
+      effects.map { effect =>
+        // Use fork directly which handles platform differences
+        fork(effect).unsafeRunSync()
       }
-
-    // Create all fork effects first (very fast)
-    val forkEffects = loop(effects, Nil)
-
-    // Now sequence them - this is the sequential part but fork operations are lightweight
-    Eru.sequence(forkEffects)
+    }
   }
 
   def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
