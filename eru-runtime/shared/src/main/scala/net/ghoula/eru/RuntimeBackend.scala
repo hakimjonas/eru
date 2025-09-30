@@ -43,26 +43,23 @@ private object StructuredConcurrency {
         rootFibers match {
           case Some(queue) =>
             queue.offer(fiber)
-            // More aggressive cleanup: clean every 20 fibers
-            if (queue.size() > 20) {
-              cleanupCompletedFibers(queue)
-            }
+            // Incremental cleanup: remove one completed fiber per add to prevent unbounded growth
+            // This amortizes cleanup cost across operations and avoids expensive full queue drains
+            cleanupOneCompletedFiber(queue)
           case None => ()
         }
     }
   }
 
-  private def cleanupCompletedFibers(queue: ConcurrentLinkedQueue[UnifiedFiber[?, ?]]): Unit = {
-    val active = scala.collection.mutable.ListBuffer.empty[UnifiedFiber[?, ?]]
-    var fiber = Option(queue.poll())
-    while (fiber.nonEmpty) {
-      fiber.get.currentState match {
+  private def cleanupOneCompletedFiber(queue: ConcurrentLinkedQueue[UnifiedFiber[?, ?]]): Unit = {
+    // Poll one fiber and re-add if still active, discard if completed
+    // This provides O(1) amortized cleanup instead of O(n) periodic full drains
+    Option(queue.poll()).foreach { fiber =>
+      fiber.currentState match {
         case UnifiedFiberState.Completed(_) => () // Discard completed
-        case UnifiedFiberState.Active(_, _, _) => active += fiber.get // Keep active
+        case UnifiedFiberState.Active(_, _, _) => queue.offer(fiber) // Re-add active
       }
-      fiber = Option(queue.poll())
     }
-    active.foreach(queue.offer)
   }
 
   def cleanupRootFibers(rootFibers: Option[ConcurrentLinkedQueue[UnifiedFiber[?, ?]]]): Unit = {

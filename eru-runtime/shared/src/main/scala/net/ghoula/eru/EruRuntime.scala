@@ -528,14 +528,13 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     *   }}}
     */
   private def forkAll[E, A](effects: List[Eru[E, A]]): Eru[Nothing, List[Fiber[E, A]]] = {
-    // Create all fibers in a single effectTotal to avoid deep chaining
-    // This reduces memory allocation from O(n²) to O(n)
-    Eru.effectTotal {
-      effects.map { effect =>
-        // Use fork directly which handles platform differences
-        fork(effect).unsafeRunSync()
-      }
-    }
+    // Fork each effect in sequence, collecting the resulting fibers.
+    // While this creates a chain of flatMap operations, it's correct and efficient:
+    //   1. Fork is lightweight (just schedules the fiber, doesn't wait)
+    //   2. Actual work runs asynchronously in parallel
+    //   3. Eru's trampolined interpreter handles the chain stack-safely
+    // This respects effect boundaries and maintains referential transparency.
+    Eru.traverse(effects)(fork(_))
   }
 
   def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =

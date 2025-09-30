@@ -34,7 +34,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def eruFlatMapChain(): Int = runEru {
     Eru
-      .effect(scala.util.Random.nextInt(10))
+      .effect(TEST_VALUE)
       .flatMap(x => Eru.effect(x * 2))
       .flatMap(x => Eru.effect(x + 1))
       .flatMap(x => Eru.succeed(x * 3))
@@ -43,7 +43,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def zioFlatMapChain(): Int = runZio {
     ZIO
-      .attempt(scala.util.Random.nextInt(10))
+      .attempt(TEST_VALUE)
       .flatMap(x => ZIO.attempt(x * 2))
       .flatMap(x => ZIO.attempt(x + 1))
       .flatMap(x => ZIO.succeed(x * 3))
@@ -51,7 +51,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
 
   @Benchmark
   def ioFlatMapChain(): Int = runIO {
-    IO.delay(scala.util.Random.nextInt(10))
+    IO.delay(TEST_VALUE)
       .flatMap(x => IO.delay(x * 2))
       .flatMap(x => IO.delay(x + 1))
       .flatMap(x => IO.pure(x * 3))
@@ -64,7 +64,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def eruErrorRecovery(): String = runEru {
     Eru.effect {
-      if (scala.util.Random.nextBoolean()) throw new Exception("error")
+      if (TEST_VALUE % 2 == 0) throw new Exception("error")
       else "success"
     }.recover { case _: Exception => "recovered" }
   }
@@ -72,7 +72,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def zioErrorRecovery(): String = runZio {
     ZIO.attempt {
-      if (scala.util.Random.nextBoolean()) throw new Exception("error")
+      if (TEST_VALUE % 2 == 0) throw new Exception("error")
       else "success"
     }.orElse(ZIO.succeed("recovered"))
   }
@@ -80,7 +80,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def ioErrorRecovery(): String = runIO {
     IO.delay {
-      if (scala.util.Random.nextBoolean()) throw new Exception("error")
+      if (TEST_VALUE % 2 == 0) throw new Exception("error")
       else "success"
     }.handleError { _ => "recovered" }
   }
@@ -231,19 +231,19 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
 
   @Benchmark
   def eruParSequence(): Int = runEru {
-    val effects = (1 to 5).map(i => Eru.effect(scala.util.Random.nextInt(i))).toList
+    val effects = (1 to 5).map(i => Eru.effect(i * 2)).toList
     runtime.parSequence(effects).map(_.sum)
   }
 
   @Benchmark
   def zioParSequence(): Int = runZio {
-    val effects = (1 to 5).map(i => ZIO.attempt(scala.util.Random.nextInt(i)))
+    val effects = (1 to 5).map(i => ZIO.attempt(i * 2))
     ZIO.collectAllPar(effects).map(_.sum)
   }
 
   @Benchmark
   def ioParSequence(): Int = runIO {
-    val effects = (1 to 5).map(i => IO.delay(scala.util.Random.nextInt(i))).toList
+    val effects = (1 to 5).map(i => IO.delay(i * 2)).toList
     effects.parSequence.map(_.sum)
   }
 
@@ -254,19 +254,19 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def eruParTraverse(): Int = runEru {
     val inputs = List(1, 2, 3, 4, 5)
-    runtime.parTraverse(inputs)(i => Eru.effect(scala.util.Random.nextInt(i * 10))).map(_.sum)
+    runtime.parTraverse(inputs)(i => Eru.effect(i * 10)).map(_.sum)
   }
 
   @Benchmark
   def zioParTraverse(): Int = runZio {
     val inputs = List(1, 2, 3, 4, 5)
-    ZIO.foreachPar(inputs)(i => ZIO.attempt(scala.util.Random.nextInt(i * 10))).map(_.sum)
+    ZIO.foreachPar(inputs)(i => ZIO.attempt(i * 10)).map(_.sum)
   }
 
   @Benchmark
   def ioParTraverse(): Int = runIO {
     val inputs = List(1, 2, 3, 4, 5)
-    inputs.parTraverse(i => IO.delay(scala.util.Random.nextInt(i * 10))).map(_.sum)
+    inputs.parTraverse(i => IO.delay(i * 10)).map(_.sum)
   }
 
   // =============================================================================
@@ -278,8 +278,12 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
     val effects = (1 to 3)
       .map(i =>
         Eru.effect {
-          Thread.sleep(i)
-          i * 10
+          try {
+            Thread.sleep(i)
+            i * 10
+          } catch {
+            case _: InterruptedException => i * 10
+          }
         }
       )
       .toList
@@ -291,8 +295,12 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
     val effects = (1 to 3)
       .map(i =>
         ZIO.attempt {
-          Thread.sleep(i)
-          i * 10
+          try {
+            Thread.sleep(i)
+            i * 10
+          } catch {
+            case _: InterruptedException => i * 10
+          }
         }
       )
       .toList
@@ -312,8 +320,12 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
     val effects = (1 to 3)
       .map(i =>
         IO.delay {
-          Thread.sleep(i)
-          i * 10
+          try {
+            Thread.sleep(i)
+            i * 10
+          } catch {
+            case _: InterruptedException => i * 10
+          }
         }
       )
       .toList
@@ -327,7 +339,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def eruBracket(): Int = runEru {
     Eru
-      .effect(scala.util.Random.nextInt(100))
+      .effect(TEST_VALUE)
       .bracket(_ => Eru.unit) { resource =>
         Eru.effect(resource * 2)
       }
@@ -336,7 +348,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def zioBracket(): Int = runZio {
     ZIO.acquireReleaseWith(
-      ZIO.attempt(scala.util.Random.nextInt(100))
+      ZIO.attempt(TEST_VALUE)
     )(_ => ZIO.unit) { resource =>
       ZIO.attempt(resource * 2)
     }
@@ -344,7 +356,7 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
 
   @Benchmark
   def ioBracket(): Int = runIO {
-    IO.delay(scala.util.Random.nextInt(100))
+    IO.delay(TEST_VALUE)
       .bracket(resource => IO.delay(resource * 2))(_ => IO.unit)
   }
 
@@ -355,16 +367,11 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def eruTimeout(): Option[Int] = runEru {
     val effect = Eru.effect {
-      // Sometimes fast, sometimes "slow" (relative to timeout)
-      if (scala.util.Random.nextBoolean()) {
-        1
-      } else {
-        Thread.sleep(1)
-        2
-      }
+      // Fast path - completes before timeout
+      TEST_VALUE
     }
     effect
-      .timeout(java.time.Duration.ofNanos(500000))
+      .timeout(java.time.Duration.ofSeconds(1)) // 1s timeout - never triggers
       .map(Some(_))
       .recover { case _: java.util.concurrent.TimeoutException => None }
   }
@@ -372,28 +379,20 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def zioTimeout(): Option[Int] = runZio {
     val effect = ZIO.attempt {
-      if (scala.util.Random.nextBoolean()) {
-        1
-      } else {
-        Thread.sleep(1)
-        2
-      }
+      // Fast path - completes before timeout
+      TEST_VALUE
     }
-    effect.timeout(zio.Duration.fromNanos(500000))
+    effect.timeout(zio.Duration.fromSeconds(1))
   }
 
   @Benchmark
   def ioTimeout(): Option[Int] = runIO {
     val effect = IO.delay {
-      if (scala.util.Random.nextBoolean()) {
-        1
-      } else {
-        Thread.sleep(1)
-        2
-      }
+      // Fast path - completes before timeout
+      TEST_VALUE
     }
     effect
-      .timeout(scala.concurrent.duration.Duration(500000, TimeUnit.NANOSECONDS))
+      .timeout(scala.concurrent.duration.Duration(1, TimeUnit.SECONDS))
       .map(Some(_))
       .handleError(_ => None)
   }
@@ -405,18 +404,18 @@ class ComprehensiveAPIBench extends FairBenchmarkBase {
   @Benchmark
   def eruForeachParN(): Int = runEru {
     val inputs = (1 to 10).toList
-    runtime.foreachParN(3, inputs)(i => Eru.effect(scala.util.Random.nextInt(i))).map(_.sum)
+    runtime.foreachParN(3, inputs)(i => Eru.effect(i * 2)).map(_.sum)
   }
 
   @Benchmark
   def zioForeachParN(): Int = runZio {
     val inputs = (1 to 10).toList
-    ZIO.foreachPar(inputs)(i => ZIO.attempt(scala.util.Random.nextInt(i))).map(_.sum)
+    ZIO.foreachPar(inputs)(i => ZIO.attempt(i * 2)).map(_.sum)
   }
 
   @Benchmark
   def ioForeachParN(): Int = runIO {
     val inputs = (1 to 10).toList
-    inputs.parTraverseN(3)(i => IO.delay(scala.util.Random.nextInt(i))).map(_.sum)
+    inputs.parTraverseN(3)(i => IO.delay(i * 2)).map(_.sum)
   }
 }

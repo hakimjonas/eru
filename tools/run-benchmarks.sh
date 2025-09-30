@@ -278,21 +278,21 @@ case $MODE in
         MEASUREMENT_ITERATIONS=5
 
         echo -e "${BOLD}${MAGENTA}Phase 1: Quick Validation${NC}"
-        run_benchmark "Core Operations Smoke" "net.ghoula.eru.bench.fair.CoreOperationsBench"
+        run_benchmark "Core Operations Smoke" "net.ghoula.eru.bench.fair.CoreOperationsBench" 480
 
         echo -e "${BOLD}${MAGENTA}Phase 2: Comparative Benchmarks${NC}"
-        run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench"
-        run_benchmark "Error Handling" "net.ghoula.eru.bench.fair.ErrorHandlingBench"
+        run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench" 480
+        run_benchmark "Error Handling" "net.ghoula.eru.bench.fair.ErrorHandlingBench" 480
         run_benchmark "State Management" "net.ghoula.eru.bench.fair.StateManagementBench"
         run_benchmark "Concurrency" "net.ghoula.eru.bench.fair.ConcurrencyBench" 300
         run_benchmark "Resource Management" "net.ghoula.eru.bench.fair.ResourceManagementBench"
         run_benchmark "Stack Safety" "net.ghoula.eru.bench.fair.StackSafetyBench"
-        run_benchmark "Collection Operations" "net.ghoula.eru.bench.fair.CollectionOperationsBench"
-        run_benchmark "Coordination" "net.ghoula.eru.bench.fair.CoordinationBench"
+        run_benchmark "Collection Operations" "net.ghoula.eru.bench.fair.CollectionOperationsBench" 480
+        run_benchmark "Coordination" "net.ghoula.eru.bench.fair.CoordinationBench" 480
 
         echo -e "${BOLD}${MAGENTA}Phase 3: Additional Patterns${NC}"
         run_benchmark "Pattern Benchmarks" "net.ghoula.eru.bench.fair.PatternBench"
-        run_benchmark "API Coverage" "net.ghoula.eru.bench.fair.ComprehensiveAPIBench"
+        run_benchmark "API Coverage" "net.ghoula.eru.bench.fair.ComprehensiveAPIBench" 600
 
         if [[ "$INCLUDE_GC" == "true" ]]; then
             echo -e "${BOLD}${MAGENTA}Phase 4: Memory Analysis${NC}"

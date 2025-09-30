@@ -40,8 +40,8 @@ private[eru] trait ConcurrencyBackend {
 
   /** Launches multiple effects in batch and returns fiber handles.
     *
-    * This is an optimization for parallel operations that need to fork many effects.
-    * Default implementation uses traverse, but backends can override for better performance.
+    * This is an optimization for parallel operations that need to fork many effects. Default
+    * implementation uses traverse, but backends can override for better performance.
     *
     * @param effects
     *   the effects to run in parallel
@@ -53,8 +53,8 @@ private[eru] trait ConcurrencyBackend {
 
   /** Awaits multiple fibers in batch and returns their exits.
     *
-    * This is an optimization for parallel operations that need to await many fibers.
-    * Default implementation uses traverse, but backends can override for better performance.
+    * This is an optimization for parallel operations that need to await many fibers. Default
+    * implementation uses traverse, but backends can override for better performance.
     *
     * @param fibers
     *   the fibers to await
