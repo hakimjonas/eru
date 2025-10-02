@@ -1,313 +1,234 @@
 package net.ghoula.eru
 
-import net.ghoula.eru.prelude.*
+import java.time.Duration
 
-/** A concurrent queue for communication between fibers.
+/** Pure functional concurrent queue.
   *
-  * Queues provide a way to safely pass values between concurrent fibers. They support both bounded
-  * (with capacity limits) and unbounded variants.
+  * This queue implementation is built entirely on Eru primitives (Ref and Promise), demonstrating
+  * true compositional concurrency without any Java concurrent utilities.
+  *
+  * The design follows Eru's Four Pillars:
+  *   - Foundational Correctness: Built purely on Eru primitives without Java utilities
+  *   - Radical Ergonomics: Clear method names and comprehensive API coverage
+  *   - Guided Correctness: Clear naming conventions indicate suspension behavior
+  *   - Transparent Runtime: Predictable suspension behavior through documentation
+  *
+  * @tparam A
+  *   the type of elements in the queue
   */
 trait Queue[A] {
 
-  /** Adds an element to the queue.
+  /** Adds an element to the queue, suspending if full.
     *
-    * For bounded queues, this operation will suspend if the queue is at capacity until space
-    * becomes available. For unbounded queues, this operation always succeeds immediately.
+    * This operation will suspend indefinitely if the queue is at capacity, waiting until space
+    * becomes available. The Suspending type ensures this cannot be called with unsafeRunSync.
     *
     * @param a
-    *   the element to add to the queue
+    *   the element to add
     * @return
-    *   an effect that succeeds when the element has been added
+    *   a suspending effect that completes when the element is added
     */
-  def offer(a: A): Eru[Nothing, Unit]
+  def put(a: A): Suspending[Nothing, Unit]
 
-  /** Removes and returns an element from the queue.
+  /** Removes and returns an element, suspending if empty.
     *
-    * This operation will suspend if the queue is empty until an element becomes available.
+    * This operation will suspend indefinitely if the queue is empty, waiting until an element
+    * becomes available. The Suspending type prevents deadlocks at compile-time.
     *
     * @return
-    *   an effect that yields an element from the queue
+    *   a suspending effect that yields the next element
     */
-  def take: Eru[Nothing, A]
+  def take: Suspending[Nothing, A]
 
-  /** Attempts to remove and return an element from the queue without suspending.
+  /** Adds multiple elements, suspending if insufficient space.
+    *
+    * @param as
+    *   the elements to add
+    * @return
+    *   a suspending effect that completes when all elements are added
+    */
+  def putAll(as: Seq[A]): Suspending[Nothing, Unit]
+
+  /** Removes up to n elements, suspending until at least one is available.
+    *
+    * @param n
+    *   the maximum number of elements to take
+    * @return
+    *   a suspending effect that yields the taken elements (at least 1, up to n)
+    */
+  def takeUpTo(n: Int): Suspending[Nothing, List[A]]
+
+  /** Attempts to add an element without blocking.
+    *
+    * @param a
+    *   the element to add
+    * @return
+    *   true if the element was added, false if the queue was full
+    */
+  def tryPut(a: A): Immediate[Nothing, Boolean]
+
+  /** Attempts to remove an element without blocking.
     *
     * @return
-    *   an effect that yields Some(element) if available, or None if the queue is empty
+    *   Some(element) if available, None if the queue was empty
     */
-  def poll: Eru[Nothing, Option[A]]
+  def tryTake: Immediate[Nothing, Option[A]]
+
+  /** Alias for tryTake for backward compatibility.
+    *
+    * @return
+    *   Some(element) if available, None if the queue was empty
+    */
+  def poll: Immediate[Nothing, Option[A]] = tryTake
+
+  /** Attempts to add multiple elements without blocking.
+    *
+    * @param as
+    *   the elements to add
+    * @return
+    *   the number of elements successfully added
+    */
+  def tryPutAll(as: Seq[A]): Immediate[Nothing, Int]
+
+  /** Attempts to remove up to n elements without blocking.
+    *
+    * @param n
+    *   the maximum number of elements to take
+    * @return
+    *   the list of elements taken (may be empty)
+    */
+  def tryTakeUpTo(n: Int): Immediate[Nothing, List[A]]
+
+  /** Attempts to add an element within the timeout period.
+    *
+    * @param a
+    *   the element to add
+    * @param timeout
+    *   maximum time to wait
+    * @return
+    *   true if successful, false if timeout expired
+    */
+  def putWithin(a: A, timeout: Duration): Immediate[Throwable, Boolean]
+
+  /** Attempts to remove an element within the timeout period.
+    *
+    * @param timeout
+    *   maximum time to wait
+    * @return
+    *   Some(element) if available within timeout, None otherwise
+    */
+  def takeWithin(timeout: Duration): Immediate[Throwable, Option[A]]
+
+  /** Attempts to add multiple elements within the timeout period.
+    *
+    * @param as
+    *   the elements to add
+    * @param timeout
+    *   maximum time to wait
+    * @return
+    *   the number of elements successfully added before timeout
+    */
+  def putAllWithin(as: Seq[A], timeout: Duration): Immediate[Throwable, Int]
+
+  /** Attempts to remove up to n elements within the timeout period.
+    *
+    * @param n
+    *   the maximum number of elements to take
+    * @param timeout
+    *   maximum time to wait
+    * @return
+    *   the list of elements taken before timeout (may be empty)
+    */
+  def takeUpToWithin(n: Int, timeout: Duration): Immediate[Throwable, List[A]]
 
   /** Returns the current number of elements in the queue.
     *
-    * Note: This is a snapshot and may change immediately after the call due to concurrent
-    * operations.
+    * Note: This is a snapshot and may change immediately due to concurrent operations.
     *
     * @return
-    *   an effect that yields the current queue size
+    *   the current queue size
     */
-  def size: Eru[Nothing, Int]
+  def size: Immediate[Nothing, Int]
 
-  /** Checks whether the queue is currently empty.
+  /** Checks if the queue is currently empty.
     *
     * @return
-    *   an effect that yields true if the queue is empty, false otherwise
+    *   true if empty, false otherwise
     */
-  def isEmpty: Eru[Nothing, Boolean] = size.map(_ == 0)
+  def isEmpty: Immediate[Nothing, Boolean]
 
-  /** For bounded queues, returns the remaining capacity. For unbounded queues, returns
-    * Int.MaxValue.
+  /** Checks if the queue is currently at capacity.
+    *
+    * For unbounded queues, this always returns false.
     *
     * @return
-    *   an effect that yields the remaining capacity
+    *   true if full, false otherwise
     */
-  def remainingCapacity: Eru[Nothing, Int]
+  def isFull: Immediate[Nothing, Boolean]
+
+  /** Returns the remaining capacity of the queue.
+    *
+    * For unbounded queues, this returns Int.MaxValue.
+    *
+    * @return
+    *   the number of additional elements that can be added without blocking
+    */
+  def remainingCapacity: Immediate[Nothing, Int]
+
+  /** Peeks at the next element without removing it.
+    *
+    * @return
+    *   Some(element) if available, None if empty
+    */
+  def peek: Immediate[Nothing, Option[A]]
+
+  /** Returns the queue's capacity limit.
+    *
+    * @return
+    *   Some(capacity) for bounded queues, None for unbounded
+    */
+  def capacity: Immediate[Nothing, Option[Int]]
+
 }
 
+/** Companion object for Queue. */
 object Queue {
 
   /** Creates a bounded queue with the specified capacity.
     *
     * @param capacity
-    *   the maximum number of elements the queue can hold
-    * @tparam A
-    *   the element type
+    *   the maximum number of elements
     * @return
     *   an effect that yields a new bounded queue
     */
-  def bounded[A](capacity: Int)(using runtime: EruRuntime): Eru[Nothing, Queue[A]] = {
-    require(capacity > 0, "Queue capacity must be positive")
-    Eru.succeed(new BoundedQueue[A](capacity, runtime))
-  }
+  def bounded[A](capacity: Int)(using runtime: EruRuntime): Eru[Nothing, Queue[A]] =
+    QueueImpl.bounded[A](capacity, runtime)
 
   /** Creates an unbounded queue.
     *
-    * @tparam A
-    *   the element type
     * @return
     *   an effect that yields a new unbounded queue
     */
   def unbounded[A](using runtime: EruRuntime): Eru[Nothing, Queue[A]] =
-    Eru.succeed(new UnboundedQueue[A](runtime))
+    QueueImpl.unbounded[A](runtime)
 
-  private final class BoundedQueue[A](capacity: Int, runtime: EruRuntime) extends Queue[A] {
-    import java.util.concurrent.ConcurrentLinkedQueue
-    import java.util.concurrent.atomic.AtomicInteger
+  /** Creates a dropping queue that discards new elements when full.
+    *
+    * @param capacity
+    *   the maximum number of elements
+    * @return
+    *   an effect that yields a new dropping queue
+    */
+  def dropping[A](capacity: Int)(using runtime: EruRuntime): Eru[Nothing, Queue[A]] =
+    QueueImpl.dropping[A](capacity, runtime)
 
-    private val queue = new ConcurrentLinkedQueue[A]()
-    private val currentSize = new AtomicInteger(0)
-    private val waitingTakers = new ConcurrentLinkedQueue[Either[Nothing, A] => Unit]()
-    private val waitingOfferers = new ConcurrentLinkedQueue[(A, Either[Nothing, Unit] => Unit)]()
-
-    def offer(a: A): Eru[Nothing, Unit] = {
-      def tryOffer: Eru[Nothing, Boolean] = Eru.succeed {
-        val current = currentSize.get()
-        if (current < capacity && currentSize.compareAndSet(current, current + 1)) {
-          queue.offer(a)
-          notifyWaitingTakers()
-          true
-        } else {
-          false
-        }
-      }
-
-      tryOffer.flatMap { offered =>
-        if (offered) Eru.unit
-        else {
-          // Queue is full, need to suspend
-          runtime
-            .suspend[Nothing, Unit] { callback =>
-              Eru.succeed {
-                waitingOfferers.offer((a, callback))
-                // Double-check after registering
-                val current = currentSize.get()
-                if (current < capacity && currentSize.compareAndSet(current, current + 1)) {
-                  if (waitingOfferers.remove((a, callback))) {
-                    queue.offer(a)
-                    notifyWaitingTakers()
-                    callback(Right(()))
-                  }
-                }
-              }
-            }
-            .attempt
-            .flatMap {
-              case Result.Success(value) => Eru.succeed(value)
-              case Result.Failure(throwable) => Eru.effect(throw throwable)
-            }
-            .attempt
-            .map {
-              case Result.Success(value) => value
-              case Result.Failure(_) =>
-                throw new IllegalStateException("Queue offer encountered unexpected error")
-            }
-        }
-      }
-    }
-
-    def take: Eru[Nothing, A] = {
-      def tryTake: Eru[Nothing, Option[A]] = Eru.succeed {
-        Option(queue.poll()).map { element =>
-          currentSize.decrementAndGet()
-          notifyWaitingOfferers()
-          element
-        }
-      }
-
-      tryTake.flatMap {
-        case Some(element) => Eru.succeed(element)
-        case None =>
-          // Queue is empty, need to suspend
-          def safeRegisterCallback(callback: Either[Nothing, A] => Unit): Eru[Nothing, Unit] = {
-            val registerEffect = Eru.effect(waitingTakers.offer(callback)).attempt.map(_ => ())
-            val doubleCheck = Eru.succeed(Option(queue.poll())).flatMap {
-              case Some(element) =>
-                // Race condition: element became available after registration
-                Eru.effect {
-                  if (waitingTakers.remove(callback)) {
-                    currentSize.decrementAndGet()
-                    notifyWaitingOfferers()
-                    callback(Right(element))
-                  }
-                  // If remove failed, callback will be invoked by offer
-                }.attempt.map(_ => ())
-              case None =>
-                // Still empty - callback will be invoked by offer
-                Eru.unit
-            }
-            registerEffect.flatMap(_ => doubleCheck)
-          }
-
-          runtime
-            .suspend[Nothing, A](safeRegisterCallback)
-            .attempt
-            .map {
-              case Result.Success(value) => value
-              case Result.Failure(_) =>
-                // Convert any defects to a runtime exception
-                // This should never happen in a correctly implemented Queue
-                throw new IllegalStateException("Queue take encountered unexpected error")
-            }
-      }
-    }
-
-    def poll: Eru[Nothing, Option[A]] = Eru.succeed {
-      Option(queue.poll()).map { element =>
-        currentSize.decrementAndGet()
-        notifyWaitingOfferers()
-        element
-      }
-    }
-
-    def size: Eru[Nothing, Int] = Eru.succeed(currentSize.get())
-
-    def remainingCapacity: Eru[Nothing, Int] = Eru.succeed(capacity - currentSize.get())
-
-    private def notifyWaitingTakers(): Unit = {
-      Option(waitingTakers.poll()).foreach { callback =>
-        Option(queue.poll()) match {
-          case Some(element) =>
-            currentSize.decrementAndGet()
-            callback(Right(element))
-            notifyWaitingOfferers()
-          case None =>
-            waitingTakers.offer(callback) // Put it back
-        }
-      }
-    }
-
-    private def notifyWaitingOfferers(): Unit = {
-      Option(waitingOfferers.poll()).foreach { case (element, callback) =>
-        val current = currentSize.get()
-        if (current < capacity && currentSize.compareAndSet(current, current + 1)) {
-          queue.offer(element)
-          callback(Right(()))
-          notifyWaitingTakers()
-        } else {
-          waitingOfferers.offer((element, callback)) // Put it back
-        }
-      }
-    }
-  }
-
-  private final class UnboundedQueue[A](runtime: EruRuntime) extends Queue[A] {
-    import java.util.concurrent.ConcurrentLinkedQueue
-    import java.util.concurrent.atomic.AtomicInteger
-
-    private val queue = new ConcurrentLinkedQueue[A]()
-    private val currentSize = new AtomicInteger(0)
-    private val waitingTakers = new ConcurrentLinkedQueue[Either[Nothing, A] => Unit]()
-
-    def offer(a: A): Eru[Nothing, Unit] = Eru.succeed {
-      queue.offer(a)
-      currentSize.incrementAndGet()
-      notifyWaitingTakers()
-    }
-
-    def take: Eru[Nothing, A] = {
-      def tryTake: Eru[Nothing, Option[A]] = Eru.succeed {
-        Option(queue.poll()).map { element =>
-          currentSize.decrementAndGet()
-          element
-        }
-      }
-
-      tryTake.flatMap {
-        case Some(element) => Eru.succeed(element)
-        case None =>
-          // Queue is empty, need to suspend
-          def safeRegisterCallback(callback: Either[Nothing, A] => Unit): Eru[Nothing, Unit] = {
-            val registerEffect = Eru.effect(waitingTakers.offer(callback)).attempt.map(_ => ())
-            val doubleCheck = Eru.succeed(Option(queue.poll())).flatMap {
-              case Some(element) =>
-                // Race condition: element became available after registration
-                Eru.effect {
-                  if (waitingTakers.remove(callback)) {
-                    currentSize.decrementAndGet()
-                    callback(Right(element))
-                  }
-                  // If remove failed, callback will be invoked by offer
-                }.attempt.map(_ => ())
-              case None =>
-                // Still empty - callback will be invoked by offer
-                Eru.unit
-            }
-            registerEffect.flatMap(_ => doubleCheck)
-          }
-
-          runtime
-            .suspend[Nothing, A](safeRegisterCallback)
-            .attempt
-            .map {
-              case Result.Success(value) => value
-              case Result.Failure(_) =>
-                // Convert any defects to a runtime exception
-                // This should never happen in a correctly implemented Queue
-                throw new IllegalStateException("Queue take encountered unexpected error")
-            }
-      }
-    }
-
-    def poll: Eru[Nothing, Option[A]] = Eru.succeed {
-      Option(queue.poll()).map { element =>
-        currentSize.decrementAndGet()
-        element
-      }
-    }
-
-    def size: Eru[Nothing, Int] = Eru.succeed(currentSize.get())
-
-    def remainingCapacity: Eru[Nothing, Int] = Eru.succeed(Int.MaxValue)
-
-    private def notifyWaitingTakers(): Unit = {
-      Option(waitingTakers.poll()).foreach { callback =>
-        Option(queue.poll()) match {
-          case Some(element) =>
-            currentSize.decrementAndGet()
-            callback(Right(element))
-          case None =>
-            waitingTakers.offer(callback) // Put it back
-        }
-      }
-    }
-  }
+  /** Creates a sliding queue that discards old elements when full.
+    *
+    * @param capacity
+    *   the maximum number of elements
+    * @return
+    *   an effect that yields a new sliding queue
+    */
+  def sliding[A](capacity: Int)(using runtime: EruRuntime): Eru[Nothing, Queue[A]] =
+    QueueImpl.sliding[A](capacity, runtime)
 }

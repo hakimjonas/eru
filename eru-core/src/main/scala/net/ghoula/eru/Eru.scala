@@ -33,6 +33,9 @@ enum Eru[+E, +A] {
   /** Represents a synchronous, side-effecting computation suspended in a thunk. */
   private case Effect(thunk: () => Either[Throwable, A]) extends Eru[Throwable, A]
 
+  /** Represents an infallible synchronous computation that cannot fail. */
+  private case EffectTotal[A0](thunk: () => A0) extends Eru[Nothing, A0]
+
   /** Represents a chained computation with a continuation stack. The continuation stack is
     * represented by a GADT that maintains type safety across the chain of operations.
     */
@@ -136,6 +139,11 @@ enum Eru[+E, +A] {
         } catch {
           case NonFatal(ex) => Chain(this, Eru.Continuation.Step((_: A) => throw ex, Eru.Continuation.End()))
         }
+
+      // For now, EffectTotal uses standard Chain
+      // TODO: Optimize common patterns like EffectTotal.flatMap(x => Succeed(...))
+      case EffectTotal(_) =>
+        Chain(this, Eru.Continuation.Step(f, Eru.Continuation.End()))
 
       case MapChain(Succeed(sourceValue), g) =>
         try {
@@ -343,6 +351,29 @@ enum Eru[+E, +A] {
 
 object Eru {
 
+  /** Internal method to check if an Eru is a pure value (no effects). This is used for
+    * optimizations in runtime operations like zipPar.
+    *
+    * This method enables significant performance improvements by detecting when an effect is
+    * already computed and doesn't need to be scheduled for execution. Pure values can be combined
+    * directly without creating fibers or involving the runtime scheduler. This optimization is
+    * particularly effective in tight loops or recursive patterns where effects are chained with
+    * already-computed values, such as in benchmark scenarios or certain algorithmic patterns.
+    *
+    * @param eru
+    *   the effect to check
+    * @tparam E
+    *   the error type
+    * @tparam A
+    *   the success type
+    * @return
+    *   true if this is Succeed or Fail, false otherwise
+    */
+  private[eru] def isPureValue[E, A](eru: Eru[E, A]): Boolean = eru match {
+    case Succeed(_) | Fail(_) => true
+    case _ => false
+  }
+
   /** GADT representing a stack of continuations in a flatMap chain.
     *
     * This data type maintains complete type safety by linking the output type of one function to
@@ -443,6 +474,34 @@ object Eru {
       try Right(computation)
       catch { case NonFatal(t) => Left(t) }
     )
+
+  /** Defers the construction of an Eru effect, useful for optimizing cases where the effect
+    * construction itself needs to be delayed.
+    *
+    * This combinator is similar to ZIO's suspendSucceed - it delays the entire computation until
+    * it's actually needed, which can reduce allocations when effects are created but never run.
+    *
+    * @param eru
+    *   the effect to defer (by-name)
+    * @return
+    *   an effect that will construct and run the given effect when executed
+    */
+  def defer[E, A](eru: => Eru[E, A]): Eru[E, A] =
+    effectTotal(eru).flatMap(identity)
+
+  /** Creates an infallible effect that cannot fail.
+    *
+    * This is an optimization for effects that are guaranteed not to throw exceptions, avoiding the
+    * overhead of error handling. Use with caution - if the computation does throw, it will
+    * propagate uncaught.
+    *
+    * @param computation
+    *   the infallible computation to suspend (by-name)
+    * @return
+    *   an `Eru[Nothing, A]` representing the suspended computation
+    */
+  private[eru] def effectTotal[A](computation: => A): Eru[Nothing, A] =
+    new EffectTotal(() => computation)
 
   /** Executes a synchronous computation in a blocking region.
     *
@@ -1043,6 +1102,8 @@ object Eru {
     *   }}}
     */
   def traverse[A, E, B](inputs: List[A])(f: A => Eru[E, B]): Eru[E, List[B]] = {
+    // Original implementation - we can't avoid the chaining for sequential semantics
+    // without breaking the monadic laws. The optimization must happen at runtime level.
     inputs
       .foldLeft(succeed(List.empty[B])) { (accEru, input) =>
         accEru.flatMap { acc =>
@@ -1229,6 +1290,9 @@ object Eru {
 
         case Effect(thunk) =>
           done((thunk(), fins))
+
+        case EffectTotal(thunk) =>
+          done((Right(thunk()), fins))
 
         case Chain(source, cont) =>
           tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).flatMap {
@@ -1592,6 +1656,7 @@ object Eru {
       case VSucceed(value: A)
       case VFail(error: E)
       case VEffect(thunk: () => Either[Throwable, A])
+      case VEffectTotal(thunk: () => A)
       case VChain[E0, From, To](source: Eru[E0, From], cont: Continuation[E0, From, To]) extends View[E0, To]
       case VMapChain[E0, From, To](source: Eru[E0, From], f: From => To) extends View[E0, To]
       case VRecoverWith[E0, A0, E2, A1 >: A0](source: Eru[E0, A0], pf: PartialFunction[E0, Eru[E2, A1]])
@@ -1612,6 +1677,7 @@ object Eru {
       case Succeed(value) => VSucceed(value)
       case Fail(error) => VFail(error)
       case Effect(thunk) => VEffect(thunk)
+      case EffectTotal(thunk) => VEffectTotal(thunk)
       case Chain(source, cont) => VChain(source, cont)
       case MapChain(source, f) => VMapChain(source, f)
       case RecoverWith(source, pf) => VRecoverWith(source, pf)
@@ -1627,4 +1693,46 @@ object Eru {
     }
 
   }
+
+  /** Checks if the current fiber has been interrupted and yields control if needed.
+    *
+    * This is a cooperative cancellation point for CPU-bound operations. Insert this in long-running
+    * loops to allow the fiber to be interrupted.
+    *
+    * @return
+    *   an effect that checks for interruption
+    *
+    * @example
+    *   {{{
+    * def cpuIntensive(n: Int): Eru[Nothing, Int] =
+    *   Eru.iterate(0) { i =>
+    *     for {
+    *       _ <- if (i % 1000 == 0) Eru.yieldIfInterrupted else Eru.unit
+    *       next <- Eru.succeed(i + 1)
+    *     } yield next
+    *   }(_ >= n)
+    *   }}}
+    */
+  def yieldIfInterrupted: Eru[Nothing, Unit] =
+    Eru.interruptibleBlocking {
+      if (Thread.currentThread().isInterrupted) {
+        throw new InterruptedException("Cooperative cancellation")
+      }
+    }.attempt.map(_ => ())
+
+  /** Checks a condition and yields if interrupted.
+    *
+    * Combines a condition check with cooperative cancellation. Useful for long-running loops that
+    * need both a termination condition and cancellation.
+    *
+    * @param shouldContinue
+    *   the condition to check
+    * @return
+    *   an effect that succeeds if should continue, fails if interrupted or condition false
+    */
+  def checkAndYield(shouldContinue: => Boolean): Eru[String, Unit] =
+    for {
+      _ <- yieldIfInterrupted
+      _ <- if (shouldContinue) Eru.unit else Eru.fail("Condition false")
+    } yield ()
 }

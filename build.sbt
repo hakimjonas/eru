@@ -13,10 +13,21 @@ ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
 // ===== Publishing Settings =====
-ThisBuild / sonatypeRepository := sonatypeCentralHost
-ThisBuild / sonatypeProfileName := "net.ghoula"
-ThisBuild / sonatypeCredentialHost := sonatypeCentralHost
-ThisBuild / publishTo := sonatypePublishToBundle.value
+// GitHub Packages only for now
+ThisBuild / publishTo := Some("GitHub Package Registry" at "https://maven.pkg.github.com/hakimjonas/eru")
+
+// GitHub Packages authentication
+credentials ++= {
+  val githubToken = sys.env.get("GITHUB_TOKEN")
+  githubToken.map { token =>
+    Credentials(
+      "GitHub Package Registry",
+      "maven.pkg.github.com",
+      "hakimjonas", // your GitHub username
+      token
+    )
+  }.toSeq
+}
 ThisBuild / licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT"))
 ThisBuild / homepage := Some(url("https://github.com/hakimjonas/eru"))
 ThisBuild / developers := List(
@@ -159,14 +170,8 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
   .crossType(CrossType.Pure)
   .in(file("eru-core"))
   .settings(commonSettings)
-  .settings(sonatypeSettings *)
   .settings(
     name := "eru-core",
-    usePgpKeyHex("9614A0CE1CE76975"),
-    useGpgAgent := true,
-    mimaPreviousArtifacts := Set.empty,
-    tastyMiMaPreviousArtifacts := Set.empty,
-    mimaFailOnNoPrevious := false,
     libraryDependencies ++= Seq(
       "io.github.cquiroz" %%% "scala-java-time" % "2.6.0",
       "io.github.cquiroz" %%% "scala-java-time-tzdb" % "2.6.0" % Runtime,
@@ -196,14 +201,8 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
   .crossType(CrossType.Full)
   .in(file("eru-runtime"))
   .settings(commonSettings)
-  .settings(sonatypeSettings *)
   .settings(
     name := "eru-runtime",
-    usePgpKeyHex("9614A0CE1CE76975"),
-    useGpgAgent := true,
-    mimaPreviousArtifacts := Set.empty,
-    tastyMiMaPreviousArtifacts := Set.empty,
-    mimaFailOnNoPrevious := false,
     libraryDependencies ++= Seq(
       "io.github.cquiroz" %%% "scala-java-time" % "2.6.0",
       "org.scalameta" %%% "munit" % "1.1.1" % Test,

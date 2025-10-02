@@ -7,9 +7,9 @@ class CyclicBarrierSpec extends EruTestSuite {
 
   test("cyclic barrier creation succeeds") {
     val barrier = Eru.cyclicBarrier(3).unsafeRunSync()
-    assertEquals(barrier.getParties.unsafeRunSync(), 3)
-    assertEquals(barrier.getNumberWaiting.unsafeRunSync(), 0)
-    assertEquals(barrier.isBroken.unsafeRunSync(), false)
+    assertEquals(barrier.getParties.eru.unsafeRunSync(), 3)
+    assertEquals(barrier.getNumberWaiting.eru.unsafeRunSync(), 0)
+    assertEquals(barrier.isBroken.eru.unsafeRunSync(), false)
   }
 
   test("cyclic barrier creation fails with non-positive parties") {
@@ -26,33 +26,33 @@ class CyclicBarrierSpec extends EruTestSuite {
     val barrier = Eru.cyclicBarrier(1).unsafeRunSync()
 
     // Should return immediately since only one party is needed
-    barrier.await.unsafeRunSync()
+    barrier.await.eru.unsafeRunSync()
 
     // Can be used multiple times (cyclic)
-    barrier.await.unsafeRunSync()
-    barrier.await.unsafeRunSync()
+    barrier.await.eru.unsafeRunSync()
+    barrier.await.eru.unsafeRunSync()
   }
 
   test("cyclic barrier properties are consistent") {
     val barrier = Eru.cyclicBarrier(5).unsafeRunSync()
 
-    assertEquals(barrier.getParties.unsafeRunSync(), 5)
-    assertEquals(barrier.getNumberWaiting.unsafeRunSync(), 0)
-    assertEquals(barrier.isBroken.unsafeRunSync(), false)
+    assertEquals(barrier.getParties.eru.unsafeRunSync(), 5)
+    assertEquals(barrier.getNumberWaiting.eru.unsafeRunSync(), 0)
+    assertEquals(barrier.isBroken.eru.unsafeRunSync(), false)
   }
 
   test("cyclic barrier constructor is available via Eru companion") {
     val barrier = Eru.cyclicBarrier(2).unsafeRunSync()
-    assertEquals(barrier.getParties.unsafeRunSync(), 2)
+    assertEquals(barrier.getParties.eru.unsafeRunSync(), 2)
   }
 
   test("cyclic barrier operations compose with other Eru effects") {
     val program = for {
       barrier <- Eru.cyclicBarrier(1)
-      parties <- barrier.getParties
-      waiting <- barrier.getNumberWaiting
-      _ <- barrier.await // Should return immediately for single party
-      stillWaiting <- barrier.getNumberWaiting
+      parties <- barrier.getParties.eru
+      waiting <- barrier.getNumberWaiting.eru
+      _ <- barrier.await.eru // Should return immediately for single party
+      stillWaiting <- barrier.getNumberWaiting.eru
     } yield (parties, waiting, stillWaiting)
 
     val (parties, waiting, stillWaiting) = program.unsafeRunSync()
@@ -65,13 +65,13 @@ class CyclicBarrierSpec extends EruTestSuite {
     val barrier = Eru.cyclicBarrier(3).unsafeRunSync()
 
     // Initial state
-    assertEquals(barrier.getParties.unsafeRunSync(), 3)
-    assertEquals(barrier.getNumberWaiting.unsafeRunSync(), 0)
-    assertEquals(barrier.isBroken.unsafeRunSync(), false)
+    assertEquals(barrier.getParties.eru.unsafeRunSync(), 3)
+    assertEquals(barrier.getNumberWaiting.eru.unsafeRunSync(), 0)
+    assertEquals(barrier.isBroken.eru.unsafeRunSync(), false)
 
     // State should remain consistent after queries
-    assertEquals(barrier.getParties.unsafeRunSync(), 3)
-    assertEquals(barrier.getNumberWaiting.unsafeRunSync(), 0)
+    assertEquals(barrier.getParties.eru.unsafeRunSync(), 3)
+    assertEquals(barrier.getNumberWaiting.eru.unsafeRunSync(), 0)
   }
 
   test("cyclic barrier multiple single-party uses") {
@@ -79,8 +79,8 @@ class CyclicBarrierSpec extends EruTestSuite {
 
     // Use barrier multiple times in sequence
     for (_ <- 1 to 5) {
-      barrier.await.unsafeRunSync()
-      assertEquals(barrier.getNumberWaiting.unsafeRunSync(), 0)
+      barrier.await.eru.unsafeRunSync()
+      assertEquals(barrier.getNumberWaiting.eru.unsafeRunSync(), 0)
     }
   }
 
@@ -91,13 +91,13 @@ class CyclicBarrierSpec extends EruTestSuite {
     Eru
       .collectAllDiscard(
         List(
-          barrier.await,
-          barrier.await,
-          barrier.await
+          barrier.await.eru,
+          barrier.await.eru,
+          barrier.await.eru
         )
       )
       .unsafeRunSync()
 
-    assertEquals(barrier.getNumberWaiting.unsafeRunSync(), 0)
+    assertEquals(barrier.getNumberWaiting.eru.unsafeRunSync(), 0)
   }
 }

@@ -2,9 +2,8 @@ package net.ghoula.eru
 
 /** A fiber-safe, mutable reference that provides atomic read and update operations.
   *
-  * Instances are created in the `eru-runtime` module, and all operations are described as `Eru`
-  * programs. The current runtime is single-threaded; however, the public API is designed to remain
-  * compatible with a possible future multithreaded scheduler.
+  * All operations are guaranteed to be atomic and thread-safe, using compare-and-swap semantics
+  * internally. The reference is safe to use across multiple fibers running on Virtual Threads.
   */
 trait Ref[A] {
 
@@ -43,6 +42,7 @@ trait Ref[A] {
     *   an effect that yields the auxiliary result produced by `f`
     */
   def modify[B](f: A => (A, B)): Eru[Nothing, B]
+
 }
 
 object Ref {
@@ -61,12 +61,14 @@ object Ref {
   private final class RuntimeRef[A](init: A) extends Ref[A] {
     private val state = new java.util.concurrent.atomic.AtomicReference(init)
 
-    def get: Eru[Nothing, A] = Eru.succeed(state.get())
+    def get: Eru[Nothing, A] =
+      Eru.succeed(state.get())
 
-    def set(a: A): Eru[Nothing, Unit] = Eru.succeed { state.set(a); () }
+    def set(a: A): Eru[Nothing, Unit] =
+      Eru.effectTotal { state.set(a); () }
 
     def update(f: A => A): Eru[Nothing, A] =
-      Eru.succeed {
+      Eru.effectTotal {
         @annotation.tailrec
         def loop(): A = {
           val current = state.get()
@@ -78,7 +80,7 @@ object Ref {
       }
 
     def modify[B](f: A => (A, B)): Eru[Nothing, B] =
-      Eru.succeed {
+      Eru.effectTotal {
         @annotation.tailrec
         def loop(): B = {
           val current = state.get()
@@ -88,5 +90,6 @@ object Ref {
         }
         loop()
       }
+
   }
 }

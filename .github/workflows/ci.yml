@@ -41,36 +41,9 @@ jobs:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
 
-      - name: Run JVM Runtime tests (individual isolation)
-        run: |
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.PromiseSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.DeferredSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.QueueSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.CountDownLatchSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.CyclicBarrierSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.HubSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.ParallelSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.QueueAsyncSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.CollectAllDeadlockSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.CoordinationConcurrencySpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.PromiseConcurrencySpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.HubConcurrencySpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.QueueConcurrencySpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.ConcurrencyStressSpec'
-          timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.TimersSpec'
-          timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.SuspendSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.VTForkSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.RetryPolicyPropertySpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.ParallelDegreeLimitedSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.ValidationPatternsSpec'
-          timeout 30s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.RuntimeHealthCheck'
-          timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberStressSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberExecutionSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberErrorPropagationSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberInterruptionSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberLifecycleSpec'
-          timeout 60s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberPropertySpec'
-          timeout 90s sbt 'eruRuntimeJVM/testOnly net.ghoula.eru.fiber.FiberFinalizerIntegrationSpec'
+      - name: Run JVM Runtime tests
+        run: sbt eruRuntimeJVM/test
+        timeout-minutes: 10
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
@@ -221,13 +194,14 @@ jobs:
   #          SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
   #        run: sbt docsPublish
 
-  # SNAPSHOT publishing job: Publishes SNAPSHOT versions on pushes to main branch only
-  publish-snapshot:
+  # Publishing job: Publishes to GitHub Packages on pushes to main branch
+  publish-github:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -245,20 +219,12 @@ jobs:
       - name: Set up sbt launcher
         uses: sbt/setup-sbt@v1
 
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.PGP_SECRET }}
-          passphrase: ${{ secrets.PGP_PASSPHRASE }}
-
-      - name: Publish SNAPSHOT to Sonatype
+      - name: Publish to GitHub Packages
         env:
           JAVA_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           SBT_OPTS: "-Xms2G -Xmx6G -XX:+UseG1GC"
-          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Publishing signed SNAPSHOT version..."
-          sbt +publishSigned
-          echo "Signed SNAPSHOT published successfully!"
+          echo "Publishing to GitHub Packages..."
+          sbt +publish
+          echo "Published successfully to GitHub Packages!"

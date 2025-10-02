@@ -1,15 +1,22 @@
 package net.ghoula.eru
 
 /** Utilities for implementing equals, hashCode, and toString methods.
+  *
+  * Provides consistent implementations of common methods for data classes.
   */
 private[eru] object DataClassUtils {
 
-  /** Generates hash code for multiple values.
+  /** Generates hash code for multiple values using prime multiplication.
     *
     * @param values
     *   the values to include in the hash code calculation
     * @return
     *   the combined hash code
+    *
+    * @example
+    *   {{{
+    * val hash = DataClassUtils.hashCodeFor("name", 42, true)
+    *   }}}
     */
   def hashCodeFor(values: Any*): Int = {
     val prime = 31
@@ -26,6 +33,12 @@ private[eru] object DataClassUtils {
     *   the field values
     * @return
     *   a formatted string in the form "ClassName(value1, value2, ...)"
+    *
+    * @example
+    *   {{{
+    * val str = DataClassUtils.toStringFor("Person", "Alice", 30)
+    * // str: String = "Person(Alice, 30)"
+    *   }}}
     */
   def toStringFor(className: String, values: Any*): String = {
     val valueString = values.mkString(", ")
@@ -35,7 +48,8 @@ private[eru] object DataClassUtils {
 
 /** Opaque domain types with validation.
   *
-  *   - AttemptCount: non‑negative attempt counts
+  * Provides type-safe wrappers for common retry and circuit breaker parameters:
+  *   - AttemptCount: non-negative attempt counts
   *   - JitterFactor: a double in [0.0, 1.0]
   *   - FailureThreshold: a positive integer threshold
   */

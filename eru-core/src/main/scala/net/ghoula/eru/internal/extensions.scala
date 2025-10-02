@@ -2,7 +2,7 @@ package net.ghoula.eru.internal
 
 import java.time.{Duration, Instant}
 
-import net.ghoula.eru.{DomainTypes, Eru, Result, patterns, trace}
+import net.ghoula.eru.{DomainTypes, Eru, Exit, Result, patterns, trace}
 
 /** Consolidated extension methods for Eru.
   *
@@ -106,6 +106,39 @@ object extensions {
       case Result.Success(_) => false
       case Result.Failure(_) => true
     }
+
+    /** Converts this `Result` to an `Eru` effect.
+      *
+      * Success values become successful effects, and failure values become failed effects. This
+      * provides a convenient extension method alternative to `Result.toEru`.
+      *
+      * @return
+      *   an `Eru[E, A]` representing the converted result
+      *
+      * @example
+      *   {{{
+      * val result: Result[String, Int] = Result.succeed(42)
+      * val effect: Eru[String, Int] = result.toEru
+      *   }}}
+      */
+    def toEru: Eru[E, A] = Result.toEru(result)
+
+    /** Converts this `Result` to an `Exit` value.
+      *
+      * Success values become `Exit.Success`, failure values become either `Exit.Failure` for typed
+      * errors or `Exit.Die` for throwable exceptions. This provides a convenient extension method
+      * alternative to `Result.toExit`.
+      *
+      * @return
+      *   an `Exit[E, A]` representing the converted result
+      *
+      * @example
+      *   {{{
+      * val result: Result[String, Int] = Result.fail("error")
+      * val exit: Exit[String, Int] = result.toExit
+      *   }}}
+      */
+    def toExit: Exit[E, A] = Result.toExit(result)
   }
 
   /** Extension methods providing built-in caching and resource helpers for `Eru[E, A]`.

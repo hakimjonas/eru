@@ -41,9 +41,24 @@ private object StructuredConcurrency {
       case Some(scope) => scope.childFibers.offer(fiber)
       case None =>
         rootFibers match {
-          case Some(queue) => queue.offer(fiber)
+          case Some(queue) =>
+            queue.offer(fiber)
+            // Incremental cleanup: remove one completed fiber per add to prevent unbounded growth
+            // This amortizes cleanup cost across operations and avoids expensive full queue drains
+            cleanupOneCompletedFiber(queue)
           case None => ()
         }
+    }
+  }
+
+  private def cleanupOneCompletedFiber(queue: ConcurrentLinkedQueue[UnifiedFiber[?, ?]]): Unit = {
+    // Poll one fiber and re-add if still active, discard if completed
+    // This provides O(1) amortized cleanup instead of O(n) periodic full drains
+    Option(queue.poll()).foreach { fiber =>
+      fiber.currentState match {
+        case UnifiedFiberState.Completed(_) => () // Discard completed
+        case UnifiedFiberState.Active(_, _, _) => queue.offer(fiber) // Re-add active
+      }
     }
   }
 
@@ -111,7 +126,7 @@ enum RuntimeBackend {
   ): Eru[Nothing, Fiber[E, A]] =
     this match {
       case Synchronous =>
-        Eru.effect {
+        Eru.effectTotal {
           val id = FiberId.fresh()
           observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
 
@@ -137,7 +152,7 @@ enum RuntimeBackend {
         import Eru.Internals.View.*
         Eru.Internals.view(fa) match {
           case VSucceed(value) =>
-            Eru.effect {
+            Eru.effectTotal {
               val id = FiberId.fresh()
               observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
               val exit = Exit.Success(value)
@@ -153,7 +168,7 @@ enum RuntimeBackend {
             }
 
           case VFail(error) =>
-            Eru.effect {
+            Eru.effectTotal {
               val id = FiberId.fresh()
               observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
               val exit = Exit.Failure(error)
@@ -171,7 +186,7 @@ enum RuntimeBackend {
           case VMapChain(source, f) =>
             Eru.Internals.view(source) match {
               case VSucceed(value) =>
-                Eru.effect {
+                Eru.effectTotal {
                   val id = FiberId.fresh()
                   observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
                   val mappedValue = f(value)
@@ -187,9 +202,10 @@ enum RuntimeBackend {
                     UnifiedFiber.completed(id, exit)
                 }
               case _ =>
-                Eru.effect {
+                Eru.effectTotal {
                   val id = FiberId.fresh()
                   val fiber = UnifiedFiber.active[E, A](id)
+                  val parentScope = StructuredConcurrency.getCurrentScope()
 
                   StructuredConcurrency.addChildFiber(fiber, rootFibers)
 
@@ -197,6 +213,8 @@ enum RuntimeBackend {
 
                   Thread.startVirtualThread { () =>
                     UnifiedFiber.setThread(fiber, Thread.currentThread())
+                    // Restore parent scope in new thread
+                    StructuredConcurrency.setCurrentScope(parentScope)
 
                     StructuredConcurrency.withNewScope { _ =>
                       val (exit, finalizers) = Eru.executeWithFinalizers(fa)
@@ -223,9 +241,10 @@ enum RuntimeBackend {
             }
 
           case _ =>
-            Eru.effect {
+            Eru.effectTotal {
               val id = FiberId.fresh()
               val fiber = UnifiedFiber.active[E, A](id)
+              val parentScope = StructuredConcurrency.getCurrentScope()
 
               StructuredConcurrency.addChildFiber(fiber, rootFibers)
 
@@ -233,6 +252,8 @@ enum RuntimeBackend {
 
               Thread.startVirtualThread { () =>
                 UnifiedFiber.setThread(fiber, Thread.currentThread())
+                // Restore parent scope in new thread
+                StructuredConcurrency.setCurrentScope(parentScope)
 
                 StructuredConcurrency.withNewScope { _ =>
                   val (exit, finalizers) = Eru.executeWithFinalizers(fa)
@@ -274,7 +295,7 @@ enum RuntimeBackend {
         fa.map(Left.apply)
 
       case VirtualThreads =>
-        Eru.effect {
+        Eru.effectTotal {
           import java.util.concurrent.atomic.AtomicReference
           import java.util.concurrent.CountDownLatch
 
@@ -282,6 +303,7 @@ enum RuntimeBackend {
           val latch = new CountDownLatch(1)
           val leftThreadRef = new AtomicReference[Option[Thread]](None)
           val rightThreadRef = new AtomicReference[Option[Thread]](None)
+          val parentScope = StructuredConcurrency.getCurrentScope()
 
           def trySet(thunk: () => Eru[E1 | E2 | Throwable, Either[A, B]], cancelOther: () => Unit): Unit =
             if (resultRef.compareAndSet(None, Some(thunk))) {
@@ -291,6 +313,8 @@ enum RuntimeBackend {
 
           val runLeft: Runnable = () => {
             leftThreadRef.set(Some(Thread.currentThread()))
+            // Restore parent scope in race thread
+            StructuredConcurrency.setCurrentScope(parentScope)
             val (exit, finalizers) = Eru.executeWithFinalizers(fa)
             finalizers.foreach { finalizer =>
               try finalizer().unsafeRunSync()
@@ -302,7 +326,7 @@ enum RuntimeBackend {
               case Exit.Failure(e1) =>
                 trySet(() => Eru.fail(e1), () => rightThreadRef.get().foreach(_.interrupt()))
               case Exit.Die(t) =>
-                trySet(() => Eru.effect(throw t), () => rightThreadRef.get().foreach(_.interrupt()))
+                trySet(() => Eru.effectTotal(throw t), () => rightThreadRef.get().foreach(_.interrupt()))
               case Exit.Interrupt(_, _) =>
                 ()
             }
@@ -310,6 +334,8 @@ enum RuntimeBackend {
 
           val runRight: Runnable = () => {
             rightThreadRef.set(Some(Thread.currentThread()))
+            // Restore parent scope in race thread
+            StructuredConcurrency.setCurrentScope(parentScope)
             val (exit, finalizers) = Eru.executeWithFinalizers(fb)
             finalizers.foreach { finalizer =>
               try finalizer().unsafeRunSync()
@@ -321,7 +347,7 @@ enum RuntimeBackend {
               case Exit.Failure(e2) =>
                 trySet(() => Eru.fail(e2), () => leftThreadRef.get().foreach(_.interrupt()))
               case Exit.Die(t) =>
-                trySet(() => Eru.effect(throw t), () => leftThreadRef.get().foreach(_.interrupt()))
+                trySet(() => Eru.effectTotal(throw t), () => leftThreadRef.get().foreach(_.interrupt()))
               case Exit.Interrupt(_, _) =>
                 ()
             }
@@ -342,8 +368,8 @@ enum RuntimeBackend {
           }
         }.attempt.flatMap {
           case Result.Success(Some(thunk)) => thunk()
-          case Result.Success(None) => Eru.effect(throw new IllegalStateException("race: no result set"))
-          case Result.Failure(t) => Eru.effect(throw t)
+          case Result.Success(None) => Eru.effectTotal(throw new IllegalStateException("race: no result set"))
+          case Result.Failure(t) => Eru.effectTotal(throw t)
         }
     }
 
@@ -357,9 +383,9 @@ enum RuntimeBackend {
   def sleep(duration: java.time.Duration): Eru[Nothing, Unit] =
     this match {
       case Synchronous =>
-        Eru.effect {
+        Eru.effectTotal {
           Thread.sleep(duration.toMillis)
-        }.attempt.flatMap(_ => Eru.unit)
+        }
 
       case VirtualThreads =>
         Eru.interruptibleBlocking {
@@ -379,12 +405,94 @@ enum RuntimeBackend {
   def timeout[E, A](
     duration: java.time.Duration
   )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] = {
-    race(fa, sleep(duration)).flatMap {
-      case Left(a) => Eru.succeed(a)
-      case Right(_) =>
-        Eru.effect(throw new java.util.concurrent.TimeoutException(s"Operation timed out after $duration"))
+    // Fast path: pure values complete instantly and never timeout
+    import Eru.Internals.View.*
+    Eru.Internals.view(fa) match {
+      case VSucceed(value) =>
+        Eru.succeed(value)
+      case VFail(error) =>
+        Eru.fail(error)
+      case _ =>
+        // Effectful computation, use race against sleep
+        race(fa, sleep(duration)).flatMap {
+          case Left(a) => Eru.succeed(a)
+          case Right(_) =>
+            Eru.fail(new java.util.concurrent.TimeoutException(s"Operation timed out after $duration"))
+        }
     }
   }
+
+  /** Batch fork operation for improved performance.
+    *
+    * @param effects
+    *   list of effects to fork
+    * @param rootFibers
+    *   optional queue for root fiber tracking
+    * @return
+    *   an effect yielding all created fibers
+    */
+  def forkBatch[E, A](
+    effects: List[Eru[E, A]],
+    rootFibers: Option[ConcurrentLinkedQueue[UnifiedFiber[?, ?]]] = None
+  ): Eru[Nothing, List[Fiber[E, A]]] =
+    this match {
+      case Synchronous =>
+        // For Native, just use regular traverse since it's synchronous anyway
+        Eru.traverse(effects)(e => fork(e, None, rootFibers))
+
+      case VirtualThreads =>
+        // Optimized batch creation for Virtual Threads
+        Eru.effectTotal {
+          effects.map { fa =>
+            val id = FiberId.fresh()
+            val fiber = UnifiedFiber.active[E, A](id)
+
+            StructuredConcurrency.addChildFiber(fiber, rootFibers)
+
+            Thread.startVirtualThread { () =>
+              UnifiedFiber.setThread(fiber, Thread.currentThread())
+
+              // Skip creating a new scope for simple parallel operations
+              // This reduces overhead significantly
+              val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+
+              finalizers.foreach { finalizer =>
+                try finalizer().unsafeRunSync()
+                catch case _: Exception => ()
+              }
+
+              UnifiedFiber.complete(fiber, exit)
+            }
+
+            fiber: Fiber[E, A]
+          }
+        }
+    }
+
+  /** Awaits multiple fibers in batch and returns their exits.
+    *
+    * This optimization avoids deep chaining when awaiting many fibers.
+    *
+    * @param fibers
+    *   the fibers to await
+    * @return
+    *   an effect yielding all exits
+    */
+  def awaitAll[E, A](fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
+    this match {
+      case Synchronous =>
+        // For synchronous, fibers are already completed, just collect exits
+        Eru.effectTotal {
+          fibers.map(_.await.unsafeRunSync())
+        }
+
+      case VirtualThreads =>
+        // For Virtual Threads, we need to avoid sequential blocking
+        // The problem is that each await blocks, so we can't just map over them
+        // We need to use the natural parallelism of Virtual Threads
+        // But since we can't avoid the chaining in traverse, let's just use it
+        Eru.traverse(fibers)(_.await)
+    }
 
   /** Cleanup method for structured concurrency.
     *
@@ -402,13 +510,18 @@ enum RuntimeBackend {
 /** Platform detection and backend selection. */
 object Platform {
 
-  /** Detects if we're running on the JVM (vs Scala Native). */
-  val isJVM: Boolean =
-    try {
-      Option(Class.forName("java.lang.Thread").getDeclaredMethod("isVirtual")).isDefined
-    } catch {
-      case _: Exception => false
-    }
+  /** Detects if we're running on the JVM (vs Scala Native).
+    *
+    * Uses a simple heuristic based on system properties that differ between platforms.
+    */
+  val isJVM: Boolean = {
+    val javaVersion = Option(System.getProperty("java.version"))
+    val javaVendor = Option(System.getProperty("java.vendor"))
+
+    javaVersion.isDefined && javaVendor.isDefined &&
+    javaVersion.exists(v => v.contains(".") || v.toIntOption.exists(_ >= 8)) &&
+    javaVendor.exists(v => !v.toLowerCase.contains("scala"))
+  }
 
   /** The runtime backend for this platform. */
   val backend: RuntimeBackend =

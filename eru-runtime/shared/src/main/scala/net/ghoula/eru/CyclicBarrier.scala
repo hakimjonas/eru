@@ -11,6 +11,9 @@ import net.ghoula.eru.prelude.*
   *
   * This is useful for coordinating multiple concurrent operations that need to synchronize at
   * specific points during their execution.
+  *
+  * This implementation is built entirely on Eru primitives (Ref), demonstrating pure functional
+  * concurrency without any Java concurrent utilities.
   */
 trait CyclicBarrier {
 
@@ -22,16 +25,16 @@ trait CyclicBarrier {
     * After all parties are released, the barrier is reset for the next cycle.
     *
     * @return
-    *   an effect that succeeds when all parties have reached the barrier
+    *   a suspending effect that succeeds when all parties have reached the barrier
     */
-  def await: Eru[Nothing, Unit]
+  def await: Suspending[Nothing, Unit]
 
   /** Returns the number of parties required to trip this barrier.
     *
     * @return
-    *   an effect that yields the number of parties
+    *   an immediate effect that yields the number of parties
     */
-  def getParties: Eru[Nothing, Int]
+  def getParties: Immediate[Nothing, Int]
 
   /** Returns the number of parties currently waiting at the barrier.
     *
@@ -39,9 +42,9 @@ trait CyclicBarrier {
     * value may change immediately after this call returns.
     *
     * @return
-    *   an effect that yields the number of waiting parties
+    *   an immediate effect that yields the number of waiting parties
     */
-  def getNumberWaiting: Eru[Nothing, Int]
+  def getNumberWaiting: Immediate[Nothing, Int]
 
   /** Checks whether the barrier is currently broken.
     *
@@ -49,9 +52,9 @@ trait CyclicBarrier {
     * This implementation doesn't support barrier breaking, so this always returns false.
     *
     * @return
-    *   an effect that yields false (barriers don't break in this implementation)
+    *   an immediate effect that yields false (barriers don't break in this implementation)
     */
-  def isBroken: Eru[Nothing, Boolean] = Eru.succeed(false)
+  def isBroken: Immediate[Nothing, Boolean] = new Immediate(Eru.succeed(false))
 }
 
 object CyclicBarrier {
@@ -67,86 +70,72 @@ object CyclicBarrier {
     */
   def make(parties: Int)(using runtime: EruRuntime): Eru[Nothing, CyclicBarrier] = {
     require(parties > 0, "CyclicBarrier parties must be positive")
-    Eru.succeed(new RuntimeCyclicBarrier(parties, runtime))
+    for {
+      stateRef <- Ref.make(BarrierState(0, 0, Nil))
+    } yield new RuntimeCyclicBarrier(parties, stateRef, runtime)
   }
 
-  private final class RuntimeCyclicBarrier(parties: Int, runtime: EruRuntime) extends CyclicBarrier {
-    import java.util.concurrent.ConcurrentLinkedQueue
-    import java.util.concurrent.atomic.AtomicInteger
+  /** Internal state representation for CyclicBarrier. */
+  private case class BarrierState(
+    generation: Int,
+    waiting: Int,
+    waiters: List[(Int, Unit => Unit)]
+  )
 
-    private val currentGeneration = new AtomicInteger(0)
-    private val partiesCurrentlyWaiting = new AtomicInteger(0)
-    private val generationWaiters = new ConcurrentLinkedQueue[(Int, Either[Nothing, Unit] => Unit)]()
+  private final class RuntimeCyclicBarrier(parties: Int, stateRef: Ref[BarrierState], runtime: EruRuntime)
+      extends CyclicBarrier {
 
-    /** Pure function to notify all waiters of the current generation. */
-    private def notifyAllWaiters(currentGeneration: Int): Eru[Nothing, Unit] = {
-      @annotation.tailrec
-      def drainWaiters(acc: List[(Int, Either[Nothing, Unit] => Unit)]): List[(Int, Either[Nothing, Unit] => Unit)] = {
-        Option(generationWaiters.poll()) match {
-          case Some(waiter) => drainWaiters(waiter :: acc)
-          case None => acc
-        }
-      }
+    def getParties: Immediate[Nothing, Int] =
+      new Immediate(Eru.succeed(parties))
 
-      Eru.effect {
-        val waitersToNotify = drainWaiters(Nil)
-        waitersToNotify
-          .filter(_._1 == currentGeneration)
-          .foreach(_._2(Right(())))
-      }.attempt.map(_ => ())
-    }
+    def getNumberWaiting: Immediate[Nothing, Int] =
+      new Immediate(stateRef.get.map(_.waiting))
 
-    def getParties: Eru[Nothing, Int] =
-      Eru.succeed(parties)
-
-    def getNumberWaiting: Eru[Nothing, Int] =
-      Eru.succeed(partiesCurrentlyWaiting.get())
-
-    /** Pure function to register a callback with proper race condition handling. */
-    private def safeRegisterCallback(
-      currentGen: Int,
-      callback: Either[Nothing, Unit] => Unit
-    ): Eru[Nothing, Unit] = {
-      def checkAndRegister: Eru[Nothing, Unit] = {
-        val currentWaiting = partiesCurrentlyWaiting.incrementAndGet()
-        if (currentWaiting == parties) {
-          val tripBarrier = Eru.effect {
-            partiesCurrentlyWaiting.set(0)
-            currentGeneration.incrementAndGet()
-          }.attempt.map(_ => ())
-
-          val notifyAll = notifyAllWaiters(currentGen)
-          val notifySelf = Eru.effect(callback(Right(()))).attempt.map(_ => ())
-
-          tripBarrier.flatMap(_ => notifyAll).flatMap(_ => notifySelf)
-        } else {
-          val registerEffect = Eru.effect(generationWaiters.offer((currentGen, callback))).attempt.map(_ => ())
-          val doubleCheck = Eru.succeed(currentGeneration.get()).flatMap { newGeneration =>
-            if (newGeneration > currentGen) {
-              Eru.effect {
-                if (generationWaiters.remove((currentGen, callback))) {
-                  callback(Right(()))
-                }
-              }.attempt.map(_ => ())
-            } else {
-              Eru.unit
-            }
-          }
-          registerEffect.flatMap(_ => doubleCheck)
-        }
-      }
-
-      checkAndRegister
-    }
-
-    def await: Eru[Nothing, Unit] = {
-      val currentGen = currentGeneration.get()
-
+    def await: Suspending[Nothing, Unit] = new Suspending({
       if (parties == 1) {
+        // Single party - no need to wait
         Eru.unit
       } else {
         runtime
-          .suspend[Nothing, Unit](callback => safeRegisterCallback(currentGen, callback))
+          .suspend[Nothing, Unit] { callback =>
+            // Create a wrapper callback
+            val wrappedCallback: Unit => Unit = (_: Unit) => callback(Right(()))
+
+            stateRef.modify { state =>
+              val currentGen = state.generation
+              val newWaiting = state.waiting + 1
+
+              if (newWaiting == parties) {
+                // Last party to arrive - trip the barrier
+                // Release all waiters from this generation and reset
+                val waitersToRelease = state.waiters.filter(_._1 == currentGen).map(_._2)
+                val newState = BarrierState(
+                  generation = currentGen + 1,
+                  waiting = 0,
+                  waiters = state.waiters.filterNot(_._1 == currentGen)
+                )
+                (newState, (true, waitersToRelease))
+              } else {
+                // Not the last party - add to waiters
+                val newState = state.copy(
+                  waiting = newWaiting,
+                  waiters = (currentGen, wrappedCallback) :: state.waiters
+                )
+                (newState, (false, Nil))
+              }
+            }.flatMap { case (isLastParty, waitersToNotify) =>
+              if (isLastParty) {
+                // Notify all waiters and ourselves
+                Eru.effectTotal {
+                  waitersToNotify.foreach(callback => callback(()))
+                  wrappedCallback(())
+                }
+              } else {
+                // Successfully registered, will be notified when barrier trips
+                Eru.unit
+              }
+            }
+          }
           .attempt
           .map {
             case Result.Success(_) => ()
@@ -154,6 +143,6 @@ object CyclicBarrier {
               throw new IllegalStateException("CyclicBarrier await encountered unexpected error")
           }
       }
-    }
+    })
   }
 }

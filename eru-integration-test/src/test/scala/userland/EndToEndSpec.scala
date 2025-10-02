@@ -27,9 +27,10 @@ final class EndToEndSpec extends munit.FunSuite {
 
     val program = for {
       ref <- Eru.ref(List.empty[Int])
-      _ <- Eru.succeed(1).flatMap(n => ref.update(n :: _)).fork
-      _ <- Eru.succeed(2).flatMap(n => ref.update(n :: _)).fork
-      _ <- Eru.blocking(Thread.sleep(10))
+      f1 <- Eru.succeed(1).flatMap(n => ref.update(n :: _)).fork
+      f2 <- Eru.succeed(2).flatMap(n => ref.update(n :: _)).fork
+      _ <- f1.await
+      _ <- f2.await
       l <- ref.get
       ok <- Eru.succeed(l.sum).retryWithBackoff(Duration.ofMillis(10), maxRetries = 2)
       out <- Eru.succeed(ok).timeoutTo(Duration.ofSeconds(1), -1)

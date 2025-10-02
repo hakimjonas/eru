@@ -26,8 +26,17 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruDeferredBasic(): Int = runEru {
     for {
       deferred <- Eru.deferred[Int]
-      _ <- deferred.complete(TEST_VALUE)
-      result <- deferred.await
+      _ <- deferred.complete(TEST_VALUE).eru
+      result <- deferred.await.eru
+    } yield result
+  }
+
+  @Benchmark
+  def eruPromiseBasic(): Int = runEru {
+    for {
+      promise <- Eru.promise[Nothing, Int]
+      _ <- promise.succeed(TEST_VALUE).eru
+      result <- promise.await.eru
     } yield result
   }
 
@@ -59,12 +68,28 @@ class CoordinationBench extends FairBenchmarkBase {
       d1 <- Eru.deferred[Int]
       d2 <- Eru.deferred[Int]
       d3 <- Eru.deferred[Int]
-      _ <- d1.complete(10)
-      _ <- d2.complete(20)
-      _ <- d3.complete(12)
-      a <- d1.await
-      b <- d2.await
-      c <- d3.await
+      _ <- d1.complete(10).eru
+      _ <- d2.complete(20).eru
+      _ <- d3.complete(12).eru
+      a <- d1.await.eru
+      b <- d2.await.eru
+      c <- d3.await.eru
+      result <- Eru.succeed(a + b + c)
+    } yield result
+  }
+
+  @Benchmark
+  def eruMultiplePromise(): Int = runEru {
+    for {
+      p1 <- Eru.promise[Nothing, Int]
+      p2 <- Eru.promise[Nothing, Int]
+      p3 <- Eru.promise[Nothing, Int]
+      _ <- p1.succeed(10).eru
+      _ <- p2.succeed(20).eru
+      _ <- p3.succeed(12).eru
+      a <- p1.await.eru
+      b <- p2.await.eru
+      c <- p3.await.eru
       result <- Eru.succeed(a + b + c)
     } yield result
   }
@@ -110,7 +135,10 @@ class CoordinationBench extends FairBenchmarkBase {
     for {
       sem <- Eru.semaphore(1)
       ref <- Eru.ref(0)
-      result <- sem.withPermit(ref.update(_ + TEST_VALUE).flatMap(_ => ref.get)).map(_.get)
+      _ <- sem.acquire.eru
+      _ <- ref.update(_ + TEST_VALUE)
+      result <- ref.get
+      _ <- sem.release.eru
     } yield result
   }
 
@@ -138,19 +166,21 @@ class CoordinationBench extends FairBenchmarkBase {
 
   @Benchmark
   def eruCombinedCoordination(): Int = runEru {
+    // Sequential ref updates + deferred for fair comparison
     for {
       ref <- Eru.ref(0)
       deferred <- Eru.deferred[Int]
       _ <- ref.update(_ + 10)
       _ <- ref.update(_ + 20)
       current <- ref.get
-      _ <- deferred.complete(current + 12)
-      result <- deferred.await
+      _ <- deferred.complete(current + 12).eru
+      result <- deferred.await.eru
     } yield result
   }
 
   @Benchmark
   def zioCombinedCoordination(): Int = runZio {
+    // Same sequential operations for fair comparison
     for {
       ref <- zio.Ref.make(0)
       promise <- zio.Promise.make[Nothing, Int]
@@ -183,8 +213,8 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruQueue(): Int = runEru {
     for {
       queue <- Eru.queue[Int](10)
-      _ <- queue.offer(TEST_VALUE)
-      result <- queue.take
+      _ <- queue.put(TEST_VALUE).eru
+      result <- queue.take.eru
     } yield result
   }
 
@@ -211,12 +241,12 @@ class CoordinationBench extends FairBenchmarkBase {
   // =============================================================================
 
   @Benchmark
-  def eruSemaphore(): Boolean = runEru {
+  def eruSemaphore(): Unit = runEru {
     for {
       semaphore <- Eru.semaphore(1)
-      acquired <- semaphore.tryAcquire
-      _ <- if (acquired) semaphore.release else Eru.succeed(())
-    } yield acquired
+      _ <- semaphore.acquire.eru
+      _ <- semaphore.release.eru
+    } yield ()
   }
 
   @Benchmark
@@ -243,18 +273,25 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruCountDownLatch(): Unit = runEru {
     for {
       latch <- Eru.countDownLatch(1)
-      _ <- latch.countDown
-      _ <- latch.await
+      _ <- latch.countDown.eru
+      _ <- latch.await.eru
     } yield ()
   }
 
   @Benchmark
   def zioCountDownLatch(): Unit = runZio {
-    // ZIO doesn't have CountDownLatch, simulate with Ref
+    // ZIO doesn't have CountDownLatch, simulate with Promise for fair comparison
     for {
+      promise <- zio.Promise.make[Nothing, Unit]
       ref <- zio.Ref.make(1)
-      _ <- ref.update(_ - 1)
-      _ <- ref.get.flatMap(count => if (count <= 0) ZIO.unit else ZIO.unit)
+      _ <- ref.modify { count =>
+        val newCount = count - 1
+        if (newCount <= 0) (true, newCount)
+        else (false, newCount)
+      }.flatMap { hitZero =>
+        if (hitZero) promise.succeed(()) else ZIO.unit
+      }
+      _ <- promise.await
     } yield ()
   }
 
@@ -275,14 +312,24 @@ class CoordinationBench extends FairBenchmarkBase {
   def eruCyclicBarrier(): Unit = runEru {
     for {
       barrier <- Eru.cyclicBarrier(1)
-      _ <- barrier.await
+      _ <- barrier.await.eru
     } yield ()
   }
 
   @Benchmark
   def zioCyclicBarrier(): Unit = runZio {
-    // ZIO doesn't have CyclicBarrier, simulate with simple operation
-    ZIO.unit
+    // ZIO doesn't have CyclicBarrier, simulate with Promise-based synchronization
+    // This is equivalent to what CyclicBarrier does with parties=1
+    for {
+      promise <- zio.Promise.make[Nothing, Unit]
+      counter <- zio.Ref.make(1)
+      _ <- counter.modify { count =>
+        val newCount = count - 1
+        (newCount <= 0, newCount)
+      }.flatMap { reachedZero =>
+        if (reachedZero) promise.succeed(()) else promise.await
+      }
+    } yield ()
   }
 
   @Benchmark
@@ -291,5 +338,166 @@ class CoordinationBench extends FairBenchmarkBase {
       barrier <- cats.effect.std.CyclicBarrier[IO](1)
       _ <- barrier.await
     } yield ()
+  }
+
+  // =============================================================================
+  // Concurrent Coordination (Actual concurrent scenarios)
+  // =============================================================================
+
+  @Benchmark
+  def eruConcurrentPromise(): Int = runEru {
+    for {
+      promise <- Eru.promise[Nothing, Int]
+      fiber <- Eru.effect {
+        Thread.sleep(1)
+        TEST_VALUE
+      }.flatMap(v => promise.succeed(v).eru).fork
+      result <- promise.await.eru
+      _ <- fiber.await
+    } yield result
+  }
+
+  @Benchmark
+  def zioConcurrentPromise(): Int = runZio {
+    for {
+      promise <- zio.Promise.make[Nothing, Int]
+      fiber <- ZIO.attempt {
+        Thread.sleep(1)
+        TEST_VALUE
+      }.flatMap(v => promise.succeed(v)).fork
+      result <- promise.await
+      _ <- fiber.await
+    } yield result
+  }
+
+  @Benchmark
+  def ioConcurrentDeferred(): Int = runIO {
+    for {
+      deferred <- cats.effect.Deferred[IO, Int]
+      fiber <- IO.delay {
+        Thread.sleep(1)
+        TEST_VALUE
+      }.flatMap(v => deferred.complete(v)).start
+      result <- deferred.get
+      _ <- fiber.joinWithNever
+    } yield result
+  }
+
+  @Benchmark
+  def eruConcurrentSemaphore(): Int = runEru {
+    for {
+      sem <- Eru.semaphore(1)
+      counter <- Eru.ref(0)
+      fiber1 <- sem
+        .withPermit(
+          counter.update(_ + 1).flatMap(_ => Eru.effect(Thread.sleep(1)))
+        )
+        .fork
+      fiber2 <- sem
+        .withPermit(
+          counter.update(_ + 1).flatMap(_ => Eru.effect(Thread.sleep(1)))
+        )
+        .fork
+      _ <- fiber1.await
+      _ <- fiber2.await
+      result <- counter.get
+    } yield result
+  }
+
+  @Benchmark
+  def zioConcurrentSemaphore(): Int = runZio {
+    for {
+      sem <- zio.Semaphore.make(1)
+      counter <- zio.Ref.make(0)
+      fiber1 <- sem
+        .withPermit(
+          counter.update(_ + 1) *> ZIO.attempt(Thread.sleep(1))
+        )
+        .fork
+      fiber2 <- sem
+        .withPermit(
+          counter.update(_ + 1) *> ZIO.attempt(Thread.sleep(1))
+        )
+        .fork
+      _ <- fiber1.await
+      _ <- fiber2.await
+      result <- counter.get
+    } yield result
+  }
+
+  @Benchmark
+  def ioConcurrentSemaphore(): Int = runIO {
+    for {
+      sem <- cats.effect.std.Semaphore[IO](1)
+      counter <- cats.effect.Ref[IO].of(0)
+      fiber1 <- sem.permit
+        .surround(
+          counter.update(_ + 1) >> IO.delay(Thread.sleep(1))
+        )
+        .start
+      fiber2 <- sem.permit
+        .surround(
+          counter.update(_ + 1) >> IO.delay(Thread.sleep(1))
+        )
+        .start
+      _ <- fiber1.joinWithNever
+      _ <- fiber2.joinWithNever
+      result <- counter.get
+    } yield result
+  }
+
+  @Benchmark
+  def eruConcurrentQueue(): Int = runEru {
+    for {
+      queue <- Eru.queue[Int](2)
+      producer <- (
+        queue.put(1).eru.flatMap(_ => Eru.effect(Thread.sleep(1)).flatMap(_ => queue.put(2).eru))
+      ).fork
+      consumer <- (
+        queue.take.eru.flatMap(_ => queue.take.eru)
+      ).fork
+      _ <- producer.await
+      result <- consumer.await.flatMap(Eru.fromExit(_))
+    } yield result
+  }
+
+  @Benchmark
+  def zioConcurrentQueue(): Int = runZio {
+    for {
+      queue <- zio.Queue.bounded[Int](2)
+      producer <- (
+        queue.offer(1) *>
+          ZIO.attempt(Thread.sleep(1)) *>
+          queue.offer(2)
+      ).fork
+      consumer <- (
+        queue.take *>
+          queue.take
+      ).fork
+      _ <- producer.await
+      exit <- consumer.await
+      result <- exit match {
+        case zio.Exit.Success(value) => ZIO.succeed(value)
+        case zio.Exit.Failure(cause) => ZIO.failCause(cause)
+      }
+    } yield result
+  }
+
+  @Benchmark
+  def ioConcurrentQueue(): Int = runIO {
+    for {
+      queue <- cats.effect.std.Queue.bounded[IO, Int](2)
+      producer <- (
+        queue.offer(1) >>
+          IO.delay(Thread.sleep(1)) >>
+          queue.offer(2)
+      ).start
+      consumer <- (
+        queue.take >>
+          queue.take
+      ).start
+      _ <- producer.joinWithNever
+      result <- consumer.joinWithNever
+    } yield result
   }
 }

@@ -12,7 +12,7 @@ class HubConcurrencySpec extends EruTestSuite {
 
   test("hub concurrent publishing maintains message delivery") {
     val hub = Eru.hub[String](10).unsafeRunSync() // Large capacity to avoid blocking
-    val subscriber = hub.subscribe.unsafeRunSync()
+    val subscriber = hub.subscribe.eru.unsafeRunSync()
 
     val messageCount = 5
     val allPublished = Eru.countDownLatch(messageCount).unsafeRunSync()
@@ -22,8 +22,8 @@ class HubConcurrencySpec extends EruTestSuite {
       Eru
         .foreach(1 to messageCount) { i =>
           for {
-            _ <- hub.publish(s"msg$i")
-            _ <- allPublished.countDown
+            _ <- hub.publish(s"msg$i").eru
+            _ <- allPublished.countDown.eru
           } yield ()
         }
       )
@@ -32,8 +32,8 @@ class HubConcurrencySpec extends EruTestSuite {
 
     // Consumer
     val consumer = (for {
-      _ <- allPublished.await // Wait for all messages to be published
-      messages <- Eru.collectAll((1 to messageCount).map(_ => subscriber.take))
+      _ <- allPublished.await.eru // Wait for all messages to be published
+      messages <- Eru.collectAll((1 to messageCount).map(_ => subscriber.take.eru))
     } yield messages).fork.unsafeRunSync()
 
     publisher.await.unsafeRunSync()
@@ -49,27 +49,27 @@ class HubConcurrencySpec extends EruTestSuite {
 
   test("hub multiple subscribers receive all messages independently") {
     val hub = Eru.hub[Int](10).unsafeRunSync()
-    val subscriber1 = hub.subscribe.unsafeRunSync()
-    val subscriber2 = hub.subscribe.unsafeRunSync()
+    val subscriber1 = hub.subscribe.eru.unsafeRunSync()
+    val subscriber2 = hub.subscribe.eru.unsafeRunSync()
 
     val messageCount = 3 // Small number for fast test
     val publishComplete = Eru.promise[Nothing, Unit].unsafeRunSync()
 
     // Publisher
     val publisher = (for {
-      _ <- Eru.foreach(1 to messageCount)(hub.publish)
-      _ <- publishComplete.succeed(())
+      _ <- Eru.foreach(1 to messageCount)(i => hub.publish(i).eru)
+      _ <- publishComplete.succeed(()).eru
     } yield ()).fork.unsafeRunSync()
 
     // Consumers
     val consumer1 = (for {
-      _ <- publishComplete.await
-      messages <- Eru.collectAll((1 to messageCount).map(_ => subscriber1.take))
+      _ <- publishComplete.await.eru
+      messages <- Eru.collectAll((1 to messageCount).map(_ => subscriber1.take.eru))
     } yield messages).fork.unsafeRunSync()
 
     val consumer2 = (for {
-      _ <- publishComplete.await
-      messages <- Eru.collectAll((1 to messageCount).map(_ => subscriber2.take))
+      _ <- publishComplete.await.eru
+      messages <- Eru.collectAll((1 to messageCount).map(_ => subscriber2.take.eru))
     } yield messages).fork.unsafeRunSync()
 
     publisher.await.unsafeRunSync()

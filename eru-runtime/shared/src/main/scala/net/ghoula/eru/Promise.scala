@@ -11,6 +11,9 @@ import net.ghoula.eru.prelude.*
   * Unlike `Deferred[A]` which only handles successful completion, `Promise[E, A]` provides full
   * typed error handling capabilities, making it suitable for coordination patterns where failures
   * need to be propagated between fibers.
+  *
+  * This implementation is built entirely on Eru primitives (Ref), demonstrating pure functional
+  * concurrency without any Java concurrent utilities.
   */
 trait Promise[E, A] {
 
@@ -22,7 +25,7 @@ trait Promise[E, A] {
     *   an effect that yields `true` if this invocation completed the promise, or `false` if it was
     *   already completed
     */
-  def succeed(value: A): Eru[Nothing, Boolean]
+  def succeed(value: A): Immediate[Nothing, Boolean]
 
   /** Completes this `Promise` with a failure value if it has not been completed yet.
     *
@@ -32,7 +35,7 @@ trait Promise[E, A] {
     *   an effect that yields `true` if this invocation completed the promise, or `false` if it was
     *   already completed
     */
-  def fail(error: E): Eru[Nothing, Boolean]
+  def fail(error: E): Immediate[Nothing, Boolean]
 
   /** Completes this `Promise` with the result of another effect if it has not been completed yet.
     *
@@ -42,11 +45,10 @@ trait Promise[E, A] {
     *   an effect that yields `true` if this invocation completed the promise, or `false` if it was
     *   already completed
     */
-  def complete(effect: Eru[E, A]): Eru[Nothing, Boolean] =
-    effect.attempt.flatMap {
-      case Result.Success(value) => succeed(value)
-      case Result.Failure(error) => fail(error)
-    }
+  def complete(effect: Eru[E, A]): Immediate[Nothing, Boolean] = new Immediate(effect.attempt.flatMap {
+    case Result.Success(value) => succeed(value).eru
+    case Result.Failure(error) => fail(error).eru
+  })
 
   /** Awaits completion, returning the result when available.
     *
@@ -56,21 +58,28 @@ trait Promise[E, A] {
     * @return
     *   an effect that yields the completed result (success or failure)
     */
-  def await: Eru[E, A]
+  def await: Suspending[E, A]
 
   /** Checks whether this promise has been completed.
     *
     * @return
     *   an effect that yields `true` if the promise is completed, `false` otherwise
     */
-  def isDone: Eru[Nothing, Boolean]
+  def isDone: Immediate[Nothing, Boolean]
 
   /** Attempts to retrieve the current result without suspending.
     *
     * @return
-    *   an effect that yields `Some(result)` if completed, or `None` if still pending
+    *   an immediate effect that yields `Some(result)` if completed, or `None` if still pending
     */
-  def poll: Eru[Nothing, Option[Exit[E, A]]]
+  def poll: Immediate[Nothing, Option[Exit[E, A]]]
+
+  /** Alias for poll for consistency with suspension naming conventions.
+    *
+    * @return
+    *   an immediate effect that yields `Some(result)` if completed, or `None` if still pending
+    */
+  def tryGet: Immediate[Nothing, Option[Exit[E, A]]] = poll
 }
 
 object Promise {
@@ -85,118 +94,119 @@ object Promise {
     *   an effect that yields the created promise
     */
   def make[E, A](using runtime: EruRuntime): Eru[Nothing, Promise[E, A]] =
-    Eru.succeed(new RuntimePromise[E, A](runtime))
+    Ref.make(PromiseState.empty[E, A]).map(stateRef => new RuntimePromise[E, A](stateRef, runtime))
 
-  private final class RuntimePromise[E, A](runtime: EruRuntime) extends Promise[E, A] {
-    import java.util.concurrent.ConcurrentLinkedQueue
-    import java.util.concurrent.atomic.AtomicReference
+  /** Internal state representation for Promise. */
+  private sealed trait PromiseState[E, A] {
+    def isCompleted: Boolean
+    def result: Option[Exit[E, A]]
+    def waiters: List[Either[E, A] => Unit]
+  }
 
-    private val completionState = new AtomicReference[Option[Exit[E, A]]](None)
-    private val pendingCallbacks = new ConcurrentLinkedQueue[Either[E, A] => Unit]()
+  private object PromiseState {
 
-    /** Pure function to notify all waiters of completion, expressed as an effect. */
-    private def notifyAllWaiters(exit: Exit[E, A]): Eru[Nothing, Unit] = {
-      @annotation.tailrec
-      def drainWaiters(acc: List[Either[E, A] => Unit]): List[Either[E, A] => Unit] = {
-        Option(pendingCallbacks.poll()) match {
-          case Some(waiter) => drainWaiters(waiter :: acc)
-          case None => acc
-        }
-      }
-
-      Eru.effect {
-        val waitersToNotify = drainWaiters(Nil)
-        val result = exit match {
-          case Exit.Success(value) => Right(value)
-          case Exit.Failure(error) => Left(error)
-          case Exit.Die(_) | Exit.Interrupt(_, _) =>
-            throw new IllegalStateException("Promise completed with unexpected exit type")
-        }
-        waitersToNotify.foreach(_(result))
-      }.attempt.map(_ => ())
+    /** An empty promise with no result and potentially waiting callbacks. */
+    case class Pending[E, A](waiters: List[Either[E, A] => Unit]) extends PromiseState[E, A] {
+      def isCompleted: Boolean = false
+      def result: Option[Exit[E, A]] = None
     }
 
+    /** A promise completed with a success value, storing the Eru effect directly. */
+    case class CompletedSuccess[E, A](value: A) extends PromiseState[E, A] {
+      def isCompleted: Boolean = true
+      def result: Option[Exit[E, A]] = Some(Exit.Success(value))
+      def waiters: List[Either[E, A] => Unit] = Nil
+    }
+
+    /** A promise completed with a failure, storing the full Exit for error cases. */
+    case class CompletedFailure[E, A](exit: Exit[E, A]) extends PromiseState[E, A] {
+      def isCompleted: Boolean = true
+      def result: Option[Exit[E, A]] = Some(exit)
+      def waiters: List[Either[E, A] => Unit] = Nil
+    }
+
+    def empty[E, A]: PromiseState[E, A] = Pending(Nil)
+  }
+
+  private final class RuntimePromise[E, A](stateRef: Ref[PromiseState[E, A]], runtime: EruRuntime)
+      extends Promise[E, A] {
+    import PromiseState.*
+
+    /** Helper to convert Exit to Either for callbacks. */
+    private def exitToEither(exit: Exit[E, A]): Either[E, A] = exit match {
+      case Exit.Success(value) => Right(value)
+      case Exit.Failure(error) => Left(error)
+      case Exit.Die(_) | Exit.Interrupt(_, _) =>
+        throw new IllegalStateException("Promise completed with unexpected exit type")
+    }
+
+    /** Attempts to complete the promise and notifies waiters if successful. */
     private def attemptComplete(exit: Exit[E, A]): Eru[Nothing, Boolean] = {
-      val attemptCompletion = Eru.effect(completionState.compareAndSet(None, Some(exit))).attempt.map {
-        case Result.Success(result) => result
-        case Result.Failure(_) => false
+      val newState: PromiseState[E, A] = exit match {
+        case Exit.Success(value) => CompletedSuccess(value)
+        case other => CompletedFailure(other)
       }
 
-      attemptCompletion.flatMap { wasCompleted =>
-        if (wasCompleted) notifyAllWaiters(exit).map(_ => true)
-        else Eru.succeed(false)
-      }
-    }
-
-    def succeed(value: A): Eru[Nothing, Boolean] =
-      attemptComplete(Exit.Success(value))
-
-    def fail(error: E): Eru[Nothing, Boolean] =
-      attemptComplete(Exit.Failure(error))
-
-    def isDone: Eru[Nothing, Boolean] =
-      Eru.succeed(completionState.get().isDefined)
-
-    def poll: Eru[Nothing, Option[Exit[E, A]]] =
-      Eru.succeed(completionState.get())
-
-    /** Pure function to register a callback with proper race condition handling. */
-    private def safeRegisterCallback(callback: Either[E, A] => Unit): Eru[Nothing, Unit] = {
-      def checkAndRegister: Eru[Nothing, Unit] =
-        Eru.succeed(completionState.get()).flatMap {
-          case Some(exit) =>
-            val result = exit match {
-              case Exit.Success(value) => Right(value)
-              case Exit.Failure(error) => Left(error)
-              case Exit.Die(_) | Exit.Interrupt(_, _) =>
-                // This shouldn't happen - convert to defect
-                throw new IllegalStateException("Promise completed with unexpected exit type")
-            }
-            Eru.effect(callback(result)).attempt.map(_ => ())
-          case None =>
-            // Not completed - register callback and double-check
-            val registerEffect = Eru.effect(pendingCallbacks.offer(callback)).attempt.map(_ => ())
-            val doubleCheck = Eru.succeed(completionState.get()).flatMap {
-              case Some(exit) =>
-                // Race condition: completed after registration
-                Eru.effect {
-                  if (pendingCallbacks.remove(callback)) {
-                    val result = exit match {
-                      case Exit.Success(value) => Right(value)
-                      case Exit.Failure(error) => Left(error)
-                      case Exit.Die(_) | Exit.Interrupt(_, _) =>
-                        throw new IllegalStateException("Promise completed with unexpected exit type")
-                    }
-                    callback(result)
-                  }
-                  // If remove failed, callback will be invoked by completer
-                }.attempt.map(_ => ())
-              case None =>
-                // Still pending - callback will be invoked by completer
-                Eru.unit
-            }
-            registerEffect.flatMap(_ => doubleCheck)
-        }
-
-      checkAndRegister
-    }
-
-    def await: Eru[E, A] =
-      Eru.succeed(completionState.get()).flatMap {
-        case Some(exit) =>
-          // Already completed - return immediately without suspension
-          exit match {
-            case Exit.Success(value) => Eru.succeed(value)
-            case Exit.Failure(error) => Eru.fail(error)
-            case Exit.Die(_) | Exit.Interrupt(_, _) =>
-              // This should never happen in normal Promise usage
-              throw new IllegalStateException("Promise completed with unexpected exit type")
+      stateRef.modify {
+        case Pending(waiters) =>
+          (newState, (true, waiters))
+        case completed =>
+          (completed, (false, Nil))
+      }.flatMap { case (wasCompleted, waitersToNotify) =>
+        if (wasCompleted && waitersToNotify.nonEmpty) {
+          val result = exitToEither(exit)
+          Eru.effectTotal {
+            waitersToNotify.foreach(_(result))
+            true
           }
-        case None =>
-          // Not completed - suspend using runtime's async boundary support
-          // Use the same error conversion pattern as Queue for consistency
+        } else {
+          Eru.succeed(wasCompleted)
+        }
+      }
+    }
+
+    def succeed(value: A): Immediate[Nothing, Boolean] = new Immediate(attemptComplete(Exit.Success(value)))
+
+    def fail(error: E): Immediate[Nothing, Boolean] = new Immediate(attemptComplete(Exit.Failure(error)))
+
+    def isDone: Immediate[Nothing, Boolean] = new Immediate(stateRef.get.map(_.isCompleted))
+
+    def poll: Immediate[Nothing, Option[Exit[E, A]]] = new Immediate(stateRef.get.map(_.result))
+
+    def await: Suspending[E, A] = new Suspending({
+      // Fast path: check state first without defer
+      stateRef.get.flatMap {
+        // Direct return for success case - no wrapping needed!
+        case CompletedSuccess(value) =>
+          Eru.succeed(value)
+        case CompletedFailure(Exit.Failure(error)) =>
+          Eru.fail(error)
+        case CompletedFailure(exit) =>
+          // Rare case: Die or Interrupt
+          throw new IllegalStateException(s"Promise completed with unexpected exit type: $exit")
+        case Pending(_) =>
           runtime
-            .suspend[Nothing, Either[E, A]](callback => safeRegisterCallback(result => callback(Right(result))))
+            .suspend[Nothing, Either[E, A]] { callback =>
+              val wrappedCallback: Either[E, A] => Unit = (result: Either[E, A]) => callback(Right(result))
+
+              val registerCallback = stateRef.modify {
+                case Pending(waiters) =>
+                  (Pending(wrappedCallback :: waiters), None)
+                case completed @ CompletedSuccess(value) =>
+                  (completed, Some(Right(value)))
+                case completed @ CompletedFailure(exit) =>
+                  (completed, Some(exitToEither(exit)))
+              }
+
+              registerCallback.flatMap {
+                case Some(result) =>
+                  Eru.effectTotal {
+                    wrappedCallback(result)
+                  }
+                case None =>
+                  Eru.unit
+              }
+            }
             .attempt
             .flatMap {
               case Result.Success(either) =>
@@ -205,9 +215,9 @@ object Promise {
                   case Right(value) => Eru.succeed(value)
                 }
               case Result.Failure(_) =>
-                // This should never happen in a correctly implemented Promise
                 throw new IllegalStateException("Promise await encountered unexpected error")
             }
       }
+    })
   }
 }

@@ -10,6 +10,9 @@ import net.ghoula.eru.prelude.*
   *
   * This is useful for coordinating multiple concurrent operations where you need to wait for all of
   * them to complete before proceeding.
+  *
+  * This implementation is built entirely on Eru primitives (Ref), demonstrating pure functional
+  * concurrency without any Java concurrent utilities.
   */
 trait CountDownLatch {
 
@@ -20,7 +23,7 @@ trait CountDownLatch {
     * @return
     *   an effect that succeeds when the count is decremented
     */
-  def countDown: Eru[Nothing, Unit]
+  def countDown: Immediate[Nothing, Unit]
 
   /** Awaits until the latch count reaches zero.
     *
@@ -30,7 +33,7 @@ trait CountDownLatch {
     * @return
     *   an effect that succeeds when the count reaches zero
     */
-  def await: Eru[Nothing, Unit]
+  def await: Suspending[Nothing, Unit]
 
   /** Returns the current count value.
     *
@@ -40,14 +43,14 @@ trait CountDownLatch {
     * @return
     *   an effect that yields the current count
     */
-  def getCount: Eru[Nothing, Int]
+  def getCount: Immediate[Nothing, Int]
 
   /** Checks whether the count has reached zero.
     *
     * @return
     *   an effect that yields `true` if the count is zero, `false` otherwise
     */
-  def isZero: Eru[Nothing, Boolean] = getCount.map(_ == 0)
+  def isZero: Immediate[Nothing, Boolean] = new Immediate(getCount.eru.map(_ == 0))
 }
 
 object CountDownLatch {
@@ -63,124 +66,88 @@ object CountDownLatch {
     */
   def make(count: Int)(using runtime: EruRuntime): Eru[Nothing, CountDownLatch] = {
     require(count >= 0, "CountDownLatch count must be non-negative")
-    Eru.succeed(new RuntimeCountDownLatch(count, runtime))
+    for {
+      stateRef <- Ref.make(LatchState(count, Nil))
+    } yield new RuntimeCountDownLatch(stateRef, runtime)
   }
 
-  private final class RuntimeCountDownLatch(initialCount: Int, runtime: EruRuntime) extends CountDownLatch {
-    import java.util.concurrent.ConcurrentLinkedQueue
-    import java.util.concurrent.atomic.AtomicInteger
+  /** Internal state representation for CountDownLatch. */
+  private case class LatchState(
+    count: Int,
+    waiters: List[Unit => Unit]
+  )
 
-    // Current count - when it reaches 0, all waiters are notified
-    private val count = new AtomicInteger(initialCount)
-    // Queue of waiting callbacks
-    private val waiters = new ConcurrentLinkedQueue[Either[Nothing, Unit] => Unit]()
+  private final class RuntimeCountDownLatch(stateRef: Ref[LatchState], runtime: EruRuntime) extends CountDownLatch {
 
-    /** Pure function to notify all waiters when count reaches zero. */
-    private def notifyAllWaiters: Eru[Nothing, Unit] = {
-      @annotation.tailrec
-      def drainWaiters(acc: List[Either[Nothing, Unit] => Unit]): List[Either[Nothing, Unit] => Unit] = {
-        Option(waiters.poll()) match {
-          case Some(waiter) => drainWaiters(waiter :: acc)
-          case None => acc
-        }
-      }
-
-      Eru.effect {
-        val waitersToNotify = drainWaiters(Nil)
-        waitersToNotify.foreach(_(Right(())))
-      }.attempt.map(_ => ())
-    }
-
-    def countDown: Eru[Nothing, Unit] = {
-      val decrementAndCheck = Eru.effect {
-        // Use compareAndSet loop to prevent count from going below zero
-        @annotation.tailrec
-        def decrementIfPositive(): Boolean = {
-          val current = count.get()
-          if (current <= 0) {
-            false // Already at zero, no decrement
+    def countDown: Immediate[Nothing, Unit] = new Immediate({
+      stateRef.modify { state =>
+        if (state.count <= 0) {
+          (state, (false, Nil))
+        } else {
+          val newCount = state.count - 1
+          if (newCount == 0) {
+            (LatchState(0, Nil), (true, state.waiters))
           } else {
-            val newCount = current - 1
-            if (count.compareAndSet(current, newCount)) {
-              newCount == 0 // Return true if we just hit zero
-            } else {
-              decrementIfPositive() // Retry due to race condition
-            }
+            (state.copy(count = newCount), (false, Nil))
           }
         }
-        decrementIfPositive()
-      }.attempt.map {
-        case Result.Success(hitZero) => hitZero
-        case Result.Failure(_) => false
-      }
-
-      decrementAndCheck.flatMap { hitZero =>
-        if (hitZero) notifyAllWaiters
-        else Eru.unit
-      }
-    }
-
-    def getCount: Eru[Nothing, Int] =
-      Eru.succeed(count.get())
-
-    /** Pure function to register a callback with proper race condition handling. */
-    private def safeRegisterCallback(callback: Either[Nothing, Unit] => Unit): Eru[Nothing, Unit] = {
-      def checkAndRegister: Eru[Nothing, Unit] =
-        Eru.succeed(count.get()).flatMap { currentCount =>
-          if (currentCount == 0) {
-            // Already at zero - invoke callback immediately
-            Eru.effect(callback(Right(()))).attempt.map(_ => ())
-          } else {
-            // Not at zero - register callback and double-check
-            val registerEffect = Eru.effect(waiters.offer(callback)).attempt.map(_ => ())
-            val doubleCheck = Eru.succeed(count.get()).flatMap { newCount =>
-              if (newCount == 0) {
-                // Race condition: reached zero after registration
-                Eru.effect {
-                  if (waiters.remove(callback)) {
-                    callback(Right(()))
-                  }
-                  // If remove failed, callback will be invoked by countdown
-                }.attempt.map(_ => ())
-              } else {
-                // Still not zero - callback will be invoked by countdown
-                Eru.unit
-              }
-            }
-            registerEffect.flatMap(_ => doubleCheck)
+      }.flatMap { case (hitZero, waitersToNotify) =>
+        if (hitZero && waitersToNotify.nonEmpty) {
+          Eru.effectTotal {
+            waitersToNotify.foreach(callback => callback(()))
           }
+        } else {
+          Eru.unit
         }
+      }
+    })
 
-      checkAndRegister
-    }
+    def getCount: Immediate[Nothing, Int] = new Immediate(stateRef.get.map(_.count))
 
-    def await: Eru[Nothing, Unit] =
-      Eru.succeed(count.get()).flatMap { currentCount =>
-        if (currentCount == 0) {
-          // Already at zero - return immediately
+    def await: Suspending[Nothing, Unit] = new Suspending({
+      stateRef.get.flatMap { state =>
+        if (state.count == 0) {
           Eru.unit
         } else {
-          // Not at zero - suspend until countdown reaches zero
           runtime
-            .suspend[Nothing, Unit](safeRegisterCallback)
+            .suspend[Nothing, Unit] { callback =>
+              val wrappedCallback: Unit => Unit = (_: Unit) => callback(Right(()))
+
+              val registerCallback = stateRef.modify { state =>
+                if (state.count == 0) {
+                  (state, true)
+                } else {
+                  (state.copy(waiters = wrappedCallback :: state.waiters), false)
+                }
+              }
+
+              registerCallback.flatMap { reachedZero =>
+                if (reachedZero) {
+                  Eru.effectTotal {
+                    wrappedCallback(())
+                  }
+                } else {
+                  Eru.unit
+                }
+              }
+            }
             .attempt
             .flatMap {
               case Result.Success(_) => Eru.unit
               case Result.Failure(_) =>
-                // Fall back to polling mode when suspend fails
                 pollUntilZero()
             }
         }
       }
+    })
 
     /** Polling fallback for backends that don't support suspend. */
     private def pollUntilZero(): Eru[Nothing, Unit] = {
       def checkAndRepeat: Eru[Nothing, Unit] =
-        Eru.succeed(count.get()).flatMap { currentCount =>
-          if (currentCount == 0) {
+        stateRef.get.flatMap { state =>
+          if (state.count == 0) {
             Eru.unit
           } else {
-            // Small delay to avoid busy-waiting, then check again
             Eru.effect(Thread.`yield`()).attempt.flatMap(_ => checkAndRepeat)
           }
         }

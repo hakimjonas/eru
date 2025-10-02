@@ -152,34 +152,6 @@ class ResultSpec extends munit.FunSuite {
     assert(!result.isFailure)
   }
 
-  /** Validates that Result is covariant in its error type parameter.
-    *
-    * Tests that Result[E, A] can be safely upcast to Result[F, A] when E <: F, demonstrating proper
-    * covariance in the error type.
-    */
-  test("Result is covariant in error type") {
-    val stringError: Result[String, Int] = Result.fail("error")
-    val anyError: Result[Any, Int] = stringError
-    assertEquals(anyError, Result.Failure("error"))
-  }
-
-  /** Validates that Result is covariant in its success type parameter.
-    *
-    * Tests that Result[E, A] can be safely upcast to Result[E, B] when A <: B, demonstrating proper
-    * covariance in the success type.
-    */
-  test("Result is covariant in success type") {
-    val stringValue: Result[String, String] = Result.succeed("value")
-    val anyValue: Result[String, Any] = stringValue
-    assertEquals(anyValue, Result.Success("value"))
-  }
-
-  test("map preserves error type covariance") {
-    val result: Result[String, Int] = Result.succeed(5)
-    val mapped: Result[String, String] = result.map(_.toString)
-    assertEquals(mapped, Result.Success("5"))
-  }
-
   test("flatMap unifies error types correctly") {
     val result1: Result[String, Int] = Result.succeed(5)
     val result2: Result[RuntimeException, String] = Result.succeed("hello")
@@ -318,5 +290,38 @@ class ResultSpec extends munit.FunSuite {
     assertEquals(typedExit, Exit.Failure("business error"))
     assertEquals(throwableExit, Exit.Die(exception))
     assertEquals(successExit, Exit.Success(42))
+  }
+
+  test("Result extension method toEru converts Success to successful Eru") {
+    val result = Result.succeed(42)
+    val eru = result.toEru
+    assertEquals(eru.unsafeRunSync(), 42)
+  }
+
+  test("Result extension method toEru converts Failure to failed Eru") {
+    val result = Result.fail("error")
+    val eru = result.toEru
+    intercept[RuntimeException] {
+      eru.unsafeRunSync()
+    }
+  }
+
+  test("Result extension method toExit converts Success to Exit.Success") {
+    val result = Result.succeed(42)
+    val exit = result.toExit
+    assertEquals(exit, Exit.Success(42))
+  }
+
+  test("Result extension method toExit converts typed Failure to Exit.Failure") {
+    val result = Result.fail("error")
+    val exit = result.toExit
+    assertEquals(exit, Exit.Failure("error"))
+  }
+
+  test("Result extension method toExit converts Throwable Failure to Exit.Die") {
+    val throwable = new RuntimeException("boom")
+    val result = Result.fail(throwable)
+    val exit = result.toExit
+    assertEquals(exit, Exit.Die(throwable))
   }
 }

@@ -98,11 +98,8 @@ private final class VTAsyncFiber[E, A](
   }
 
   def interrupt(cause: InterruptCause): Eru[Nothing, Unit] = {
-    Eru.effect {
+    Eru.effectTotal {
       thread.interrupt()
-    }.attempt.flatMap {
-      case Result.Success(_) => Eru.unit
-      case Result.Failure(_) => Eru.unit
     }
   }
 }

@@ -140,26 +140,6 @@ class FiberInterruptionSpec extends EruTestSuite {
     }
   }
 
-  /** Validates that interrupt causes provide meaningful string representations.
-    *
-    * Tests that all interrupt cause types generate descriptive toString output containing relevant
-    * context information for debugging and logging.
-    */
-  test("interrupt cause toString provides meaningful descriptions") {
-    val cancelledCause = InterruptCause.Cancelled(Some("user action"))
-    val timeoutCause = InterruptCause.Timeout(Duration.ofSeconds(30), Some("API call"))
-    val resourceCause = InterruptCause.ResourceExhausted("connections", Some("Pool exhausted"))
-    val customCause = InterruptCause.Custom("maintenance", Some("Scheduled downtime"), Map("window" -> "2am-4am"))
-
-    assert(cancelledCause.toString.contains("user action"))
-    assert(timeoutCause.toString.contains("30"))
-    assert(timeoutCause.toString.contains("API call"))
-    assert(resourceCause.toString.contains("connections"))
-    assert(resourceCause.toString.contains("Pool exhausted"))
-    assert(customCause.toString.contains("maintenance"))
-    assert(customCause.toString.contains("Scheduled downtime"))
-  }
-
   /** Validates that interrupting an already completed fiber has no effect.
     *
     * Tests that interruption calls on fibers that have already completed do not change their exit

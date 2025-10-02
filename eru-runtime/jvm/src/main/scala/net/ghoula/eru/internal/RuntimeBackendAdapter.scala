@@ -59,6 +59,12 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, observer, Some(rootFibers))
 
+  override def forkBatch[E, A](effects: List[Eru[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
+    backend.forkBatch(effects, Some(rootFibers))
+
+  override def awaitAll[E, A](fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
+    backend.awaitAll(fibers)
+
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
     backend.race(fa, fb)
 
@@ -69,21 +75,29 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
     backend.timeout(duration)(fa)
 
   def retry[E, A](policy: EruRuntime.Policy)(fa: Eru[E, A]): Eru[E, A] = {
-    import EruRuntime.Policy.*
-    def delay(i: Int): Option[java.time.Duration] = policy match {
-      case Recurs(n) => if (i < n) Some(java.time.Duration.ZERO) else None
-      case Exponential(base, maxRet) => if (i < maxRet) Some(base.multipliedBy(1L << i)) else None
-    }
-    def loop(i: Int): Eru[E, A] =
-      fa.recoverWith {
-        case t: Throwable => Eru.fail(t)
-        case e =>
-          delay(i) match {
-            case Some(d) => sleep(d).flatMap(_ => loop(i + 1))
-            case None => Eru.fail(e)
+    // Fast path: pure success values don't need retrying
+    import Eru.Internals.View.*
+    Eru.Internals.view(fa) match {
+      case VSucceed(value) =>
+        Eru.succeed(value)
+      case _ =>
+        // Effectful or failure, apply retry logic
+        import EruRuntime.Policy.*
+        def delay(i: Int): Option[java.time.Duration] = policy match {
+          case Recurs(n) => if (i < n) Some(java.time.Duration.ZERO) else None
+          case Exponential(base, maxRet) => if (i < maxRet) Some(base.multipliedBy(1L << i)) else None
+        }
+        def loop(i: Int): Eru[E, A] =
+          fa.recoverWith {
+            case t: Throwable => Eru.fail(t)
+            case e =>
+              delay(i) match {
+                case Some(d) => sleep(d).flatMap(_ => loop(i + 1))
+                case None => Eru.fail(e)
+              }
           }
-      }
-    loop(0)
+        loop(0)
+    }
   }
 
   def handleSuspend[E, A](

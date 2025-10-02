@@ -38,6 +38,32 @@ private[eru] trait ConcurrencyBackend {
     */
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver] = None): Eru[Nothing, Fiber[E, A]]
 
+  /** Launches multiple effects in batch and returns fiber handles.
+    *
+    * This is an optimization for parallel operations that need to fork many effects. Default
+    * implementation uses traverse, but backends can override for better performance.
+    *
+    * @param effects
+    *   the effects to run in parallel
+    * @return
+    *   an effect that yields a list of fiber handles
+    */
+  def forkBatch[E, A](effects: List[Eru[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
+    Eru.traverse(effects)(fork(_, None))
+
+  /** Awaits multiple fibers in batch and returns their exits.
+    *
+    * This is an optimization for parallel operations that need to await many fibers. Default
+    * implementation uses traverse, but backends can override for better performance.
+    *
+    * @param fibers
+    *   the fibers to await
+    * @return
+    *   an effect that yields a list of exits
+    */
+  def awaitAll[E, A](fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
+    Eru.traverse(fibers)(_.await)
+
   /** Race semantics. Backends must cancel the loser and return the winner. */
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]]
 

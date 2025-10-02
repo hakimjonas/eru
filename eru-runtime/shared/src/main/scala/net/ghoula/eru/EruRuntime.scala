@@ -61,9 +61,14 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 
   /** Executes two effects in parallel and combines their results into a pair.
     *
-    * Both effects execute concurrently and run to completion to ensure all resources are properly
-    * cleaned up. If either effect fails, the first error encountered is propagated after both
-    * effects have finished executing, guaranteeing that all finalizers run correctly.
+    * This method intelligently optimizes execution based on the input effects:
+    *   - If both effects are pure values (Succeed/Fail), combines them without creating fibers
+    *   - If one effect is pure, only forks the other effect
+    *   - If both effects are computations, forks both into new fibers for parallel execution
+    *
+    * Both effects execute concurrently (when forked) and run to completion to ensure all resources
+    * are properly cleaned up. If either effect fails, the first error encountered is propagated
+    * after both effects have finished executing, guaranteeing that all finalizers run correctly.
     *
     * This approach provides stronger structured concurrency guarantees than immediate cancellation
     * by ensuring resource cleanup always completes, even under failure conditions.
@@ -101,34 +106,163 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     *   }}}
     */
   def zipPar[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, (A, B)] =
-    for {
-      fiberA <- fork(fa)
-      fiberB <- fork(fb)
-      exitA <- fiberA.await
-      exitB <- fiberB.await
-      result <- (exitA, exitB) match {
-        case (Exit.Success(a), Exit.Success(b)) => Eru.succeed((a, b))
-        case (Exit.Failure(e), _) => Eru.fail(e)
-        case (_, Exit.Failure(e)) => Eru.fail(e)
-        case (Exit.Die(t), _) => Eru.effect(throw t)
-        case (_, Exit.Die(t)) => Eru.effect(throw t)
-        case (Exit.Interrupt(_, _), Exit.Interrupt(_, _)) =>
-          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: both fibers interrupted") }
-        case (Exit.Interrupt(_, _), Exit.Success(_)) =>
-          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber A interrupted") }
-        case (Exit.Success(_), Exit.Interrupt(_, _)) =>
-          Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber B interrupted") }
+    // Fast path: if both are pure values, just combine them without forking
+    if (Eru.isPureValue(fa) && Eru.isPureValue(fb)) {
+      for {
+        a <- fa
+        b <- fb
+      } yield (a, b)
+    } else if (Eru.isPureValue(fa)) {
+      // Only fb needs to be forked
+      for {
+        a <- fa
+        fiberB <- fork(fb)
+        exitB <- fiberB.await
+        b <- exitB match {
+          case Exit.Success(value) => Eru.succeed(value)
+          case Exit.Failure(error) => Eru.fail(error)
+          case Exit.Die(t) => Eru.effect(throw t)
+          case Exit.Interrupt(_, _) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber interrupted") }
+        }
+      } yield (a, b)
+    } else if (Eru.isPureValue(fb)) {
+      // Only fa needs to be forked
+      for {
+        fiberA <- fork(fa)
+        b <- fb
+        exitA <- fiberA.await
+        a <- exitA match {
+          case Exit.Success(value) => Eru.succeed(value)
+          case Exit.Failure(error) => Eru.fail(error)
+          case Exit.Die(t) => Eru.effect(throw t)
+          case Exit.Interrupt(_, _) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber interrupted") }
+        }
+      } yield (a, b)
+    } else {
+      // Both need to be forked - original implementation
+      for {
+        fiberA <- fork(fa)
+        fiberB <- fork(fb)
+        exitA <- fiberA.await
+        exitB <- fiberB.await
+        result <- (exitA, exitB) match {
+          case (Exit.Success(a), Exit.Success(b)) => Eru.succeed((a, b))
+          case (Exit.Failure(e1), Exit.Failure(_)) =>
+            // Just return the first error for now - proper aggregation would need type changes
+            Eru.fail(e1)
+          case (Exit.Failure(e), _) => Eru.fail(e)
+          case (_, Exit.Failure(e)) => Eru.fail(e)
+          case (Exit.Die(t), _) => Eru.effect(throw t)
+          case (_, Exit.Die(t)) => Eru.effect(throw t)
+          case (Exit.Interrupt(_, _), Exit.Interrupt(_, _)) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: both fibers interrupted") }
+          case (Exit.Interrupt(_, _), Exit.Success(_)) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber A interrupted") }
+          case (Exit.Success(_), Exit.Interrupt(_, _)) =>
+            Eru.interruptibleBlocking { throw new InterruptedException("ZipPar: fiber B interrupted") }
+        }
+      } yield result
+    }
+
+  /** Executes two effects in parallel, collecting all errors if both fail.
+    *
+    * Similar to `zipPar`, but when both computations fail, returns a `ParallelErrors` containing
+    * both errors instead of just the first. This provides complete error information for debugging
+    * and error reporting in scenarios where multiple failures are meaningful.
+    *
+    * @param fa
+    *   the first effect to execute
+    * @param fb
+    *   the second effect to execute
+    * @tparam E1
+    *   the error type of the first effect
+    * @tparam E2
+    *   the error type of the second effect
+    * @tparam A
+    *   the success type of the first effect
+    * @tparam B
+    *   the success type of the second effect
+    * @return
+    *   an effect yielding a tuple of both results, or `ParallelErrors` if both fail
+    *
+    * @example
+    *   {{{
+    * val validation1 = validateEmail(email)    // Eru[String, Email]
+    * val validation2 = validatePassword(pass)  // Eru[String, Password]
+    *
+    * runtime.zipParAll(validation1, validation2) match {
+    *   case Success((email, password)) => // Both succeeded
+    *   case Failure(ParallelErrors(first, rest)) => // Multiple errors collected
+    *   case Failure(singleError: String) => // Only one failed
+    * }
+    *   }}}
+    */
+  def zipParAll[E1, E2, A, B](
+    fa: Eru[E1, A],
+    fb: Eru[E2, B]
+  ): Eru[E1 | E2 | ParallelErrors[E1 | E2] | Throwable, (A, B)] =
+    // Fast path: if both are pure values, just combine them without forking
+    if (Eru.isPureValue(fa) && Eru.isPureValue(fb)) {
+      fa.attempt.flatMap { resultA =>
+        fb.attempt.flatMap { resultB =>
+          (resultA, resultB) match {
+            case (Result.Success(a), Result.Success(b)) => Eru.succeed((a, b))
+            case (Result.Failure(e1), Result.Failure(e2)) => Eru.fail(ParallelErrors(e1, List(e2)))
+            case (Result.Failure(e), _) => Eru.fail(e)
+            case (_, Result.Failure(e)) => Eru.fail(e)
+          }
+        }
       }
-    } yield result
+    } else {
+      for {
+        fiberA <- fork(fa)
+        fiberB <- fork(fb)
+        exitA <- fiberA.await
+        exitB <- fiberB.await
+        result <- (exitA, exitB) match {
+          case (Exit.Success(a), Exit.Success(b)) =>
+            Eru.succeed((a, b))
+          case (Exit.Failure(e1), Exit.Failure(e2)) =>
+            Eru.fail(ParallelErrors(e1, List(e2)))
+          case (Exit.Failure(e), _) =>
+            Eru.fail(e)
+          case (_, Exit.Failure(e)) =>
+            Eru.fail(e)
+          case (Exit.Die(t), _) =>
+            Eru.effect(throw t)
+          case (_, Exit.Die(t)) =>
+            Eru.effect(throw t)
+          case (Exit.Interrupt(id1, _), Exit.Interrupt(id2, _)) =>
+            Eru.interruptibleBlocking {
+              throw new InterruptedException(s"ZipParAll: both fibers interrupted: $id1, $id2")
+            }
+          case (Exit.Interrupt(id, _), _) =>
+            Eru.interruptibleBlocking {
+              throw new InterruptedException(s"ZipParAll: fiber interrupted: $id")
+            }
+          case (_, Exit.Interrupt(id, _)) =>
+            Eru.interruptibleBlocking {
+              throw new InterruptedException(s"ZipParAll: fiber interrupted: $id")
+            }
+        }
+      } yield result
+    }
 
   /** Races two effects, returning the result of whichever completes first.
     *
-    * Races two effects and returns the result of whichever completes first. The loser is signaled
-    * to cancel and its finalizers are guaranteed to run, ensuring proper resource cleanup.
+    * This method intelligently optimizes execution based on the input effects:
+    *   - If the first effect is a pure value, it wins immediately without racing
+    *   - If only the second effect is pure, it wins immediately
+    *   - If both effects are computations, they race concurrently
     *
-    * Race semantics are intentionally non-deterministic - either effect may win depending on
-    * execution timing, system load, and scheduling decisions. This makes race suitable for timeout
-    * patterns and competitive computations.
+    * When actual racing occurs, both effects execute concurrently and the loser is signaled to
+    * cancel with its finalizers guaranteed to run, ensuring proper resource cleanup.
+    *
+    * Race semantics are intentionally non-deterministic when both effects are computations - either
+    * effect may win depending on execution timing, system load, and scheduling decisions. This
+    * makes race suitable for timeout patterns and competitive computations.
     *
     * @param fa
     *   the first effect to race
@@ -167,7 +301,17 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     *   }}}
     */
   def race[E1, E2, A, B](fa: Eru[E1, A], fb: Eru[E2, B]): Eru[E1 | E2 | Throwable, Either[A, B]] =
-    backend.race(fa, fb)
+    // Fast path: if either or both are pure values, we can decide the winner immediately
+    if (Eru.isPureValue(fa)) {
+      // fa is pure, it wins immediately
+      fa.map(Left.apply)
+    } else if (Eru.isPureValue(fb)) {
+      // fb is pure but fa is not, fb wins
+      fb.map(Right.apply)
+    } else {
+      // Both are effectful, use the backend implementation
+      backend.race(fa, fb)
+    }
 
   /** Suspends execution for the specified duration.
     *
@@ -268,7 +412,6 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
   )(fa: Eru[E, A]): Eru[E | java.util.concurrent.TimeoutException | Throwable, A] =
     backend.timeout(duration)(fa)
 
-  // Policy type alias for convenience
   private type Policy = EruRuntime.Policy
 
   /** Retries on typed failure according to the provided policy. Defects (Throwables) are propagated
@@ -384,57 +527,125 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     * }
     *   }}}
     */
+  private def forkAll[E, A](effects: List[Eru[E, A]]): Eru[Nothing, List[Fiber[E, A]]] = {
+    // Fork each effect in sequence, collecting the resulting fibers.
+    // While this creates a chain of flatMap operations, it's correct and efficient:
+    //   1. Fork is lightweight (just schedules the fiber, doesn't wait)
+    //   2. Actual work runs asynchronously in parallel
+    //   3. Eru's trampolined interpreter handles the chain stack-safely
+    // This respects effect boundaries and maintains referential transparency.
+    Eru.traverse(effects)(fork(_))
+  }
+
   def parSequence[E, A](effects: List[Eru[E, A]]): Eru[E | Throwable, List[A]] =
     effects match {
       case Nil => Eru.succeed(List.empty[A])
       case _ =>
-        def forkAll(remaining: List[Eru[E, A]], acc: List[Fiber[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
-          remaining match {
-            case Nil => Eru.succeed(acc.reverse)
-            case head :: tail =>
-              fork(head).flatMap(fiber => forkAll(tail, fiber :: acc))
-          }
+        // Fork all fibers in a single batch to minimize sequential overhead
+        // While we can't avoid sequencing entirely, we can minimize the cost
+        forkAll(effects).flatMap { fibers =>
+          // Await all fibers - traverse is unavoidable here but fibers complete quickly
+          Eru.traverse(fibers)(_.await).flatMap { exits =>
+            exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
+              case Some((fiberId, cause)) =>
+                Eru.interruptibleBlocking {
+                  throw new InterruptedException(s"ParSequence interrupted due to fiber $fiberId: $cause")
+                }
+              case None =>
+                val errors = exits.collect { case Exit.Failure(error) => error }
+                val dies = exits.collect { case Exit.Die(throwable) => throwable }
 
-        def awaitAll(fibers: List[Fiber[E, A]]): Eru[Nothing, List[Exit[E, A]]] =
-          fibers match {
-            case Nil => Eru.succeed(Nil)
-            case head :: tail =>
-              for {
-                exit <- head.await
-                rest <- awaitAll(tail)
-              } yield exit :: rest
-          }
-
-        def processExits(exits: List[Exit[E, A]]): Eru[E | Throwable, List[A]] = {
-          // Check for interruptions first - if any fiber was interrupted, interrupt this computation
-          exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
-            case Some((fiberId, cause)) =>
-              // Use interruptibleBlocking to trigger interruption through the interpreter
-              Eru.interruptibleBlocking {
-                throw new InterruptedException(s"ParSequence interrupted due to fiber $fiberId: $cause")
-              }
-            case None =>
-              // No interruptions, handle errors normally
-              val firstError = exits.collectFirst {
-                case Exit.Failure(error) => Left(error)
-                case Exit.Die(throwable) => Right(throwable)
-              }
-
-              firstError match {
-                case Some(Left(error)) => Eru.fail(error)
-                case Some(Right(throwable)) => Eru.effect(throw throwable)
-                case None =>
+                if (dies.nonEmpty) {
+                  // If any died, throw the first one
+                  Eru.effect(throw dies.head)
+                } else if (errors.nonEmpty) {
+                  // Return first error - proper aggregation would need type changes
+                  Eru.fail(errors.head)
+                } else {
                   val results = exits.collect { case Exit.Success(value) => value }
                   Eru.succeed(results)
+                }
+            }
+          }
+        }
+    }
+
+  /** Executes a list of effects in parallel, collecting all errors if multiple fail.
+    *
+    * Similar to `parSequence`, but instead of failing fast with the first error, this method
+    * collects all errors that occur during parallel execution. When multiple effects fail, returns
+    * a `ParallelErrors` containing all error information.
+    *
+    * This is particularly useful for validation scenarios where you want to report all validation
+    * errors at once rather than stopping at the first error.
+    *
+    * @param effects
+    *   the list of effects to execute in parallel
+    * @tparam E
+    *   the typed error that effects may produce
+    * @tparam A
+    *   the success type that effects produce
+    * @return
+    *   an effect that succeeds with all results or fails with collected errors
+    *
+    * @example
+    *   {{{
+    * val validations = List(
+    *   validateAge(age),
+    *   validateEmail(email),
+    *   validatePhone(phone)
+    * )
+    *
+    * runtime.parSequenceAll(validations) match {
+    *   case Success(results) => // All validations passed
+    *   case Failure(ParallelErrors(first, rest)) =>
+    *     // Multiple validation failures
+    *     println(s"Found ${rest.size + 1} validation errors")
+    *   case Failure(singleError) =>
+    *     // Only one validation failed
+    * }
+    *   }}}
+    */
+  def parSequenceAll[E, A](effects: List[Eru[E, A]]): Eru[E | ParallelErrors[E] | Throwable, List[A]] =
+    effects match {
+      case Nil => Eru.succeed(List.empty[A])
+      case _ =>
+        // Fork all fibers in a single batch to minimize sequential overhead
+        // While we can't avoid sequencing entirely, we can minimize the cost
+        forkAll(effects).flatMap { fibers =>
+          // Await all fibers - traverse is unavoidable here but fibers complete quickly
+          Eru.traverse(fibers)(_.await)
+        }.flatMap { exits =>
+          // Process exits to collect errors or return results
+          exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
+            case Some((fiberId, cause)) =>
+              Eru.interruptibleBlocking {
+                throw new InterruptedException(s"ParSequenceAll interrupted due to fiber $fiberId: $cause")
+              }
+            case None =>
+              val errors = exits.collect { case Exit.Failure(error) => error }
+              val dies = exits.collect { case Exit.Die(throwable) => throwable }
+
+              if (dies.nonEmpty) {
+                // If any died, throw the first one
+                Eru.effect(throw dies.head)
+              } else if (errors.nonEmpty) {
+                // Collect all errors
+                if (errors.size == 1) {
+                  Eru.fail(errors.head)
+                } else {
+                  Eru.fail(ParallelErrors(errors.head, errors.tail))
+                }
+              } else {
+                val results = exits.collect { case Exit.Success(value) => value }
+                if (results.size == exits.size) {
+                  Eru.succeed(results)
+                } else {
+                  Eru.effect(throw new IllegalStateException("ParSequenceAll: Unexpected exit combination"))
+                }
               }
           }
         }
-
-        for {
-          fibers <- forkAll(effects, Nil)
-          exits <- awaitAll(fibers)
-          results <- processExits(exits)
-        } yield results
     }
 
   /** Executes effects derived from a collection of inputs in parallel.
@@ -517,17 +728,25 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
       case single :: Nil =>
         single.map(a => (a, 0))
       case _ =>
-        def raceWithIndex(remaining: List[Eru[E, A]], currentIndex: Int): Eru[E | Throwable, (A, Int)] =
-          remaining match {
-            case Nil => Eru.effect(throw new IllegalStateException("raceAll: unexpected empty list"))
-            case single :: Nil => single.map(a => (a, currentIndex))
-            case current :: rest =>
-              race(current, raceWithIndex(rest, currentIndex + 1)).flatMap {
-                case Left(value) => Eru.succeed((value, currentIndex))
-                case Right((value, index)) => Eru.succeed((value, index))
+        // Fast path: find the first pure value and return it immediately
+        effects.zipWithIndex.find { case (effect, _) => Eru.isPureValue(effect) } match {
+          case Some((pureEffect, index)) =>
+            // Found a pure value, it wins immediately
+            pureEffect.map(a => (a, index))
+          case None =>
+            // All are effectful, use the recursive race
+            def raceWithIndex(remaining: List[Eru[E, A]], currentIndex: Int): Eru[E | Throwable, (A, Int)] =
+              remaining match {
+                case Nil => Eru.effect(throw new IllegalStateException("raceAll: unexpected empty list"))
+                case single :: Nil => single.map(a => (a, currentIndex))
+                case current :: rest =>
+                  race(current, raceWithIndex(rest, currentIndex + 1)).flatMap {
+                    case Left(value) => Eru.succeed((value, currentIndex))
+                    case Right((value, index)) => Eru.succeed((value, index))
+                  }
               }
-          }
-        raceWithIndex(effects, 0)
+            raceWithIndex(effects, 0)
+        }
     }
 
   /** Executes effects derived from a collection of inputs in parallel with bounded concurrency.
@@ -688,18 +907,15 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
           }
 
         def processExits(exits: List[Exit[E, A]]): Eru[Throwable, Either[List[E], List[A]]] = {
-          // Check for interruptions first
           exits.collectFirst { case Exit.Interrupt(fiberId, cause) => (fiberId, cause) } match {
             case Some((fiberId, cause)) =>
               Eru.interruptibleBlocking {
                 throw new InterruptedException(s"ValidatePar interrupted due to fiber $fiberId: $cause")
               }
             case None =>
-              // Collect all errors and successes
               val errors = exits.collect { case Exit.Failure(error) => error }
               val defects = exits.collect { case Exit.Die(throwable) => throwable }
 
-              // If there are defects, propagate the first one
               defects.headOption match {
                 case Some(throwable) => Eru.effect(throw throwable)
                 case None =>
@@ -784,7 +1000,6 @@ object EruRuntime {
     *   - Testing scenarios that require complete runtime isolation
     */
   def create(): EruRuntime = {
-    // Create a fresh backend for true isolation
     val freshBackend = createFreshBackend()
     new EruRuntime(freshBackend)
   }
@@ -795,7 +1010,6 @@ object EruRuntime {
     * state issues with coordination primitives.
     */
   private def createFreshBackend(): internal.ConcurrencyBackend = {
-    // Platform-specific fresh backend creation without casting
     PlatformBackend.createFreshBackend()
   }
 

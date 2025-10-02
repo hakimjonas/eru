@@ -48,7 +48,7 @@ THOROUGH_SET=false
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        smoke|ci|comparative|scaling|memory|full)
+        smoke|quick|ci|comparative|scaling|memory|full)
             MODE="$1"
             shift
             ;;
@@ -87,11 +87,11 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "MODES (what to benchmark):"
             echo "  smoke       - Representative sampling across all categories (~2-3 min) [default]"
+            echo "  quick       - Fastest possible full picture (1 iteration, all benchmarks) (~5 min)"
             echo "  ci          - Comprehensive CI-friendly sampling (~5-8 min) [CI/CD recommended]"
             echo "  comparative - All comparative benchmarks vs ZIO/Cats Effect (~25-35 min) [comprehensive]"
-            echo "  scaling     - Parametric scaling analysis (~20-30 min)"
             echo "  memory      - Memory & GC analysis (~10-15 min)"
-            echo "  full        - Complete benchmark suite (~60-90 min)"
+            echo "  full        - Complete benchmark suite (~45-60 min)"
             echo ""
             echo "EXECUTION OPTIONS (how to run benchmarks):"
             echo "  --quick     - Fast execution (2 warmups, 3 measurements) [-20% time]"
@@ -183,7 +183,13 @@ run_benchmark() {
     # Generate structured JSON output with unambiguous number formatting
     local json_file="$(pwd)/$OUTPUT_DIR/$(echo "$bench_name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -d '()' | tr -d ',')-$TIMESTAMP.json"
 
-    if timeout ${timeout_duration} bash -c "LANG=C LC_ALL=C sbt 'eruBenchJVM/Jmh/run -rf json -rff $json_file -i $MEASUREMENT_ITERATIONS -wi $WARMUP_ITERATIONS -f1 -t1 $gc_option $bench_class'" 2>&1 | tee "$log_file"; then
+    # Determine which project to use based on the benchmark class
+    local project="eruBenchJVM"
+    if [[ "$bench_class" == *"matrix"* ]]; then
+        project="eruBenchMatrix"
+    fi
+
+    if timeout ${timeout_duration} bash -c "LANG=C LC_ALL=C sbt '$project/Jmh/run -rf json -rff $json_file -i $MEASUREMENT_ITERATIONS -wi $WARMUP_ITERATIONS -f1 -t1 $gc_option $bench_class'" 2>&1 | tee "$log_file"; then
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
         echo -e "\n${BOLD}${GREEN}✅ COMPLETED${NC} - ${duration}s"
@@ -200,6 +206,20 @@ run_benchmark() {
 
 # Mode-specific execution
 case $MODE in
+    quick)
+        echo -e "${YELLOW}⚡ Running quick full picture (minimal iterations, all categories)${NC}\n"
+        WARMUP_ITERATIONS=1
+        MEASUREMENT_ITERATIONS=1
+        run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench"
+        run_benchmark "Error Handling" "net.ghoula.eru.bench.fair.ErrorHandlingBench"
+        run_benchmark "State Management" "net.ghoula.eru.bench.fair.StateManagementBench"
+        run_benchmark "Concurrency" "net.ghoula.eru.bench.fair.ConcurrencyBench"
+        run_benchmark "Resource Management" "net.ghoula.eru.bench.fair.ResourceManagementBench"
+        run_benchmark "Stack Safety" "net.ghoula.eru.bench.fair.StackSafetyBench"
+        run_benchmark "Collection Operations" "net.ghoula.eru.bench.fair.CollectionOperationsBench"
+        run_benchmark "Coordination" "net.ghoula.eru.bench.fair.CoordinationBench"
+        ;;
+
     smoke)
         echo -e "${YELLOW}🔥 Running smoke test (representative sampling across all categories)${NC}\n"
         run_benchmark "Core Operations (Sample)" "net.ghoula.eru.bench.fair.CoreOperationsBench.eruSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.zioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.ioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.eruFlatMap|net.ghoula.eru.bench.fair.CoreOperationsBench.zioFlatMap|net.ghoula.eru.bench.fair.CoreOperationsBench.ioFlatMap"
@@ -239,9 +259,9 @@ case $MODE in
 
     scaling)
         echo -e "${YELLOW}📈 Running scaling benchmarks (parametric analysis)${NC}\n"
-        run_benchmark "Concurrency Scaling" "net.ghoula.eru.bench.matrix.ConcurrencyScalingBench" 400
-        run_benchmark "Depth Scaling" "net.ghoula.eru.bench.matrix.DepthScalingBench" 400
-        run_benchmark "Data Size Scaling" "net.ghoula.eru.bench.matrix.DataSizeScalingBench" 400
+        echo -e "${RED}Scaling benchmarks not yet implemented${NC}"
+        echo "Run 'comparative' mode for full comparison benchmarks"
+        exit 0
         ;;
 
     memory)
@@ -258,22 +278,21 @@ case $MODE in
         MEASUREMENT_ITERATIONS=5
 
         echo -e "${BOLD}${MAGENTA}Phase 1: Quick Validation${NC}"
-        run_benchmark "Core Operations Smoke" "net.ghoula.eru.bench.fair.CoreOperationsBench"
+        run_benchmark "Core Operations Smoke" "net.ghoula.eru.bench.fair.CoreOperationsBench" 480
 
         echo -e "${BOLD}${MAGENTA}Phase 2: Comparative Benchmarks${NC}"
-        run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench"
-        run_benchmark "Error Handling" "net.ghoula.eru.bench.fair.ErrorHandlingBench"
+        run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench" 480
+        run_benchmark "Error Handling" "net.ghoula.eru.bench.fair.ErrorHandlingBench" 480
         run_benchmark "State Management" "net.ghoula.eru.bench.fair.StateManagementBench"
         run_benchmark "Concurrency" "net.ghoula.eru.bench.fair.ConcurrencyBench" 300
         run_benchmark "Resource Management" "net.ghoula.eru.bench.fair.ResourceManagementBench"
         run_benchmark "Stack Safety" "net.ghoula.eru.bench.fair.StackSafetyBench"
-        run_benchmark "Collection Operations" "net.ghoula.eru.bench.fair.CollectionOperationsBench"
-        run_benchmark "Coordination" "net.ghoula.eru.bench.fair.CoordinationBench"
+        run_benchmark "Collection Operations" "net.ghoula.eru.bench.fair.CollectionOperationsBench" 480
+        run_benchmark "Coordination" "net.ghoula.eru.bench.fair.CoordinationBench" 480
 
-        echo -e "${BOLD}${MAGENTA}Phase 3: Scaling Analysis${NC}"
-        run_benchmark "Concurrency Scaling" "net.ghoula.eru.bench.matrix.ConcurrencyScalingBench" 400
-        run_benchmark "Depth Scaling" "net.ghoula.eru.bench.matrix.DepthScalingBench" 400
-        run_benchmark "Data Size Scaling" "net.ghoula.eru.bench.matrix.DataSizeScalingBench" 400
+        echo -e "${BOLD}${MAGENTA}Phase 3: Additional Patterns${NC}"
+        run_benchmark "Pattern Benchmarks" "net.ghoula.eru.bench.fair.PatternBench"
+        run_benchmark "API Coverage" "net.ghoula.eru.bench.fair.ComprehensiveAPIBench" 600
 
         if [[ "$INCLUDE_GC" == "true" ]]; then
             echo -e "${BOLD}${MAGENTA}Phase 4: Memory Analysis${NC}"

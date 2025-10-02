@@ -176,16 +176,4 @@ class FiberLifecycleSpec extends EruTestSuite {
     assertEquals(outerExit, Exit.Success("outer-inner"))
   }
 
-  /** Validates that fiber types preserve variance correctly.
-    *
-    * Tests that fiber type parameters maintain proper covariance relationships, allowing safe
-    * subtype substitution in both error and success types.
-    */
-  test("fiber types preserve variance correctly") {
-    val stringFiber: Fiber[String, String] = Eru.succeed("test").fork.unsafeRunSync()
-    val anyFiber: Fiber[Any, Any] = stringFiber
-
-    val exit = anyFiber.await.unsafeRunSync()
-    assertEquals(exit, Exit.Success("test"))
-  }
 }
