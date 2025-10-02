@@ -156,8 +156,8 @@ val result = myProgram.unsafeRunSyncWith(observer)
 ## What's Next
 
 - **[API Documentation](API.md)** - Complete reference for all Eru operations
-- **[Concurrency Guide](CONCURRENCY.md)** - Advanced fiber patterns and structured concurrency
-- **[Resource Management](RESOURCES.md)** - Safe resource handling patterns  
+- **[The Eru Book](book/00-table-of-contents.md)** - Comprehensive progressive guide
+- **[Resource Management](RESOURCES.md)** - Safe resource handling patterns
 - **[Observability](OBSERVER.md)** - Monitoring and debugging techniques
 
 ## Common Patterns

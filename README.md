@@ -88,17 +88,16 @@ Eru delivers exceptional performance through Virtual Threads and optimized desig
 - **Memory Efficiency**: Lower allocation rates and smaller per-operation footprint
 - **Concurrency**: 30-70x performance improvements on concurrent operations
 
-Performance results are reproducible and documented with full environment details in the [Performance Guide](PERFORMANCE.md).
+Performance results are reproducible and documented with full environment details.
 
 ## Documentation
 
-- **[Quick Start Guide](QUICKSTART.md)** - Get started with Eru basics
-- **[API Documentation](API.md)** - Complete API reference
-- **[Concurrency Guide](CONCURRENCY.md)** - Fiber patterns and structured concurrency
-- **[Resource Management](RESOURCES.md)** - Safe resource patterns and best practices  
+- **[Quick Start Guide](QUICKSTART.md)** - Get started with Eru basics in 5 minutes
+- **[The Eru Book](book/00-table-of-contents.md)** - Comprehensive progressive guide to effect-driven development
+- **[API Documentation](API.md)** - Complete API reference for quick lookup
 - **[Observability](OBSERVER.md)** - Monitoring and debugging with observers
-- **[Performance](PERFORMANCE.md)** - Performance characteristics and benchmarks
-- **[Reliability](RELIABILITY.md)** - Testing approach and correctness guarantees
+- **[Resource Management](RESOURCES.md)** - External resources and ecosystem
+- **[Contributing](CONTRIBUTING.md)** - Guidelines for contributing to Eru
 
 ## Commands
 
