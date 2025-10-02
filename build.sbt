@@ -1,5 +1,3 @@
-import xerial.sbt.Sonatype.autoImport.*
-import xerial.sbt.Sonatype.{sonatypeCentralHost, sonatypeSettings}
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 import scalanativecrossproject.ScalaNativeCrossPlugin.autoImport.*
 import scala.scalanative.build.*
@@ -13,21 +11,19 @@ ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
 // ===== Publishing Settings =====
-// GitHub Packages only for now
+// GitHub Packages only
 ThisBuild / publishTo := Some("GitHub Package Registry" at "https://maven.pkg.github.com/hakimjonas/eru")
+ThisBuild / publishMavenStyle := true
 
 // GitHub Packages authentication
-credentials ++= {
-  val githubToken = sys.env.get("GITHUB_TOKEN")
-  githubToken.map { token =>
-    Credentials(
-      "GitHub Package Registry",
-      "maven.pkg.github.com",
-      "hakimjonas", // your GitHub username
-      token
-    )
-  }.toSeq
-}
+ThisBuild / credentials ++= sys.env.get("GITHUB_TOKEN").map { token =>
+  Credentials(
+    "GitHub Package Registry",
+    "maven.pkg.github.com",
+    "hakimjonas",
+    token
+  )
+}.toSeq
 ThisBuild / licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT"))
 ThisBuild / homepage := Some(url("https://github.com/hakimjonas/eru"))
 ThisBuild / developers := List(
@@ -390,6 +386,3 @@ lazy val site = project
 // ===== Global Settings =====
 Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / excludeLintKeys += cleanAll
-
-// Enable sbt-pgp plugin
-enablePlugins(SbtPgp)
