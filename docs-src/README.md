@@ -77,18 +77,6 @@ Eru is organized into focused, cross-platform modules:
 - **Type Safety**: Strong typing with covariant error handling
 - **Zero-Cast Runtime**: No unsafe operations in the core interpreter
 - **Observability**: Comprehensive event system for monitoring and debugging
-- **Performance**: Optimized design leveraging Virtual Threads (see Performance section)
-
-## Performance
-
-Eru achieves strong performance through Virtual Threads and optimized design:
-
-- **Core Operations**: 177-694x faster than Cats Effect in microbenchmarks
-- **Basic Combinators**: 4-5x faster than ZIO in microbenchmarks
-- **Memory Efficiency**: Lower allocation rates and reduced per-operation footprint
-- **Concurrency**: 30-70x improvements on concurrent operations
-
-Benchmark results are reproducible and include full environment details. See `eru-bench-jvm` for methodology and raw data.
 
 ## Documentation
 
@@ -135,3 +123,7 @@ Eru is designed and developed by **Hakim Jonas Ghoula**.
 ## License
 
 Eru is licensed under the MIT License.
+
+---
+
+*P.S. It's also quite fast.*
