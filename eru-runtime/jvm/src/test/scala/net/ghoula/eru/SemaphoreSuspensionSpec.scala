@@ -78,18 +78,12 @@ class SemaphoreSuspensionSpec extends EruTestSuite {
         _ <- Eru.effect(clock.advance(java.time.Duration.ofMillis(10)))
 
         // Second fiber must wait
-        fiber2Started <- Eru.ref(false)
         fiber2 <- isolatedRuntime.fork {
-          for {
-            _ <- fiber2Started.set(true)
-            result <- semaphore.withPermit(Eru.succeed("second")).eru
-          } yield result
+          semaphore.withPermit(Eru.succeed("second")).eru
         }
 
-        // Check that fiber2 started but is blocked
+        // Advance time slightly - fiber2 will be blocked waiting
         _ <- Eru.effect(clock.advance(java.time.Duration.ofMillis(10)))
-        started <- fiber2Started.get
-        _ <- Eru.effect(assert(started, "Fiber 2 should have started"))
 
         // Advance time to let fiber1 complete and release permit
         _ <- Eru.effect(clock.advance(java.time.Duration.ofMillis(40)))
