@@ -1,6 +1,6 @@
 # Eru
 
-Eru is a pragmatic and ergonomic effect system for Scala 3, built for correctness, performance, and exceptional developer experience. It provides a powerful, cross-platform foundation with true concurrency support on JVM and seamless synchronous execution on Scala Native.
+Eru is a pragmatic effect system for Scala 3, built for correctness, performance, and developer ergonomics. It provides a cross-platform foundation with true concurrency support on JVM and seamless synchronous execution on Scala Native.
 
 This project is guided by a strong philosophical vision for what a modern effect system should be. To understand the design principles and goals of Eru, please read our core document:
 
@@ -8,7 +8,7 @@ This project is guided by a strong philosophical vision for what a modern effect
 
 ## Status
 
-**Current Development Status (September 2025)**: Eru has achieved complete cross-platform implementation with full concurrency support on JVM and synchronous execution on Native.
+**Current Development Status**: Eru has achieved complete cross-platform implementation with full concurrency support on JVM and synchronous execution on Native.
 
 - **Correctness Foundation**: 576+ tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
 
@@ -76,28 +76,29 @@ Eru is organized into focused, cross-platform modules:
 - **Cross-Platform**: Write once, run on JVM with concurrency or Native synchronously
 - **Type Safety**: Strong typing with covariant error handling
 - **Zero-Cast Runtime**: No unsafe operations in the core interpreter
-- **Exceptional Performance**: 2+ orders of magnitude faster than Cats Effect, leveraging Virtual Threads
-- **Rich Observability**: Comprehensive event system for monitoring and debugging
+- **Observability**: Comprehensive event system for monitoring and debugging
+- **Performance**: Optimized design leveraging Virtual Threads (see Performance section)
 
 ## Performance
 
-Eru delivers exceptional performance through Virtual Threads and optimized design:
+Eru achieves strong performance through Virtual Threads and optimized design:
 
-- **Core Operations**: 177-694x faster than Cats Effect
-- **Basic Combinators**: 4-5x faster than ZIO
-- **Memory Efficiency**: Lower allocation rates and smaller per-operation footprint
-- **Concurrency**: 30-70x performance improvements on concurrent operations
+- **Core Operations**: 177-694x faster than Cats Effect in microbenchmarks
+- **Basic Combinators**: 4-5x faster than ZIO in microbenchmarks
+- **Memory Efficiency**: Lower allocation rates and reduced per-operation footprint
+- **Concurrency**: 30-70x improvements on concurrent operations
 
-Performance results are reproducible and documented with full environment details.
+Benchmark results are reproducible and include full environment details. See `eru-bench-jvm` for methodology and raw data.
 
 ## Documentation
 
 - **[Quick Start Guide](QUICKSTART.md)** - Get started with Eru basics in 5 minutes
-- **[The Eru Book](book/00-table-of-contents.md)** - Comprehensive progressive guide to effect-driven development
 - **[API Documentation](API.md)** - Complete API reference for quick lookup
 - **[Observability](OBSERVER.md)** - Monitoring and debugging with observers
-- **[Resource Management](RESOURCES.md)** - External resources and ecosystem
+- **[External Resources](RESOURCES.md)** - Community resources and ecosystem links
 - **[Contributing](CONTRIBUTING.md)** - Guidelines for contributing to Eru
+
+For a comprehensive progressive guide, see **[The Eru Book](https://hakimjonas.github.io/eru/book/)** (coming soon).
 
 ## Commands
 
