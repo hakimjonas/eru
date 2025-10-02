@@ -1,7 +1,5 @@
 # Chapter 11: Observability & Debugging
 
-*"A system you cannot observe is a system you cannot understand, debug, or optimize."*
-
 Observability is one of Eru's four foundational pillars. This chapter explores Eru's comprehensive observability system through `EruObserver`, covering structured event monitoring, distributed tracing, performance analysis, and debugging techniques that make concurrent programs transparent and maintainable.
 
 ## The Observer System
@@ -16,7 +14,7 @@ class LoggingObserver extends EruObserver {
   def onEvent(event: EruEvent): Unit = {
     event match {
       case EruEvent.ProgramStart(scopeId) =>
-        println(s"🚀 Program started with scope $scopeId")
+        println(s"Program started with scope $scopeId")
 
       case EruEvent.ProgramEnd(scopeId, outcome) =>
         val outcomeStr = outcome match {
@@ -24,19 +22,19 @@ class LoggingObserver extends EruObserver {
           case EruObserver.Outcome.TypedFailure(error) => s"TypedFailure($error)"
           case EruObserver.Outcome.Defect(throwable) => s"Defect(${throwable.getMessage})"
         }
-        println(s"🏁 Program ended with scope $scopeId: $outcomeStr")
+        println(s"Program ended with scope $scopeId: $outcomeStr")
 
       case EruEvent.FiberStarted(fiberId) =>
-        println(s"🧵 Fiber $fiberId started")
+        println(s"Fiber $fiberId started")
 
       case EruEvent.FiberCompleted(fiberId, exit) =>
-        println(s"🔚 Fiber $fiberId completed: $exit")
+        println(s"Fiber $fiberId completed: $exit")
 
       case EruEvent.Step(scopeId, label) =>
-        println(s"🐛 Debug step [$scopeId]: $label")
+        println(s"Debug step [$scopeId]: $label")
 
       case _ => // Handle other event types
-        println(s"📝 Other event: $event")
+        println(s"Other event: $event")
     }
   }
 }
@@ -752,8 +750,4 @@ Eru's observability system provides comprehensive insights into program executio
 
 ## What's Next
 
-In Chapter 12, we'll explore Eru's performance characteristics, benchmarking techniques, and optimization strategies that help you build high-performance systems while maintaining correctness and observability.
-
----
-
-*"Observability is not about perfect information—it's about having the right information at the right time to make informed decisions."*
+Chapter 12 explores Eru's performance characteristics, benchmarking techniques, and optimization strategies that help you build high-performance systems while maintaining correctness and observability.

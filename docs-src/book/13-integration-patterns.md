@@ -1,7 +1,5 @@
 # Chapter 13: Integration Patterns
 
-*"Great software doesn't exist in isolation—it integrates seamlessly with the existing ecosystem while maintaining its own principles."*
-
 Real-world adoption of Eru requires seamless integration with existing codebases, legacy systems, blocking operations, and third-party libraries. This chapter provides comprehensive patterns and strategies for integrating Eru into existing systems while maintaining safety, performance, and composability.
 
 ## Integration Philosophy
@@ -959,8 +957,4 @@ Eru's integration patterns enable seamless adoption in existing systems:
 
 ## What's Next
 
-In Chapter 14, we'll explore the Eru ecosystem, including Valar integration, community patterns, migration strategies from other effect systems, and the broader vision for Eru's place in the Scala ecosystem.
-
----
-
-*"Integration is not about compromise—it's about building bridges that preserve the best of both worlds."*
+Chapter 14 explores the Eru ecosystem, including Valar integration, community patterns, migration strategies from other effect systems, and the broader vision for Eru's place in the Scala ecosystem.

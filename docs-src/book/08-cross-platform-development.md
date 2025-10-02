@@ -1,7 +1,5 @@
 # Chapter 8: Cross-Platform Development
 
-*"One codebase, multiple targets. Eru's cross-platform design lets you write once, run everywhere."*
-
 Eru is designed from the ground up as a cross-platform effect system. Your core business logic can run unchanged on both the JVM and Scala Native, with only runtime differences in how concurrency is handled. This chapter explores the execution models and patterns for writing truly portable code.
 
 ## Understanding Platform Differences
@@ -69,6 +67,8 @@ println(nativeResult)
 ```
 
 The API is identical - the difference is in runtime characteristics, not code structure.
+
+**Important Limitation**: Scala Native provides API compatibility but executes synchronously. Operations like `fork`, `race`, and `timeout` compile successfully but don't provide true concurrency. Child fibers execute sequentially, races always choose the first argument, and timeouts execute the full operation before checking duration. Choose Native for deterministic single-threaded execution, not for parallel workloads.
 
 ## Writing Platform-Agnostic Code
 
@@ -549,8 +549,4 @@ Cross-platform development with Eru provides several advantages:
 
 ## What's Next
 
-In Chapter 9, we'll explore Eru's concurrency model with fibers and structured concurrency patterns, focusing on the JVM runtime capabilities while understanding how the patterns apply to both platforms.
-
----
-
-*"The best cross-platform code is the code that doesn't know it's cross-platform."*
+Chapter 9 explores Eru's concurrency model with fibers and structured concurrency patterns, focusing on the JVM runtime capabilities while understanding how the patterns apply to both platforms.

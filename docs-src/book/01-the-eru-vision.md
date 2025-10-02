@@ -1,7 +1,5 @@
 # Chapter 1: Why Effect Systems Matter
 
-*"The question is not whether you have effects in your program, but whether you control them."*
-
 If you're reading this, you probably already write solid Scala code. You understand functional programming principles, use immutable data structures, and think carefully about program design. So why would you need an effect system like Eru? What does it bring to the table that plain Scala doesn't already provide?
 
 Effect systems provide one principled approach to a fundamental challenge in functional programming: managing computational effects like failure, I/O, concurrency, and resource management while maintaining structured, composable code. They represent a mature solution that has proven valuable in production environments dealing with complex effect coordination.
@@ -150,7 +148,7 @@ processOrder(order).attempt.unsafeRunSync() match {
 
 ## Mental Overhead: Is It Worth It?
 
-Let's be honest about the costs:
+Understanding the costs:
 
 **Learning curve**: Effect systems require understanding new abstractions like `flatMap`, `bracket`, and resource safety.
 
@@ -313,19 +311,34 @@ def registerUser(userData: UserData): Eru[RegistrationError, User] =
 The effect system version:
 - Makes all effects explicit in types
 - Handles resource cleanup automatically
-- Composes error handling naturally  
+- Composes error handling naturally
 - Makes concurrent operations safe by default
 - Separates business logic from effect management
 - Is much easier to test and reason about
 
+## Virtual Thread-Native Architecture
+
+Eru takes a different architectural approach from other effect systems: it builds directly on Java Virtual Threads (introduced in Java 21) rather than implementing a custom fiber runtime.
+
+**Why This Matters:**
+
+- **Platform Integration**: Forward-compatible with Java's emerging structured concurrency APIs (JEP 480, currently in Fifth Preview in JDK 25)
+- **ThreadLocal Propagation**: Structured concurrency semantics work naturally via ThreadLocal scope inheritance
+- **Mature Foundation**: Leverages the JVM's optimized Virtual Thread implementation
+- **Reduced Complexity**: No custom scheduler to maintain or debug
+
+**Cross-Platform Reality:**
+
+On the JVM, Eru's fibers are Virtual Threads providing true parallelism with lightweight concurrency. On Scala Native, the same API compiles but executes synchronously, providing API compatibility without true concurrency. This enables write-once, compile-everywhere code while being honest about platform capabilities.
+
 ## The Four Pillars of Eru
 
-My focus in creating Eru centers on four foundational principles that guide every design decision:
+Eru's design centers on four foundational principles that guide every design decision:
 
 ### Pillar I: Foundational Correctness
 *The Bedrock of Everything Else*
 
-I treat correctness as non-negotiable. Every design decision prioritizes reliability and predictability, aiming for a level of correctness that developers can take for granted.
+Correctness is non-negotiable. Every design decision prioritizes reliability and predictability, aiming for a level of correctness that developers can take for granted.
 
 **Pure Program Representation**: `Eru[E, A]` represents programs as immutable, total descriptions. All side effects are explicitly suspended within the `Eru` context to maintain referential transparency.
 
@@ -344,10 +357,10 @@ val result: String = program.unsafeRunSync()
 
 **Verified Lawfulness**: Eru's adherence to functional programming laws is validated through property-based testing, ensuring behavioral contracts remain precise and predictable.
 
-### Pillar II: Radical Ergonomics  
+### Pillar II: Radical Ergonomics
 *Power Without Ceremony*
 
-I believe powerful tools should feel natural to use. The best abstractions make complex operations simple without sacrificing capability.
+Powerful tools should feel natural to use. The best abstractions make complex operations simple without sacrificing capability.
 
 **Discoverable Operations**: Common patterns like retries, timeouts, and resource management are provided as first-class methods directly on the `Eru` type, making them easy to find and use.
 
@@ -368,7 +381,7 @@ val longRunningTask: Eru[String, String] = Eru.succeed("Task completed")
 ### Pillar III: Guided Correctness
 *Making the Right Path the Easy Path*
 
-I've designed the architecture to naturally guide developers toward correct solutions. Good APIs should make safe patterns more convenient than unsafe alternatives.
+The architecture naturally guides developers toward correct solutions. Good APIs make safe patterns more convenient than unsafe alternatives, though guidance cannot prevent all programming errors.
 
 **Resource Safety by Design**: `Eru.Resource` and bracketing patterns encode proper resource lifecycles, making the safest approach also the most ergonomic.
 
@@ -393,7 +406,7 @@ val safeFileRead: Eru[Throwable, String] =
 ### Pillar IV: Transparent Runtime
 *Observable Execution*
 
-I believe running programs shouldn't be black boxes. Observability is built into Eru's foundation, making program behavior visible and debuggable.
+Running programs shouldn't be black boxes. Observability is built into Eru's foundation, making program behavior visible and debuggable.
 
 **Structured Error Information**: Failures provide rich, typed context rather than opaque messages, making debugging more straightforward.
 
@@ -558,7 +571,3 @@ These patterns appear consistently across domains - resource bracketing, structu
 ## What's Next
 
 Chapter 2 covers the practical basics of using Eru. It demonstrates core patterns through working code examples, showing how the concepts discussed here translate into actual development practices.
-
----
-
-*"The foundation is understanding. The practice is building upon it."*

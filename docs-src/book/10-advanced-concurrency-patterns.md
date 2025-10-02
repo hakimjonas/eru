@@ -1,7 +1,5 @@
 # Chapter 10: Advanced Concurrency Patterns
 
-*"Concurrency is not just about running things in parallel—it's about coordinating independent computations to work together safely and efficiently."*
-
 Building on Chapter 9's introduction to fibers, this chapter explores advanced concurrency patterns that make Eru production-ready. We'll cover parallel processing strategies, coordination primitives, resource-bounded concurrency, and sophisticated racing patterns that enable robust concurrent systems.
 
 ## Parallel Collection Processing
@@ -611,8 +609,4 @@ Advanced concurrency patterns provide the building blocks for robust, production
 
 ## What's Next
 
-In Chapter 11, we'll explore Eru's observability system with `EruObserver`, covering structured logging, distributed tracing, performance monitoring, and debugging techniques that make concurrent programs transparent and maintainable.
-
----
-
-*"The art of concurrent programming is not just making things run in parallel, but coordinating them to work together as a coherent whole."*
+Chapter 11 explores Eru's observability system with `EruObserver`, covering structured logging, distributed tracing, performance monitoring, and debugging techniques that make concurrent programs transparent and maintainable.

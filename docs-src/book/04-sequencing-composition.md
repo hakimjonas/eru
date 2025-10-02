@@ -1,8 +1,6 @@
 # Chapter 4: Sequencing & Composition
 
-*"The art of programming lies not in individual operations, but in how they combine."*
-
-You've learned to create individual Eru programs. Now comes the real power: combining them into larger, more sophisticated computations. This chapter explores Eru's composition operators and when to use each one.
+After learning to create individual Eru programs, the next step is combining them into larger, more sophisticated computations. This chapter explores Eru's composition operators and when to use each one.
 
 ## The Composition Toolbox
 
@@ -301,8 +299,4 @@ Understanding composition is important for effective Eru programming:
 
 ## What's Next
 
-In Chapter 5, we'll explore error handling - the `E` in `Eru[E, A]`. You'll see techniques for recovering from failures, accumulating errors, and building applications that handle error conditions gracefully.
-
----
-
-*"From simple parts, complex systems emerge. From thoughtful composition, robust programs follow."*
+Chapter 5 explores error handling - the `E` in `Eru[E, A]`, covering techniques for recovering from failures, accumulating errors, and building applications that handle error conditions gracefully.

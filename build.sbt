@@ -381,7 +381,7 @@ lazy val site = project
 
     // Site mappings for versioned docs
     makeSite / mappings ++= Seq(
-      file("docs-src/MANIFESTO_DRAFT_V3.md") -> "vision.md",
+      file("docs-src/MANIFESTO.md") -> "vision.md",
       file("README.md") -> "index.md"
     )
   )

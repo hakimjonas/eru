@@ -1,7 +1,5 @@
 # Chapter 14: The Eru Ecosystem
 
-*"Great software ecosystems grow organically around shared principles and complementary strengths."*
-
 This final chapter explores Eru's place within the broader Scala ecosystem, covering Valar integration, migration strategies from other effect systems, community patterns, and the vision for Eru's continued evolution. Understanding the ecosystem helps you make informed decisions about adoption and integration.
 
 ## The Eru Philosophy in Context
@@ -871,11 +869,7 @@ Eru represents a principled approach to effect-driven development in Scala, emph
 
 Whether you're building a new application, migrating from another effect system, or integrating with existing infrastructure, Eru's design philosophy and ecosystem support enable you to build robust, performant, and maintainable systems.
 
-The journey with Eru begins with understanding its core principles and grows through practical application, community engagement, and continuous learning. Welcome to the Eru ecosystem—where correctness, performance, and developer joy converge.
-
----
-
-*"The best software ecosystems don't just solve today's problems—they evolve to meet tomorrow's challenges while preserving the principles that made them valuable in the first place."*
+The journey with Eru begins with understanding its core principles and grows through practical application, community engagement, and continuous learning.
 
 ## Acknowledgments
 

@@ -1,35 +1,35 @@
 # Eru
 
-Eru is a pragmatic and ergonomic effect system for Scala 3, built for correctness, performance, and exceptional developer experience. It provides a powerful, cross-platform foundation with true concurrency support on JVM and seamless synchronous execution on Scala Native.
+Eru is an effect system for Scala 3 that makes correctness visible in types. It provides Virtual Thread-based concurrency on JVM and cross-compiles to Scala Native.
 
-This project is guided by a strong philosophical vision for what a modern effect system should be. To understand the design principles and goals of Eru, please read our core document:
+Read **[The Eru Manifesto](MANIFESTO.md)** to understand the design principles and goals.
 
-**[The Eru Manifesto](MANIFESTO.md)**
+## Installation
 
-## Status
+Add to your `build.sbt`:
 
-**Current Development Status (September 2025)**: Eru has achieved complete cross-platform implementation with full concurrency support on JVM and synchronous execution on Native.
+```scala
+libraryDependencies ++= Seq(
+  "net.ghoula" %% "eru-core" % "0.1.0",
+  "net.ghoula" %% "eru-runtime" % "0.1.0"
+)
+```
 
-- **Correctness Foundation**: 576+ tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
-
-- **Cross-Platform Support**:
-    - **JVM**: Full support with true concurrency via Java Virtual Threads (JDK 21+)
-    - **Scala Native**: Complete synchronous runtime with identical API surface
-
-- **Concurrency Runtime**: Production-ready concurrent operations including fork, race, zipPar, timeouts, structured concurrency patterns, optimized coordination primitives (Ref, Semaphore, Deferred), degree-limited parallel execution, and error accumulation patterns for domain validation.
-
-- **Performance**: Exceptional performance characteristics with optimized execution paths and minimal allocation overhead. Benchmarks demonstrate **177-694x faster execution** than Cats Effect and **4-5x faster** than ZIO on common operations.
+**Requirements**: Scala 3.7.3+, Java 21+ (for JVM), Scala Native 0.5+ (for Native)
 
 ## Quick Start
 
 ```scala
 import net.ghoula.eru.prelude.*
 
-// Basic effects
-val hello = Eru.succeed("Hello, Eru!")
+// Pure effects - no execution yet
+val program = Eru.succeed(42).map(_ * 2)
 
-// Resource-safe operations  
-val fileOp = Eru.effect {
+// Run synchronously
+val result = program.unsafeRunSync() // 84
+
+// Resource safety
+val readFile = Eru.effect {
   Files.newBufferedReader(path)
 }.bracket { reader =>
   Eru.effect(reader.close())
@@ -37,101 +37,81 @@ val fileOp = Eru.effect {
   Eru.effect(reader.readLine())
 }
 
-// Concurrent operations (JVM) / Sequential (Native)
-val concurrent = for {
-  fiber1 <- Eru.succeed(42).fork
-  fiber2 <- Eru.succeed("world").fork
-  result1 <- fiber1.await
-  result2 <- fiber2.await
-} yield (result1, result2)
+// Error handling with typed errors
+val validated: Eru[String, Int] =
+  Eru.effect(readInput())
+    .flatMap(validate)
+    .recover { case "invalid" => 0 }
 ```
 
-## Architecture
+**See [Quick Start Guide](QUICKSTART.md) for detailed examples.**
 
-Eru is organized into focused, cross-platform modules:
+## Core Features
 
-- **eru-core**: Pure synchronous kernel with zero-cast interpreter (JVM + Native)
-- **eru-runtime**: Cross-platform runtime with concurrency support (JVM + Native)
-- **eru-bench-jvm**: Performance benchmarks and profiling (JVM only)
-- **eru-integration-test**: End-to-end integration tests (JVM only)
+**Pure Effects**: Programs are immutable values. Side effects are suspended until execution.
 
-## Platform Capabilities
+**Typed Errors**: The error channel is part of the type signature (`Eru[E, A]`). Scala 3's union types track all possible errors at compile time.
 
-### JVM Platform
-- **True Concurrency**: Java Virtual Threads for lightweight, scalable concurrency
-- **Non-blocking Operations**: Efficient sleep, timeouts, and async boundaries
-- **Structured Concurrency**: Parent-child fiber relationships with automatic cleanup
-- **Observer Integration**: Complete fiber lifecycle events and tracing
+**Resource Safety**: Bracket patterns and finalizers ensure cleanup. Resources are released in acquisition-reverse order (FILO).
 
-### Scala Native Platform
-- **Synchronous Execution**: Deterministic, single-threaded execution model
-- **Identical API**: Same interface as JVM for seamless cross-platform development
-- **Resource Safety**: Full support for finalizers and resource management
-- **Zero Reflection**: Native-compatible implementation without runtime reflection
+**Zero-Cast Runtime**: The interpreter uses no unsafe casts. Type safety is preserved through the entire execution path, verified by build linting.
 
-## Key Features
+**Cross-Platform**: Same core effect system on JVM and Native. Write once, compile to both platforms.
 
-- **Pure Effect System**: Immutable, referentially transparent computations
-- **Resource Safety**: Automatic cleanup with finalizers and bracket patterns
-- **Cross-Platform**: Write once, run on JVM with concurrency or Native synchronously
-- **Type Safety**: Strong typing with covariant error handling
-- **Zero-Cast Runtime**: No unsafe operations in the core interpreter
-- **Exceptional Performance**: 2+ orders of magnitude faster than Cats Effect, leveraging Virtual Threads
-- **Rich Observability**: Comprehensive event system for monitoring and debugging
+## What Makes Eru Different
 
-## Performance
+**Suspension Safety**: Operations that may block indefinitely (like `queue.take`) return a `Suspending[E, A]` type. This type has no `unsafeRunSync` method - you must use `timeout` or `fork`. The compiler prevents accidental deadlocks, making the safe path the obvious path.
 
-Eru delivers exceptional performance through Virtual Threads and optimized design:
+**Virtual Thread-Native Design**: Built directly on Java Virtual Threads rather than implementing a custom fiber runtime. Uses ThreadLocal scope propagation for structured concurrency semantics, making Eru forward-compatible with Java's emerging structured concurrency APIs (JEP 480, Fifth Preview in JDK 25).
 
-- **Core Operations**: 177-694x faster than Cats Effect
-- **Basic Combinators**: 4-5x faster than ZIO
-- **Memory Efficiency**: Lower allocation rates and smaller per-operation footprint
-- **Concurrency**: 30-70x performance improvements on concurrent operations
+**Zero-Dependency Primitives**: Concurrency primitives like Queue and Semaphore are built entirely from Eru's core abstractions (Ref + Promise), not `java.util.concurrent`. This demonstrates true compositional concurrency without hidden dependencies.
 
-Performance results are reproducible and documented with full environment details in the [Performance Guide](PERFORMANCE.md).
+## Platform Support
+
+### JVM (Java 21+)
+- **Concurrency**: Virtual Threads provide lightweight fibers with true parallelism
+- **Operations**: fork, race, timeout, sleep all work as expected
+- **Primitives**: Ref, Semaphore, Deferred, Promise, Queue for coordination
+- **Use cases**: Web servers, concurrent applications, high-throughput systems
+
+### Scala Native (0.5+)
+- **Execution**: Single-threaded, synchronous execution
+- **API Compatibility**: Same API as JVM - code compiles identically
+- **Behavior**: Concurrent operations (`fork`, `race`, `timeout`) compile but execute sequentially
+- **Use cases**: CLI tools, scripts, single-threaded applications
+
+**Important**: Native support enables cross-compilation but does not provide true concurrency. Choose Native for deterministic single-threaded execution, not for parallel workloads.
+
+## Technical Foundation
+
+Eru's design leverages modern platform capabilities:
+
+- **Scala 3.7.3+**: Union types for error channels, GADT enums for the effect representation, opaque types for domain modeling
+- **Java 21+**: Virtual Threads for scalable concurrency, structured concurrency for safe fiber management
+- **Scala Native 0.5+**: Cross-platform `java.time` via scala-java-time, zero-reflection runtime
+
+These platform improvements enabled compile-time safety guarantees that weren't previously possible.
 
 ## Documentation
 
-- **[Quick Start Guide](QUICKSTART.md)** - Get started with Eru basics
-- **[API Documentation](API.md)** - Complete API reference
-- **[Concurrency Guide](CONCURRENCY.md)** - Fiber patterns and structured concurrency
-- **[Resource Management](RESOURCES.md)** - Safe resource patterns and best practices  
+- **[Quick Start Guide](QUICKSTART.md)** - Get started with Eru basics in 5 minutes
+- **[API Documentation](API.md)** - Complete API reference for quick lookup
+- **[Resource Management](RESOURCES.md)** - Safe resource handling with bracket and ensure
 - **[Observability](OBSERVER.md)** - Monitoring and debugging with observers
-- **[Performance](PERFORMANCE.md)** - Performance characteristics and benchmarks
-- **[Reliability](RELIABILITY.md)** - Testing approach and correctness guarantees
+- **[Contributing](CONTRIBUTING.md)** - Guidelines for contributing to Eru
 
-## Commands
+For a comprehensive progressive guide, see **[The Eru Book](https://hakimjonas.github.io/eru/book/)** (coming soon).
 
-### Development Workflow
-```bash
-sbt prepare          # Format, compile, and prepare for commit
-sbt check            # Validate formatting and run quality checks  
-sbt testAll          # Run all tests including integration tests
-sbt test             # Run unit tests only
-sbt docs             # Validate documentation examples
-```
+## Project Status
 
-### Platform-Specific Testing
-```bash
-sbt eruCoreJVM/test       # JVM tests for core module
-sbt eruCoreNative/test    # Native tests for core module
-sbt eruIntegrationTest/test # Integration tests (JVM only)
-```
+**Version**: 0.1.0 (pre-release)
+**Stability**: Core API is stable. Breaking changes may occur before 1.0.
+**Test Coverage**: 576+ tests across JVM and Native platforms
 
-### Benchmarking
-```bash
-sbt bench             # Full benchmark suite (JVM only)
-sbt benchCore         # Core performance benchmarks
-```
+The JVM runtime is production-ready with full concurrency support. Native support provides API compatibility for cross-compilation with synchronous execution.
 
 ## Contributing
 
-Eru welcomes contributions! Please see CONTRIBUTING.md in the repository root for development workflow, code quality standards, and guidelines.
+Eru is designed and developed by **Hakim Jonas Ghoula** and licensed under the **MIT License**.
 
-## Author
-
-Eru is designed and developed by **Hakim Jonas Ghoula**.
-
-## License
-
-Eru is licensed under the MIT License.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, code quality standards, and build commands.
