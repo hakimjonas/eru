@@ -16,14 +16,17 @@ ThisBuild / publishTo := Some("GitHub Package Registry" at "https://maven.pkg.gi
 ThisBuild / publishMavenStyle := true
 
 // GitHub Packages authentication
-ThisBuild / credentials ++= sys.env.get("GITHUB_TOKEN").map { token =>
-  Credentials(
-    "GitHub Package Registry",
-    "maven.pkg.github.com",
-    "hakimjonas",
-    token
-  )
-}.toSeq
+ThisBuild / credentials ++= sys.env
+  .get("GITHUB_TOKEN")
+  .map { token =>
+    Credentials(
+      "GitHub Package Registry",
+      "maven.pkg.github.com",
+      "hakimjonas",
+      token
+    )
+  }
+  .toSeq
 ThisBuild / licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT"))
 ThisBuild / homepage := Some(url("https://github.com/hakimjonas/eru"))
 ThisBuild / developers := List(
