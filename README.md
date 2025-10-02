@@ -1,6 +1,6 @@
 # Eru
 
-Eru is a pragmatic effect system for Scala 3, built for correctness, performance, and developer ergonomics. It provides a cross-platform foundation with true concurrency support on JVM and seamless synchronous execution on Scala Native.
+Eru is an effect system for Scala 3 that makes correctness visible in types. It provides true concurrency on JVM via Virtual Threads, and cross-compiles to Scala Native for single-threaded applications.
 
 This project is guided by a strong philosophical vision for what a modern effect system should be. To understand the design principles and goals of Eru, please read our core document:
 
@@ -8,17 +8,15 @@ This project is guided by a strong philosophical vision for what a modern effect
 
 ## Status
 
-**Current Development Status**: Eru has achieved complete cross-platform implementation with full concurrency support on JVM and synchronous execution on Native.
+**Current Status**: Production-ready on JVM with full concurrency support. Native support provides API compatibility for cross-compilation with synchronous execution.
 
-- **Correctness Foundation**: 576+ tests passing across JVM and Native platforms, with a zero-cast runtime implementation enforced by the build linter.
+**Test Coverage**: 576+ tests across JVM and Native platforms, with zero-cast runtime enforced by build linting.
 
-- **Cross-Platform Support**:
-    - **JVM**: Full support with true concurrency via Java Virtual Threads (JDK 21+)
-    - **Scala Native**: Complete synchronous runtime with identical API surface
+**JVM Runtime**: Virtual Threads enable millions of concurrent fibers. Operations include fork, race, zipPar, timeouts, structured concurrency, coordination primitives (Ref, Semaphore, Deferred, Promise), degree-limited parallelism, and error accumulation patterns.
 
-- **Concurrency Runtime**: Production-ready concurrent operations including fork, race, zipPar, timeouts, structured concurrency patterns, optimized coordination primitives (Ref, Semaphore, Deferred), degree-limited parallel execution, and error accumulation patterns for domain validation.
+**Native Runtime**: Synchronous execution model with identical API surface. Concurrent operations compile but execute sequentially. Suitable for CLIs, scripts, and single-threaded applications.
 
-- **Runtime Architecture**: GADT-based interpreter with zero-cast execution (no unsafe operations in the runtime). Virtual Threads on JVM enable millions of concurrent fibers with minimal overhead. Continuation-passing execution avoids stack frame allocation. Cross-platform design with platform-optimized backends (concurrent on JVM, synchronous on Native) from a single unified API.
+**Architecture**: GADT-based interpreter with continuation-passing execution (no stack frame allocation). Platform-optimized backends share a unified core.
 
 ## Quick Start
 
@@ -59,24 +57,34 @@ Eru is organized into focused, cross-platform modules:
 
 ### JVM Platform
 - **True Concurrency**: Java Virtual Threads for lightweight, scalable concurrency
-- **Non-blocking Operations**: Efficient sleep, timeouts, and async boundaries
+- **Async Operations**: Real timeouts, sleep, and non-blocking boundaries
 - **Structured Concurrency**: Parent-child fiber relationships with automatic cleanup
 - **Observer Integration**: Complete fiber lifecycle events and tracing
+- **Use Cases**: Servers, concurrent applications, high-throughput systems
 
 ### Scala Native Platform
-- **Synchronous Execution**: Deterministic, single-threaded execution model
-- **Identical API**: Same interface as JVM for seamless cross-platform development
+- **Synchronous Execution**: Single-threaded, deterministic execution model
+- **API Compatibility**: Same API surface as JVM - code compiles identically
+- **Execution Differences**: `fork`, `race`, `timeout` compile but execute synchronously
 - **Resource Safety**: Full support for finalizers and resource management
-- **Zero Reflection**: Native-compatible implementation without runtime reflection
+- **Zero Reflection**: No runtime reflection dependencies
+- **Use Cases**: CLIs, scripts, single-threaded applications, Native binaries
 
-## Key Features
+**Note**: Native provides API compatibility for cross-compilation, but concurrent operations (fork, race, timeout) do not provide true concurrency. They execute synchronously to maintain deterministic behavior.
 
-- **Pure Effect System**: Immutable, referentially transparent computations
-- **Resource Safety**: Automatic cleanup with finalizers and bracket patterns
-- **Cross-Platform**: Write once, run on JVM with concurrency or Native synchronously
-- **Type Safety**: Strong typing with covariant error handling
-- **Zero-Cast Runtime**: No unsafe operations in the core interpreter
-- **Observability**: Comprehensive event system for monitoring and debugging
+## What Makes Eru Different
+
+**Suspension Safety**: Operations that may suspend indefinitely return `Suspending[E, A]`, which has no `unsafeRunSync` method. The type system prevents deadlocks at compile time by forcing you to use `timeout` or `fork`. Non-suspending operations return `Immediate[E, A]` which can be run synchronously.
+
+**Typed Error Channel**: Errors are values in the type signature (`Eru[E, A]`), with full union type support. The compiler tracks which errors your program can produce.
+
+**Zero-Cast Interpreter**: The core runtime uses no unsafe casts, verified by build-time linting. The GADT-based interpreter preserves types through the entire execution path.
+
+**FILO Finalizer Semantics**: Resource cleanup happens in First-In-Last-Out order, matching natural acquisition/release patterns. Finalizers compose predictably across flatMap and other combinators.
+
+**Structured Concurrency**: Parent fibers automatically interrupt and await child fibers on exit. No fiber leaks, no manual cleanup, no surprises.
+
+**Cross-Platform Core**: The same effect system kernel runs on JVM and Native. Platform-specific runtimes provide optimized execution (Virtual Threads on JVM, synchronous on Native) behind a unified API.
 
 ## Documentation
 
