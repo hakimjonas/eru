@@ -1,7 +1,5 @@
 # Chapter 5: Error Handling
 
-*"In the face of failure, the wise program does not panic—it recovers."*
-
 This chapter covers error handling patterns, from simple string errors to structured ADTs and advanced recovery strategies.
 
 ## The Philosophy of Typed Errors
@@ -340,8 +338,4 @@ Understanding error handling with Eru changes how you build resilient applicatio
 
 ## What's Next
 
-In Chapter 6, we'll explore resource management—one of the areas where effect systems truly excel. You'll learn about `bracket`, `Resource`, and other patterns that ensure your programs properly acquire, use, and release resources even in the presence of failures.
-
----
-
-*"Good programs anticipate failure and prepare for it. Well-designed code recovers gracefully."*
+Chapter 6 explores resource management, covering `bracket`, `Resource`, and other patterns that ensure programs properly acquire, use, and release resources even in the presence of failures.

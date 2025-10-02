@@ -1,8 +1,6 @@
 # Chapter 6: API Reference & Patterns
 
-*"Understanding comes not from memorizing methods, but from learning patterns."*
-
-This chapter serves as your comprehensive reference to Eru's API patterns. Rather than listing every method, we focus on the ergonomic patterns that make Eru programs elegant and maintainable.
+This chapter serves as a comprehensive reference to Eru's API patterns. Rather than listing every method, we focus on the ergonomic patterns that make Eru programs elegant and maintainable.
 
 ## Core Construction Patterns
 
@@ -507,8 +505,4 @@ This reference demonstrates the patterns that make Eru programs elegant:
 
 ## What's Next
 
-With these patterns understood, you can build production systems with Eru. The next chapter will explore concurrency and the runtime system that brings these patterns to life in multi-threaded environments.
-
----
-
-*"An API is not about what you can do—it's about what you shouldn't have to think about."*
+With these patterns understood, you can build production systems with Eru. Chapter 7 explores resource management in depth, covering guaranteed cleanup and safe resource handling patterns.

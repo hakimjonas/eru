@@ -1,8 +1,6 @@
 # Chapter 3: The Eru Type Deep Dive
 
-*"Understanding the foundation helps with everything that follows."*
-
-Now that you've written your first Eru programs, let's examine how `Eru[E, A]` works under the hood. This chapter explores the core type, its design decisions, and the concepts that will help you use it effectively.
+Now that you've written your first Eru programs, this chapter examines how `Eru[E, A]` works under the hood. This chapter explores the core type, its design decisions, and the concepts that will help you use it effectively.
 
 ## The Nature of Eru
 
@@ -292,8 +290,4 @@ Understanding `Eru[E, A]` as a data structure rather than a computation changes 
 
 ## What's Next
 
-In Chapter 4, we'll explore how to combine and sequence Eru programs using `map`, `flatMap`, `zip`, and other combinators. You'll learn when to use each operator and how Eru optimizes complex compositions for maximum performance.
-
----
-
-*"The foundation is laid. Now we build upon it."*
+Chapter 4 explores how to combine and sequence Eru programs using `map`, `flatMap`, `zip`, and other combinators, covering when to use each operator and how Eru optimizes complex compositions for maximum performance.

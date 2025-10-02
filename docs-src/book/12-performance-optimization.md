@@ -1,7 +1,5 @@
 # Chapter 12: Performance & Optimization
 
-*"Performance is not about micro-optimizations—it's about understanding your system's characteristics and making informed architectural decisions."*
-
 Eru achieves exceptional performance while maintaining safety and composability. This chapter explores Eru's performance characteristics, benchmarking methodologies, optimization strategies, and measurement techniques that help you build high-performance systems without sacrificing correctness.
 
 ## Performance Philosophy
@@ -194,7 +192,7 @@ def compareStackSafetyPerformance(): Unit = {
   val recursiveDuration = (endRecursive - startRecursive) / 1000000.0
 
   println(f"Recursive approach (n=1000): $recursiveResult in $recursiveDuration%.2f ms")
-  println("📈 Use iterative builders (Eru.iterate) for optimal performance")
+  println("Use iterative builders (Eru.iterate) for optimal performance")
 }
 
 compareStackSafetyPerformance()
@@ -297,7 +295,7 @@ def resourcePerformanceTest(): Unit = {
   val ensureOpsPerMs = iterations / ensureDuration
 
   println(f"Ensure pattern: $ensureOpsPerMs%.0f ops/ms")
-  println("📊 Both patterns provide excellent performance with guaranteed cleanup")
+  println("Both patterns provide excellent performance with guaranteed cleanup")
 }
 
 resourcePerformanceTest()
@@ -430,7 +428,7 @@ def memoryOptimizedPatterns(): Unit = {
   val duration = (end - start) / 1000000.0
 
   println(f"Memory-efficient processing: ${result.size} items in $duration%.2f ms")
-  println("📋 Key patterns: traverse vs map+sequence, iterative builders, resource pooling")
+  println("Key patterns: traverse vs map+sequence, iterative builders, resource pooling")
 }
 
 memoryOptimizedPatterns()
@@ -756,8 +754,4 @@ Eru's performance characteristics enable building high-performance systems:
 
 ## What's Next
 
-In Chapter 13, we'll explore integration patterns for working with legacy code, blocking operations, third-party libraries, and existing systems—essential skills for real-world Eru adoption.
-
----
-
-*"Great performance is not about doing things faster—it's about doing the right things efficiently."*
+Chapter 13 explores integration patterns for working with legacy code, blocking operations, third-party libraries, and existing systems—essential skills for real-world Eru adoption.

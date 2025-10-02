@@ -1,12 +1,12 @@
 # Chapter 9: Introduction to Fibers
 
-*"Fibers are to concurrency what functions are to computation - composable, lightweight, and safe."*
-
-This chapter introduces you to fibers, Eru's approach to structured concurrency. If you've used threads before, fibers will feel familiar but much safer and more composable. This chapter focuses on foundational patterns that work on the JVM runtime.
+This chapter introduces fibers, Eru's approach to structured concurrency. If you've used threads before, fibers will feel familiar but much safer and more composable. This chapter focuses on foundational patterns that work on the JVM runtime.
 
 ## What Are Fibers?
 
-A fiber is a lightweight concurrent execution context that runs Eru programs independently. Unlike operating system threads, fibers are managed by the Eru runtime and provide structured concurrency guarantees:
+A fiber is a lightweight concurrent execution context that runs Eru programs independently. Unlike operating system threads, fibers are managed by the Eru runtime and provide structured concurrency guarantees.
+
+**Platform Implementation**: On the JVM, fibers are implemented using Java Virtual Threads (available in Java 21+), providing true parallelism with lightweight concurrency. On Scala Native, fibers execute synchronously while maintaining API compatibility. This chapter's examples demonstrate concurrent behavior on the JVM; Native platforms execute the same code deterministically in a single thread.
 
 ```scala mdoc
 import net.ghoula.eru.prelude.*
@@ -421,8 +421,4 @@ This introduction to fibers demonstrates several fundamental concepts:
 
 ## What's Next
 
-In Chapter 10, we'll explore advanced concurrency patterns including parallel processing, coordination primitives, and resource-bounded concurrency patterns for production systems.
-
----
-
-*"Concurrency is not parallelism, but fibers make both safe and composable."*
+Chapter 10 explores advanced concurrency patterns including parallel processing, coordination primitives, and resource-bounded concurrency patterns for production systems.

@@ -1,7 +1,5 @@
 # Chapter 7: Resource Management
 
-*"Good programs clean up after themselves, even when things go wrong."*
-
 Resource management is one of the most error-prone aspects of programming. Files that stay open, connections that aren't closed, memory that isn't freed—these issues can bring down production systems. This chapter shows how Eru's `ensure` combinator provides reliable resource cleanup.
 
 ## The Resource Problem
@@ -359,8 +357,4 @@ Understanding resource management with Eru provides several benefits:
 
 ## What's Next
 
-In Chapter 8, we'll explore cross-platform development with Eru, covering the differences between JVM and Native execution models and how to write code that works consistently across both platforms.
-
----
-
-*"The mark of good code is not just what it does, but what it cleans up."*
+Chapter 8 explores cross-platform development with Eru, covering the differences between JVM and Native execution models and how to write code that works consistently across both platforms.
