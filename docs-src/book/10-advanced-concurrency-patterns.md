@@ -93,17 +93,17 @@ def promiseCoordination(): Eru[String | Throwable, String] = {
       Thread.sleep(10) // Minimal delay for demonstration
       "Producer result"
     }.mapError(_.getMessage)
-      .flatMap(result => promise.succeed(result).map(_ => ()))
+      .flatMap(result => promise.succeed(result).map(_ => ()).eru)
       .fork
 
     // Fork fibers that wait for the promise
     consumer1 <- promise.await
       .map(result => s"Consumer1 received: $result")
-      .fork
+      .eru.fork
 
     consumer2 <- promise.await
       .map(result => s"Consumer2 received: $result")
-      .fork
+      .eru.fork
 
     // Collect all results
     _ <- producer.await
@@ -145,17 +145,17 @@ def deferredCoordination(): Eru[Throwable, String] = {
       // Expensive computation
       (1 to 1000).sum
     }.mapError(_.getMessage)
-      .flatMap(result => deferred.complete(result).map(_ => ()))
+      .flatMap(result => deferred.complete(result).map(_ => ()).eru)
       .fork
 
     // Multiple fibers can await the same deferred value
     awaiter1 <- deferred.await
       .map(value => s"Awaiter1 got: $value")
-      .fork
+      .eru.fork
 
     awaiter2 <- deferred.await
       .map(value => s"Awaiter2 got: $value")
-      .fork
+      .eru.fork
 
     // Collect results
     _ <- computation.await
@@ -198,10 +198,7 @@ def semaphoreExample(): Eru[String | Throwable, List[String]] = {
         Thread.sleep(5) // Brief delay for demonstration
         s"Operation $id completed"
       }.mapError(_.getMessage)
-    }.flatMap {
-      case Some(result) => Eru.succeed(result)
-      case None => Eru.fail(s"Failed to acquire permit for operation $id")
-    }
+    }.eru
   }
 
   for {
@@ -253,10 +250,7 @@ class ConnectionPool(maxConnections: Int) {
           Eru.effect(connection.close()).mapError(_.getMessage)
         )
       } yield result
-    }.flatMap {
-      case Some(result) => Eru.succeed(result)
-      case None => Eru.fail("No database connections available")
-    }
+    }.eru
   }
 }
 
@@ -428,10 +422,10 @@ def producerConsumerDemo(): Eru[String | Throwable, String] = {
     // Producer fiber that adds items to queue
     producer <- Eru.traverse((1 to 5).toList) { i =>
       val item = s"item-$i"
-      queue.offer(item).map { _ =>
+      queue.put(item).map { _ =>
         println(s"Produced: $item")
         s"Produced $item"
-      }
+      }.eru
     }.fork
 
     // Consumer fiber that takes items from queue
@@ -439,15 +433,15 @@ def producerConsumerDemo(): Eru[String | Throwable, String] = {
       item1 <- queue.take.map { item =>
         println(s"Consumer consumed: $item")
         item
-      }
+      }.eru
       item2 <- queue.take.map { item =>
         println(s"Consumer consumed: $item")
         item
-      }
+      }.eru
       item3 <- queue.take.map { item =>
         println(s"Consumer consumed: $item")
         item
-      }
+      }.eru
     } yield List(item1, item2, item3)).fork
 
     // Wait for both to complete
