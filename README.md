@@ -18,7 +18,7 @@ This project is guided by a strong philosophical vision for what a modern effect
 
 - **Concurrency Runtime**: Production-ready concurrent operations including fork, race, zipPar, timeouts, structured concurrency patterns, optimized coordination primitives (Ref, Semaphore, Deferred), degree-limited parallel execution, and error accumulation patterns for domain validation.
 
-- **Performance**: Exceptional performance characteristics with optimized execution paths and minimal allocation overhead. Benchmarks demonstrate **177-694x faster execution** than Cats Effect and **4-5x faster** than ZIO on common operations.
+- **Runtime Architecture**: GADT-based interpreter with zero-cast execution (no unsafe operations in the runtime). Virtual Threads on JVM enable millions of concurrent fibers with minimal overhead. Continuation-passing execution avoids stack frame allocation. Cross-platform design with platform-optimized backends (concurrent on JVM, synchronous on Native) from a single unified API.
 
 ## Quick Start
 
