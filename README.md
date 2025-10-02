@@ -2,7 +2,7 @@
 
 Eru is an effect system for Scala 3 that makes correctness visible in types. It provides true concurrency on JVM via Virtual Threads, and cross-compiles to Scala Native for single-threaded applications.
 
-This project is guided by a strong philosophical vision for what a modern effect system should be. To understand the design principles and goals of Eru, please read our core document:
+This project is guided by a clear vision for what a modern effect system should be. To understand the design principles and goals of Eru, please read our core document:
 
 **[The Eru Manifesto](MANIFESTO.md)**
 
@@ -85,6 +85,20 @@ Eru is organized into focused, cross-platform modules:
 **Structured Concurrency**: Parent fibers automatically interrupt and await child fibers on exit. No fiber leaks, no manual cleanup, no surprises.
 
 **Cross-Platform Core**: The same effect system kernel runs on JVM and Native. Platform-specific runtimes provide optimized execution (Virtual Threads on JVM, synchronous on Native) behind a unified API.
+
+## Requirements
+
+**Minimum Versions**:
+- **Scala**: 3.7.3 or later
+- **JVM**: Java 21 or later (for Virtual Threads support)
+- **Scala Native**: 0.5.x (for Native compilation)
+
+**Platform Dependencies**: Eru's design leverages modern language and runtime features:
+- **Scala 3**: Union types for error channels, opaque types for domain modeling, GADT enums for the effect representation, match types for advanced type-level programming
+- **Java 21+**: Virtual Threads enable lightweight concurrency with millions of fibers, structured concurrency primitives provide safe parent-child relationships
+- **Scala Native 0.5+**: Cross-platform `java.time` support via scala-java-time, deterministic single-threaded execution
+
+These platform improvements made it possible to build an effect system with compile-time safety guarantees and runtime efficiency that weren't previously achievable.
 
 ## Documentation
 
