@@ -11,7 +11,7 @@ import net.ghoula.eru.CorePrelude.*
   * ensure, and other resource operations maintain proper ordering, cleanup guarantees, and
   * compositional properties essential for predictable resource lifecycle management.
   */
-class EruResourceLawsSpec extends munit.FunSuite {
+class ResourceLawsSpec extends munit.FunSuite {
 
   private val samples = 200
   private val maxDepth = 8

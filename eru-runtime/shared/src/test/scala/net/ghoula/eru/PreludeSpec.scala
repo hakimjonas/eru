@@ -162,7 +162,7 @@ class PreludeSpec extends EruTestSuite {
     val effect = Eru.succeed(42)
 
     // Test ensure extension
-    val withCleanup = effect.ensure(Eru.effect { cleaned = true; () })
+    val withCleanup = effect.ensure(Eru.effect { cleaned = true })
     val result = withCleanup.unsafeRunSync()
 
     assertEquals(result, 42)
