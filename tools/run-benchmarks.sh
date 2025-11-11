@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 🚀 Eru Comprehensive Benchmark Runner
+# Eru Comprehensive Benchmark Runner
 # Unified script for all benchmark types with modular execution
 #
 # Usage:
@@ -159,7 +159,7 @@ cat > "$SYSTEM_INFO_FILE" << EOF
 EOF
 
 echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}${CYAN}                    🚀 ERU BENCHMARK RUNNER - $MODE MODE                     ${NC}"
+echo -e "${BOLD}${CYAN}                    ERU BENCHMARK RUNNER - $MODE MODE                     ${NC}"
 echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -192,12 +192,12 @@ run_benchmark() {
     if timeout ${timeout_duration} bash -c "LANG=C LC_ALL=C sbt '$project/Jmh/run -rf json -rff $json_file -i $MEASUREMENT_ITERATIONS -wi $WARMUP_ITERATIONS -f1 -t1 $gc_option $bench_class'" 2>&1 | tee "$log_file"; then
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
-        echo -e "\n${BOLD}${GREEN}✅ COMPLETED${NC} - ${duration}s"
-        echo -e "${BLUE}📄 JSON results:${NC} ${json_file}"
-        echo -e "${BLUE}📋 Full log:${NC} ${log_file}"
+        echo -e "\n${BOLD}${GREEN}COMPLETED${NC} - ${duration}s"
+        echo -e "${BLUE}JSON results:${NC} ${json_file}"
+        echo -e "${BLUE}Full log:${NC} ${log_file}"
         return 0
     else
-        echo -e "\n${BOLD}${RED}❌ FAILED${NC}"
+        echo -e "\n${BOLD}${RED}FAILED${NC}"
         return 1
     fi
     
@@ -207,7 +207,7 @@ run_benchmark() {
 # Mode-specific execution
 case $MODE in
     quick)
-        echo -e "${YELLOW}⚡ Running quick full picture (minimal iterations, all categories)${NC}\n"
+        echo -e "${YELLOW}Running quick full picture (minimal iterations, all categories)${NC}\n"
         WARMUP_ITERATIONS=1
         MEASUREMENT_ITERATIONS=1
         run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench"
@@ -221,7 +221,7 @@ case $MODE in
         ;;
 
     smoke)
-        echo -e "${YELLOW}🔥 Running smoke test (representative sampling across all categories)${NC}\n"
+        echo -e "${YELLOW}Running smoke test (representative sampling across all categories)${NC}\n"
         run_benchmark "Core Operations (Sample)" "net.ghoula.eru.bench.fair.CoreOperationsBench.eruSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.zioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.ioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.eruFlatMap|net.ghoula.eru.bench.fair.CoreOperationsBench.zioFlatMap|net.ghoula.eru.bench.fair.CoreOperationsBench.ioFlatMap"
         run_benchmark "Error Handling (Sample)" "net.ghoula.eru.bench.fair.ErrorHandlingBench.eruSuccessfulAttempt|net.ghoula.eru.bench.fair.ErrorHandlingBench.zioSuccessfulEither|net.ghoula.eru.bench.fair.ErrorHandlingBench.ioSuccessfulAttempt"
         run_benchmark "Concurrency (Sample)" "net.ghoula.eru.bench.fair.ConcurrencyBench.eruForkAwait|net.ghoula.eru.bench.fair.ConcurrencyBench.zioForkAwait|net.ghoula.eru.bench.fair.ConcurrencyBench.ioForkAwait"
@@ -230,7 +230,7 @@ case $MODE in
         ;;
 
     ci)
-        echo -e "${YELLOW}🚀 Running CI benchmarks (comprehensive sampling for continuous integration)${NC}\n"
+        echo -e "${YELLOW}Running CI benchmarks (comprehensive sampling for continuous integration)${NC}\n"
         # Core operations - basic + one challenging pattern
         run_benchmark "Core Operations (CI)" "net.ghoula.eru.bench.fair.CoreOperationsBench.eruSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.zioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.ioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.eruLongChain|net.ghoula.eru.bench.fair.CoreOperationsBench.zioLongChain|net.ghoula.eru.bench.fair.CoreOperationsBench.ioLongChain"
         # Error handling - both success and failure paths
@@ -246,7 +246,7 @@ case $MODE in
         ;;
 
     comparative)
-        echo -e "${YELLOW}📊 Running comparative benchmarks vs ZIO/Cats Effect (all categories)${NC}\n"
+        echo -e "${YELLOW}Running comparative benchmarks vs ZIO/Cats Effect (all categories)${NC}\n"
         run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench"
         run_benchmark "Error Handling" "net.ghoula.eru.bench.fair.ErrorHandlingBench"
         run_benchmark "State Management" "net.ghoula.eru.bench.fair.StateManagementBench"
@@ -258,21 +258,21 @@ case $MODE in
         ;;
 
     scaling)
-        echo -e "${YELLOW}📈 Running scaling benchmarks (parametric analysis)${NC}\n"
+        echo -e "${YELLOW}Running scaling benchmarks (parametric analysis)${NC}\n"
         echo -e "${RED}Scaling benchmarks not yet implemented${NC}"
         echo "Run 'comparative' mode for full comparison benchmarks"
         exit 0
         ;;
 
     memory)
-        echo -e "${YELLOW}🧠 Running memory benchmarks (GC analysis)${NC}\n"
+        echo -e "${YELLOW}Running memory benchmarks (GC analysis)${NC}\n"
         INCLUDE_GC=true
         run_benchmark "Core Operations (Memory)" "net.ghoula.eru.bench.fair.CoreOperationsBench" 300
         run_benchmark "Concurrency (Memory)" "net.ghoula.eru.bench.fair.ConcurrencyBench" 360
         ;;
         
     full)
-        echo -e "${YELLOW}🎯 Running complete benchmark suite (all modes)${NC}\n"
+        echo -e "${YELLOW}Running complete benchmark suite (all modes)${NC}\n"
         # Full mode should use thorough statistical iterations by default
         WARMUP_ITERATIONS=3
         MEASUREMENT_ITERATIONS=5
@@ -309,7 +309,7 @@ case $MODE in
 esac
 
 echo -e "\n${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}${CYAN}                              🎉 BENCHMARKS COMPLETE                         ${NC}"
+echo -e "${BOLD}${CYAN}                              BENCHMARKS COMPLETE                         ${NC}"
 echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BOLD}Results saved to:${NC} ${CYAN}$OUTPUT_DIR/*-$TIMESTAMP.{json,log}${NC}"
 echo -e "${BOLD}System info:${NC} ${CYAN}$SYSTEM_INFO_FILE${NC}"
