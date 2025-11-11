@@ -7,21 +7,21 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import net.ghoula.eru.*
 
-/** Mathematically rigorous tests for structured concurrency guarantees.
+/** Property-based tests for structured concurrency guarantees.
   *
-  * These tests provide mathematical proofs (not just suggestions) that structured concurrency works
-  * correctly by establishing formal properties and verifying them through deterministic
-  * synchronization mechanisms rather than timing assumptions.
+  * These tests verify structured concurrency properties through deterministic synchronization
+  * mechanisms rather than timing assumptions, establishing that parent-child lifetime relationships
+  * and transitive termination guarantees hold correctly.
   */
-class MathematicallyCorrectStructuredConcurrencyTest extends munit.FunSuite {
+class StructuredConcurrencyPropertySpec extends munit.FunSuite {
 
-  /** Validates the mathematical property of parent-child lifetime binding.
+  /** Validates the property that child fiber lifetimes are bounded by parent lifetimes.
     *
-    * Mathematical Property: ∀ parent, child: lifetime(child) ⊆ lifetime(parent) Proof Method: Uses
-    * synchronization primitives that can only be satisfied if the child is properly terminated when
-    * the parent completes.
+    * Property: For all parent and child fibers, lifetime(child) ⊆ lifetime(parent)
+    * Verification: Uses synchronization primitives that can only be satisfied if the child is
+    * properly terminated when the parent completes.
     */
-  test("parent-child lifetime binding - mathematical property") {
+  test("parent-child lifetime binding property") {
     val childAttemptedCompletion = new AtomicBoolean(false)
     val childStarted = new AtomicBoolean(false)
 
@@ -54,12 +54,12 @@ class MathematicallyCorrectStructuredConcurrencyTest extends munit.FunSuite {
     )
   }
 
-  /** Validates the mathematical property of transitive termination.
+  /** Validates the property of transitive termination.
     *
-    * Mathematical Property: If A spawns B and B spawns C, then completion of A should terminate
-    * both B and C. Formally: parent(A,B) ∧ parent(B,C) → terminate(A) ⇒ terminate(B) ∧ terminate(C)
+    * Property: If A spawns B and B spawns C, then completion of A should terminate both B and C.
+    * Formally: parent(A,B) ∧ parent(B,C) → terminate(A) ⇒ terminate(B) ∧ terminate(C)
     */
-  test("transitive termination - mathematical property") {
+  test("transitive termination property") {
     val cAttemptedWork = new AtomicBoolean(false)
     val bAttemptedWork = new AtomicBoolean(false)
     val aStarted = new AtomicBoolean(false)

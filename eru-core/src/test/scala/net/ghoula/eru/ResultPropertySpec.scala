@@ -11,7 +11,7 @@ import net.ghoula.eru.CorePrelude.*
   * the Result type across a wide range of inputs, ensuring mathematical correctness of all Result
   * operations and companion object methods.
   */
-class ResultPropertyBasedSpec extends munit.ScalaCheckSuite {
+class ResultPropertySpec extends munit.ScalaCheckSuite {
 
   /** Generator for small positive integers to control test complexity. */
   private val smallPositiveInts: Gen[Int] = Gen.choose(1, 1000)

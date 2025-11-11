@@ -9,7 +9,7 @@ import net.ghoula.eru.CorePrelude.*
   * that the extended resource safety mechanisms maintain correctness under various failure
   * conditions and provide comprehensive coverage for advanced resource management patterns.
   */
-class EruResourceSafetyExtensionsSpec extends munit.FunSuite {
+class ResourceSafetySpec extends munit.FunSuite {
 
   test("ensureAll runs multiple finalizers in FILO order") {
     var order = List.empty[String]

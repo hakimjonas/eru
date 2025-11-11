@@ -8,19 +8,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import net.ghoula.eru.*
 
-/** Mathematical test to verify finalizer execution during interruption.
+/** Property-based tests to verify finalizer execution during interruption.
   *
-  * This test determines whether the failing finalizer behavior represents a fundamental design
-  * limitation or a correctable issue.
+  * These tests verify whether finalizers execute correctly during fiber interruption,
+  * helping determine if issues represent design limitations or correctable bugs.
   */
-class FinalizerInterruptionMathematicalTest extends TestProgressReporter {
+class FinalizerInterruptionPropertySpec extends TestProgressReporter {
 
-  /** Tests the mathematical property that finalizers execute during fiber interruption.
+  /** Tests the property that finalizers execute during fiber interruption.
     *
     * Validates that ensure finalizers are properly executed when a fiber is interrupted, which is a
     * critical correctness property for resource safety.
     */
-  test("mathematical property: ensure finalizers execute during fiber interruption") {
+  test("ensure finalizers execute during fiber interruption") {
     val finalizerExecuted = new AtomicBoolean(false)
 
     val computation = for {
@@ -41,12 +41,12 @@ class FinalizerInterruptionMathematicalTest extends TestProgressReporter {
     assert(finalizerExecuted.get(), "Finalizer should execute during fiber interruption")
   }
 
-  /** Tests the mathematical property that finalizers execute during sleep interruption.
+  /** Tests the property that finalizers execute during sleep interruption.
     *
     * Validates finalizer execution when interrupting sleeping computations, which may reveal
     * implementation limitations in the current runtime.
     */
-  test("mathematical property: ensure finalizers execute during sleep interruption") {
+  test("ensure finalizers execute during sleep interruption") {
     val finalizerExecuted = new AtomicBoolean(false)
 
     val computation = for {
