@@ -55,14 +55,14 @@ object BenchmarkAnalyzer {
   def analyzeCategory(category: String, timestamp: String): Option[CategoryAnalysis] = {
     val file = s"benchmark-results/$category-$timestamp.json"
     if (!Files.exists(Paths.get(file))) {
-      println(s"⚠️  File not found: $file")
+      println(s"File not found: $file")
       return None
     }
 
     val results = parseResults(file)
     if (results.isEmpty) return None
 
-    println(s"\n📊 $category".toUpperCase)
+    println(s"\n$category".toUpperCase)
     println("-" * 60)
 
     val eruResults = results.filter(_.benchmark.toLowerCase.contains("eru"))
@@ -213,7 +213,7 @@ object BenchmarkAnalyzer {
     // Aggregate concerns
     val allConcerns = analyses.flatMap(_.concerns).distinct
     if (allConcerns.nonEmpty) {
-      println("\n   ⚠️  Areas for Investigation:")
+      println("\n   Areas for Investigation:")
       allConcerns.foreach(c => println(s"      - $c"))
     }
   }

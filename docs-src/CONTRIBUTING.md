@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Eru! This guide will help you und
 
 1. **Fork and clone** the repository
 2. **Install dependencies**: Ensure you have JDK 21+ and sbt installed
-3. **Run tests**: Execute `./run-all-tests.sh` to verify everything works
+3. **Run tests**: Execute `sbt testJVM testNative testIntegration` to verify everything works
 4. **Make changes** following our development workflow below
 5. **Submit a PR** with clear description and tests
 
@@ -21,16 +21,19 @@ sbt prepare
 # Validate code quality and documentation
 sbt check
 
-# Run all tests in isolation (recommended)
-./run-all-tests.sh
+# Run all tests
+sbt testJVM testNative testIntegration
 
 # Individual platform testing
 sbt testJVM              # All JVM tests
 sbt testNative           # All Native tests
 sbt testIntegration      # Integration tests (JVM only)
 
-# Optimized testing (fastest)
-sbt testAllOptimized     # Pre-compile everything, then run tests
+# Individual module testing (for faster feedback)
+sbt eruCoreJVM/test      # Core JVM tests
+sbt eruRuntimeJVM/test   # Runtime JVM tests
+sbt eruCoreNative/test   # Core Native tests
+sbt eruRuntimeNative/test # Runtime Native tests
 ```
 
 ### Development Cycle
@@ -131,15 +134,21 @@ def recursive(n: Int): Eru[Nothing, Int] =
 
 ## Testing Guidelines
 
-### Test Isolation
+### Running Tests
 
-Due to resource contention between concurrent test suites, always use:
+Run the full test suite with:
 
 ```bash
-./run-all-tests.sh  # Isolated test runner - ALWAYS use this
+sbt testJVM testNative testIntegration
 ```
 
-This prevents thread pool exhaustion and coordination deadlocks that cause hanging tests.
+Or run individual test suites for faster feedback:
+
+```bash
+sbt eruCoreJVM/test       # Core tests (JVM)
+sbt eruRuntimeJVM/test    # Runtime tests (JVM)
+sbt eruIntegrationTest/test  # Integration tests
+```
 
 ### Platform Testing
 
@@ -263,7 +272,7 @@ Brief description of changes and motivation.
 
 ## Testing
 
-- [ ] All tests pass (`./run-all-tests.sh`)
+- [ ] All tests pass (`sbt testJVM testNative testIntegration`)
 - [ ] New tests added for new functionality
 - [ ] Performance benchmarks run (if applicable)
 - [ ] Cross-platform compatibility verified

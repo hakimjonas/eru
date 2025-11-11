@@ -91,10 +91,10 @@ if [ -f "benchmark-results/system-info-${TIMESTAMP}.json" ]; then
 fi
 
 echo -e "\n${BOLD}Quick Performance Indicators:${NC}"
-echo "  🚀 Concurrency: Check fork/await and zipPar scores"
-echo "  ⚡ Core Ops: Check succeed and flatMap scores"
-echo "  🛡️ Error Handling: Check attempt and recover scores"
-echo "  📊 Collections: Check traverse and parallel traverse scores"
+echo "  Concurrency: Check fork/await and zipPar scores"
+echo "  Core Ops: Check succeed and flatMap scores"
+echo "  Error Handling: Check attempt and recover scores"
+echo "  Collections: Check traverse and parallel traverse scores"
 
 echo -e "\n${BOLD}For detailed analysis:${NC}"
 echo "  - View JSON files: benchmark-results/*-${TIMESTAMP}.json"

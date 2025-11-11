@@ -74,9 +74,14 @@ Thumbs.db
 logs/
 *.log
 
-# Benchmark results (keep tracked ones, ignore new ones)
+# Benchmark results - ignore all generated files
+benchmark-results/*.json
 benchmark-results/*.log
 benchmark-validation-results/*.log
+
+# Test output files
+test_output.txt
+*test_output*.txt
 
 # Claude Code development files
 CLAUDE.md
