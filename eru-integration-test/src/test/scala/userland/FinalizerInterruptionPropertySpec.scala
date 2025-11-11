@@ -10,8 +10,8 @@ import net.ghoula.eru.*
 
 /** Property-based tests to verify finalizer execution during interruption.
   *
-  * These tests verify whether finalizers execute correctly during fiber interruption,
-  * helping determine if issues represent design limitations or correctable bugs.
+  * These tests verify whether finalizers execute correctly during fiber interruption, helping
+  * determine if issues represent design limitations or correctable bugs.
   */
 class FinalizerInterruptionPropertySpec extends TestProgressReporter {
 

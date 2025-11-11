@@ -17,9 +17,9 @@ class StructuredConcurrencyPropertySpec extends munit.FunSuite {
 
   /** Validates the property that child fiber lifetimes are bounded by parent lifetimes.
     *
-    * Property: For all parent and child fibers, lifetime(child) ⊆ lifetime(parent)
-    * Verification: Uses synchronization primitives that can only be satisfied if the child is
-    * properly terminated when the parent completes.
+    * Property: For all parent and child fibers, lifetime(child) ⊆ lifetime(parent) Verification:
+    * Uses synchronization primitives that can only be satisfied if the child is properly terminated
+    * when the parent completes.
     */
   test("parent-child lifetime binding property") {
     val childAttemptedCompletion = new AtomicBoolean(false)
