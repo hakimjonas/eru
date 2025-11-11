@@ -41,7 +41,7 @@ val value = program.unsafeRunSync()
 
 ### Sequencing Operations
 
-Chain computations using `map` and `flatMap`. Eru optimizes pure chains for exceptional performance:
+Chain computations using `map` and `flatMap`. Eru optimizes pure chains for efficient execution:
 
 ```scala
 val computation: Eru[Nothing, Int] =

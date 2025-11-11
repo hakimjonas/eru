@@ -227,24 +227,24 @@ class PerformanceObserver extends EruObserver {
     event match {
       case EruEvent.ProgramStart(scopeId) =>
         startTimes(s"program-$scopeId") = currentTime
-        println(s"📊 Program started with scope $scopeId")
+        println(s"Program started with scope $scopeId")
 
       case EruEvent.ProgramEnd(scopeId, outcome) =>
         startTimes.get(s"program-$scopeId").foreach { startTime =>
           val duration = currentTime - startTime
           metrics(s"program-$scopeId-duration") = duration
-          println(s"📊 Program $scopeId executed in ${duration}ms with outcome: $outcome")
+          println(s"Program $scopeId executed in ${duration}ms with outcome: $outcome")
         }
 
       case EruEvent.FiberStarted(fiberId) =>
         startTimes(s"fiber-$fiberId") = currentTime
-        println(s"📊 Fiber $fiberId started")
+        println(s"Fiber $fiberId started")
 
       case EruEvent.FiberCompleted(fiberId, exit) =>
         startTimes.get(s"fiber-$fiberId").foreach { startTime =>
           val duration = currentTime - startTime
           metrics(s"fiber-$fiberId-duration") = duration
-          println(s"📊 Fiber $fiberId completed in ${duration}ms with exit: $exit")
+          println(s"Fiber $fiberId completed in ${duration}ms with exit: $exit")
         }
 
       case EruEvent.Step(scopeId, label) =>
@@ -360,12 +360,12 @@ class TracingObserver extends EruObserver {
 
       case EruEvent.ChildInterruptionRequested(parentId, childId, signal, reason) =>
         traces.values.lastOption.foreach { traceBuffer =>
-          traceBuffer += s"TRACE [$timestamp]   ⚡ Parent $parentId requested interruption of child $childId ($signal): $reason"
+          traceBuffer += s"TRACE [$timestamp]   Parent $parentId requested interruption of child $childId ($signal): $reason"
         }
 
       case EruEvent.TraceSpan(span) =>
         traces.values.lastOption.foreach { traceBuffer =>
-          traceBuffer += s"TRACE [$timestamp]   📊 Trace span: $span"
+          traceBuffer += s"TRACE [$timestamp]   Trace span: $span"
         }
     }
   }

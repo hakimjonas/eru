@@ -100,10 +100,8 @@ Based on comprehensive CI benchmarking, Eru demonstrates exceptional performance
 - eruIterate: 23,148 ops/ms
 - eruTraverse: 25,641 ops/ms
 
-**Comparative Performance** (Eru vs other effect systems):
-- 2-4x faster than ZIO for core operations
-- 50-160x faster than Cats Effect for basic operations
-- Consistent performance across different operation types
+**Performance Characteristics**:
+Eru demonstrates strong performance across different operation types, with consistent throughput suitable for production workloads requiring high-performance effect composition.
 
 ## Performance Optimization Strategies
 
@@ -738,7 +736,7 @@ productionMonitoringExample()
 
 Eru's performance characteristics enable building high-performance systems:
 
-**Exceptional Baseline Performance**: 2k-160k ops/ms for core operations, significantly faster than other effect systems.
+**Strong Baseline Performance**: 2k-160k ops/ms for core operations, demonstrating throughput characteristics suitable for demanding production workloads.
 
 **Consistent Performance**: Performance remains stable across different operation types and composition patterns.
 

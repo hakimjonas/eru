@@ -104,9 +104,9 @@ All contributions must align with Eru's four pillars:
 
 ## Stack Safety Guidelines
 
-⚠️ **Critical**: Always follow stack-safe patterns when writing Eru code:
+**Critical**: Always follow stack-safe patterns when writing Eru code:
 
-### ✅ Safe Patterns
+### Safe Patterns
 
 ```scala
 // Use iterative builders for loops
@@ -121,7 +121,7 @@ values.foldLeft(Eru.succeed(0)) { (acc, v) =>
 Eru.traverse(items)(item => processItem(item))
 ```
 
-### ❌ Avoid These Patterns
+### Unsafe Patterns (Avoid)
 
 ```scala
 // DON'T: Recursive Eru construction - Scala stack overflow

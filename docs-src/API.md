@@ -351,9 +351,9 @@ The `prelude` import provides the most ergonomic experience with all commonly ne
 
 ## Stack Safety Guidelines
 
-**⚠️ Important**: Eru provides full stack safety for its own operations (`flatMap`, `map`, etc.), but Scala function recursion can still cause stack overflow. Always prefer iterative patterns:
+**Important**: Eru provides full stack safety for its own operations (`flatMap`, `map`, etc.), but Scala function recursion can still cause stack overflow. Always prefer iterative patterns:
 
-### ✅ Safe Patterns
+### Safe Patterns
 
 ```scala
 // Use iterative builders for loops
@@ -368,7 +368,7 @@ values.foldLeft(Eru.succeed(0)) { (acc, v) =>
 Eru.traverse(items)(item => processItem(item))
 ```
 
-### ❌ Avoid These Patterns
+### Unsafe Patterns (Avoid)
 
 ```scala
 // DON'T: Recursive Eru construction - Scala stack overflow
