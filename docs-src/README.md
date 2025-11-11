@@ -62,7 +62,7 @@ val validated: Eru[String, Int] =
 
 **Suspension Safety**: Operations that may block indefinitely (like `queue.take`) return a `Suspending[E, A]` type. This type has no `unsafeRunSync` method - you must use `timeout` or `fork`. The compiler prevents accidental deadlocks, making the safe path the obvious path.
 
-**Virtual Thread-Native Design**: Built directly on Java Virtual Threads rather than implementing a custom fiber runtime. Uses ThreadLocal scope propagation for structured concurrency semantics, making Eru forward-compatible with Java's emerging structured concurrency APIs (JEP 480, Fifth Preview in JDK 25).
+**Custom Fiber Runtime on Virtual Threads**: Implements structured concurrency with ThreadLocal scope propagation, hierarchical fiber management, and rich interrupt semantics on top of Java Virtual Threads, providing a production-ready effect system runtime with cross-platform support.
 
 **Zero-Dependency Primitives**: Concurrency primitives like Queue and Semaphore are built entirely from Eru's core abstractions (Ref + Promise), not `java.util.concurrent`. This demonstrates true compositional concurrency without hidden dependencies.
 

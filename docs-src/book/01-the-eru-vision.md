@@ -316,16 +316,18 @@ The effect system version:
 - Separates business logic from effect management
 - Is much easier to test and reason about
 
-## Virtual Thread-Native Architecture
+## Custom Fiber Runtime Architecture
 
-Eru takes a different architectural approach from other effect systems: it builds directly on Java Virtual Threads (introduced in Java 21) rather than implementing a custom fiber runtime.
+Eru implements a complete effect system fiber runtime on top of Java Virtual Threads (introduced in Java 21), providing structured concurrency with sophisticated semantics beyond what Virtual Threads alone provide.
 
-**Why This Matters:**
+**Key Runtime Features:**
 
-- **Platform Integration**: Forward-compatible with Java's emerging structured concurrency APIs (JEP 480, currently in Fifth Preview in JDK 25)
-- **ThreadLocal Propagation**: Structured concurrency semantics work naturally via ThreadLocal scope inheritance
-- **Mature Foundation**: Leverages the JVM's optimized Virtual Thread implementation
-- **Reduced Complexity**: No custom scheduler to maintain or debug
+- **Hierarchical Fiber Management**: Parent-child relationships tracked through FiberScope with automatic cleanup
+- **ThreadLocal Scope Propagation**: Structured concurrency guarantees enforced via ThreadLocal scope inheritance
+- **Rich Interrupt Semantics**: Beyond basic interruption - includes Cancelled, Timeout, ParentTerminated, ResourceExhausted causes
+- **FILO Finalizer Execution**: Guaranteed cleanup order for resource safety
+- **Zero-Cast Implementation**: Type-safe interpreter with no unsafe operations
+- **Cross-Platform Abstraction**: Same runtime API compiles to both JVM (concurrent) and Native (synchronous)
 
 **Cross-Platform Reality:**
 
