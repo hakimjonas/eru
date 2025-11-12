@@ -38,6 +38,20 @@ private[eru] trait ConcurrencyBackend {
     */
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver] = None): Eru[Nothing, Fiber[E, A]]
 
+  /** Fork with custom fiber tracking queue for incremental cleanup.
+    * @param fa
+    *   the effect to run
+    * @param customTracking
+    *   queue for tracking fibers with automatic cleanup
+    * @return
+    *   an effect that yields a fiber handle
+    */
+  def forkWithTracking[E, A](
+    fa: Eru[E, A],
+    @scala.annotation.unused customTracking: java.util.concurrent.ConcurrentLinkedQueue[net.ghoula.eru.UnifiedFiber[?, ?]]
+  ): Eru[Nothing, Fiber[E, A]] =
+    fork(fa, None) // Default implementation ignores tracking
+
   /** Launches multiple effects in batch and returns fiber handles.
     *
     * This is an optimization for parallel operations that need to fork many effects. Default

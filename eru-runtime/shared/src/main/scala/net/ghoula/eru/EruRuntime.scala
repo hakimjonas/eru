@@ -1,6 +1,21 @@
 package net.ghoula.eru
 
 import java.time.Duration
+import java.util.concurrent.ConcurrentLinkedQueue
+
+/** Tracks forked fibers for automatic cleanup.
+  *
+  * Used with `EruRuntime.forkTracked` to enable incremental cleanup of completed fibers,
+  * preventing unbounded memory growth in long-running servers.
+  */
+final class FiberTracker {
+  private[eru] val queue: ConcurrentLinkedQueue[UnifiedFiber[?, ?]] =
+    new ConcurrentLinkedQueue()
+}
+
+object FiberTracker {
+  def apply(): FiberTracker = new FiberTracker()
+}
 
 /** Runtime for executing concurrent operations.
   *
@@ -58,6 +73,24 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     */
   def forkWithObserver[E, A](fa: Eru[E, A], observer: EruObserver): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, Some(observer))
+
+  /** Forks an effect with explicit fiber tracking for automatic cleanup.
+    *
+    * This enables incremental cleanup of completed fibers, preventing unbounded memory growth
+    * in long-running servers that fork many concurrent tasks (e.g., one per HTTP connection).
+    *
+    * @param fa
+    *   the effect to execute
+    * @param tracker
+    *   optional fiber tracker for automatic cleanup
+    * @return
+    *   an effect yielding a fiber handle
+    */
+  def forkTracked[E, A](
+    fa: Eru[E, A],
+    tracker: FiberTracker
+  ): Eru[Nothing, Fiber[E, A]] =
+    backend.forkWithTracking(fa, tracker.queue)
 
   /** Executes two effects in parallel and combines their results into a pair.
     *

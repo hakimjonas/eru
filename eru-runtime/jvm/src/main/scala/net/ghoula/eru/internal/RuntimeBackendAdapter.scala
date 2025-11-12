@@ -59,6 +59,13 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, observer, Some(rootFibers))
 
+  /** Fork with custom fiber tracking queue for incremental cleanup. */
+  override def forkWithTracking[E, A](
+    fa: Eru[E, A],
+    customTracking: ConcurrentLinkedQueue[UnifiedFiber[?, ?]]
+  ): Eru[Nothing, Fiber[E, A]] =
+    backend.fork(fa, None, Some(customTracking))
+
   override def forkBatch[E, A](effects: List[Eru[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
     backend.forkBatch(effects, Some(rootFibers))
 
