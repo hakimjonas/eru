@@ -48,7 +48,9 @@ private[eru] trait ConcurrencyBackend {
     */
   def forkWithTracking[E, A](
     fa: Eru[E, A],
-    @scala.annotation.unused customTracking: java.util.concurrent.ConcurrentLinkedQueue[net.ghoula.eru.UnifiedFiber[?, ?]]
+    @scala.annotation.unused customTracking: java.util.concurrent.ConcurrentLinkedQueue[
+      net.ghoula.eru.UnifiedFiber[?, ?]
+    ]
   ): Eru[Nothing, Fiber[E, A]] =
     fork(fa, None) // Default implementation ignores tracking
 

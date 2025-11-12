@@ -5,8 +5,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /** Tracks forked fibers for automatic cleanup.
   *
-  * Used with `EruRuntime.forkTracked` to enable incremental cleanup of completed fibers,
-  * preventing unbounded memory growth in long-running servers.
+  * Used with `EruRuntime.forkTracked` to enable incremental cleanup of completed fibers, preventing
+  * unbounded memory growth in long-running servers.
   */
 final class FiberTracker {
   private[eru] val queue: ConcurrentLinkedQueue[UnifiedFiber[?, ?]] =
@@ -76,8 +76,8 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 
   /** Forks an effect with explicit fiber tracking for automatic cleanup.
     *
-    * This enables incremental cleanup of completed fibers, preventing unbounded memory growth
-    * in long-running servers that fork many concurrent tasks (e.g., one per HTTP connection).
+    * This enables incremental cleanup of completed fibers, preventing unbounded memory growth in
+    * long-running servers that fork many concurrent tasks (e.g., one per HTTP connection).
     *
     * @param fa
     *   the effect to execute
