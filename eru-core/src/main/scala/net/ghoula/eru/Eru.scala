@@ -1,5 +1,7 @@
 package net.ghoula.eru
 
+import java.util.concurrent.ConcurrentHashMap
+import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 import scala.util.control.TailCalls.{TailRec, done, tailcall}
 
@@ -1212,7 +1214,7 @@ object Eru {
     def executeWithFinalizers[E, A](computation: Eru[E, A]): (Exit[E, A], List[() => Eru[Nothing, Unit]]) = {
       initializeAsyncSchedulerIfNeeded()
 
-      val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
+      val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
 
       try {
         val (either, fins) = runFiberLoop(computation, Nil, Hooks.Noop, None, outstandingFibers).result
@@ -1279,7 +1281,7 @@ object Eru {
       fins: List[Finalizer],
       hooks: Hooks,
       currentFiberId: Option[FiberId],
-      outstandingFibers: collection.mutable.Set[EruFiber[?, ?]]
+      outstandingFibers: collection.mutable.Set[EruFiber[?, ?]] // Thread-safe via ConcurrentHashMap
     ): TailRec[(Either[E, A], List[Finalizer])] =
       eru match {
         case Succeed(value) =>
@@ -1409,7 +1411,7 @@ object Eru {
                 Nil,
                 hooks,
                 Some(childFiberId),
-                collection.mutable.Set.empty
+                ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
               ).result
 
               val childExit = childResult match {
@@ -1503,7 +1505,7 @@ object Eru {
       fins match {
         case Nil => done(())
         case fin :: rest =>
-          val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
+          val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
           tailcall(runFiberLoop(fin(), Nil, Hooks.Noop, None, outstandingFibers)).flatMap { case (_, inner) =>
             val allInnerFinalizers = outstandingFibers.foldLeft(inner) { (acc, fiber) =>
               fiber.finalizers ++ acc
@@ -1570,7 +1572,7 @@ object Eru {
       observer: EruObserver,
       fins: List[Finalizer]
     ): TailRec[(Either[E, A], List[Finalizer])] = {
-      val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
+      val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
       tailcall(runFiberLoop(eru, fins, new Hooks.ObserverHooks(scope, observer), None, outstandingFibers))
     }
 
@@ -1599,7 +1601,7 @@ object Eru {
     def runSyncWithFibers[E, A](start: Eru[E, A]): A = {
       initializeAsyncSchedulerIfNeeded()
 
-      val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
+      val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
       val (either, fins) = runFiberLoop(start, Nil, Hooks.Noop, None, outstandingFibers).result
 
       val allFinalizers = outstandingFibers.foldLeft(fins) { (acc, fiber) =>
@@ -1623,7 +1625,7 @@ object Eru {
 
       val scope = ScopeId.fresh()
       val hooks = new Hooks.ObserverHooks(scope, observer)
-      val outstandingFibers = collection.mutable.Set.empty[EruFiber[?, ?]]
+      val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
 
       observer.onEvent(EruEvent.ProgramStart(scope))
       val (either, fins) = runFiberLoop(start, Nil, hooks, None, outstandingFibers).result
