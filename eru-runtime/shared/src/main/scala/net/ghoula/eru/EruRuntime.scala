@@ -24,7 +24,25 @@ object FiberTracker {
   */
 final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
 
-  /** Launches an effect and returns a fiber handle.
+  /** Launches an effect on a new fiber with structured concurrency tracking.
+    *
+    * Forked fibers are tracked by the runtime to ensure proper cleanup at program shutdown. This
+    * provides structured concurrency guarantees: when your program exits, all tracked fibers are
+    * automatically awaited to ensure resource cleanup completes.
+    *
+    * '''When to use:'''
+    *   - Background tasks that should complete before program exit
+    *   - Parallel computations you intend to `.await` later
+    *   - Tasks requiring guaranteed completion (database transactions, file writes)
+    *   - Short-lived programs or batch jobs
+    *
+    * '''When NOT to use:'''
+    *   - Long-running servers forking thousands of handlers (use `forkDaemon` instead)
+    *   - Fire-and-forget tasks with self-contained cleanup
+    *   - Tasks where abrupt termination is acceptable
+    *
+    * For long-running servers, `fork` causes memory accumulation as completed fibers remain
+    * tracked. Use `forkDaemon` for handlers that manage their own lifecycle via finalizers.
     *
     * @param fa
     *   the effect to execute
@@ -33,16 +51,22 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     *
     * @example
     *   {{{
-    * val fiber = EruRuntime.fork {
-    *   EruRuntime.sleep(Duration.ofSeconds(1)).map(_ => "completed")
+    * // Background task that should complete before program exit
+    * val fiber = runtime.fork {
+    *   processData().ensure(cleanupResources())
     * }.unsafeRunSync()
     *
-    * val result = fiber.await.unsafeRunSync() match {
-    *   case Exit.Success(value) => s"Got: $value"
-    *   case Exit.Failure(error) => s"Failed: $error"
-    *   case other => s"Terminated: $other"
+    * // Do other work...
+    *
+    * // Ensure completion before continuing
+    * fiber.await.unsafeRunSync() match {
+    *   case Exit.Success(value) => println(s"Done: $value")
+    *   case Exit.Failure(error) => println(s"Failed: $error")
     * }
     *   }}}
+    *
+    * @see
+    *   [[forkDaemon]] for fire-and-forget tasks without tracking
     */
   def fork[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, None)
@@ -91,6 +115,69 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     tracker: FiberTracker
   ): Eru[Nothing, Fiber[E, A]] =
     backend.forkWithTracking(fa, tracker.queue)
+
+  /** Forks an effect as a daemon fiber without structured concurrency tracking.
+    *
+    * Daemon fibers are NOT tracked by the runtime for automatic cleanup at program shutdown. This
+    * is ideal for long-running servers that fork thousands of short-lived handlers, avoiding memory
+    * accumulation from tracking completed fibers. The fiber still manages its own resources via
+    * finalizers - only the tracking is skipped.
+    *
+    * '''When to use:'''
+    *   - Long-running servers forking handlers per request (HTTP, RPC, WebSocket)
+    *   - Fire-and-forget tasks with self-contained cleanup via finalizers
+    *   - Tasks where abrupt termination on program exit is acceptable
+    *   - Scenarios where tracking overhead outweighs structured concurrency benefits
+    *
+    * '''When NOT to use:'''
+    *   - Tasks requiring guaranteed completion before program exit
+    *   - Database transactions or file writes that must finish
+    *   - Tasks without proper finalizer-based cleanup
+    *   - Short-lived programs where tracking overhead is negligible
+    *
+    * '''Important:''' If the JVM exits while daemon fibers are running, they will be abruptly
+    * terminated. Ensure your fibers clean up resources via finalizers (`.ensure`), not by relying
+    * on program exit hooks.
+    *
+    * @param fa
+    *   the effect to execute
+    * @return
+    *   an effect yielding a fiber handle that can still be awaited or interrupted
+    *
+    * @example
+    *   {{{
+    * // HTTP server: fork connection handlers as daemon fibers
+    * def acceptLoop: Eru[HttpError, Unit] = {
+    *   val acceptAndHandle = for {
+    *     clientSocket <- Eru.effect(serverSocket.accept())
+    *     // Each handler manages its own lifecycle via finalizers
+    *     _ <- handleClient(clientSocket)
+    *       .ensure(Eru.effect(clientSocket.close()))  // Finalizer ensures cleanup
+    *       .forkDaemon  // Don't track - prevents memory accumulation
+    *   } yield ()
+    *   Eru.forever(acceptAndHandle)
+    * }
+    *
+    * // The handler is self-contained
+    * def handleClient(socket: Socket): Eru[HttpError, Unit] = {
+    *   for {
+    *     request <- readRequest(socket)
+    *     response <- processRequest(request)
+    *     _ <- writeResponse(socket, response)
+    *   } yield ()
+    * }.ensure(
+    *   // Cleanup always runs, even if JVM exits
+    *   Eru.effect(socket.close()).attempt.unit
+    * )
+    *   }}}
+    *
+    * @see
+    *   [[fork]] for tasks requiring guaranteed completion
+    * @see
+    *   [[forkTracked]] for custom fiber tracking strategies
+    */
+  def forkDaemon[E, A](fa: Eru[E, A]): Eru[Nothing, Fiber[E, A]] =
+    backend.forkDaemon(fa, None)
 
   /** Executes two effects in parallel and combines their results into a pair.
     *

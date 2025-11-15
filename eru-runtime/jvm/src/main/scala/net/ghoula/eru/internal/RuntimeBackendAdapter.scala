@@ -66,6 +66,10 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   ): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, None, Some(customTracking))
 
+  /** Fork as daemon without structured concurrency tracking. */
+  override def forkDaemon[E, A](fa: Eru[E, A], observer: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =
+    backend.fork(fa, observer, None) // None = no tracking in rootFibers
+
   override def forkBatch[E, A](effects: List[Eru[E, A]]): Eru[Nothing, List[Fiber[E, A]]] =
     backend.forkBatch(effects, Some(rootFibers))
 

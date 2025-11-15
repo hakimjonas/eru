@@ -26,10 +26,26 @@ object RuntimeExtensions {
     */
   extension [E, A](self: Eru[E, A])(using runtime: EruRuntime) {
 
-    /** Forks this effect onto a new fiber.
+    /** Forks this effect onto a new fiber with structured concurrency tracking.
+      *
+      * The forked fiber is tracked by the runtime to ensure proper cleanup at program shutdown,
+      * providing structured concurrency guarantees. For long-running servers that fork thousands of
+      * short-lived fibers (like HTTP handlers), consider using `forkDaemon` instead to avoid
+      * accumulating completed fibers in memory.
+      *
+      * '''Use `fork` when:''' Tasks should complete before program exit, parallel computations
+      * you'll `.await`, tasks requiring guaranteed completion (DB transactions, file writes).
+      *
+      * '''Use `forkDaemon` when:''' Long-running servers, fire-and-forget with finalizer cleanup,
+      * abrupt termination is acceptable.
       *
       * @return
       *   an effect that produces a Fiber which can be awaited or interrupted
+      *
+      * @see
+      *   [[EruRuntime.fork]] for detailed documentation
+      * @see
+      *   [[forkDaemon]] for untracked daemon fibers
       */
     def fork: Eru[Nothing, Fiber[E, A]] = runtime.fork(self)
 
@@ -42,6 +58,60 @@ object RuntimeExtensions {
       */
     def forkWithObserver(observer: EruObserver): Eru[Nothing, Fiber[E, A]] =
       runtime.forkWithObserver(self, observer)
+
+    /** Forks this effect with explicit fiber tracking for custom cleanup strategies.
+      *
+      * This enables applications to implement their own fiber lifecycle management, such as
+      * periodic cleanup or different tracking strategies. The provided tracker receives all forked
+      * fibers for manual management.
+      *
+      * @param tracker
+      *   the fiber tracker to use for this fork
+      * @return
+      *   an effect that produces a Fiber which can be awaited or interrupted
+      */
+    def forkTracked(tracker: FiberTracker): Eru[Nothing, Fiber[E, A]] =
+      runtime.forkTracked(self, tracker)
+
+    /** Forks this effect as a daemon fiber without structured concurrency tracking.
+      *
+      * Daemon fibers are NOT tracked for automatic cleanup at program shutdown, preventing memory
+      * accumulation in long-running servers. The fiber still manages resources via finalizers -
+      * only tracking is skipped. Ideal for HTTP/RPC servers forking thousands of handlers.
+      *
+      * '''Use when:''' Long-running servers, fire-and-forget with finalizer cleanup, abrupt
+      * termination acceptable.
+      *
+      * '''Avoid when:''' Tasks needing guaranteed completion, DB transactions, file writes, no
+      * finalizer cleanup.
+      *
+      * @return
+      *   an effect that produces a Fiber which can be awaited or interrupted
+      *
+      * @example
+      *   {{{
+      * import net.ghoula.eru.prelude.*
+      *
+      * given runtime: EruRuntime = EruRuntime.create()
+      *
+      * // HTTP server: fork connection handlers as daemon fibers
+      * def acceptLoop: Eru[HttpError, Unit] = {
+      *   val acceptAndHandle = for {
+      *     clientSocket <- Eru.effect(serverSocket.accept())
+      *     _ <- handleClient(clientSocket)
+      *       .ensure(Eru.effect(clientSocket.close()))  // Finalizer cleanup
+      *       .forkDaemon  // Don't track - prevents memory accumulation
+      *   } yield ()
+      *   Eru.forever(acceptAndHandle)
+      * }
+      *   }}}
+      *
+      * @see
+      *   [[EruRuntime.forkDaemon]] for detailed documentation
+      * @see
+      *   [[fork]] for tracked fibers with structured concurrency
+      */
+    def forkDaemon: Eru[Nothing, Fiber[E, A]] = runtime.forkDaemon(self)
 
     /** Runs this effect and another in parallel, combining results.
       *

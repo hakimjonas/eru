@@ -109,4 +109,26 @@ object prelude {
     *   success type of the fiber
     */
   type Fiber[+E, +A] = net.ghoula.eru.Fiber[E, A]
+
+  /** Type alias for fiber tracker, re-exposed for discoverability.
+    *
+    * FiberTracker enables custom fiber lifecycle management for applications that need fine-grained
+    * control over fiber tracking and cleanup strategies.
+    */
+  type FiberTracker = net.ghoula.eru.FiberTracker
+
+  /** Exposes the FiberTracker companion for creating fiber trackers.
+    *
+    * @example
+    *   {{{
+    * import net.ghoula.eru.prelude.*
+    *
+    * given runtime: EruRuntime = EruRuntime.create()
+    *
+    * // Create custom tracker for connection pool
+    * val tracker = FiberTracker()
+    * val fiber = handleConnection(socket).forkTracked(tracker)
+    *   }}}
+    */
+  val FiberTracker = net.ghoula.eru.FiberTracker
 }

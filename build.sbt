@@ -215,10 +215,10 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
     Test / testForkedParallel := false,
     Test / fork := true,
     Test / javaOptions ++= Seq(
-      "-Xms1G",
-      "-Xmx2G",
-      "-XX:+UseG1GC",
-      "-XX:MaxGCPauseMillis=200",
+      "-XX:+UseZGC", // Enable ZGC (optimal for Project Loom)
+      "-XX:+ZGenerational", // Enable generational mode (Java 21+)
+      "-Xms2G", // Initial heap size
+      "-Xmx2G", // Max heap size
       "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4"
     )
   )

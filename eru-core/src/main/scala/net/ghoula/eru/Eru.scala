@@ -1376,18 +1376,27 @@ object Eru {
 
               asyncFiber.getCompleted match {
                 case Some(completedFiber) =>
-                  outstandingFibers += completedFiber
+                  // Only track fibers with finalizers to prevent unbounded accumulation
+                  if completedFiber.finalizers.nonEmpty then {
+                    outstandingFibers += completedFiber
+                  }
                   done((Right(completedFiber), fins))
                 case None =>
                   handleSuspend { callback =>
                     asyncFiber.onComplete { completedFiber =>
-                      outstandingFibers += completedFiber
+                      // Only track fibers with finalizers to prevent unbounded accumulation
+                      if completedFiber.finalizers.nonEmpty then {
+                        outstandingFibers += completedFiber
+                      }
                       callback(Right(completedFiber))
                     }
 
                     asyncFiber.getCompleted match {
                       case Some(completedFiber) =>
-                        outstandingFibers += completedFiber
+                        // Only track fibers with finalizers to prevent unbounded accumulation
+                        if completedFiber.finalizers.nonEmpty then {
+                          outstandingFibers += completedFiber
+                        }
                         callback(Right(completedFiber))
                       case None =>
                         () // Will complete via onComplete
@@ -1426,7 +1435,10 @@ object Eru {
               }
 
               val completedFiber = EruFiber.withId(childFiberId, childExit, childFinalizers)
-              outstandingFibers += completedFiber
+              // Only track fibers with finalizers to prevent unbounded accumulation
+              if completedFiber.finalizers.nonEmpty then {
+                outstandingFibers += completedFiber
+              }
               done((Right(completedFiber), fins))
           }
 
