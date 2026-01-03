@@ -1,5 +1,6 @@
-import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
+import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 import scalanativecrossproject.ScalaNativeCrossPlugin.autoImport.*
+
 import scala.scalanative.build.*
 import scala.sys.process.Process
 
@@ -185,7 +186,7 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
     testFrameworks += new TestFramework("munit.Framework"),
     nativeConfig ~= { c =>
       c.withLTO(LTO.full)
-        .withMode(Mode.releaseFast)
+        .withMode(scala.scalanative.build.Mode.releaseFast)
         .withGC(GC.immix)
     },
     // Make native compilation more visible
