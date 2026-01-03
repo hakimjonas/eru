@@ -54,6 +54,26 @@ private[eru] trait ConcurrencyBackend {
   ): Eru[Nothing, Fiber[E, A]] =
     fork(fa, None) // Default implementation ignores tracking
 
+  /** Forks an effect as a daemon fiber without structured concurrency tracking.
+    *
+    * Daemon fibers are not tracked for automatic cleanup at program shutdown, making this ideal for
+    * long-running servers that fork thousands of short-lived handlers (e.g., HTTP connection
+    * handlers). The fiber still manages its own resources via finalizers.
+    *
+    * Use this for fire-and-forget patterns where the fiber's lifecycle is self-contained. Use
+    * regular `fork` when you need structured concurrency guarantees and automatic cleanup at
+    * program termination.
+    *
+    * @param fa
+    *   the effect to execute
+    * @param observer
+    *   optional observer to receive fiber lifecycle events
+    * @return
+    *   an effect that yields a fiber handle
+    */
+  def forkDaemon[E, A](fa: Eru[E, A], observer: Option[EruObserver] = None): Eru[Nothing, Fiber[E, A]] =
+    fork(fa, observer) // Default implementation delegates to fork (no tracking anyway)
+
   /** Launches multiple effects in batch and returns fiber handles.
     *
     * This is an optimization for parallel operations that need to fork many effects. Default

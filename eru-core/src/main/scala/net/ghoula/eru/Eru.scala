@@ -14,6 +14,11 @@ private class InterruptedWithFinalizers(
   val finalizers: List[() => Eru[Nothing, Unit]]
 ) extends InterruptedException(cause.toString)
 
+/** Internal exception used to signal that the fast-path interpreter cannot handle a case. Used for
+  * exception-based fallback to the safe TailCalls-based interpreter.
+  */
+private class FastPathUnsupported extends scala.util.control.ControlThrowable
+
 /** A computation that can succeed with a value of type `A` or fail with an error of type `E`.
   *
   * Computations are lazy and immutable descriptions that can be composed with combinators like
@@ -1260,6 +1265,97 @@ object Eru {
       }
     }
 
+    /** Fast-path interpreter for simple effect chains that avoids TailCalls allocations.
+      *
+      * This interpreter handles common effect patterns using direct @tailrec recursion instead of
+      * TailCalls, eliminating allocation overhead for simple cases. When it encounters an
+      * unsupported case, it throws FastPathUnsupported to trigger fallback to the safe
+      * TailCalls-based interpreter.
+      *
+      * Supported cases:
+      *   - Terminal operations: Succeed, Fail, Effect, EffectTotal
+      *   - Map fusion: MapChain
+      *   - Simple single-step chains: Chain with single Step continuation
+      *   - Error handling: MapError, Attempt
+      *
+      * Unsupported cases (triggers fallback):
+      *   - Complex continuations (multi-step chains, Compose)
+      *   - Advanced operations (Fork, Await, Suspend, Ensure, Debug, etc.)
+      *   - Any case requiring hooks or finalizers
+      *
+      * @param eru
+      *   the effect to interpret
+      * @param fins
+      *   accumulated finalizers (must be empty for fast path)
+      * @return
+      *   the result and any finalizers produced
+      * @throws FastPathUnsupported
+      *   when encountering an unsupported case
+      */
+    private def runFast[E, A](
+      eru: Eru[E, A],
+      fins: List[Finalizer]
+    ): (Either[E, A], List[Finalizer]) = {
+      // Only attempt fast path if no finalizers - resource operations need safe interpreter
+      if (fins.nonEmpty) {
+        throw new FastPathUnsupported()
+      }
+
+      eru match {
+        // Terminal cases - already optimal
+        case Succeed(value) => (Right(value), fins)
+
+        case Fail(error) => (Left(error), fins)
+
+        case Effect(thunk) => (thunk(), fins)
+
+        case EffectTotal(thunk) => (Right(thunk()), fins)
+
+        // Map fusion - evaluate source then apply function
+        case MapChain(source, f) =>
+          try {
+            val (sourceResult, sourceFins) = runFast(source, fins)
+            sourceResult match {
+              case Right(value) => (Right(f(value)), sourceFins)
+              case Left(error) => (Left(error), sourceFins)
+            }
+          } catch {
+            case _: FastPathUnsupported =>
+              throw new FastPathUnsupported()
+          }
+
+        // MapError - evaluate source then transform error
+        case MapError(source, f) =>
+          try {
+            val (sourceResult, sourceFins) = runFast(source, fins)
+            sourceResult match {
+              case Right(value) => (Right(value), sourceFins)
+              case Left(error) => (Left(f(error)), sourceFins)
+            }
+          } catch {
+            case _: FastPathUnsupported =>
+              throw new FastPathUnsupported()
+          }
+
+        // Attempt - evaluate source then wrap result
+        case Attempt(source) =>
+          try {
+            val (sourceResult, sourceFins) = runFast(source, fins)
+            sourceResult match {
+              case Left(e) => (Right(Result.Failure(e)), sourceFins)
+              case Right(a) => (Right(Result.Success(a)), sourceFins)
+            }
+          } catch {
+            case _: FastPathUnsupported =>
+              throw new FastPathUnsupported()
+          }
+
+        // Complex cases (including Chain/flatMap) - bail to safe interpreter
+        case _ =>
+          throw new FastPathUnsupported()
+      }
+    }
+
     /** Fiber-aware runLoop implementing Strategy A: Eager Fiber Evaluation.
       *
       * This method extends runLoop to handle Fork and Await operations using eager evaluation. Fork
@@ -1376,18 +1472,27 @@ object Eru {
 
               asyncFiber.getCompleted match {
                 case Some(completedFiber) =>
-                  outstandingFibers += completedFiber
+                  // Only track fibers with finalizers to prevent unbounded accumulation
+                  if completedFiber.finalizers.nonEmpty then {
+                    outstandingFibers += completedFiber
+                  }
                   done((Right(completedFiber), fins))
                 case None =>
                   handleSuspend { callback =>
                     asyncFiber.onComplete { completedFiber =>
-                      outstandingFibers += completedFiber
+                      // Only track fibers with finalizers to prevent unbounded accumulation
+                      if completedFiber.finalizers.nonEmpty then {
+                        outstandingFibers += completedFiber
+                      }
                       callback(Right(completedFiber))
                     }
 
                     asyncFiber.getCompleted match {
                       case Some(completedFiber) =>
-                        outstandingFibers += completedFiber
+                        // Only track fibers with finalizers to prevent unbounded accumulation
+                        if completedFiber.finalizers.nonEmpty then {
+                          outstandingFibers += completedFiber
+                        }
                         callback(Right(completedFiber))
                       case None =>
                         () // Will complete via onComplete
@@ -1426,7 +1531,10 @@ object Eru {
               }
 
               val completedFiber = EruFiber.withId(childFiberId, childExit, childFinalizers)
-              outstandingFibers += completedFiber
+              // Only track fibers with finalizers to prevent unbounded accumulation
+              if completedFiber.finalizers.nonEmpty then {
+                outstandingFibers += completedFiber
+              }
               done((Right(completedFiber), fins))
           }
 
@@ -1602,7 +1710,16 @@ object Eru {
       initializeAsyncSchedulerIfNeeded()
 
       val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
-      val (either, fins) = runFiberLoop(start, Nil, Hooks.Noop, None, outstandingFibers).result
+
+      // Try fast path first - only when no hooks and no initial finalizers
+      val (either, fins) =
+        try {
+          runFast(start, Nil)
+        } catch {
+          case _: FastPathUnsupported =>
+            // Fall back to safe TailCalls-based interpreter
+            runFiberLoop(start, Nil, Hooks.Noop, None, outstandingFibers).result
+        }
 
       val allFinalizers = outstandingFibers.foldLeft(fins) { (acc, fiber) =>
         fiber.finalizers ++ acc

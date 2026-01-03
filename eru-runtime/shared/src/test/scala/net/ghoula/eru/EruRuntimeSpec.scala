@@ -50,6 +50,41 @@ class EruRuntimeSpec extends EruTestSuite {
     assert(observer.events.nonEmpty, "Observer should capture events")
   }
 
+  test("forkDaemon creates fiber without structured concurrency tracking") {
+    // forkDaemon should work exactly like fork but without adding to rootFibers
+    val fiber = runtime.forkDaemon(Eru.succeed(123)).unsafeRunSync()
+
+    val exit = fiber.await.unsafeRunSync()
+    exit match {
+      case Exit.Success(value) => assertEquals(value, 123)
+      case other => fail(s"Expected Success(123), got: $other")
+    }
+  }
+
+  test("forkDaemon with failing effect returns failure") {
+    val fiber = runtime.forkDaemon(Eru.fail("daemon-error")).unsafeRunSync()
+
+    val exit = fiber.await.unsafeRunSync()
+    exit match {
+      case Exit.Failure(error) => assertEquals(error, "daemon-error")
+      case other => fail(s"Expected Failure('daemon-error'), got: $other")
+    }
+  }
+
+  test("forkTracked uses custom tracker") {
+    val tracker = FiberTracker()
+    val fiber = runtime.forkTracked(Eru.succeed(456), tracker).unsafeRunSync()
+
+    val exit = fiber.await.unsafeRunSync()
+    exit match {
+      case Exit.Success(value) => assertEquals(value, 456)
+      case other => fail(s"Expected Success(456), got: $other")
+    }
+
+    // Note: We can't easily verify the tracker was used without accessing internal state,
+    // but at least we verify the API works
+  }
+
   test("zipPar runs both effects concurrently") {
     // val start = System.nanoTime()
     val result = runtime

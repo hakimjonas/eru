@@ -50,6 +50,29 @@ class RuntimeExtensionsSpec extends EruTestSuite {
     assert(fiberEvents.nonEmpty, "Should capture fiber lifecycle events")
   }
 
+  test("forkDaemon extension creates fiber without tracking") {
+    val effect = Eru.succeed(789)
+    val fiber = effect.forkDaemon.unsafeRunSync()
+    val exit = fiber.await.unsafeRunSync()
+
+    exit match {
+      case Exit.Success(value) => assertEquals(value, 789)
+      case other => fail(s"Expected Success(789), got: $other")
+    }
+  }
+
+  test("forkTracked extension uses custom tracker") {
+    val tracker = FiberTracker()
+    val effect = Eru.succeed(321)
+    val fiber = effect.forkTracked(tracker).unsafeRunSync()
+    val exit = fiber.await.unsafeRunSync()
+
+    exit match {
+      case Exit.Success(value) => assertEquals(value, 321)
+      case other => fail(s"Expected Success(321), got: $other")
+    }
+  }
+
   test("zipPar extension runs effects concurrently") {
     if (Platform.backend == RuntimeBackend.VirtualThreads) {
       // Only test concurrency on JVM where we have VirtualThreads

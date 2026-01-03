@@ -84,10 +84,10 @@ object Semaphore {
   /** Creates a new semaphore initialized with `n` permits. */
   def make(n: Long)(using runtime: EruRuntime): Eru[Nothing, Semaphore] =
     for {
-      stateRef <- Ref.make(State(if (n < 0) 0L else n, List.empty))
+      stateRef <- Ref.make(State(if (n < 0) 0L else n, scala.collection.immutable.Queue.empty))
     } yield new RuntimeSemaphore(stateRef, runtime)
 
-  private case class State(permits: Long, waiters: List[Promise[Nothing, Unit]])
+  private case class State(permits: Long, waiters: scala.collection.immutable.Queue[Promise[Nothing, Unit]])
 
   private final class RuntimeSemaphore(stateRef: Ref[State], runtime: EruRuntime) extends Semaphore {
 
@@ -108,7 +108,7 @@ object Semaphore {
               if (state.permits > 0) {
                 (state.copy(permits = state.permits - 1), false)
               } else {
-                (state.copy(waiters = state.waiters :+ promise), true)
+                (state.copy(waiters = state.waiters.enqueue(promise)), true)
               }
             }
             _ <-
@@ -159,10 +159,10 @@ object Semaphore {
 
     def release: Immediate[Nothing, Unit] = new Immediate(
       stateRef.modify { state =>
-        state.waiters match {
-          case waiter :: rest =>
+        state.waiters.dequeueOption match {
+          case Some((waiter, rest)) =>
             (state.copy(waiters = rest), Some(waiter))
-          case Nil =>
+          case None =>
             (state.copy(permits = state.permits + 1), None)
         }
       }.flatMap {
@@ -180,7 +180,7 @@ object Semaphore {
           val toWake = math.min(n, state.waiters.length).toInt
           val (wakingUp, stillWaiting) = state.waiters.splitAt(toWake)
           val extraPermits = n - toWake
-          (state.copy(permits = state.permits + extraPermits, waiters = stillWaiting), wakingUp)
+          (state.copy(permits = state.permits + extraPermits, waiters = stillWaiting), wakingUp.toList)
         }.flatMap { waitersToWake =>
           Eru.foreach(waitersToWake)(_.succeed(()).eru).map(_ => ())
         }
