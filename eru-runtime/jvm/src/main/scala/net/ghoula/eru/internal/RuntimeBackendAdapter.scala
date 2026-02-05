@@ -172,6 +172,67 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
     // Note: Don't eagerly close privateExecutor as it may still have pending tasks
     // The lazy executor will be cleaned up by GC when the adapter is collected
   }
+
+  override def shutdownRootFibers(observer: Option[EruObserver]): Eru[Nothing, (Int, Int)] = {
+    Eru.effectTotal {
+      val fibersToCleanup = scala.collection.mutable.ListBuffer.empty[UnifiedFiber[?, ?]]
+      var fiber = Option(rootFibers.poll())
+      while (fiber.nonEmpty) {
+        fibersToCleanup += fiber.get
+        fiber = Option(rootFibers.poll())
+      }
+
+      val total = fibersToCleanup.size
+      val parentId = FiberId.fresh()
+
+      observer.foreach { obs =>
+        obs.onEvent(EruObserver.EruEvent.StructuredCleanupStarted(parentId, total))
+      }
+
+      var interrupted = 0
+      var alreadyCompleted = 0
+
+      fibersToCleanup.foreach { fiberToCleanup =>
+        try {
+          val wasActive = fiberToCleanup.currentState match {
+            case UnifiedFiberState.Active(_, _, _, _, _) => true
+            case UnifiedFiberState.Completed(_) => false
+          }
+
+          observer.foreach { obs =>
+            obs.onEvent(
+              EruObserver.EruEvent.ChildInterruptionRequested(
+                parentId,
+                fiberToCleanup.id,
+                InterruptCause.ParentTerminated(parentId, Exit.Success(())),
+                wasActive
+              )
+            )
+          }
+
+          if wasActive then {
+            fiberToCleanup
+              .interrupt(InterruptCause.ParentTerminated(parentId, Exit.Success(())))
+              .attempt
+              .unsafeRunSync()
+            interrupted += 1
+          } else {
+            alreadyCompleted += 1
+          }
+
+          fiberToCleanup.await.attempt.unsafeRunSync()
+        } catch {
+          case _: Exception => ()
+        }
+      }
+
+      observer.foreach { obs =>
+        obs.onEvent(EruObserver.EruEvent.StructuredCleanupCompleted(parentId, interrupted, alreadyCompleted))
+      }
+
+      (interrupted, alreadyCompleted)
+    }
+  }
 }
 
 /** Factory for creating RuntimeBackend adapters. */
