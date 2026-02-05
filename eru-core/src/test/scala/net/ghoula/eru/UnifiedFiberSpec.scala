@@ -32,7 +32,7 @@ class UnifiedFiberSpec extends munit.FunSuite {
 
     assertEquals(fiber.id, id)
     fiber.currentState match {
-      case UnifiedFiberState.Active(latch, exitRef, threadRef) =>
+      case UnifiedFiberState.Active(latch, exitRef, threadRef, _, _) =>
         assertEquals(latch.getCount(), 1L, "Latch should start at 1")
         assert(Option(exitRef.get()).isEmpty, "Exit ref should be unset")
         assertEquals(threadRef.get(), None, "Thread ref should be None")
@@ -68,7 +68,7 @@ class UnifiedFiberSpec extends munit.FunSuite {
 
     // Verify state change
     fiber.currentState match {
-      case UnifiedFiberState.Active(latch, exitRef, _) =>
+      case UnifiedFiberState.Active(latch, exitRef, _, _, _) =>
         assertEquals(latch.getCount(), 0L, "Latch should be released")
         assertEquals(exitRef.get(), exit, "Exit should be set")
       case _ => fail("Should still be Active state (state is not mutated)")
@@ -85,7 +85,7 @@ class UnifiedFiberSpec extends munit.FunSuite {
 
     // Verify thread was set
     fiber.currentState match {
-      case UnifiedFiberState.Active(_, _, threadRef) =>
+      case UnifiedFiberState.Active(_, _, threadRef, _, _) =>
         assertEquals(threadRef.get(), Some(thread))
       case _ => fail("Expected Active state")
     }
@@ -154,17 +154,21 @@ class UnifiedFiberSpec extends munit.FunSuite {
   }
 
   test("UnifiedFiberState.Active stores coordination primitives correctly") {
+    val id = FiberId.fresh()
     val latch = new CountDownLatch(1)
     val exitRef = new AtomicReference[Exit[String, Int]]()
     val threadRef = new AtomicReference[Option[Thread]](None)
+    val observerRef = new AtomicReference[Option[EruObserver]](None)
 
-    val state = UnifiedFiberState.Active(latch, exitRef, threadRef)
+    val state = UnifiedFiberState.Active(latch, exitRef, threadRef, observerRef, id)
 
     state match {
-      case UnifiedFiberState.Active(l, e, t) =>
-        assert(l eq latch, "Latch should be the same reference")
-        assert(e eq exitRef, "Exit ref should be the same reference")
-        assert(t eq threadRef, "Thread ref should be the same reference")
+      case UnifiedFiberState.Active(l, e, t, o, fid) =>
+        assert(l.eq(latch), "Latch should be the same reference")
+        assert(e.eq(exitRef), "Exit ref should be the same reference")
+        assert(t.eq(threadRef), "Thread ref should be the same reference")
+        assert(o.eq(observerRef), "Observer ref should be the same reference")
+        assertEquals(fid, id, "Fiber ID should match")
       case _ => fail("Expected Active state")
     }
   }
@@ -181,7 +185,7 @@ class UnifiedFiberSpec extends munit.FunSuite {
 
     // Last completion wins (not thread-safe, but that's the current implementation)
     fiber.currentState match {
-      case UnifiedFiberState.Active(latch, exitRef, _) =>
+      case UnifiedFiberState.Active(latch, exitRef, _, _, _) =>
         assertEquals(exitRef.get(), exit2, "Last exit should be set")
         assertEquals(latch.getCount(), 0L, "Latch should be released")
       case _ => fail("Expected Active state")
