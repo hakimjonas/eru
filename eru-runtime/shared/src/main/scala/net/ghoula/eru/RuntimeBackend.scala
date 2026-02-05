@@ -74,6 +74,10 @@ private object StructuredConcurrency {
 
         fibersToCleanup.foreach { fiberToCleanup =>
           try {
+            fiberToCleanup
+              .interrupt(InterruptCause.ParentTerminated(FiberId.fresh(), Exit.Success(())))
+              .attempt
+              .unsafeRunSync()
             fiberToCleanup.await.attempt.unsafeRunSync()
           } catch {
             case _: Exception => ()
