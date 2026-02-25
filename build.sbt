@@ -7,7 +7,7 @@ import scala.sys.process.Process
 // ===== Build-wide Settings =====
 ThisBuild / organization := "net.ghoula"
 ThisBuild / versionScheme := Some("early-semver")
-ThisBuild / scalaVersion := "3.7.4"
+ThisBuild / scalaVersion := "3.8.2"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
@@ -40,7 +40,7 @@ ThisBuild / scmInfo := Some(
 // ===== Compiler Settings =====
 lazy val sharedScalacOptions = Seq(
   "-feature",
-  "-Xfatal-warnings",
+  "-Werror",
   "-Wunused:all",
   "-Wrecurse-with-default",
   "-no-indent"
@@ -217,7 +217,6 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
     Test / fork := true,
     Test / javaOptions ++= Seq(
       "-XX:+UseZGC", // Enable ZGC (optimal for Project Loom)
-      "-XX:+ZGenerational", // Enable generational mode (Java 21+)
       "-Xms2G", // Initial heap size
       "-Xmx2G", // Max heap size
       "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4"
