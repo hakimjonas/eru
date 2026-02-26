@@ -1569,10 +1569,18 @@ object Eru {
         case Continuation.End() =>
           done((Right(input), fins))
         case Continuation.Step(f, next) =>
-          tailcall(runFiberLoop(f(input), fins, hooks, currentFiberId, outstandingFibers)).flatMap {
-            case (Right(intermediate), fs) =>
-              tailcall(runFiberContinuation(next, intermediate, fs, hooks, currentFiberId, outstandingFibers))
-            case (Left(error), fs) => done((Left(error), fs))
+          next match {
+            case Continuation.End() =>
+              // Tail-position optimization: when next is End() (identity), skip the no-op
+              // continuation and return runFiberLoop result directly. This prevents TailRec.Cont
+              // accumulation in recursive flatMap loops (e.g. handleRequestLoop, Eru.forever).
+              tailcall(runFiberLoop(f(input), fins, hooks, currentFiberId, outstandingFibers))
+            case _ =>
+              tailcall(runFiberLoop(f(input), fins, hooks, currentFiberId, outstandingFibers)).flatMap {
+                case (Right(intermediate), fs) =>
+                  tailcall(runFiberContinuation(next, intermediate, fs, hooks, currentFiberId, outstandingFibers))
+                case (Left(error), fs) => done((Left(error), fs))
+              }
           }
         case Continuation.Compose(first, g) =>
           // Process the first continuation, then apply g to the result

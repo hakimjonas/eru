@@ -126,6 +126,20 @@ class ExtremeStackSafetySpec extends munit.FunSuite {
     }
   }
 
+  test("effectful recursive flatMap loop completes without closure accumulation") {
+    // This exercises the TailCalls interpreter path (via Eru.effect), unlike Eru.succeed
+    // which triggers flatMap's eager evaluation and bypasses the interpreter entirely.
+    // Without the Step(f, End()) optimization, TailRec.Cont nodes accumulate and cause OOM.
+    def effectfulLoop(n: Int): Eru[Throwable, Int] =
+      Eru.effect(n).flatMap { current =>
+        if (current <= 0) Eru.succeed(0)
+        else effectfulLoop(current - 1)
+      }
+
+    val result = effectfulLoop(100_000).unsafeRunSync()
+    assertEquals(result, 0)
+  }
+
   test("extremely deep chaining with collection methods") {
     val chainDepth = 1000 // 1K chain depth
 
