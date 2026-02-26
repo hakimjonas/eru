@@ -27,7 +27,7 @@ import net.ghoula.eru.prelude.*
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 3, timeUnit = TimeUnit.SECONDS)
-@Fork(value = 3) // Multiple forks for statistical confidence
+@Fork(value = 3, jvmArgsAppend = Array("-XX:+UseZGC", "-XX:+ZGenerational"))
 abstract class MatrixBenchmarkBase {
 
   // =============================================================================

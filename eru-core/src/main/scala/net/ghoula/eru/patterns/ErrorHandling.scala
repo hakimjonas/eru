@@ -182,6 +182,10 @@ object ErrorHandling {
       require(!maxDelay.isNegative, "maxDelay cannot be negative")
       require(maxDelay.compareTo(baseDelay) >= 0, "maxDelay must be >= baseDelay")
 
+      // @unchecked is correct here (not .runtimeChecked): E is a type parameter erased at
+      // runtime, so this is an erasure-related cast. .runtimeChecked only suppresses exhaustivity
+      // warnings, not erasure warnings. Safety: callers provide a typed shouldRetryError function,
+      // and the catch-all case handles non-E values.
       val anyErrorPredicate: Any => Boolean = {
         case e: E @unchecked => shouldRetryError(e)
         case _ => false

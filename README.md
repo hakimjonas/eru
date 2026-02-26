@@ -15,7 +15,7 @@ libraryDependencies ++= Seq(
 )
 ```
 
-**Requirements**: Scala 3.7.3+, Java 21+ (for JVM), Scala Native 0.5+ (for Native)
+**Requirements**: Scala 3.8.2+, Java 21+ (for JVM), Scala Native 0.5+ (for Native)
 
 ## Quick Start
 
@@ -86,8 +86,8 @@ val validated: Eru[String, Int] =
 
 Eru's design leverages modern platform capabilities:
 
-- **Scala 3.7.3+**: Union types for error channels, GADT enums for the effect representation, opaque types for domain modeling
-- **Java 21+**: Virtual Threads for scalable concurrency, structured concurrency for safe fiber management
+- **Scala 3.8.2+**: Union types for error channels, GADT enums for the effect representation, opaque types for domain modeling. Better Fors (SIP-62) eliminates redundant `.map` calls and tuple allocations in for-comprehensions. VarHandle-based lazy vals (replacing `sun.misc.Unsafe`) ensure forward compatibility with JDK 24+/26+.
+- **Java 21+**: Virtual Threads for lightweight concurrency. ZGC generational mode recommended (`-XX:+UseZGC -XX:+ZGenerational`; default in JDK 23+). Structured concurrency is implemented by Eru itself, not inherited from the JDK (Java's SC remains in preview as of JDK 25).
 - **Scala Native 0.5+**: Cross-platform `java.time` via scala-java-time, zero-reflection runtime
 
 These platform improvements enabled compile-time safety guarantees that weren't previously possible.

@@ -168,6 +168,11 @@ object UnifiedFiber {
   def complete[E, A](fiber: UnifiedFiber[E, A], exit: Exit[E, A], skipObserver: Boolean = false): Unit = {
     fiber.state match {
       case UnifiedFiberState.Active(latch, exitRef, _, observerRef, fiberId) =>
+        // @unchecked is correct here (not .runtimeChecked): generic type parameters E and A
+        // in AtomicReference[Exit[E, A]] are erased at runtime. .runtimeChecked only suppresses
+        // exhaustivity warnings, not erasure warnings. Safety: the fiber state machine guarantees
+        // exitRef holds an AtomicReference[Exit[E, A]] — Active state is only created with the
+        // matching type parameters, and complete() is called with the same E, A.
         exitRef match {
           case ref: AtomicReference[Exit[E, A]] @unchecked =>
             ref.set(exit)
