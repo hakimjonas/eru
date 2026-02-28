@@ -8,7 +8,7 @@
 *.zip
 *.tar.gz
 *.rar
-
+*.semanticdb
 # sbt specific
 .cache/
 .history/

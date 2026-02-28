@@ -217,7 +217,7 @@ enum RuntimeBackend {
 
                   Thread.startVirtualThread { () =>
                     UnifiedFiber.setThread(fiber, Thread.currentThread())
-                    // Restore parent scope in new thread
+                    // Restore parent scope and timer service in new thread
                     StructuredConcurrency.setCurrentScope(parentScope)
 
                     try {
@@ -262,7 +262,7 @@ enum RuntimeBackend {
 
               Thread.startVirtualThread { () =>
                 UnifiedFiber.setThread(fiber, Thread.currentThread())
-                // Restore parent scope in new thread
+                // Restore parent scope and timer service in new thread
                 StructuredConcurrency.setCurrentScope(parentScope)
 
                 try {
@@ -329,8 +329,9 @@ enum RuntimeBackend {
 
           val runLeft: Runnable = () => {
             leftThreadRef.set(Some(Thread.currentThread()))
-            // Restore parent scope in race thread
+            // Restore parent scope and timer service in race thread
             StructuredConcurrency.setCurrentScope(parentScope)
+
             val (exit, finalizers) = Eru.executeWithFinalizers(fa)
             finalizers.foreach { finalizer =>
               try finalizer().unsafeRunSync()
@@ -350,8 +351,9 @@ enum RuntimeBackend {
 
           val runRight: Runnable = () => {
             rightThreadRef.set(Some(Thread.currentThread()))
-            // Restore parent scope in race thread
+            // Restore parent scope and timer service in race thread
             StructuredConcurrency.setCurrentScope(parentScope)
+
             val (exit, finalizers) = Eru.executeWithFinalizers(fb)
             finalizers.foreach { finalizer =>
               try finalizer().unsafeRunSync()

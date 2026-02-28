@@ -20,6 +20,19 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
   // Lazy instance-local executor to avoid shared thread pool contention between multiple Eru applications
   private lazy val privateExecutor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()
 
+  // Timer wheel for Eru.at / Eru.after — lazy so it's only created on VirtualThreads backend
+  private lazy val timerWheel: HashedTimerWheel = {
+    val tw = new HashedTimerWheel()
+    TimerService.set(tw)
+    tw
+  }
+
+  // Initialize timer wheel on VirtualThreads backend
+  backend match {
+    case RuntimeBackend.VirtualThreads => timerWheel // force lazy val
+    case _ => ()
+  }
+
   val capabilities: BackendCapabilities = backend match {
     case RuntimeBackend.Synchronous =>
       new BackendCapabilities(
@@ -169,6 +182,11 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
 
   override def cleanup(): Unit = {
     backend.cleanup(Some(rootFibers))
+    // Shutdown timer wheel if it was initialized
+    backend match {
+      case RuntimeBackend.VirtualThreads => timerWheel.shutdown()
+      case _ => ()
+    }
     // Note: Don't eagerly close privateExecutor as it may still have pending tasks
     // The lazy executor will be cleaned up by GC when the adapter is collected
   }

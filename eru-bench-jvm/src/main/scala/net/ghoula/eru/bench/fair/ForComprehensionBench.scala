@@ -10,9 +10,9 @@ import net.ghoula.eru.prelude.*
   *   - Change 2: val bindings desugar to simple vals instead of tuple wrapping
   *   - Change 3: compiler skips the final .map when yield returns the last binding
   *
-  * These benchmarks measure the effect of these optimizations on Eru's for-comprehension-driven API.
-  * Since Eru's entire composition model is built on flatMap/map chains, these compiler improvements
-  * directly reduce allocation pressure in real Eru programs.
+  * These benchmarks measure the effect of these optimizations on Eru's for-comprehension-driven
+  * API. Since Eru's entire composition model is built on flatMap/map chains, these compiler
+  * improvements directly reduce allocation pressure in real Eru programs.
   */
 class ForComprehensionBench extends FairBenchmarkBase {
 
@@ -35,8 +35,8 @@ class ForComprehensionBench extends FairBenchmarkBase {
   // Intermediate val binding — tuple elimination (SIP-62 Change 2)
   // =============================================================================
 
-  /** Val bindings in for-comprehensions previously created intermediate tuples.
-    * 3.8 desugars them to simple vals, eliminating tuple allocation.
+  /** Val bindings in for-comprehensions previously created intermediate tuples. 3.8 desugars them
+    * to simple vals, eliminating tuple allocation.
     */
   @Benchmark
   def forWithIntermediateVals(): Int = runEru {
@@ -75,8 +75,8 @@ class ForComprehensionBench extends FairBenchmarkBase {
   // Effectful chain (interpreter path)
   // =============================================================================
 
-  /** Uses Eru.effect to exercise the TailCalls interpreter, not just eager Succeed.
-    * This ensures the optimization benefits hold for suspended effects too.
+  /** Uses Eru.effect to exercise the TailCalls interpreter, not just eager Succeed. This ensures
+    * the optimization benefits hold for suspended effects too.
     */
   @Benchmark
   def forEffectfulChain(): Int = runEru {
