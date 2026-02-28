@@ -22,11 +22,11 @@ addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "1.1.4")
 addSbtPlugin("ch.epfl.scala" % "sbt-tasty-mima" % "1.3.0")
 
 // Benchmarking
-addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.7")
+addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.8")
 
 // Aggregated Scaladoc
 addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.5.0")
 
 // Site + GitHub Pages publishing
-addSbtPlugin("com.github.sbt" % "sbt-site" % "1.6.0")
+addSbtPlugin("com.github.sbt" % "sbt-site" % "1.7.0")
 addSbtPlugin("com.github.sbt" % "sbt-ghpages" % "0.8.0")

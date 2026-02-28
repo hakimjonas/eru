@@ -175,8 +175,8 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
     libraryDependencies ++= Seq(
       "io.github.cquiroz" %%% "scala-java-time" % "2.6.0",
       "io.github.cquiroz" %%% "scala-java-time-tzdb" % "2.6.0" % Runtime,
-      "org.scalameta" %%% "munit" % "1.1.1" % Test,
-      "org.scalameta" %%% "munit-scalacheck" % "1.1.0" % Test
+      "org.scalameta" %%% "munit" % "1.2.3" % Test,
+      "org.scalameta" %%% "munit-scalacheck" % "1.2.0" % Test
     )
   )
   .jvmSettings(
@@ -205,8 +205,8 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
     name := "eru-runtime",
     libraryDependencies ++= Seq(
       "io.github.cquiroz" %%% "scala-java-time" % "2.6.0",
-      "org.scalameta" %%% "munit" % "1.1.1" % Test,
-      "org.scalameta" %%% "munit-scalacheck" % "1.1.0" % Test
+      "org.scalameta" %%% "munit" % "1.2.3" % Test,
+      "org.scalameta" %%% "munit-scalacheck" % "1.2.0" % Test
     )
   )
   .jvmSettings(
@@ -245,7 +245,7 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
     name := "eru-bench-jvm",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % "2.1.22",
+      "dev.zio" %% "zio" % "2.1.24",
       "org.typelevel" %% "cats-effect" % "3.6.3"
     ),
     // JMH settings
@@ -265,7 +265,7 @@ lazy val eruBenchMatrix = (project in file("eru-bench-matrix"))
     name := "eru-bench-matrix",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % "2.1.22",
+      "dev.zio" %% "zio" % "2.1.24",
       "org.typelevel" %% "cats-effect" % "3.6.3"
     ),
     // JMH settings for matrix benchmarks
@@ -287,7 +287,7 @@ lazy val eruIntegrationTest = (project in file("eru-integration-test"))
     name := "eru-integration-test",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "munit" % "1.2.1" % Test
+      "org.scalameta" %% "munit" % "1.2.3" % Test
     ),
     Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
   )

@@ -71,7 +71,8 @@ val validated: Eru[String, Int] =
 ### JVM (Java 21+)
 - **Concurrency**: Virtual Threads provide lightweight fibers with true parallelism
 - **Operations**: fork, race, timeout, sleep all work as expected
-- **Primitives**: Ref, Semaphore, Deferred, Promise, Queue for coordination
+- **Primitives**: Ref, Semaphore, Deferred, Promise, Queue, RefMap, KeyedSemaphore for coordination
+- **Timer**: `Eru.at`/`Eru.after` for scheduling effects via hashed timer wheel
 - **Use cases**: Web servers, concurrent applications, high-throughput systems
 
 ### Scala Native (0.5+)
@@ -86,8 +87,8 @@ val validated: Eru[String, Int] =
 
 Eru's design leverages modern platform capabilities:
 
-- **Scala 3.8.2+**: Union types for error channels, GADT enums for the effect representation, opaque types for domain modeling. Better Fors (SIP-62) eliminates redundant `.map` calls and tuple allocations in for-comprehensions. VarHandle-based lazy vals (replacing `sun.misc.Unsafe`) ensure forward compatibility with JDK 24+/26+.
-- **Java 21+**: Virtual Threads for lightweight concurrency. ZGC generational mode recommended (`-XX:+UseZGC -XX:+ZGenerational`; default in JDK 23+). Structured concurrency is implemented by Eru itself, not inherited from the JDK (Java's SC remains in preview as of JDK 25).
+- **Scala 3.8.2+**: Union types for error channels, GADT enums for the effect representation, opaque types for domain modeling
+- **Java 21+**: Virtual Threads for scalable concurrency, structured concurrency for safe fiber management
 - **Scala Native 0.5+**: Cross-platform `java.time` via scala-java-time, zero-reflection runtime
 
 These platform improvements enabled compile-time safety guarantees that weren't previously possible.
@@ -106,7 +107,7 @@ For a comprehensive progressive guide, see **[The Eru Book](https://hakimjonas.g
 
 **Version**: 0.1.0 (pre-release)
 **Stability**: Core API is stable. Breaking changes may occur before 1.0.
-**Test Coverage**: 576+ tests across JVM and Native platforms
+**Test Coverage**: 1000+ tests across JVM and Native platforms
 
 The JVM runtime is production-ready with full concurrency support. Native support provides API compatibility for cross-compilation with synchronous execution.
 
