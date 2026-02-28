@@ -60,27 +60,6 @@ jobs:
       # - name: Build documentation site
       #   run: sbt docsSite
 
-      - name: Run CI benchmarks (comprehensive sampling vs ZIO/Cats Effect)
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "Running fast benchmarks for PR validation..."
-            timeout 12m ./tools/run-benchmarks.sh ci --quick --output=ci-results
-          else
-            echo "Running thorough benchmarks for main branch..."
-            timeout 12m ./tools/run-benchmarks.sh ci --thorough --output=ci-results
-          fi
-
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v5
-        if: always()
-        with:
-          name: ci-benchmark-results
-          path: |
-            ci-results/*.json
-            ci-results/*.log
-            ci-results/system-info-*.json
-          retention-days: 30
-
   # --- Publish Job: Commented out for now. ---
   # When you are ready to stage a release, remove the '#' from the lines below.
   # This job will trigger on a tag push (e.g., 'v1.0.0').

@@ -124,7 +124,7 @@ lazy val root = (project in file("."))
     }
   )
   .settings(
-    // Fair benchmark system commands (use ./run-fair-benchmarks.sh for full system)
+    // Benchmark commands (use ./tools/run-benchmarks.sh for the full runner)
     addCommandAlias("benchCore", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*CoreOperationsBench.*"),
     addCommandAlias("benchState", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*StateManagementBench.*"),
     addCommandAlias("benchConcurrency", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*ConcurrencyBench.*"),

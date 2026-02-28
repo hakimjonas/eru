@@ -183,7 +183,7 @@ class YourFeatureSpec extends EruSpecification {
 
 ## Performance Expectations
 
-Eru achieves exceptional performance (4,756-160,143 ops/ms, 50-80x faster than Cats Effect). When contributing:
+Eru's GADT-based interpreter and Scala 3 enum representation achieve high throughput across core operations (4,756-160,143 ops/ms in JMH benchmarks). When contributing:
 
 - **Maintain performance standards** - benchmark critical paths
 - **Profile before optimizing** - use JMH benchmarks for validation
@@ -196,11 +196,8 @@ Eru achieves exceptional performance (4,756-160,143 ops/ms, 50-80x faster than C
 # Quick performance check (structured JSON output)
 ./tools/run-benchmarks.sh smoke
 
-# Full benchmark suite
+# Full comparative suite (local development only)
 ./tools/run-benchmarks.sh comparative
-
-# CI benchmarks validation (5-8 minutes, comprehensive)
-./tools/run-benchmarks.sh ci
 
 # Individual benchmark with JSON output (recommended)
 LANG=C LC_ALL=C sbt "eruBenchJVM/Jmh/run -rf json -rff results.json CoreOperationsBench.eruSucceed"

@@ -8,8 +8,8 @@
 #
 # Modes:
 #   smoke        - Representative sampling across all categories (~2-3 min, default)
-#   ci           - Comprehensive CI-friendly sampling (~5-8 min, CI/CD recommended)
-#   comparative  - All comparative benchmarks vs ZIO/Cats Effect (~25-35 min, comprehensive)
+#   ci           - Comprehensive sampling, all categories (~5-8 min)
+#   comparative  - All cross-framework benchmarks (~25-35 min, comprehensive)
 #   scaling      - Parametric scaling analysis (~20-30 min)
 #   memory       - Memory & GC analysis (~10-15 min)
 #   full         - Complete benchmark suite (~60-90 min)
@@ -88,8 +88,8 @@ while [[ $# -gt 0 ]]; do
             echo "MODES (what to benchmark):"
             echo "  smoke       - Representative sampling across all categories (~2-3 min) [default]"
             echo "  quick       - Fastest possible full picture (1 iteration, all benchmarks) (~5 min)"
-            echo "  ci          - Comprehensive CI-friendly sampling (~5-8 min) [CI/CD recommended]"
-            echo "  comparative - All comparative benchmarks vs ZIO/Cats Effect (~25-35 min) [comprehensive]"
+            echo "  ci          - Comprehensive sampling, all categories (~5-8 min)"
+            echo "  comparative - All cross-framework benchmarks (~25-35 min) [comprehensive]"
             echo "  memory      - Memory & GC analysis (~10-15 min)"
             echo "  full        - Complete benchmark suite (~45-60 min)"
             echo ""
@@ -230,7 +230,7 @@ case $MODE in
         ;;
 
     ci)
-        echo -e "${YELLOW}Running CI benchmarks (comprehensive sampling for continuous integration)${NC}\n"
+        echo -e "${YELLOW}Running CI benchmarks (all categories)${NC}\n"
         # Core operations - succeed (isolated: eruSucceed can cause VM premature exit on CI)
         run_benchmark "Core Operations - Succeed (CI)" "net.ghoula.eru.bench.fair.CoreOperationsBench.eruSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.zioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.ioSucceed"
         # Core operations - chains (reliable, produces the more interesting comparison data)
@@ -248,7 +248,7 @@ case $MODE in
         ;;
 
     comparative)
-        echo -e "${YELLOW}Running comparative benchmarks vs ZIO/Cats Effect (all categories)${NC}\n"
+        echo -e "${YELLOW}Running cross-framework benchmarks (all categories)${NC}\n"
         run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench"
         run_benchmark "Error Handling" "net.ghoula.eru.bench.fair.ErrorHandlingBench"
         run_benchmark "State Management" "net.ghoula.eru.bench.fair.StateManagementBench"

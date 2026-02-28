@@ -1,6 +1,6 @@
 ### The Eru Manifesto (Revised)
 
-**Our Vision:** To create `Eru`, the definitive effect system for the discerning Scala 3 developer. `Eru` is not an alternative to existing frameworks; it is a new benchmark for what is possible when a library is designed from first principles to leverage the full power, purity, and expressiveness of a modern type system.
+**Our Vision:** To create `Eru`, an effect system designed from first principles for Scala 3 and JVM 21+. ZIO and Cats Effect informed many of Eru's design decisions. Targeting modern platforms exclusively — Scala 3's type system and Project Loom's virtual threads — opens up design choices that backward compatibility would otherwise preclude.
 
 Its worth is demonstrated not by ecosystem breadth, but by the integrity of its own design, its lawfulness, and its operational reliability.
 
@@ -49,7 +49,7 @@ A running program should not be a black box. `Eru` is built from the ground up t
 
 ---
 
-This manifesto defines `Eru`'s identity: a pioneer, not a follower. It is a testament to the idea that a library can be simultaneously pure, correct, powerful, and a profound joy to use. The existing validation library `Valar` will be rebased on `Eru` in its next release, unifying effect, error, and validation semantics.
+Eru builds on ideas from ZIO and Cats Effect, and aims to provide a Scala 3 idiomatic effect system built for performance and ergonomics.
 
 ---
 

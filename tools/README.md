@@ -16,7 +16,7 @@ Main benchmark runner with multiple execution modes.
 **Modes:**
 - `smoke` - Representative sampling across all categories (2-3 min, default)
 - `ci` - Comprehensive CI-friendly sampling (5-8 min, recommended for CI/CD)
-- `comparative` - All comparative benchmarks vs ZIO/Cats Effect (25-35 min)
+- `comparative` - All comparative benchmarks across effect systems (25-35 min)
 - `scaling` - Parametric scaling analysis (20-30 min)
 - `memory` - Memory and GC analysis (10-15 min)
 - `full` - Complete benchmark suite (60-90 min)
@@ -74,7 +74,7 @@ scala tools/analyze-benchmarks.scala [timestamp]
 **Description:**
 Provides detailed statistical analysis including:
 - Per-category performance comparisons
-- Eru vs ZIO vs Cats Effect ratios
+- Cross-framework throughput ratios
 - Top performers identification
 - Performance concerns and recommendations
 
@@ -141,7 +141,7 @@ Benchmark results are stored in `benchmark-results/` with timestamped filenames.
 
 ### CI Integration
 
-CI uses `./tools/run-benchmarks.sh ci` with either `--quick` (for PRs) or `--thorough` (for main branch). See `.github/workflows/ci.yml` for configuration.
+Benchmarks are not run in CI. They are available for local development use via `./tools/run-benchmarks.sh`.
 
 ### Performance Analysis
 

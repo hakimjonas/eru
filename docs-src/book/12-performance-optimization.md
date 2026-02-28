@@ -100,10 +100,7 @@ Based on comprehensive CI benchmarking, Eru demonstrates exceptional performance
 - eruIterate: 23,148 ops/ms
 - eruTraverse: 25,641 ops/ms
 
-**Comparative Performance** (Eru vs other effect systems):
-- 2-4x faster than ZIO for core operations
-- 50-160x faster than Cats Effect for basic operations
-- Consistent performance across different operation types
+**Why Eru Performs Well**: Targeting Scala 3 + JVM 21+ exclusively enables design choices that benefit performance. The GADT-based interpreter uses Scala 3 `enum` for efficient pattern matching, and the runtime is virtual thread-native rather than adapted from a thread-pool model. ZIO and Cats Effect target broader platform compatibility, which involves different trade-offs.
 
 ## Performance Optimization Strategies
 
@@ -738,7 +735,7 @@ productionMonitoringExample()
 
 Eru's performance characteristics enable building high-performance systems:
 
-**Exceptional Baseline Performance**: 2k-160k ops/ms for core operations, significantly faster than other effect systems.
+**Exceptional Baseline Performance**: 2k-160k ops/ms for core operations, enabled by Eru's GADT-based interpreter and Scala 3 enum optimizations.
 
 **Consistent Performance**: Performance remains stable across different operation types and composition patterns.
 
