@@ -24,7 +24,7 @@ import net.ghoula.eru.prelude.*
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
-@Fork(value = 1, jvmArgsAppend = Array("-XX:+UseZGC", "-XX:+ZGenerational"))
+@Fork(value = 1, jvmArgsAppend = Array("-XX:+UseZGC"))
 abstract class FairBenchmarkBase {
 
   // Shared runtime setup for all benchmarks - using shared for optimal performance
