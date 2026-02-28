@@ -1,6 +1,6 @@
 # Chapter 14: The Eru Ecosystem
 
-This final chapter explores Eru's place within the broader Scala ecosystem, covering Valar integration, migration strategies from other effect systems, community patterns, and the vision for Eru's continued evolution. Understanding the ecosystem helps you make informed decisions about adoption and integration.
+This final chapter explores Eru's place within the broader Scala ecosystem, covering migration strategies from other effect systems, community patterns, and the vision for Eru's continued evolution. Understanding the ecosystem helps you make informed decisions about adoption and integration.
 
 ## The Eru Philosophy in Context
 
@@ -8,11 +8,11 @@ Eru exists within a rich ecosystem of Scala effect systems, each with different 
 
 ### Eru's Unique Position
 
-**Correctness-First Design**: Unlike systems that prioritize features or performance first, Eru treats correctness as non-negotiable.
+**Correctness-First Design**: Correctness is the non-negotiable foundation on which everything else is built.
 
 **Radical Ergonomics**: Every API decision prioritizes developer joy and intuitive usage patterns.
 
-**Exceptional Performance**: 50-160k ops/ms throughput with consistent performance across operation types.
+**High Throughput**: 4k-160k ops/ms from GADT-based interpreter and virtual thread-native runtime.
 
 **Cross-Platform Foundation**: Designed from the ground up for both JVM and Scala Native.
 
@@ -83,135 +83,6 @@ ecosystemResult match {
   case net.ghoula.eru.Result.Success(result) => println(s"Ecosystem integration: $result")
   case net.ghoula.eru.Result.Failure(error) => println(s"Ecosystem integration error: $error")
 }
-```
-
-## Valar Integration
-
-Valar is Eru's companion library for practical, opinionated patterns. While Eru provides the foundational effect system, Valar offers higher-level abstractions:
-
-```scala mdoc
-// Conceptual Valar integration patterns
-// (Note: This simulates Valar patterns for demonstration)
-
-object ValarPatterns {
-
-  // Valar-style HTTP service definition
-  trait ApiService[F[_]] {
-    def getUser(id: String): F[ApiResponse]
-    def updateUser(id: String, data: String): F[ApiResponse]
-    def deleteUser(id: String): F[Unit]
-  }
-
-  // Valar provides opinionated error handling
-  enum ApiError:
-    case NotFound(resource: String)
-    case Unauthorized(message: String)
-    case ValidationError(field: String, message: String)
-    case NetworkError(cause: String)
-
-  // Valar-style service implementation with Eru
-  class EruApiService extends ApiService[[A] =>> Eru[ApiError, A]] {
-
-    def getUser(id: String): Eru[ApiError, ApiResponse] = {
-      if (id.isEmpty) {
-        Eru.fail(ApiError.ValidationError("id", "User ID cannot be empty"))
-      } else if (id == "unauthorized") {
-        Eru.fail(ApiError.Unauthorized("Access denied"))
-      } else if (id == "notfound") {
-        Eru.fail(ApiError.NotFound(s"User $id"))
-      } else {
-        Eru.succeed(ApiResponse(s"User data for $id", 200))
-      }
-    }
-
-    def updateUser(id: String, data: String): Eru[ApiError, ApiResponse] = {
-      for {
-        _ <- getUser(id) // Validate user exists
-        result <- Eru.succeed(ApiResponse(s"Updated user $id", 200))
-      } yield result
-    }
-
-    def deleteUser(id: String): Eru[ApiError, Unit] = {
-      getUser(id).map(_ => ()) // Validate user exists, then delete
-    }
-  }
-
-  // Valar-style application composition
-  case class AppConfig(apiUrl: String, timeout: Int, retries: Int)
-
-  class Application(config: AppConfig, apiService: ApiService[[A] =>> Eru[ApiError, A]]) {
-
-    def handleUserRequest(action: String, userId: String, data: Option[String] = None): Eru[String, String] = {
-      val apiCall = action match {
-        case "get" =>
-          apiService.getUser(userId).map(_.data)
-        case "update" =>
-          data.fold(Eru.fail(ApiError.ValidationError("data", "Update data required"))) { updateData =>
-            apiService.updateUser(userId, updateData).map(_.data)
-          }
-        case "delete" =>
-          apiService.deleteUser(userId).map(_ => "User deleted")
-        case _ =>
-          Eru.fail(ApiError.ValidationError("action", "Invalid action"))
-      }
-
-      // Convert API errors to string errors for the application layer
-      apiCall.mapError {
-        case ApiError.NotFound(resource) => s"Resource not found: $resource"
-        case ApiError.Unauthorized(msg) => s"Unauthorized: $msg"
-        case ApiError.ValidationError(field, msg) => s"Validation error in $field: $msg"
-        case ApiError.NetworkError(cause) => s"Network error: $cause"
-      }
-    }
-
-    // Valar-style retry patterns
-    def withRetry[A](operation: Eru[String, A], maxRetries: Int = config.retries): Eru[String, A] = {
-      def attempt(retriesLeft: Int): Eru[String, A] = {
-        operation.recoverWith { error =>
-          if (retriesLeft > 0) {
-            for {
-              _ <- Eru.succeed(s"Retrying operation: $error (retriesLeft: $retriesLeft)").debug("Retry")
-              result <- attempt(retriesLeft - 1)
-            } yield result
-          } else {
-            Eru.fail(s"Operation failed after ${maxRetries} retries: $error")
-          }
-        }
-      }
-      attempt(maxRetries)
-    }
-  }
-}
-
-// Valar integration example
-def valarExample(): Eru[String, String] = {
-  val config = ValarPatterns.AppConfig("https://api.example.com", 5000, 3)
-  val apiService = ValarPatterns.EruApiService()
-  val app = ValarPatterns.Application(config, apiService)
-
-  for {
-    // Test successful operations
-    getResult <- app.handleUserRequest("get", "user123")
-    updateResult <- app.handleUserRequest("update", "user123", Some("new data"))
-
-    // Test error handling
-    notFoundResult <- app.handleUserRequest("get", "notfound").attempt.map {
-      case net.ghoula.eru.Result.Success(result) => s"Success: $result"
-      case net.ghoula.eru.Result.Failure(error) => s"Expected error: $error"
-    }
-
-    // Test retry pattern
-    retryResult <- app.withRetry(Eru.succeed("Operation succeeded"), maxRetries = 2)
-
-    summary <- Eru.succeed {
-      s"Valar patterns: get=[$getResult], update=[$updateResult], notFound=[$notFoundResult], retry=[$retryResult]"
-    }
-
-  } yield summary
-}
-
-val valarResult = valarExample().unsafeRunSync()
-println(s"Valar integration: $valarResult")
 ```
 
 ## Migration from Other Effect Systems
@@ -851,8 +722,6 @@ The Eru ecosystem provides a comprehensive foundation for effect-driven developm
 
 **Complementary Design**: Eru works alongside existing Scala ecosystem tools, enhancing rather than replacing proven patterns.
 
-**Valar Integration**: Higher-level abstractions through Valar provide opinionated patterns for common use cases.
-
 **Migration Support**: Clear migration paths from Cats Effect and ZIO enable gradual adoption.
 
 **Community Patterns**: Established patterns for common architectural needs (repositories, sagas, event sourcing).
@@ -873,9 +742,7 @@ The journey with Eru begins with understanding its core principles and grows thr
 
 ## Acknowledgments
 
-The Eru project stands on the shoulders of giants in the Scala effect system ecosystem. We acknowledge the pioneering work of Cats Effect, ZIO, Monix, and other effect systems that have explored this design space and established many of the patterns that Eru builds upon.
-
-The Scala community's commitment to principled functional programming, type safety, and performance has created the foundation that makes Eru possible. Thank you to all contributors, reviewers, and early adopters who have helped shape Eru into a production-ready effect system.
+Eru builds on ideas from Cats Effect, ZIO, Monix, and other effect systems that explored this design space and established many of the patterns Eru uses. The Scala community's commitment to principled functional programming, type safety, and performance created the foundation that makes Eru possible. Thank you to all contributors, reviewers, and early adopters who have helped shape Eru into a production-ready effect system.
 
 ---
 

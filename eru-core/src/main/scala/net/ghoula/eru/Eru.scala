@@ -677,7 +677,7 @@ object Eru {
     *
     * This operation provides optimized batch execution that avoids creating continuation chains for
     * each iteration. Unlike manual chaining with `foldLeft`, this method uses specialized batch
-    * processing for superior performance.
+    * processing for better performance.
     *
     * @param as
     *   the collection of elements to process

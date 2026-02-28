@@ -957,4 +957,4 @@ Eru's integration patterns enable seamless adoption in existing systems:
 
 ## What's Next
 
-Chapter 14 explores the Eru ecosystem, including Valar integration, community patterns, migration strategies from other effect systems, and the broader vision for Eru's place in the Scala ecosystem.
+Chapter 14 explores the Eru ecosystem, including community patterns, migration strategies from other effect systems, and the broader vision for Eru's place in the Scala ecosystem.
