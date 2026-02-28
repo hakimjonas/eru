@@ -56,8 +56,9 @@ jobs:
       - name: Check documentation (mdoc)
         run: sbt docs
 
-      - name: Build documentation site
-        run: sbt docsSite
+      # TODO: Re-enable after first release (docsSite requires published artifacts)
+      # - name: Build documentation site
+      #   run: sbt docsSite
 
       - name: Run CI benchmarks (comprehensive sampling vs ZIO/Cats Effect)
         run: |
