@@ -275,7 +275,7 @@ And the corresponding `build.sbt`:
 
 ```scala
 // file: build.sbt
-ThisBuild / scalaVersion := "3.3.0"
+ThisBuild / scalaVersion := "3.8.2"
 
 libraryDependencies ++= Seq(
   "net.ghoula" %% "eru-core" % "@VERSION@"
