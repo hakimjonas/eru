@@ -3,7 +3,7 @@ addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.4")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.3")
 
 // Documentation
-addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.7.1")
+addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.8.2")
 
 // Publishing & release (GitHub Packages only)
 addSbtPlugin("com.github.sbt" % "sbt-dynver" % "5.1.0")
