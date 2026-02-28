@@ -37,6 +37,17 @@ ThisBuild / scmInfo := Some(
   ScmInfo(url("https://github.com/hakimjonas/eru"), "scm:git@github.com:hakimjonas/eru.git")
 )
 
+// ===== Assembly Merge Strategy (for standalone benchmark JAR) =====
+ThisBuild / assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", "services", _*) => MergeStrategy.concat
+  case PathList("META-INF", "BenchmarkList")  => MergeStrategy.concat
+  case PathList("META-INF", "CompilerHints")  => MergeStrategy.concat
+  case PathList("META-INF", _*)             => MergeStrategy.discard
+  case "scala-collection-compat.properties" => MergeStrategy.first
+  case x if x.endsWith("module-info.class") => MergeStrategy.discard
+  case x                                    => MergeStrategy.defaultMergeStrategy(x)
+}
+
 // ===== Compiler Settings =====
 lazy val sharedScalacOptions = Seq(
   "-feature",
@@ -253,7 +264,10 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
     Jmh / classDirectory := (Compile / classDirectory).value,
     Jmh / dependencyClasspath := (Compile / dependencyClasspath).value,
     Jmh / compile := (Jmh / compile).dependsOn(Compile / compile).value,
-    Jmh / run := (Jmh / run).dependsOn(Jmh / compile).evaluated
+    Jmh / run := (Jmh / run).dependsOn(Jmh / compile).evaluated,
+    // Standalone JMH fat JAR
+    assembly / mainClass := Some("org.openjdk.jmh.Main"),
+    assembly / assemblyJarName := "benchmarks.jar"
   )
 
 // ===== Matrix Benchmarks (JVM only) =====

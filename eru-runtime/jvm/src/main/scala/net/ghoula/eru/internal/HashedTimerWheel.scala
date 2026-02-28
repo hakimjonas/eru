@@ -97,6 +97,9 @@ private[eru] final class HashedTimerWheel(
     }
   }
 
+  /** Schedules a task for execution at the given epoch time. O(1) insertion into the appropriate
+    * wheel bucket.
+    */
   def schedule(epochMillis: Long, task: Runnable): Unit = {
     val now = System.currentTimeMillis()
     val delayMs = math.max(0L, epochMillis - now)
@@ -109,6 +112,7 @@ private[eru] final class HashedTimerWheel(
     wheel(targetBucket).add(new TimerEntry(epochMillis, task, rounds))
   }
 
+  /** Stops the daemon tick thread. Idempotent — subsequent calls are no-ops. */
   def shutdown(): Unit = {
     if (running.compareAndSet(true, false)) {
       daemonThreadRef.get().foreach(_.interrupt())

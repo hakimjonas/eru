@@ -24,6 +24,9 @@ addSbtPlugin("ch.epfl.scala" % "sbt-tasty-mima" % "1.3.0")
 // Benchmarking
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.8")
 
+// Fat JAR for standalone benchmark runs
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.3.0")
+
 // Aggregated Scaladoc
 addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.5.0")
 

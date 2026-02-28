@@ -12,7 +12,7 @@ Eru exists within a rich ecosystem of Scala effect systems, each with different 
 
 **Radical Ergonomics**: Every API decision prioritizes developer joy and intuitive usage patterns.
 
-**High Throughput**: 4k-160k ops/ms from GADT-based interpreter and virtual thread-native runtime.
+**High Throughput**: 1.5k-260k ops/ms from GADT-based interpreter and virtual thread-native runtime.
 
 **Cross-Platform Foundation**: Designed from the ground up for both JVM and Scala Native.
 

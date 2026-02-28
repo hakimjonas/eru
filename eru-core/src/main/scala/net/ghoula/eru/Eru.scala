@@ -155,8 +155,6 @@ enum Eru[+E, +A] {
           case NonFatal(ex) => Chain(this, Eru.Continuation.Step((_: A) => throw ex, Eru.Continuation.End()))
         }
 
-      // For now, EffectTotal uses standard Chain
-      // TODO: Optimize common patterns like EffectTotal.flatMap(x => Succeed(...))
       case EffectTotal(_) =>
         Chain(this, Eru.Continuation.Step(f, Eru.Continuation.End()))
 
@@ -366,23 +364,8 @@ enum Eru[+E, +A] {
 
 object Eru {
 
-  /** Internal method to check if an Eru is a pure value (no effects). This is used for
-    * optimizations in runtime operations like zipPar.
-    *
-    * This method enables significant performance improvements by detecting when an effect is
-    * already computed and doesn't need to be scheduled for execution. Pure values can be combined
-    * directly without creating fibers or involving the runtime scheduler. This optimization is
-    * particularly effective in tight loops or recursive patterns where effects are chained with
-    * already-computed values, such as in benchmark scenarios or certain algorithmic patterns.
-    *
-    * @param eru
-    *   the effect to check
-    * @tparam E
-    *   the error type
-    * @tparam A
-    *   the success type
-    * @return
-    *   true if this is Succeed or Fail, false otherwise
+  /** Returns true if this effect is an already-computed value (`Succeed` or `Fail`), allowing
+    * runtime operations like `zipPar` to skip fiber scheduling.
     */
   private[eru] def isPureValue[E, A](eru: Eru[E, A]): Boolean = eru match {
     case Succeed(_) | Fail(_) => true
