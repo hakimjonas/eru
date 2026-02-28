@@ -22,6 +22,23 @@ import net.ghoula.eru.prelude.*
   */
 class ConcurrencyScalingBench extends MatrixBenchmarkBase {
 
+  // Scaling dimensions (var required by JMH @Param injection)
+  @Param(Array("1", "8"))
+  var threadCount: Int = 1
+
+  @Param(Array("10", "1000"))
+  var fiberCount: Int = 100
+
+  @Param(Array("cpu-bound", "mixed"))
+  var workloadType: String = "cpu-bound"
+
+  // Fixed dimensions
+  val concurrencyLevel: Int = 1000
+  val collectionSize: Int = 100
+  val dataSize: String = "medium"
+  val chainDepth: Int = 100
+  val nestingLevel: Int = 10
+
   // =============================================================================
   // Fork/Await Scaling Tests
   // =============================================================================

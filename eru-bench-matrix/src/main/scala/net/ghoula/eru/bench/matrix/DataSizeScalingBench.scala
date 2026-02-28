@@ -23,6 +23,23 @@ import net.ghoula.eru.prelude.*
   */
 class DataSizeScalingBench extends MatrixBenchmarkBase {
 
+  // Scaling dimensions (var required by JMH @Param injection)
+  @Param(Array("10", "1000"))
+  var collectionSize: Int = 100
+
+  @Param(Array("small", "large"))
+  var dataSize: String = "medium"
+
+  @Param(Array("cpu-bound", "mixed"))
+  var workloadType: String = "cpu-bound"
+
+  // Fixed dimensions
+  val threadCount: Int = 1
+  val fiberCount: Int = 100
+  val concurrencyLevel: Int = 100
+  val chainDepth: Int = 100
+  val nestingLevel: Int = 10
+
   // =============================================================================
   // Collection Size Scaling Tests
   // =============================================================================
