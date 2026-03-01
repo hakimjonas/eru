@@ -24,7 +24,10 @@ import net.ghoula.eru.TimerService
   */
 private[eru] final class HashedTimerWheel(
   tickDurationMs: Long = 10L,
-  ticksPerWheel: Int = 4096
+  ticksPerWheel: Int = 4096,
+  clock: () => Long = () => System.currentTimeMillis(),
+  daemonEnabled: Boolean = true,
+  taskRunner: Runnable => Unit = r => { Thread.startVirtualThread(r); () }
 ) extends TimerService {
 
   private final class TimerEntry(
@@ -41,7 +44,7 @@ private[eru] final class HashedTimerWheel(
   private val daemonThreadRef = new AtomicReference[Option[Thread]](None)
 
   // Start the background tick thread
-  startDaemon()
+  if (daemonEnabled) startDaemon()
 
   private def startDaemon(): Unit = {
     val thread = Thread.startVirtualThread { () =>
@@ -55,44 +58,36 @@ private[eru] final class HashedTimerWheel(
         }
 
         if (alive && running.get()) {
-          val tick = currentTick.incrementAndGet()
-          val bucketIdx = (tick & mask).toInt
-          val bucket = wheel(bucketIdx)
-          val now = System.currentTimeMillis()
-
-          // Drain the bucket: fire due entries, re-enqueue entries with remaining rounds
-          val requeue = new java.util.ArrayList[TimerEntry]()
-          drainBucket(bucket, now, requeue)
-
-          // Re-add entries that weren't fired
-          val it = requeue.iterator()
-          while (it.hasNext) {
-            bucket.add(it.next())
-          }
+          tick()
         }
       }
     }
     daemonThreadRef.set(Some(thread))
   }
 
+  private[eru] def tick(): Unit = {
+    val t = currentTick.incrementAndGet()
+    val bucketIdx = (t & mask).toInt
+    val bucket = wheel(bucketIdx)
+    val requeue = new java.util.ArrayList[TimerEntry]()
+    drainBucket(bucket, requeue)
+    val it = requeue.iterator()
+    while (it.hasNext) bucket.add(it.next())
+  }
+
   @annotation.tailrec
   private def drainBucket(
     bucket: ConcurrentLinkedQueue[TimerEntry],
-    now: Long,
     requeue: java.util.ArrayList[TimerEntry]
   ): Unit = {
     Option(bucket.poll()) match {
+      case Some(entry) if entry.rounds > 0 =>
+        entry.rounds -= 1
+        requeue.add(entry)
+        drainBucket(bucket, requeue)
       case Some(entry) =>
-        if (entry.rounds <= 0 && entry.epochMillis <= now) {
-          Thread.startVirtualThread(entry.task)
-        } else if (entry.rounds > 0) {
-          entry.rounds -= 1
-          requeue.add(entry)
-        } else {
-          // Not yet due (rounds == 0 but epochMillis > now) — re-enqueue for next rotation
-          requeue.add(entry)
-        }
-        drainBucket(bucket, now, requeue)
+        taskRunner(entry.task)
+        drainBucket(bucket, requeue)
       case None => ()
     }
   }
@@ -101,7 +96,7 @@ private[eru] final class HashedTimerWheel(
     * wheel bucket.
     */
   def schedule(epochMillis: Long, task: Runnable): Unit = {
-    val now = System.currentTimeMillis()
+    val now = clock()
     val delayMs = math.max(0L, epochMillis - now)
     val delayTicks = math.max(1L, delayMs / tickDurationMs)
     val rounds = (delayTicks / ticksPerWheel).toInt
