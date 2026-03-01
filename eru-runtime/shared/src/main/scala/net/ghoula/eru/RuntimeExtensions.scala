@@ -161,6 +161,23 @@ object RuntimeExtensions {
     def timeoutTo[A1 >: A](duration: java.time.Duration, fallback: A1): Eru[E | Throwable, A1] =
       timeout(duration).recover { case _: java.util.concurrent.TimeoutException => fallback }
 
+    /** Times out with a specific domain error instead of a generic TimeoutException.
+      *
+      * This is useful when you want timeout failures to stay in your typed error channel rather
+      * than introducing java.util.concurrent.TimeoutException.
+      *
+      * @param duration
+      *   maximum duration to wait for completion
+      * @param timeoutError
+      *   the typed error to fail with on timeout
+      * @return
+      *   an effect that either succeeds normally or fails with timeoutError
+      */
+    def failAfter[E1 >: E](duration: java.time.Duration, timeoutError: E1): Eru[E1 | Throwable, A] =
+      timeout(duration).recoverWith { case _: java.util.concurrent.TimeoutException =>
+        Eru.fail(timeoutError)
+      }
+
     /** Retries this effect on typed failure according to the provided policy.
       *
       * Defects (Throwables) are propagated without retrying.

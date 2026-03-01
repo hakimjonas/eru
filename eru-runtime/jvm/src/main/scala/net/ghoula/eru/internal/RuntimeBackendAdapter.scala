@@ -48,27 +48,6 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
       )
   }
 
-  def computeExit[E, A](fa: Eru[E, A], fiberId: FiberId): Exit[E, A] = {
-    val _ = fiberId
-    backend match {
-      case RuntimeBackend.Synchronous =>
-        val (exit, finalizers) = Eru.executeWithFinalizers(fa)
-        finalizers.foreach { finalizer =>
-          try finalizer().unsafeRunSync()
-          catch case _: Exception => ()
-        }
-        exit
-
-      case RuntimeBackend.VirtualThreads =>
-        val (exit, finalizers) = Eru.executeWithFinalizers(fa)
-        finalizers.foreach { finalizer =>
-          try finalizer().unsafeRunSync()
-          catch case _: Exception => ()
-        }
-        exit
-    }
-  }
-
   def fork[E, A](fa: Eru[E, A], observer: Option[EruObserver]): Eru[Nothing, Fiber[E, A]] =
     backend.fork(fa, observer, Some(rootFibers))
 
@@ -193,13 +172,14 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
 
   override def shutdownRootFibers(observer: Option[EruObserver]): Eru[Nothing, (Int, Int)] = {
     Eru.effectTotal {
-      val fibersToCleanup = scala.collection.mutable.ListBuffer.empty[UnifiedFiber[?, ?]]
-      var fiber = Option(rootFibers.poll())
-      while (fiber.nonEmpty) {
-        fibersToCleanup += fiber.get
-        fiber = Option(rootFibers.poll())
-      }
+      @annotation.tailrec
+      def drain(acc: List[UnifiedFiber[?, ?]]): List[UnifiedFiber[?, ?]] =
+        Option(rootFibers.poll()) match {
+          case Some(fiber) => drain(fiber :: acc)
+          case None        => acc.reverse
+        }
 
+      val fibersToCleanup = drain(Nil)
       val total = fibersToCleanup.size
       val parentId = FiberId.fresh()
 
@@ -207,10 +187,7 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
         obs.onEvent(EruObserver.EruEvent.StructuredCleanupStarted(parentId, total))
       }
 
-      var interrupted = 0
-      var alreadyCompleted = 0
-
-      fibersToCleanup.foreach { fiberToCleanup =>
+      val (interrupted, alreadyCompleted) = fibersToCleanup.foldLeft((0, 0)) { case ((intAcc, compAcc), fiberToCleanup) =>
         try {
           val wasActive = fiberToCleanup.currentState match {
             case UnifiedFiberState.Active(_, _, _, _, _) => true
@@ -233,14 +210,14 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
               .interrupt(InterruptCause.ParentTerminated(parentId, Exit.Success(())))
               .attempt
               .unsafeRunSync()
-            interrupted += 1
+            fiberToCleanup.await.attempt.unsafeRunSync()
+            (intAcc + 1, compAcc)
           } else {
-            alreadyCompleted += 1
+            fiberToCleanup.await.attempt.unsafeRunSync()
+            (intAcc, compAcc + 1)
           }
-
-          fiberToCleanup.await.attempt.unsafeRunSync()
         } catch {
-          case _: Exception => ()
+          case _: Exception => (intAcc, compAcc)
         }
       }
 

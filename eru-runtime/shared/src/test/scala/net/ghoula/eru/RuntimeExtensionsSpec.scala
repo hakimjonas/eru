@@ -199,6 +199,12 @@ class RuntimeExtensionsSpec extends EruTestSuite {
     assertEquals(result, "fast")
   }
 
+  test("failAfter extension succeeds when effect completes in time") {
+    val fast = Eru.succeed(42)
+    val result = fast.failAfter(Duration.ofMillis(100), "timeout").unsafeRunSync()
+    assertEquals(result, 42)
+  }
+
   test("retry extension retries on failure") {
     var attempts = 0
     def failingEffect: Eru[String, String] =

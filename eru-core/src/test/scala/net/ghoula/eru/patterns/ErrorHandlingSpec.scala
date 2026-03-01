@@ -285,12 +285,6 @@ class ErrorHandlingSpec extends munit.FunSuite {
     assertEquals(exception.error, "Context: original error")
   }
 
-  test("failAfter extension method placeholder works") {
-    val effect = Eru.succeed(42)
-    val result = effect.failAfter(Duration.ofSeconds(1), "timeout").unsafeRunSync()
-    assertEquals(result, 42)
-  }
-
   test("error handling extensions compose with other extensions") {
 
     val breaker = new CircuitBreaker(FailureThreshold(2), Duration.ofSeconds(1), 1)

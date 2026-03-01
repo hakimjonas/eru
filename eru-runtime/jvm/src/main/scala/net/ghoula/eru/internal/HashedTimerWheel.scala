@@ -48,16 +48,14 @@ private[eru] final class HashedTimerWheel(
 
   private def startDaemon(): Unit = {
     val thread = Thread.startVirtualThread { () =>
-      var alive = true
-      while (alive && running.get()) {
+      while (running.get()) {
         try {
           Thread.sleep(tickDurationMs)
         } catch {
-          case _: InterruptedException =>
-            alive = running.get()
+          case _: InterruptedException => ()
         }
 
-        if (alive && running.get()) {
+        if (running.get()) {
           tick()
         }
       }
@@ -71,8 +69,7 @@ private[eru] final class HashedTimerWheel(
     val bucket = wheel(bucketIdx)
     val requeue = new java.util.ArrayList[TimerEntry]()
     drainBucket(bucket, requeue)
-    val it = requeue.iterator()
-    while (it.hasNext) bucket.add(it.next())
+    requeue.forEach(entry => bucket.add(entry))
   }
 
   @annotation.tailrec
