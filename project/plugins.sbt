@@ -3,7 +3,7 @@ addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.4")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.3")
 
 // Documentation
-addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.7.1")
+addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.8.2")
 
 // Publishing & release (GitHub Packages only)
 addSbtPlugin("com.github.sbt" % "sbt-dynver" % "5.1.0")
@@ -13,7 +13,7 @@ addSbtPlugin("org.portable-scala" % "sbt-crossproject" % "1.3.2")
 addSbtPlugin("org.portable-scala" % "sbt-scala-native-crossproject" % "1.3.2")
 
 // Scala Native
-addSbtPlugin("org.scala-native" % "sbt-scala-native" % "0.5.9")
+addSbtPlugin("org.scala-native" % "sbt-scala-native" % "0.5.10")
 
 // --- Compatibility Tools ---
 // For binary compatibility checking
@@ -22,11 +22,14 @@ addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "1.1.4")
 addSbtPlugin("ch.epfl.scala" % "sbt-tasty-mima" % "1.3.0")
 
 // Benchmarking
-addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.7")
+addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.8")
+
+// Fat JAR for standalone benchmark runs
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.3.0")
 
 // Aggregated Scaladoc
 addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.5.0")
 
 // Site + GitHub Pages publishing
-addSbtPlugin("com.github.sbt" % "sbt-site" % "1.6.0")
+addSbtPlugin("com.github.sbt" % "sbt-site" % "1.7.0")
 addSbtPlugin("com.github.sbt" % "sbt-ghpages" % "0.8.0")

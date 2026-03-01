@@ -1103,6 +1103,34 @@ final class EruRuntime(private val backend: internal.ConcurrencyBackend) {
     * properly released and any pending fibers are awaited.
     */
   def cleanup(): Unit = backend.cleanup()
+
+  /** Observable shutdown that interrupts and awaits all root fibers with proper event emission.
+    *
+    * Unlike `cleanup()` which runs outside the observable program, this method returns an Eru
+    * effect that can be composed with other effects. The cleanup events (StructuredCleanupStarted,
+    * ChildInterruptionRequested, FiberCompleted, StructuredCleanupCompleted) are visible to
+    * observers, making shutdown fully observable.
+    *
+    * Use this when you need accurate observability metrics at program end:
+    *
+    * {{{
+    * val program = for {
+    *   _ <- startChannelFibers(40000)
+    *   _ <- runSimulation(duration)
+    *   _ <- printPreCleanupSummary()
+    *   (interrupted, completed) <- runtime.shutdownRootFibers(Some(diagnosticsObserver))
+    *   _ <- printFinalSummary(interrupted, completed)
+    * } yield ()
+    * }}}
+    *
+    * @param observer
+    *   optional observer to receive structured cleanup events (StructuredCleanupStarted,
+    *   ChildInterruptionRequested, StructuredCleanupCompleted)
+    * @return
+    *   an effect yielding (interrupted count, already completed count)
+    */
+  def shutdownRootFibers(observer: Option[EruObserver] = None): Eru[Nothing, (Int, Int)] =
+    backend.shutdownRootFibers(observer)
 }
 
 /** Companion object providing factory methods for creating EruRuntime instances. */

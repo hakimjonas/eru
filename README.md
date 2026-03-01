@@ -15,7 +15,7 @@ libraryDependencies ++= Seq(
 )
 ```
 
-**Requirements**: Scala 3.7.3+, Java 21+ (for JVM), Scala Native 0.5+ (for Native)
+**Requirements**: Scala 3.8.2+, Java 21+ (for JVM), Scala Native 0.5+ (for Native)
 
 ## Quick Start
 
@@ -71,7 +71,8 @@ val validated: Eru[String, Int] =
 ### JVM (Java 21+)
 - **Concurrency**: Virtual Threads provide lightweight fibers with true parallelism
 - **Operations**: fork, race, timeout, sleep all work as expected
-- **Primitives**: Ref, Semaphore, Deferred, Promise, Queue for coordination
+- **Primitives**: Ref, Semaphore, Deferred, Promise, Queue, RefMap, KeyedSemaphore for coordination
+- **Timer**: `Eru.at`/`Eru.after` for scheduling effects via hashed timer wheel
 - **Use cases**: Web servers, concurrent applications, high-throughput systems
 
 ### Scala Native (0.5+)
@@ -86,7 +87,7 @@ val validated: Eru[String, Int] =
 
 Eru's design leverages modern platform capabilities:
 
-- **Scala 3.7.3+**: Union types for error channels, GADT enums for the effect representation, opaque types for domain modeling
+- **Scala 3.8.2+**: Union types for error channels, GADT enums for the effect representation, opaque types for domain modeling
 - **Java 21+**: Virtual Threads for scalable concurrency, structured concurrency for safe fiber management
 - **Scala Native 0.5+**: Cross-platform `java.time` via scala-java-time, zero-reflection runtime
 
@@ -106,7 +107,7 @@ For a comprehensive progressive guide, see **[The Eru Book](https://hakimjonas.g
 
 **Version**: 0.1.0 (pre-release)
 **Stability**: Core API is stable. Breaking changes may occur before 1.0.
-**Test Coverage**: 576+ tests across JVM and Native platforms
+**Test Coverage**: 1000+ tests across JVM and Native platforms
 
 The JVM runtime is production-ready with full concurrency support. Native support provides API compatibility for cross-compilation with synchronous execution.
 

@@ -196,7 +196,7 @@ val deep = deepChain(100).unsafeRunSync()
 println(s"Deep result: $deep")
 ```
 
-**Key insight**: Eru's `flatMap` chains are stack-safe, but Scala function recursion is not. The iterative approach above builds an Eru data structure with many `flatMap` operations, which Eru's runtime can execute using trampolining. A naive recursive implementation would overflow the Scala call stack before Eru could provide its stack safety guarantees.
+**Key insight**: Eru's `flatMap` chains are stack-safe, but Scala function recursion is not. The iterative approach above builds an Eru data structure with many `flatMap` operations, which Eru's runtime can execute using its tail-recursive state machine interpreter. A naive recursive implementation would overflow the Scala call stack before Eru could provide its stack safety guarantees.
 
 **⚠️ Common Pitfall - Avoid Recursive Construction**:
 

@@ -8,7 +8,7 @@
 *.zip
 *.tar.gz
 *.rar
-
+*.semanticdb
 # sbt specific
 .cache/
 .history/
@@ -86,7 +86,5 @@ test_output.txt
 # Claude Code development files
 CLAUDE.md
 
-# node
-node_modules/
-package-lock.json
-package.json
+.aule
+.aule_history

@@ -1,6 +1,6 @@
 # Chapter 12: Performance & Optimization
 
-Eru achieves exceptional performance while maintaining safety and composability. This chapter explores Eru's performance characteristics, benchmarking methodologies, optimization strategies, and measurement techniques that help you build high-performance systems without sacrificing correctness.
+Eru achieves strong performance while maintaining safety and composability. This chapter explores Eru's performance characteristics, benchmarking methodologies, optimization strategies, and measurement techniques that help you build high-performance systems without sacrificing correctness.
 
 ## Performance Philosophy
 
@@ -76,34 +76,31 @@ coreOperationsBenchmark()
 
 ### Real-World Performance Data
 
-Based on comprehensive CI benchmarking, Eru demonstrates exceptional performance characteristics:
+Based on comprehensive CI benchmarking, Eru demonstrates these performance characteristics:
 
 **Core Operations (ops/ms)**:
-- eruChain: 21,430 ops/ms
-- eruFlatMap: 41,484 ops/ms
-- eruLongChain: 12,486 ops/ms
-- eruMap: 61,663 ops/ms
-- eruSucceed: 160,143 ops/ms
+- eruSucceed: 260,186 ops/ms
+- eruFlatMap: 200,370 ops/ms
+- eruMap: 193,477 ops/ms
+- eruChain: 79,860 ops/ms
+- eruLongChain: 28,335 ops/ms
 
 **Stack Safety Operations (ops/ms)**:
-- eruDeepFlatMap: 2,111 ops/ms
-- eruDeepMap: 2,496 ops/ms
-- eruUnfold: 4,756 ops/ms
+- eruDeepFlatMap: 3,253 ops/ms
+- eruDeepMap: 3,133 ops/ms
+- eruRecursiveFold: 1,582 ops/ms
 
 **Error Handling (ops/ms)**:
-- eruAttempt: 35,842 ops/ms
-- eruFallback: 50,781 ops/ms
-- eruRecoverWith: 37,037 ops/ms
+- eruSuccessfulAttempt: 83,309 ops/ms
+- eruFailRecover: 76,640 ops/ms
+- eruOrElse: 14,951 ops/ms
 
 **State Management (ops/ms)**:
-- eruFoldLeft: 30,864 ops/ms
-- eruIterate: 23,148 ops/ms
-- eruTraverse: 25,641 ops/ms
+- eruRefModify: 68,384 ops/ms
+- eruRefBasic: 13,130 ops/ms
+- eruRefUpdate: 8,939 ops/ms
 
-**Comparative Performance** (Eru vs other effect systems):
-- 2-4x faster than ZIO for core operations
-- 50-160x faster than Cats Effect for basic operations
-- Consistent performance across different operation types
+**Why Eru Performs Well**: Targeting Scala 3 + JVM 21+ exclusively enables design choices that benefit performance. The GADT-based interpreter uses Scala 3 `enum` for efficient pattern matching, and the runtime is virtual thread-native rather than adapted from a thread-pool model. Targeting a narrower platform matrix (Scala 3, JDK 21+) enables these optimizations.
 
 ## Performance Optimization Strategies
 
@@ -738,7 +735,7 @@ productionMonitoringExample()
 
 Eru's performance characteristics enable building high-performance systems:
 
-**Exceptional Baseline Performance**: 2k-160k ops/ms for core operations, significantly faster than other effect systems.
+**Baseline Performance**: 1.5k-260k ops/ms across core operations, enabled by Eru's GADT-based interpreter and Scala 3 enum optimizations.
 
 **Consistent Performance**: Performance remains stable across different operation types and composition patterns.
 

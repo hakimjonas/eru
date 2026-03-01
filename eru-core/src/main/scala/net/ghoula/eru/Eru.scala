@@ -1,9 +1,9 @@
 package net.ghoula.eru
 
 import java.util.concurrent.ConcurrentHashMap
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
-import scala.util.control.TailCalls.{TailRec, done, tailcall}
 
 import net.ghoula.eru.EruObserver.*
 
@@ -15,7 +15,7 @@ private class InterruptedWithFinalizers(
 ) extends InterruptedException(cause.toString)
 
 /** Internal exception used to signal that the fast-path interpreter cannot handle a case. Used for
-  * exception-based fallback to the safe TailCalls-based interpreter.
+  * exception-based fallback to the safe state-machine interpreter.
   */
 private class FastPathUnsupported extends scala.util.control.ControlThrowable
 
@@ -92,6 +92,14 @@ enum Eru[+E, +A] {
     */
   private case InterruptibleBlocking[A0](thunk: () => A0) extends Eru[Nothing, A0]
 
+  /** Represents a deferred computation scheduled to run at a future time in a new fiber.
+    *
+    * The interpreter delegates to a `TimerService` if available, registering the computation to
+    * fire at `epochMillis`. Returns `()` immediately (fire-and-forget). When no `TimerService` is
+    * present (sync kernel / tests), falls back to inline execution.
+    */
+  private case At[E0, A0](epochMillis: Long, computation: () => Eru[E0, A0]) extends Eru[Nothing, Unit]
+
   /** Transforms the success value of this `Eru` using a pure function. This is the Functor `map`
     * operation.
     *
@@ -147,8 +155,6 @@ enum Eru[+E, +A] {
           case NonFatal(ex) => Chain(this, Eru.Continuation.Step((_: A) => throw ex, Eru.Continuation.End()))
         }
 
-      // For now, EffectTotal uses standard Chain
-      // TODO: Optimize common patterns like EffectTotal.flatMap(x => Succeed(...))
       case EffectTotal(_) =>
         Chain(this, Eru.Continuation.Step(f, Eru.Continuation.End()))
 
@@ -358,23 +364,8 @@ enum Eru[+E, +A] {
 
 object Eru {
 
-  /** Internal method to check if an Eru is a pure value (no effects). This is used for
-    * optimizations in runtime operations like zipPar.
-    *
-    * This method enables significant performance improvements by detecting when an effect is
-    * already computed and doesn't need to be scheduled for execution. Pure values can be combined
-    * directly without creating fibers or involving the runtime scheduler. This optimization is
-    * particularly effective in tight loops or recursive patterns where effects are chained with
-    * already-computed values, such as in benchmark scenarios or certain algorithmic patterns.
-    *
-    * @param eru
-    *   the effect to check
-    * @tparam E
-    *   the error type
-    * @tparam A
-    *   the success type
-    * @return
-    *   true if this is Succeed or Fail, false otherwise
+  /** Returns true if this effect is an already-computed value (`Succeed` or `Fail`), allowing
+    * runtime operations like `zipPar` to skip fiber scheduling.
     */
   private[eru] def isPureValue[E, A](eru: Eru[E, A]): Boolean = eru match {
     case Succeed(_) | Fail(_) => true
@@ -405,6 +396,14 @@ object Eru {
     case Compose[+E1, In1, Mid1, +Out1](
       first: Continuation[E1, In1, Mid1],
       g: Mid1 => Eru[E1, Out1]
+    ) extends Continuation[E1, In1, Out1]
+
+    /** Composition of two continuations, used by the interpreter for right-associating continuation
+      * chains during Chain decomposition. Only created internally, never by user code.
+      */
+    case ComposeK[+E1, In1, Mid1, +Out1](
+      first: Continuation[E1, In1, Mid1],
+      second: Continuation[E1, Mid1, Out1]
     ) extends Continuation[E1, In1, Out1]
 
     /** Appends a new function to the end of this continuation stack, maintaining type safety. This
@@ -661,7 +660,7 @@ object Eru {
     *
     * This operation provides optimized batch execution that avoids creating continuation chains for
     * each iteration. Unlike manual chaining with `foldLeft`, this method uses specialized batch
-    * processing for superior performance.
+    * processing for better performance.
     *
     * @param as
     *   the collection of elements to process
@@ -1166,6 +1165,38 @@ object Eru {
     */
   def await[E, A](fiber: EruFiber[E, A]): Eru[E, Exit[E, A]] = Await(fiber)
 
+  /** Schedules an effect to run in a new fiber at the given absolute time.
+    *
+    * Returns immediately (fire-and-forget). The computation will be executed at (or shortly after)
+    * `epochMillis` by the runtime's timer service. When no timer service is available (synchronous
+    * kernel), falls back to inline execution.
+    *
+    * @param epochMillis
+    *   target execution time in milliseconds since epoch
+    * @param effect
+    *   the computation to run at the scheduled time
+    * @return
+    *   an effect that completes immediately after scheduling
+    */
+  def at[E, A](epochMillis: Long)(effect: => Eru[E, A]): Eru[Nothing, Unit] =
+    At(epochMillis, () => effect)
+
+  /** Schedules an effect to run in a new fiber after the given delay.
+    *
+    * Returns immediately (fire-and-forget). Equivalent to computing the absolute time from
+    * `System.currentTimeMillis() + delay.toMillis` and calling `at`.
+    *
+    * @param delay
+    *   the duration to wait before running the effect
+    * @param effect
+    *   the computation to run after the delay
+    * @return
+    *   an effect that completes immediately after scheduling
+    */
+  def after[E, A](delay: java.time.Duration)(effect: => Eru[E, A]): Eru[Nothing, Unit] =
+    EffectTotal(() => System.currentTimeMillis() + delay.toMillis)
+      .flatMap(t => At(t, () => effect))
+
   /** Executes an Eru computation and captures both its result and accumulated finalizers.
     *
     * This method provides a public API for runtime backends to execute computations while
@@ -1222,7 +1253,8 @@ object Eru {
       val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
 
       try {
-        val (either, fins) = runFiberLoop(computation, Nil, Hooks.Noop, None, outstandingFibers).result
+        val (either, fins) =
+          runFiberSafe(EvalState.Eval(computation, Continuation.End()), Nil, Hooks.Noop, None, outstandingFibers)
 
         val allFinalizers = outstandingFibers.foldLeft(fins) { (acc, fiber) =>
           fiber.finalizers ++ acc
@@ -1265,12 +1297,136 @@ object Eru {
       }
     }
 
-    /** Fast-path interpreter for simple effect chains that avoids TailCalls allocations.
+    /** State machine for the cast-free, @tailrec interpreter loop.
+      *
+      * `Mid` is existential (hidden by the GADT). The method's type parameters `[E, Out]` stay
+      * fixed across all tail-recursive iterations.
+      */
+    private enum EvalState[E, Out] {
+      case Eval[E0, Mid, Out0](
+        eru: Eru[E0, Mid],
+        cont: Continuation[E0, Mid, Out0]
+      ) extends EvalState[E0, Out0]
+
+      case Apply[E0, Mid, Out0](
+        result: Either[E0, Mid],
+        cont: Continuation[E0, Mid, Out0]
+      ) extends EvalState[E0, Out0]
+    }
+
+    /** Sub-evaluate an Eru to completion with End() continuation. */
+    private def evalSub[E, A](
+      eru: Eru[E, A],
+      fins: List[Finalizer],
+      hooks: Hooks,
+      currentFiberId: Option[FiberId],
+      outstandingFibers: collection.mutable.Set[EruFiber[?, ?]]
+    ): (Either[E, A], List[Finalizer]) =
+      runFiberSafe(EvalState.Eval(eru, Continuation.End()), fins, hooks, currentFiberId, outstandingFibers)
+
+    /** Sub-evaluate source inside an Ensure node, handling InterruptedWithFinalizers. */
+    private def evalWithEnsure[E, A](
+      source: Eru[E, A],
+      fin: Finalizer,
+      fins: List[Finalizer],
+      hooks: Hooks,
+      currentFiberId: Option[FiberId],
+      outstandingFibers: collection.mutable.Set[EruFiber[?, ?]]
+    ): (Either[E, A], List[Finalizer]) = {
+      try {
+        val (result, sourceFins) = evalSub(source, fins, hooks, currentFiberId, outstandingFibers)
+        (result, fin :: sourceFins)
+      } catch {
+        case interrupted: InterruptedWithFinalizers =>
+          throw new InterruptedWithFinalizers(
+            interrupted.fiberId,
+            interrupted.cause,
+            fin :: interrupted.finalizers
+          )
+      }
+    }
+
+    /** Evaluate an interruptible blocking thunk, converting InterruptedException to fiber
+      * interruption.
+      */
+    private def evalInterruptible[A](
+      thunk: () => A,
+      currentFiberId: Option[FiberId],
+      fins: List[Finalizer]
+    ): A = {
+      try {
+        thunk()
+      } catch {
+        case _: InterruptedException =>
+          val fiberId = currentFiberId.getOrElse(FiberId.fresh())
+          throw new InterruptedWithFinalizers(fiberId, InterruptCause.Cancelled(), fins)
+      }
+    }
+
+    /** Handle Suspend registration and poll/wait for the callback result. Type parameters E, A are
+      * inferred from register's type signature.
+      */
+    private def evalSuspend[E, A](
+      register: (Either[E, A] => Unit) => Eru[Nothing, Unit],
+      fins: List[Finalizer],
+      hooks: Hooks,
+      currentFiberId: Option[FiberId],
+      outstandingFibers: collection.mutable.Set[EruFiber[?, ?]]
+    ): (Either[E, A], List[Finalizer]) = {
+      val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
+      val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
+      val (_, fsAfterReg) = evalSub(register(cb), fins, hooks, currentFiberId, outstandingFibers)
+      pollOrWait(cbBox, fsAfterReg)
+    }
+
+    /** Poll cbBox; if result ready return it, else spin-wait (async scheduler) or throw (sync). */
+    private def pollOrWait[E, A](
+      cbBox: java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]],
+      fsAfterReg: List[Finalizer]
+    ): (Either[E, A], List[Finalizer]) = {
+      cbBox.get match {
+        case Some(result) => (result, fsAfterReg)
+        case None =>
+          AsyncScheduler.get match {
+            case Some(_) =>
+              (waitForCallback(cbBox), fsAfterReg)
+            case None =>
+              val ex = new IllegalStateException(
+                "Eru.suspend: asynchronous registration is not supported in the synchronous kernel; the register function must invoke the callback synchronously."
+              )
+              drainFinalizers(fsAfterReg)
+              throw ex
+          }
+      }
+    }
+
+    /** Await an async fiber by registering a callback and polling/waiting. */
+    private def awaitAsyncFiber[E0, A0](
+      asyncFiber: AsyncFiber[E0, A0],
+      outstandingFibers: collection.mutable.Set[EruFiber[?, ?]],
+      fins: List[Finalizer]
+    ): (Either[Nothing, EruFiber[E0, A0]], List[Finalizer]) = {
+      val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[Nothing, EruFiber[E0, A0]]]](None)
+      val cb: Either[Nothing, EruFiber[E0, A0]] => Unit = ea => cbBox.set(Some(ea))
+      asyncFiber.onComplete { completedFiber =>
+        if completedFiber.finalizers.nonEmpty then outstandingFibers += completedFiber
+        cb(Right(completedFiber))
+      }
+      asyncFiber.getCompleted match {
+        case Some(completedFiber) =>
+          if completedFiber.finalizers.nonEmpty then outstandingFibers += completedFiber
+          cb(Right(completedFiber))
+        case None => ()
+      }
+      pollOrWait(cbBox, fins)
+    }
+
+    /** Fast-path interpreter for simple effect chains that avoids allocations.
       *
       * This interpreter handles common effect patterns using direct @tailrec recursion instead of
-      * TailCalls, eliminating allocation overhead for simple cases. When it encounters an
+      * the state machine, eliminating allocation overhead for simple cases. When it encounters an
       * unsupported case, it throws FastPathUnsupported to trigger fallback to the safe
-      * TailCalls-based interpreter.
+      * state-machine interpreter.
       *
       * Supported cases:
       *   - Terminal operations: Succeed, Fail, Effect, EffectTotal
@@ -1356,340 +1512,379 @@ object Eru {
       }
     }
 
-    /** Fiber-aware runLoop implementing Strategy A: Eager Fiber Evaluation.
+    /** Stack-safe, cast-free state machine interpreter using sealed enum pattern matching.
       *
-      * This method extends runLoop to handle Fork and Await operations using eager evaluation. Fork
-      * executes the child computation immediately to completion and stores the result and
-      * finalizers directly in the EruFiber. Await becomes pure structural access with no registry
-      * lookups required.
+      * Replaces the TailCalls-based runFiberLoop/runFiberContinuation pair with a single @tailrec
+      * method. EvalState has 2 cases and Continuation has 4 cases — all concrete types known at
+      * compile time. Pattern matching on sealed enum compiles to static tableswitch, eliminating
+      * megamorphic dispatch from lambda-based trampolining.
       *
       * Key features:
-      *   - Zero type casts: All GADT constraints preserved through direct ADT pattern matching
+      *   - Zero lambdas in the trampoline: pure data ADT, no Function1 allocations
+      *   - Monomorphic allocation: no vtable lookup, no speculative inlining, no deoptimization
+      *   - Zero casts: Continuation GADT preserves type safety through all phases
       *   - Eager evaluation: Fork runs child immediately in synchronous kernel
       *   - FILO finalizer ordering: Child finalizers merge in front to maintain order
-      *   - Stack-safe: Uses TailRec for all recursive calls
       *   - Auto-join: Tracks outstanding fibers to prevent finalizer leakage
-      *   - Interruption safety: Proper exception handling merges ensure finalizers with interrupted
-      *     computation finalizers to prevent resource leaks
       */
-    private def runFiberLoop[E, A](
-      eru: Eru[E, A],
-      fins: List[Finalizer],
-      hooks: Hooks,
-      currentFiberId: Option[FiberId],
-      outstandingFibers: collection.mutable.Set[EruFiber[?, ?]] // Thread-safe via ConcurrentHashMap
-    ): TailRec[(Either[E, A], List[Finalizer])] =
-      eru match {
-        case Succeed(value) =>
-          done((Right(value), fins))
-
-        case Fail(error) =>
-          done((Left(error), fins))
-
-        case Effect(thunk) =>
-          done((thunk(), fins))
-
-        case EffectTotal(thunk) =>
-          done((Right(thunk()), fins))
-
-        case Chain(source, cont) =>
-          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).flatMap {
-            case (Right(value), fs) =>
-              tailcall(runFiberContinuation(cont, value, fs, hooks, currentFiberId, outstandingFibers))
-            case (Left(error), fs) => done((Left(error), fs))
-          }
-
-        case MapChain(source, f) =>
-          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).map {
-            case (Right(value), fs) => (Right(f(value)), fs)
-            case (Left(error), fs) => (Left(error), fs)
-          }
-
-        case RecoverWith(source, pf) =>
-          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).flatMap {
-            case (Right(value), fs) => done((Right(value), fs))
-            case (Left(error), fs) =>
-              if (pf.isDefinedAt(error)) {
-                tailcall(runFiberLoop(pf(error), fs, hooks, currentFiberId, outstandingFibers))
-              } else {
-                done((Left(error), fs))
-              }
-          }
-
-        case MapError(source, f) =>
-          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).map { case (either, fs) =>
-            (either.left.map(f), fs)
-          }
-
-        case Zip(left, right) =>
-          tailcall(runFiberLoop(left, fins, hooks, currentFiberId, outstandingFibers)).flatMap {
-            case (Right(a), fsL) =>
-              tailcall(runFiberLoop(right, fsL, hooks, currentFiberId, outstandingFibers)).map {
-                case (Right(b), fsR) => (Right((a, b)), fsR)
-                case (Left(e1), fsR) => (Left(e1), fsR)
-              }
-            case (Left(e0), fsL) => done((Left(e0), fsL))
-          }
-
-        case Attempt(source) =>
-          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers)).map {
-            case (Left(e), fs) => (Right(Result.Failure(e)), fs)
-            case (Right(a), fs) => (Right(Result.Success(a)), fs)
-          }
-
-        case Debug(source, label) =>
-          hooks.onStep(label())
-          tailcall(runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers))
-
-        case Ensure(source, fin) =>
-          tailcall {
-            try {
-              runFiberLoop(source, fins, hooks, currentFiberId, outstandingFibers).result match {
-                case (either, fs) => done((either, fin :: fs))
-              }
-            } catch {
-              case interrupted: InterruptedWithFinalizers =>
-                throw new InterruptedWithFinalizers(
-                  interrupted.fiberId,
-                  interrupted.cause,
-                  fin :: interrupted.finalizers
-                )
-            }
-          }
-
-        case Suspend(register) =>
-          handleSuspend(cb => runFiberLoop(register(cb), fins, hooks, currentFiberId, outstandingFibers).result)
-
-        case Fork(computation) =>
-          AsyncScheduler.get match {
-            case Some(scheduler) =>
-              val observer = hooks match {
-                case obs: Hooks.ObserverHooks => Some(obs.observer)
-                case _ => None
-              }
-
-              val asyncFiber = scheduler.scheduleAsync(computation, observer)
-
-              asyncFiber.getCompleted match {
-                case Some(completedFiber) =>
-                  // Only track fibers with finalizers to prevent unbounded accumulation
-                  if completedFiber.finalizers.nonEmpty then {
-                    outstandingFibers += completedFiber
-                  }
-                  done((Right(completedFiber), fins))
-                case None =>
-                  handleSuspend { callback =>
-                    asyncFiber.onComplete { completedFiber =>
-                      // Only track fibers with finalizers to prevent unbounded accumulation
-                      if completedFiber.finalizers.nonEmpty then {
-                        outstandingFibers += completedFiber
-                      }
-                      callback(Right(completedFiber))
-                    }
-
-                    asyncFiber.getCompleted match {
-                      case Some(completedFiber) =>
-                        // Only track fibers with finalizers to prevent unbounded accumulation
-                        if completedFiber.finalizers.nonEmpty then {
-                          outstandingFibers += completedFiber
-                        }
-                        callback(Right(completedFiber))
-                      case None =>
-                        () // Will complete via onComplete
-                    }
-
-                    (Right(()), fins)
-                  }
-              }
-
-            case None =>
-              val childFiberId = FiberId.fresh()
-
-              hooks match {
-                case obs: Hooks.ObserverHooks =>
-                  obs.observer.onEvent(EruEvent.FiberStarted(childFiberId))
-                case _ => // No observer
-              }
-
-              val (childResult, childFinalizers) = runFiberLoop(
-                computation,
-                Nil,
-                hooks,
-                Some(childFiberId),
-                ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
-              ).result
-
-              val childExit = childResult match {
-                case Right(value) => Exit.Success(value)
-                case Left(error) => Exit.Failure(error)
-              }
-
-              hooks match {
-                case obs: Hooks.ObserverHooks =>
-                  obs.observer.onEvent(EruEvent.FiberCompleted(childFiberId, childExit))
-                case _ => // No observer
-              }
-
-              val completedFiber = EruFiber.withId(childFiberId, childExit, childFinalizers)
-              // Only track fibers with finalizers to prevent unbounded accumulation
-              if completedFiber.finalizers.nonEmpty then {
-                outstandingFibers += completedFiber
-              }
-              done((Right(completedFiber), fins))
-          }
-
-        case Await(fiber) =>
-          outstandingFibers -= fiber
-          drainFinalizers(fiber.finalizers).result
-          done((Right(fiber.exit), fins))
-
-        case InterruptibleBlocking(thunk) =>
-          try {
-            done((Right(thunk()), fins))
-          } catch {
-            case _: InterruptedException =>
-              val fiberId = currentFiberId.getOrElse(FiberId.fresh())
-              throw new InterruptedWithFinalizers(fiberId, InterruptCause.Cancelled(), fins)
-
-            case NonFatal(ex) =>
-              throw ex
-          }
-      }
-
-    /** Fiber-aware continuation execution to match runFiberLoop */
-    @inline private def runFiberContinuation[E, In, Out](
-      cont: Continuation[E, In, Out],
-      input: In,
+    @tailrec
+    private def runFiberSafe[E, A](
+      state: EvalState[E, A],
       fins: List[Finalizer],
       hooks: Hooks,
       currentFiberId: Option[FiberId],
       outstandingFibers: collection.mutable.Set[EruFiber[?, ?]]
-    ): TailRec[(Either[E, Out], List[Finalizer])] = {
-      cont match {
-        case Continuation.End() =>
-          done((Right(input), fins))
-        case Continuation.Step(f, next) =>
-          tailcall(runFiberLoop(f(input), fins, hooks, currentFiberId, outstandingFibers)).flatMap {
-            case (Right(intermediate), fs) =>
-              tailcall(runFiberContinuation(next, intermediate, fs, hooks, currentFiberId, outstandingFibers))
-            case (Left(error), fs) => done((Left(error), fs))
+    ): (Either[E, A], List[Finalizer]) = {
+      state match {
+        // === Eval phase: process Eru nodes ===
+        case EvalState.Eval(eru, cont) =>
+          eru match {
+            // Hot-path cases — tail-recursive, zero allocation
+            case Succeed(value) =>
+              runFiberSafe(EvalState.Apply(Right(value), cont), fins, hooks, currentFiberId, outstandingFibers)
+
+            case Fail(error) =>
+              runFiberSafe(EvalState.Apply(Left(error), cont), fins, hooks, currentFiberId, outstandingFibers)
+
+            case Effect(thunk) =>
+              runFiberSafe(EvalState.Apply(thunk(), cont), fins, hooks, currentFiberId, outstandingFibers)
+
+            case EffectTotal(thunk) =>
+              runFiberSafe(EvalState.Apply(Right(thunk()), cont), fins, hooks, currentFiberId, outstandingFibers)
+
+            case Chain(source, chainCont) =>
+              chainCont match {
+                case Continuation.Step(f, _: Continuation.End[?]) =>
+                  // Common-case optimization: skip ComposeK when Chain's continuation is a single Step
+                  runFiberSafe(
+                    EvalState.Eval(source, Continuation.Step(f, cont)),
+                    fins,
+                    hooks,
+                    currentFiberId,
+                    outstandingFibers
+                  )
+                case _ =>
+                  runFiberSafe(
+                    EvalState.Eval(source, Continuation.ComposeK(chainCont, cont)),
+                    fins,
+                    hooks,
+                    currentFiberId,
+                    outstandingFibers
+                  )
+              }
+
+            case Debug(source, label) =>
+              hooks.onStep(label())
+              runFiberSafe(EvalState.Eval(source, cont), fins, hooks, currentFiberId, outstandingFibers)
+
+            // Sub-evaluation cases — call helpers, then tail-recurse
+            case MapChain(source, f) =>
+              val (sourceResult, sourceFins) = evalSub(source, fins, hooks, currentFiberId, outstandingFibers)
+              val mapped = sourceResult match {
+                case Right(value) => Right(f(value))
+                case Left(error) => Left(error)
+              }
+              runFiberSafe(EvalState.Apply(mapped, cont), sourceFins, hooks, currentFiberId, outstandingFibers)
+
+            case RecoverWith(source, pf) =>
+              val (sourceResult, sourceFins) = evalSub(source, fins, hooks, currentFiberId, outstandingFibers)
+              sourceResult match {
+                case Right(value) =>
+                  runFiberSafe(
+                    EvalState.Apply(Right(value), cont),
+                    sourceFins,
+                    hooks,
+                    currentFiberId,
+                    outstandingFibers
+                  )
+                case Left(error) =>
+                  if (pf.isDefinedAt(error))
+                    runFiberSafe(EvalState.Eval(pf(error), cont), sourceFins, hooks, currentFiberId, outstandingFibers)
+                  else
+                    runFiberSafe(
+                      EvalState.Apply(Left(error), cont),
+                      sourceFins,
+                      hooks,
+                      currentFiberId,
+                      outstandingFibers
+                    )
+              }
+
+            case MapError(source, f) =>
+              val (sourceResult, sourceFins) = evalSub(source, fins, hooks, currentFiberId, outstandingFibers)
+              val mapped = sourceResult.left.map(f)
+              runFiberSafe(EvalState.Apply(mapped, cont), sourceFins, hooks, currentFiberId, outstandingFibers)
+
+            case Zip(left, right) =>
+              val (leftResult, leftFins) = evalSub(left, fins, hooks, currentFiberId, outstandingFibers)
+              leftResult match {
+                case Right(a) =>
+                  val (rightResult, rightFins) = evalSub(right, leftFins, hooks, currentFiberId, outstandingFibers)
+                  rightResult match {
+                    case Right(b) =>
+                      runFiberSafe(
+                        EvalState.Apply(Right((a, b)), cont),
+                        rightFins,
+                        hooks,
+                        currentFiberId,
+                        outstandingFibers
+                      )
+                    case Left(e) =>
+                      runFiberSafe(EvalState.Apply(Left(e), cont), rightFins, hooks, currentFiberId, outstandingFibers)
+                  }
+                case Left(e) =>
+                  runFiberSafe(EvalState.Apply(Left(e), cont), leftFins, hooks, currentFiberId, outstandingFibers)
+              }
+
+            case Attempt(source) =>
+              val (sourceResult, sourceFins) = evalSub(source, fins, hooks, currentFiberId, outstandingFibers)
+              val wrapped = sourceResult match {
+                case Left(e) => Right(Result.Failure(e))
+                case Right(a) => Right(Result.Success(a))
+              }
+              runFiberSafe(EvalState.Apply(wrapped, cont), sourceFins, hooks, currentFiberId, outstandingFibers)
+
+            case Ensure(source, fin) =>
+              val (result, sourceFins) = evalWithEnsure(source, fin, fins, hooks, currentFiberId, outstandingFibers)
+              runFiberSafe(EvalState.Apply(result, cont), sourceFins, hooks, currentFiberId, outstandingFibers)
+
+            case Suspend(register) =>
+              val (result, fsSuspend) = evalSuspend(register, fins, hooks, currentFiberId, outstandingFibers)
+              runFiberSafe(EvalState.Apply(result, cont), fsSuspend, hooks, currentFiberId, outstandingFibers)
+
+            case Fork(computation) =>
+              AsyncScheduler.get match {
+                case Some(scheduler) =>
+                  val observer = hooks match {
+                    case obs: Hooks.ObserverHooks => Some(obs.observer)
+                    case _ => None
+                  }
+                  val asyncFiber = scheduler.scheduleAsync(computation, observer)
+                  asyncFiber.getCompleted match {
+                    case Some(completedFiber) =>
+                      if completedFiber.finalizers.nonEmpty then outstandingFibers += completedFiber
+                      runFiberSafe(
+                        EvalState.Apply(Right(completedFiber), cont),
+                        fins,
+                        hooks,
+                        currentFiberId,
+                        outstandingFibers
+                      )
+                    case None =>
+                      val (result, fsSuspend) = awaitAsyncFiber(asyncFiber, outstandingFibers, fins)
+                      runFiberSafe(EvalState.Apply(result, cont), fsSuspend, hooks, currentFiberId, outstandingFibers)
+                  }
+
+                case None =>
+                  val childFiberId = FiberId.fresh()
+                  hooks match {
+                    case obs: Hooks.ObserverHooks =>
+                      obs.observer.onEvent(EruEvent.FiberStarted(childFiberId))
+                    case _ =>
+                  }
+                  val (childResult, childFinalizers) = evalSub(
+                    computation,
+                    Nil,
+                    hooks,
+                    Some(childFiberId),
+                    ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
+                  )
+                  val childExit = childResult match {
+                    case Right(value) => Exit.Success(value)
+                    case Left(error) => Exit.Failure(error)
+                  }
+                  hooks match {
+                    case obs: Hooks.ObserverHooks =>
+                      obs.observer.onEvent(EruEvent.FiberCompleted(childFiberId, childExit))
+                    case _ =>
+                  }
+                  val completedFiber = EruFiber.withId(childFiberId, childExit, childFinalizers)
+                  if completedFiber.finalizers.nonEmpty then outstandingFibers += completedFiber
+                  runFiberSafe(
+                    EvalState.Apply(Right(completedFiber), cont),
+                    fins,
+                    hooks,
+                    currentFiberId,
+                    outstandingFibers
+                  )
+              }
+
+            case Await(fiber) =>
+              outstandingFibers -= fiber
+              drainFinalizers(fiber.finalizers)
+              runFiberSafe(EvalState.Apply(Right(fiber.exit), cont), fins, hooks, currentFiberId, outstandingFibers)
+
+            case InterruptibleBlocking(thunk) =>
+              val value = evalInterruptible(thunk, currentFiberId, fins)
+              runFiberSafe(EvalState.Apply(Right(value), cont), fins, hooks, currentFiberId, outstandingFibers)
+
+            case At(epochMillis, computation) =>
+              TimerService.get match {
+                case Some(timer) =>
+                  val task: Runnable = () => {
+                    try {
+                      val (_, finalizers) = Eru.executeWithFinalizers(computation())
+                      finalizers.foreach(f =>
+                        try f().unsafeRunSync()
+                        catch { case _: Exception => () }
+                      )
+                    } catch { case _: Throwable => () }
+                  }
+                  val now = System.currentTimeMillis()
+                  timer.schedule(if epochMillis <= now then now else epochMillis, task)
+                  runFiberSafe(EvalState.Apply(Right(()), cont), fins, hooks, currentFiberId, outstandingFibers)
+
+                case None =>
+                  // Sync kernel fallback — run inline
+                  val childId = FiberId.fresh()
+                  evalSub(computation(), Nil, hooks, Some(childId), outstandingFibers)
+                  runFiberSafe(EvalState.Apply(Right(()), cont), fins, hooks, currentFiberId, outstandingFibers)
+              }
           }
-        case Continuation.Compose(first, g) =>
-          // Process the first continuation, then apply g to the result
-          tailcall(runFiberContinuation(first, input, fins, hooks, currentFiberId, outstandingFibers)).flatMap {
-            case (Right(intermediate), fs) =>
-              tailcall(runFiberLoop(g(intermediate), fs, hooks, currentFiberId, outstandingFibers))
-            case (Left(error), fs) => done((Left(error), fs))
+
+        // === Apply phase: process Continuation nodes ===
+        case EvalState.Apply(result, cont) =>
+          cont match {
+            case _: Continuation.End[?] =>
+              (result, fins)
+
+            case Continuation.Step(f, next) =>
+              result match {
+                case Right(value) =>
+                  next match {
+                    case _: Continuation.End[?] =>
+                      // Tail-position optimization: skip no-op continuation
+                      runFiberSafe(
+                        EvalState.Eval(f(value), Continuation.End()),
+                        fins,
+                        hooks,
+                        currentFiberId,
+                        outstandingFibers
+                      )
+                    case _ =>
+                      runFiberSafe(EvalState.Eval(f(value), next), fins, hooks, currentFiberId, outstandingFibers)
+                  }
+                case Left(error) =>
+                  runFiberSafe(EvalState.Apply(Left(error), next), fins, hooks, currentFiberId, outstandingFibers)
+              }
+
+            case Continuation.Compose(first, g) =>
+              // Convert to ComposeK(first, Step(g, End()))
+              runFiberSafe(
+                EvalState.Apply(result, Continuation.ComposeK(first, Continuation.Step(g, Continuation.End()))),
+                fins,
+                hooks,
+                currentFiberId,
+                outstandingFibers
+              )
+
+            case Continuation.ComposeK(first, second) =>
+              first match {
+                case _: Continuation.End[?] =>
+                  runFiberSafe(EvalState.Apply(result, second), fins, hooks, currentFiberId, outstandingFibers)
+
+                case Continuation.Step(f, next) =>
+                  result match {
+                    case Right(value) =>
+                      next match {
+                        case _: Continuation.End[?] =>
+                          // Skip ComposeK(End(), second) wrapper
+                          runFiberSafe(EvalState.Eval(f(value), second), fins, hooks, currentFiberId, outstandingFibers)
+                        case _ =>
+                          runFiberSafe(
+                            EvalState.Eval(f(value), Continuation.ComposeK(next, second)),
+                            fins,
+                            hooks,
+                            currentFiberId,
+                            outstandingFibers
+                          )
+                      }
+                    case Left(error) =>
+                      runFiberSafe(EvalState.Apply(Left(error), second), fins, hooks, currentFiberId, outstandingFibers)
+                  }
+
+                case Continuation.Compose(inner, g) =>
+                  // ComposeK(Compose(inner, g), second) → Apply(result, ComposeK(inner, Step(g, second)))
+                  runFiberSafe(
+                    EvalState.Apply(result, Continuation.ComposeK(inner, Continuation.Step(g, second))),
+                    fins,
+                    hooks,
+                    currentFiberId,
+                    outstandingFibers
+                  )
+
+                case Continuation.ComposeK(f1, f2) =>
+                  // ComposeK(ComposeK(f1, f2), second) → Apply(result, ComposeK(f1, ComposeK(f2, second)))
+                  runFiberSafe(
+                    EvalState.Apply(result, Continuation.ComposeK(f1, Continuation.ComposeK(f2, second))),
+                    fins,
+                    hooks,
+                    currentFiberId,
+                    outstandingFibers
+                  )
+              }
           }
       }
     }
 
     /** Executes all finalizers in FILO (First-In-Last-Out) order with proper nesting support.
       *
-      * This method processes the accumulated finalizer list by executing each finalizer and
-      * handling any nested finalizers they may produce. The execution order is critical: finalizers
-      * run in reverse order of their registration (FILO), ensuring that resources are cleaned up in
-      * the opposite order of their acquisition.
-      *
-      * Key execution characteristics:
-      *   - Processes finalizers from front to back of the list (which represents FILO order)
-      *   - Each finalizer execution can produce additional "inner" finalizers
-      *   - Inner finalizers are prepended to the remaining finalizers, maintaining FILO semantics
-      *   - Uses TailRec for stack safety when processing long finalizer chains
-      *   - Finalizer failures are contained - they don't prevent other finalizers from running
-      *
-      * Example execution order for fins = [f3, f2, f1]:
-      *   1. Execute f3 (most recently added), collect any inner finalizers
-      *   2. Execute f2, collect any inner finalizers
-      *   3. Execute f1 (first added), collect any inner finalizers
-      *   4. Process all collected inner finalizers recursively in FILO order
-      *
-      * @param fins
-      *   List of finalizers to execute (in FILO order)
-      * @return
-      *   TailRec computation that completes when all finalizers have run
+      * Uses @tailrec for stack safety. Each finalizer is sub-evaluated via runFiberSafe (a
+      * different method), so the recursive drainFinalizers call remains in tail position.
       */
-    private def drainFinalizers(fins: List[Finalizer]): TailRec[Unit] =
+    @tailrec
+    private def drainFinalizers(fins: List[Finalizer]): Unit =
       fins match {
-        case Nil => done(())
+        case Nil => ()
         case fin :: rest =>
           val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
-          tailcall(runFiberLoop(fin(), Nil, Hooks.Noop, None, outstandingFibers)).flatMap { case (_, inner) =>
-            val allInnerFinalizers = outstandingFibers.foldLeft(inner) { (acc, fiber) =>
-              fiber.finalizers ++ acc
-            }
-            tailcall(drainFinalizers(allInnerFinalizers ++ rest))
+          val (_, inner) = runFiberSafe(
+            EvalState.Eval(fin(), Continuation.End()),
+            Nil,
+            Hooks.Noop,
+            None,
+            outstandingFibers
+          )
+          val allInnerFinalizers = outstandingFibers.foldLeft(inner) { (acc, fiber) =>
+            fiber.finalizers ++ acc
           }
+          drainFinalizers(allInnerFinalizers ++ rest)
       }
 
-    /** Helper method for handling Suspend case logic.
-      *
-      * This consolidates the common pattern of creating an AtomicReference callback box and waiting
-      * for async completion found in both runWithStack and runWithObsStack.
-      *
-      * @param executeRegister
-      *   function to execute the registration with the appropriate context
-      * @tparam E
-      *   the error type
-      * @tparam A
-      *   the success type
-      * @return
-      *   TailRec computation with the suspended result
-      */
-    private def handleSuspend[E, A](
-      executeRegister: (Either[E, A] => Unit) => (Either[Any, Any], List[Finalizer])
-    ): TailRec[(Either[E, A], List[Finalizer])] = {
-      val cbBox = new java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]](None)
-      val cb: Either[E, A] => Unit = ea => cbBox.set(Some(ea))
-      val (_, fsAfterReg) = executeRegister(cb)
+    /** Spin-wait for async callback completion. Pure @tailrec, no vars. */
+    @tailrec
+    private def waitForCallback[E, A](
+      cbBox: java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]]
+    ): Either[E, A] =
       cbBox.get match {
-        case Some(result) => done((result, fsAfterReg))
+        case Some(result) => result
         case None =>
-          AsyncScheduler.get match {
-            case Some(_) =>
-              handleAsyncSuspend(cbBox, fsAfterReg)
-            case None =>
-              val ex = new IllegalStateException(
-                "Eru.suspend: asynchronous registration is not supported in the synchronous kernel; the register function must invoke the callback synchronously."
-              )
-              drainFinalizers(fsAfterReg).result
-              throw ex
-          }
+          Thread.`yield`()
+          waitForCallback(cbBox)
       }
-    }
-
-    /** Handle truly asynchronous suspension when scheduler is available */
-    private def handleAsyncSuspend[E, A](
-      cbBox: java.util.concurrent.atomic.AtomicReference[Option[Either[E, A]]],
-      fsAfterReg: List[Finalizer]
-    ): TailRec[(Either[E, A], List[Finalizer])] = {
-      def waitForCallback(): TailRec[(Either[E, A], List[Finalizer])] = {
-        cbBox.get match {
-          case Some(result) => done((result, fsAfterReg))
-          case None =>
-            Thread.`yield`()
-            tailcall(waitForCallback())
-        }
-      }
-      waitForCallback()
-    }
 
     private def runWithObsStack[E, A](
       eru: Eru[E, A],
       scope: ScopeId,
       observer: EruObserver,
       fins: List[Finalizer]
-    ): TailRec[(Either[E, A], List[Finalizer])] = {
+    ): (Either[E, A], List[Finalizer]) = {
       val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
-      tailcall(runFiberLoop(eru, fins, new Hooks.ObserverHooks(scope, observer), None, outstandingFibers))
+      runFiberSafe(
+        EvalState.Eval(eru, Continuation.End()),
+        fins,
+        new Hooks.ObserverHooks(scope, observer),
+        None,
+        outstandingFibers
+      )
     }
 
     /** Observer-aware interpreter variant */
     def runSyncWithObserver[E, A](start: Eru[E, A], observer: EruObserver): A = {
       val scope = ScopeId.fresh()
       observer.onEvent(EruEvent.ProgramStart(scope))
-      val (either, fins) = runWithObsStack(start, scope, observer, Nil).result
-      drainFinalizers(fins).result
+      val (either, fins) = runWithObsStack(start, scope, observer, Nil)
+      drainFinalizers(fins)
       either match {
         case Left(error) =>
           error match {
@@ -1717,15 +1912,15 @@ object Eru {
           runFast(start, Nil)
         } catch {
           case _: FastPathUnsupported =>
-            // Fall back to safe TailCalls-based interpreter
-            runFiberLoop(start, Nil, Hooks.Noop, None, outstandingFibers).result
+            // Fall back to safe state-machine interpreter
+            runFiberSafe(EvalState.Eval(start, Continuation.End()), Nil, Hooks.Noop, None, outstandingFibers)
         }
 
       val allFinalizers = outstandingFibers.foldLeft(fins) { (acc, fiber) =>
         fiber.finalizers ++ acc
       }
 
-      drainFinalizers(allFinalizers).result
+      drainFinalizers(allFinalizers)
       handleRunResult(either)
     }
 
@@ -1736,7 +1931,7 @@ object Eru {
       }
     }
 
-    /** Fiber-aware observer variant using runFiberLoop with eager evaluation and auto-join */
+    /** Fiber-aware observer variant using runFiberSafe with eager evaluation and auto-join */
     def runSyncWithFibersAndObserver[E, A](start: Eru[E, A], observer: EruObserver): A = {
       initializeAsyncSchedulerIfNeeded()
 
@@ -1745,13 +1940,13 @@ object Eru {
       val outstandingFibers = ConcurrentHashMap.newKeySet[EruFiber[?, ?]]().asScala
 
       observer.onEvent(EruEvent.ProgramStart(scope))
-      val (either, fins) = runFiberLoop(start, Nil, hooks, None, outstandingFibers).result
+      val (either, fins) = runFiberSafe(EvalState.Eval(start, Continuation.End()), Nil, hooks, None, outstandingFibers)
 
       val allFinalizers = outstandingFibers.foldLeft(fins) { (acc, fiber) =>
         fiber.finalizers ++ acc
       }
 
-      drainFinalizers(allFinalizers).result
+      drainFinalizers(allFinalizers)
 
       either match {
         case Left(error) =>
@@ -1789,6 +1984,7 @@ object Eru {
       case VFork[E0, A0](computation: Eru[E0, A0]) extends View[Nothing, EruFiber[E0, A0]]
       case VAwait[E0, A0](fiber: EruFiber[E0, A0]) extends View[E0, Exit[E0, A0]]
       case VInterruptibleBlocking[A0](thunk: () => A0) extends View[Nothing, A0]
+      case VAt[E0, A0](epochMillis: Long, computation: () => Eru[E0, A0]) extends View[Nothing, Unit]
     }
 
     import View.*
@@ -1809,6 +2005,7 @@ object Eru {
       case Fork(computation) => VFork(computation)
       case Await(fiber) => VAwait(fiber)
       case InterruptibleBlocking(thunk) => VInterruptibleBlocking(thunk)
+      case At(epochMillis, computation) => VAt(epochMillis, computation)
     }
 
   }

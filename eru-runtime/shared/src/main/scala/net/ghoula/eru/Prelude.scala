@@ -102,6 +102,42 @@ object prelude {
   /** Type alias for the runtime CyclicBarrier, re-exposed for discoverability. */
   type CyclicBarrier = net.ghoula.eru.CyclicBarrier
 
+  /** Concurrent map with independent per-key CAS semantics.
+    * @tparam K
+    *   key type
+    * @tparam V
+    *   value type
+    */
+  type RefMap[K, V] = net.ghoula.eru.RefMap[K, V]
+
+  /** Exposes the RefMap companion for factory methods. */
+  val RefMap = net.ghoula.eru.RefMap
+
+  /** Per-key concurrency limiter backed by independent semaphores.
+    * @tparam K
+    *   key type (e.g., hostname)
+    */
+  type KeyedSemaphore[K] = net.ghoula.eru.KeyedSemaphore[K]
+
+  /** Exposes the KeyedSemaphore companion for factory methods. */
+  val KeyedSemaphore = net.ghoula.eru.KeyedSemaphore
+
+  /** Computation that may suspend indefinitely (no `unsafeRunSync`).
+    * @tparam E
+    *   error type
+    * @tparam A
+    *   success type
+    */
+  type Suspending[+E, +A] = net.ghoula.eru.Suspending[E, A]
+
+  /** Computation that completes immediately (has `unsafeRunSync`).
+    * @tparam E
+    *   error type
+    * @tparam A
+    *   success type
+    */
+  type Immediate[+E, +A] = net.ghoula.eru.Immediate[E, A]
+
   /** Type alias for runtime fibers, re-exposed for discoverability.
     * @tparam E
     *   typed error of the fiber

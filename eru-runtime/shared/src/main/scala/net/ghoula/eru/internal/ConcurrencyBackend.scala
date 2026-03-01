@@ -140,6 +140,22 @@ private[eru] trait ConcurrencyBackend {
     * after all primary computation has completed but before returning the final result to the user.
     */
   def cleanup(): Unit = ()
+
+  /** Observable cleanup that interrupts and awaits all root fibers, emitting observer events.
+    *
+    * Unlike `cleanup()` which runs outside the observable program, this method returns an Eru
+    * effect that can be composed with other effects and whose events are visible to observers. This
+    * is essential for proper observability during graceful shutdown.
+    *
+    * @param observer
+    *   optional observer to receive structured cleanup events
+    * @return
+    *   an effect that yields cleanup statistics (interrupted count, already completed count)
+    */
+  def shutdownRootFibers(
+    @scala.annotation.unused observer: Option[EruObserver] = None
+  ): Eru[Nothing, (Int, Int)] =
+    Eru.succeed((0, 0)) // Default: no fibers to clean up
 }
 
 /** Shared synchronous backend for fallback scenarios. */

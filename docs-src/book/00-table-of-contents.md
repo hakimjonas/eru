@@ -58,7 +58,7 @@ Understanding Eru's performance characteristics. Benchmarking and measurement te
 Working with legacy code, blocking operations, and third-party libraries.
 
 **[Chapter 14: The Eru Ecosystem](14-the-eru-ecosystem.md)**
-Valar integration, community patterns, and migration strategies.
+Community patterns, migration strategies, and adoption guidelines.
 
 ---
 

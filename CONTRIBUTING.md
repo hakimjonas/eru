@@ -5,7 +5,7 @@ Thank you for your interest in contributing to Eru! This guide will help you und
 ## Quick Start
 
 1. **Fork and clone** the repository
-2. **Install dependencies**: Ensure you have JDK 21+ and sbt installed
+2. **Install dependencies**: Ensure you have JDK 25+ and sbt installed
 3. **Run tests**: Execute `sbt testJVM testNative testIntegration` to verify everything works
 4. **Make changes** following our development workflow below
 5. **Submit a PR** with clear description and tests
@@ -54,7 +54,7 @@ Follow this cycle for all contributions:
 eru/
 ├── eru-core/           # Core effect type and operations (cross-platform)
 │   └── src/main/scala/net/ghoula/eru/
-│       ├── Eru.scala   # Main effect type (704 lines)
+│       ├── Eru.scala   # Main effect type
 │       ├── Exit.scala  # Exit modeling
 │       └── ...
 ├── eru-runtime/        # Runtime with concurrency support
@@ -183,7 +183,7 @@ class YourFeatureSpec extends EruSpecification {
 
 ## Performance Expectations
 
-Eru achieves exceptional performance (4,756-160,143 ops/ms, 50-80x faster than Cats Effect). When contributing:
+Eru's GADT-based interpreter and Scala 3 enum representation achieve high throughput across core operations (4,756-160,143 ops/ms in JMH benchmarks). When contributing:
 
 - **Maintain performance standards** - benchmark critical paths
 - **Profile before optimizing** - use JMH benchmarks for validation
@@ -196,11 +196,8 @@ Eru achieves exceptional performance (4,756-160,143 ops/ms, 50-80x faster than C
 # Quick performance check (structured JSON output)
 ./tools/run-benchmarks.sh smoke
 
-# Full benchmark suite
+# Full comparative suite (local development only)
 ./tools/run-benchmarks.sh comparative
-
-# CI benchmarks validation (5-8 minutes, comprehensive)
-./tools/run-benchmarks.sh ci
 
 # Individual benchmark with JSON output (recommended)
 LANG=C LC_ALL=C sbt "eruBenchJVM/Jmh/run -rf json -rff results.json CoreOperationsBench.eruSucceed"
@@ -373,10 +370,10 @@ This enables:
 
 ### Interpreter Design
 
-The interpreter uses trampolining for stack safety and optimization passes for performance:
+The interpreter uses a `@tailrec` state machine for stack safety and optimization passes for performance:
 
 1. **Construction-time fusion** - Combine adjacent operations
-2. **Trampolined execution** - Stack-safe `flatMap` chains
+2. **Tail-recursive state machine** - Stack-safe `flatMap` chains via `EvalState` ADT
 3. **Continuation optimization** - Minimize allocations
 4. **Platform adaptation** - JVM vs Native execution strategies
 

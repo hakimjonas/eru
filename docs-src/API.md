@@ -158,6 +158,15 @@ object EruRuntime {
   def countDownLatch(count: Int): Eru[Nothing, CountDownLatch]
   def cyclicBarrier(parties: Int): Eru[Nothing, CyclicBarrier]
 
+  // High-density primitives
+  RefMap.make[K, V]: Eru[Nothing, RefMap[K, V]]          // Per-key CAS concurrent map
+  RefMap.from[K, V](entries): Eru[Nothing, RefMap[K, V]]  // Pre-populated concurrent map
+  KeyedSemaphore.make[K](permits): Eru[Nothing, KeyedSemaphore[K]]  // Per-key concurrency limiter
+
+  // Timer primitives (hashed timer wheel)
+  def at[E, A](epochMillis: Long)(effect: => Eru[E, A]): Eru[Nothing, Unit]  // Fire-and-forget at absolute time
+  def after[E, A](delay: Duration)(effect: => Eru[E, A]): Eru[Nothing, Unit] // Fire-and-forget after delay
+
   // Retry operations
   def retry[E, A](effect: Eru[E, A])(policy: RetryPolicy): Eru[E, A]
   def retryN[E, A](n: Int)(effect: Eru[E, A]): Eru[E, A]

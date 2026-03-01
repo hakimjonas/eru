@@ -182,6 +182,7 @@ object ErrorHandling {
       require(!maxDelay.isNegative, "maxDelay cannot be negative")
       require(maxDelay.compareTo(baseDelay) >= 0, "maxDelay must be >= baseDelay")
 
+      // Safe: callers provide typed shouldRetryError; catch-all handles non-E values
       val anyErrorPredicate: Any => Boolean = {
         case e: E @unchecked => shouldRetryError(e)
         case _ => false

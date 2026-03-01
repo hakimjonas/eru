@@ -589,6 +589,81 @@ bulkheadResult match {
 }
 ```
 
+## Per-Key State and Throttling
+
+When managing many independent resources — domains in a crawler, tenants in a SaaS system, connections per host — global primitives like `Ref[Map[K, V]]` or a single `Semaphore` become bottlenecks. Eru provides two per-key primitives that eliminate contention between independent keys.
+
+### RefMap: Per-Key Atomic State
+
+A `Ref[Map[K, V]]` requires a global CAS on every update, so updates to unrelated keys contend with each other. `RefMap` uses a `ConcurrentHashMap` internally — updates to different keys never interfere:
+
+```scala mdoc
+import net.ghoula.eru.prelude.*
+import net.ghoula.eru.prelude.given
+
+// Track per-domain crawl state
+case class DomainState(pagesVisited: Int, lastStatus: Int)
+
+val crawlerState: RefMap[String, DomainState] = RefMap.make[String, DomainState].unsafeRunSync()
+
+// Initialize state for two domains
+crawlerState.put("example.com", DomainState(0, 200)).unsafeRunSync()
+crawlerState.put("other.org", DomainState(0, 200)).unsafeRunSync()
+
+// Atomic per-key update — updating "example.com" never contends with "other.org"
+crawlerState.update("example.com")(s => s.copy(pagesVisited = s.pagesVisited + 1)).unsafeRunSync()
+
+// updateOrCreate handles the "first visit" case without a separate check
+crawlerState.updateOrCreate("new-site.io", DomainState(1, 200)) { s =>
+  s.copy(pagesVisited = s.pagesVisited + 1)
+}.unsafeRunSync()
+
+// Read current state
+val state = crawlerState.toMap.unsafeRunSync()
+println(s"Tracking ${state.size} domains")
+state.foreach { case (domain, s) =>
+  println(s"  $domain: ${s.pagesVisited} pages visited")
+}
+```
+
+Use `RefMap` instead of `Ref[Map[K, V]]` when you have many keys with independent update patterns.
+
+### KeyedSemaphore: Per-Key Concurrency Limits
+
+A global `Semaphore(10)` limits total concurrency to 10, regardless of which resource is being accessed. `KeyedSemaphore` creates independent semaphores per key, so you can enforce per-host limits without hosts starving each other:
+
+```scala mdoc
+// Per-host concurrency limiter: max 2 concurrent requests per host
+val limiter: KeyedSemaphore[String] = KeyedSemaphore.make[String](2).unsafeRunSync()
+
+def fetchPage(host: String, path: String): Eru[String | Throwable, String] = {
+  limiter.withPermit(host) {
+    Eru.effect {
+      // At most 2 fibers run here per host, but different hosts run independently
+      s"Fetched $host$path"
+    }.mapError(_.getMessage)
+  }
+}
+
+// These two share the "example.com" semaphore (max 2 concurrent)
+val f1 = fetchPage("example.com", "/page1").fork.unsafeRunSync()
+val f2 = fetchPage("example.com", "/page2").fork.unsafeRunSync()
+
+// This uses a separate "other.org" semaphore — never blocked by example.com
+val f3 = fetchPage("other.org", "/index").fork.unsafeRunSync()
+
+val r1 = f1.await.unsafeRunSync()
+val r2 = f2.await.unsafeRunSync()
+val r3 = f3.await.unsafeRunSync()
+println(s"Results: $r1, $r2, $r3")
+
+// Inspect active keys
+val activeHosts = limiter.activeKeys.unsafeRunSync()
+println(s"Active hosts: $activeHosts")
+```
+
+Use `KeyedSemaphore` instead of a global `Semaphore` when different keys should have independent concurrency limits.
+
 ## Key Takeaways
 
 Advanced concurrency patterns provide the building blocks for robust, production-ready concurrent systems:
@@ -604,6 +679,8 @@ Advanced concurrency patterns provide the building blocks for robust, production
 **Pipeline Processing**: Multi-stage processing with concurrent stages enables high-throughput data processing pipelines.
 
 **Error Isolation**: Bulkhead patterns and isolated error handling prevent failures in one component from cascading to others.
+
+**Per-Key Primitives**: `RefMap` and `KeyedSemaphore` eliminate contention between independent keys, enabling patterns like per-domain state tracking and per-host concurrency limits without global bottlenecks.
 
 **Production Readiness**: These patterns provide the foundation for building systems that can handle real-world production loads and failure scenarios.
 

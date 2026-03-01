@@ -57,7 +57,7 @@ private object StructuredConcurrency {
     Option(queue.poll()).foreach { fiber =>
       fiber.currentState match {
         case UnifiedFiberState.Completed(_) => () // Discard completed
-        case UnifiedFiberState.Active(_, _, _) => queue.offer(fiber) // Re-add active
+        case UnifiedFiberState.Active(_, _, _, _, _) => queue.offer(fiber) // Re-add active
       }
     }
   }
@@ -74,6 +74,10 @@ private object StructuredConcurrency {
 
         fibersToCleanup.foreach { fiberToCleanup =>
           try {
+            fiberToCleanup
+              .interrupt(InterruptCause.ParentTerminated(FiberId.fresh(), Exit.Success(())))
+              .attempt
+              .unsafeRunSync()
             fiberToCleanup.await.attempt.unsafeRunSync()
           } catch {
             case _: Exception => ()
@@ -204,7 +208,7 @@ enum RuntimeBackend {
               case _ =>
                 Eru.effectTotal {
                   val id = FiberId.fresh()
-                  val fiber = UnifiedFiber.active[E, A](id)
+                  val fiber = UnifiedFiber.active[E, A](id, observer)
                   val parentScope = StructuredConcurrency.getCurrentScope()
 
                   StructuredConcurrency.addChildFiber(fiber, rootFibers)
@@ -213,19 +217,25 @@ enum RuntimeBackend {
 
                   Thread.startVirtualThread { () =>
                     UnifiedFiber.setThread(fiber, Thread.currentThread())
-                    // Restore parent scope in new thread
+                    // Restore parent scope and timer service in new thread
                     StructuredConcurrency.setCurrentScope(parentScope)
 
-                    StructuredConcurrency.withNewScope { _ =>
-                      val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+                    try {
+                      StructuredConcurrency.withNewScope { _ =>
+                        val (exit, finalizers) = Eru.executeWithFinalizers(fa)
 
-                      finalizers.foreach { finalizer =>
-                        try finalizer().unsafeRunSync()
-                        catch case _: Exception => ()
+                        finalizers.foreach { finalizer =>
+                          try finalizer().unsafeRunSync()
+                          catch case _: Exception => ()
+                        }
+
+                        UnifiedFiber.complete(fiber, exit)
                       }
-
-                      UnifiedFiber.complete(fiber, exit)
-                      observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                    } catch {
+                      case _: InterruptedException =>
+                        UnifiedFiber.complete(fiber, Exit.Interrupt(id, InterruptCause.Cancelled()))
+                      case t: Throwable =>
+                        UnifiedFiber.complete(fiber, Exit.Die(t))
                     }
                   }
 
@@ -243,7 +253,7 @@ enum RuntimeBackend {
           case _ =>
             Eru.effectTotal {
               val id = FiberId.fresh()
-              val fiber = UnifiedFiber.active[E, A](id)
+              val fiber = UnifiedFiber.active[E, A](id, observer)
               val parentScope = StructuredConcurrency.getCurrentScope()
 
               StructuredConcurrency.addChildFiber(fiber, rootFibers)
@@ -252,19 +262,25 @@ enum RuntimeBackend {
 
               Thread.startVirtualThread { () =>
                 UnifiedFiber.setThread(fiber, Thread.currentThread())
-                // Restore parent scope in new thread
+                // Restore parent scope and timer service in new thread
                 StructuredConcurrency.setCurrentScope(parentScope)
 
-                StructuredConcurrency.withNewScope { _ =>
-                  val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+                try {
+                  StructuredConcurrency.withNewScope { _ =>
+                    val (exit, finalizers) = Eru.executeWithFinalizers(fa)
 
-                  finalizers.foreach { finalizer =>
-                    try finalizer().unsafeRunSync()
-                    catch case _: Exception => ()
+                    finalizers.foreach { finalizer =>
+                      try finalizer().unsafeRunSync()
+                      catch case _: Exception => ()
+                    }
+
+                    UnifiedFiber.complete(fiber, exit)
                   }
-
-                  UnifiedFiber.complete(fiber, exit)
-                  observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+                } catch {
+                  case _: InterruptedException =>
+                    UnifiedFiber.complete(fiber, Exit.Interrupt(id, InterruptCause.Cancelled()))
+                  case t: Throwable =>
+                    UnifiedFiber.complete(fiber, Exit.Die(t))
                 }
               }
 
@@ -313,8 +329,9 @@ enum RuntimeBackend {
 
           val runLeft: Runnable = () => {
             leftThreadRef.set(Some(Thread.currentThread()))
-            // Restore parent scope in race thread
+            // Restore parent scope and timer service in race thread
             StructuredConcurrency.setCurrentScope(parentScope)
+
             val (exit, finalizers) = Eru.executeWithFinalizers(fa)
             finalizers.foreach { finalizer =>
               try finalizer().unsafeRunSync()
@@ -334,8 +351,9 @@ enum RuntimeBackend {
 
           val runRight: Runnable = () => {
             rightThreadRef.set(Some(Thread.currentThread()))
-            // Restore parent scope in race thread
+            // Restore parent scope and timer service in race thread
             StructuredConcurrency.setCurrentScope(parentScope)
+
             val (exit, finalizers) = Eru.executeWithFinalizers(fb)
             finalizers.foreach { finalizer =>
               try finalizer().unsafeRunSync()

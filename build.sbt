@@ -7,7 +7,7 @@ import scala.sys.process.Process
 // ===== Build-wide Settings =====
 ThisBuild / organization := "net.ghoula"
 ThisBuild / versionScheme := Some("early-semver")
-ThisBuild / scalaVersion := "3.7.4"
+ThisBuild / scalaVersion := "3.8.2"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
@@ -37,10 +37,21 @@ ThisBuild / scmInfo := Some(
   ScmInfo(url("https://github.com/hakimjonas/eru"), "scm:git@github.com:hakimjonas/eru.git")
 )
 
+// ===== Assembly Merge Strategy (for standalone benchmark JAR) =====
+ThisBuild / assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", "services", _*) => MergeStrategy.concat
+  case PathList("META-INF", "BenchmarkList") => MergeStrategy.concat
+  case PathList("META-INF", "CompilerHints") => MergeStrategy.concat
+  case PathList("META-INF", _*) => MergeStrategy.discard
+  case "scala-collection-compat.properties" => MergeStrategy.first
+  case x if x.endsWith("module-info.class") => MergeStrategy.discard
+  case x => MergeStrategy.defaultMergeStrategy(x)
+}
+
 // ===== Compiler Settings =====
 lazy val sharedScalacOptions = Seq(
   "-feature",
-  "-Xfatal-warnings",
+  "-Werror",
   "-Wunused:all",
   "-Wrecurse-with-default",
   "-no-indent"
@@ -124,7 +135,7 @@ lazy val root = (project in file("."))
     }
   )
   .settings(
-    // Fair benchmark system commands (use ./run-fair-benchmarks.sh for full system)
+    // Benchmark commands (use ./tools/run-benchmarks.sh for the full runner)
     addCommandAlias("benchCore", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*CoreOperationsBench.*"),
     addCommandAlias("benchState", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*StateManagementBench.*"),
     addCommandAlias("benchConcurrency", "eruBenchJVM/Jmh/run -i 5 -wi 3 -f1 -t1 .*ConcurrencyBench.*"),
@@ -175,8 +186,8 @@ lazy val eruCore = crossProject(JVMPlatform, NativePlatform)
     libraryDependencies ++= Seq(
       "io.github.cquiroz" %%% "scala-java-time" % "2.6.0",
       "io.github.cquiroz" %%% "scala-java-time-tzdb" % "2.6.0" % Runtime,
-      "org.scalameta" %%% "munit" % "1.1.1" % Test,
-      "org.scalameta" %%% "munit-scalacheck" % "1.1.0" % Test
+      "org.scalameta" %%% "munit" % "1.2.3" % Test,
+      "org.scalameta" %%% "munit-scalacheck" % "1.2.0" % Test
     )
   )
   .jvmSettings(
@@ -205,8 +216,8 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
     name := "eru-runtime",
     libraryDependencies ++= Seq(
       "io.github.cquiroz" %%% "scala-java-time" % "2.6.0",
-      "org.scalameta" %%% "munit" % "1.1.1" % Test,
-      "org.scalameta" %%% "munit-scalacheck" % "1.1.0" % Test
+      "org.scalameta" %%% "munit" % "1.2.3" % Test,
+      "org.scalameta" %%% "munit-scalacheck" % "1.2.0" % Test
     )
   )
   .jvmSettings(
@@ -216,8 +227,7 @@ lazy val eruRuntime = crossProject(JVMPlatform, NativePlatform)
     Test / testForkedParallel := false,
     Test / fork := true,
     Test / javaOptions ++= Seq(
-      "-XX:+UseZGC", // Enable ZGC (optimal for Project Loom)
-      "-XX:+ZGenerational", // Enable generational mode (Java 21+)
+      "-XX:+UseZGC", // ZGC (generational mode is default since JDK 24)
       "-Xms2G", // Initial heap size
       "-Xmx2G", // Max heap size
       "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4"
@@ -246,7 +256,7 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
     name := "eru-bench-jvm",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % "2.1.22",
+      "dev.zio" %% "zio" % "2.1.24",
       "org.typelevel" %% "cats-effect" % "3.6.3"
     ),
     // JMH settings
@@ -254,7 +264,10 @@ lazy val eruBenchJVM = (project in file("eru-bench-jvm"))
     Jmh / classDirectory := (Compile / classDirectory).value,
     Jmh / dependencyClasspath := (Compile / dependencyClasspath).value,
     Jmh / compile := (Jmh / compile).dependsOn(Compile / compile).value,
-    Jmh / run := (Jmh / run).dependsOn(Jmh / compile).evaluated
+    Jmh / run := (Jmh / run).dependsOn(Jmh / compile).evaluated,
+    // Standalone JMH fat JAR
+    assembly / mainClass := Some("org.openjdk.jmh.Main"),
+    assembly / assemblyJarName := "benchmarks.jar"
   )
 
 // ===== Matrix Benchmarks (JVM only) =====
@@ -266,7 +279,7 @@ lazy val eruBenchMatrix = (project in file("eru-bench-matrix"))
     name := "eru-bench-matrix",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % "2.1.22",
+      "dev.zio" %% "zio" % "2.1.24",
       "org.typelevel" %% "cats-effect" % "3.6.3"
     ),
     // JMH settings for matrix benchmarks
@@ -288,7 +301,7 @@ lazy val eruIntegrationTest = (project in file("eru-integration-test"))
     name := "eru-integration-test",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "munit" % "1.2.1" % Test
+      "org.scalameta" %% "munit" % "1.2.3" % Test
     ),
     Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
   )

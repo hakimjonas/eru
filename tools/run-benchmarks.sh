@@ -8,8 +8,8 @@
 #
 # Modes:
 #   smoke        - Representative sampling across all categories (~2-3 min, default)
-#   ci           - Comprehensive CI-friendly sampling (~5-8 min, CI/CD recommended)
-#   comparative  - All comparative benchmarks vs ZIO/Cats Effect (~25-35 min, comprehensive)
+#   ci           - Comprehensive sampling, all categories (~5-8 min)
+#   comparative  - All cross-framework benchmarks (~25-35 min, comprehensive)
 #   scaling      - Parametric scaling analysis (~20-30 min)
 #   memory       - Memory & GC analysis (~10-15 min)
 #   full         - Complete benchmark suite (~60-90 min)
@@ -88,8 +88,8 @@ while [[ $# -gt 0 ]]; do
             echo "MODES (what to benchmark):"
             echo "  smoke       - Representative sampling across all categories (~2-3 min) [default]"
             echo "  quick       - Fastest possible full picture (1 iteration, all benchmarks) (~5 min)"
-            echo "  ci          - Comprehensive CI-friendly sampling (~5-8 min) [CI/CD recommended]"
-            echo "  comparative - All comparative benchmarks vs ZIO/Cats Effect (~25-35 min) [comprehensive]"
+            echo "  ci          - Comprehensive sampling, all categories (~5-8 min)"
+            echo "  comparative - All cross-framework benchmarks (~25-35 min) [comprehensive]"
             echo "  memory      - Memory & GC analysis (~10-15 min)"
             echo "  full        - Complete benchmark suite (~45-60 min)"
             echo ""
@@ -230,9 +230,11 @@ case $MODE in
         ;;
 
     ci)
-        echo -e "${YELLOW}Running CI benchmarks (comprehensive sampling for continuous integration)${NC}\n"
-        # Core operations - basic + one challenging pattern
-        run_benchmark "Core Operations (CI)" "net.ghoula.eru.bench.fair.CoreOperationsBench.eruSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.zioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.ioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.eruLongChain|net.ghoula.eru.bench.fair.CoreOperationsBench.zioLongChain|net.ghoula.eru.bench.fair.CoreOperationsBench.ioLongChain"
+        echo -e "${YELLOW}Running CI benchmarks (all categories)${NC}\n"
+        # Core operations - succeed (isolated: eruSucceed can cause VM premature exit on CI)
+        run_benchmark "Core Operations - Succeed (CI)" "net.ghoula.eru.bench.fair.CoreOperationsBench.eruSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.zioSucceed|net.ghoula.eru.bench.fair.CoreOperationsBench.ioSucceed"
+        # Core operations - chains (reliable, produces the more interesting comparison data)
+        run_benchmark "Core Operations - Chains (CI)" "net.ghoula.eru.bench.fair.CoreOperationsBench.eruLongChain|net.ghoula.eru.bench.fair.CoreOperationsBench.zioLongChain|net.ghoula.eru.bench.fair.CoreOperationsBench.ioLongChain"
         # Error handling - both success and failure paths
         run_benchmark "Error Handling (CI)" "net.ghoula.eru.bench.fair.ErrorHandlingBench.eruSuccessfulAttempt|net.ghoula.eru.bench.fair.ErrorHandlingBench.zioSuccessfulEither|net.ghoula.eru.bench.fair.ErrorHandlingBench.ioSuccessfulAttempt|net.ghoula.eru.bench.fair.ErrorHandlingBench.eruFailRecover|net.ghoula.eru.bench.fair.ErrorHandlingBench.zioFailRecover|net.ghoula.eru.bench.fair.ErrorHandlingBench.ioFailRecover"
         # Concurrency - fundamental + parallel patterns
@@ -240,13 +242,13 @@ case $MODE in
         # Collections - traverse + parallel traverse
         run_benchmark "Collection Operations (CI)" "net.ghoula.eru.bench.fair.CollectionOperationsBench.eruTraverseBasic|net.ghoula.eru.bench.fair.CollectionOperationsBench.zioTraverseBasic|net.ghoula.eru.bench.fair.CollectionOperationsBench.ioTraverseBasic|net.ghoula.eru.bench.fair.CollectionOperationsBench.eruParTraverse|net.ghoula.eru.bench.fair.CollectionOperationsBench.zioParTraverse|net.ghoula.eru.bench.fair.CollectionOperationsBench.ioParTraverse"
         # State management - basic ref operations
-        run_benchmark "State Management (CI)" "net.ghoula.eru.bench.fair.StateManagementBench.eruRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.zioRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.ioRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.eruRefContention|net.ghoula.eru.bench.fair.StateManagementBench.zioRefContention|net.ghoula.eru.bench.fair.StateManagementBench.ioRefContention"
+        run_benchmark "State Management (CI)" "net.ghoula.eru.bench.fair.StateManagementBench.eruRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.zioRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.ioRefBasic|net.ghoula.eru.bench.fair.StateManagementBench.eruRefUpdate|net.ghoula.eru.bench.fair.StateManagementBench.zioRefUpdate|net.ghoula.eru.bench.fair.StateManagementBench.ioRefUpdate"
         # Resource management - a category where performance might be closer
         run_benchmark "Resource Management (CI)" "net.ghoula.eru.bench.fair.ResourceManagementBench.eruBracketSuccess|net.ghoula.eru.bench.fair.ResourceManagementBench.zioBracketSuccess|net.ghoula.eru.bench.fair.ResourceManagementBench.ioBracketSuccess|net.ghoula.eru.bench.fair.ResourceManagementBench.eruComplexResource|net.ghoula.eru.bench.fair.ResourceManagementBench.zioComplexResource|net.ghoula.eru.bench.fair.ResourceManagementBench.ioComplexResource"
         ;;
 
     comparative)
-        echo -e "${YELLOW}Running comparative benchmarks vs ZIO/Cats Effect (all categories)${NC}\n"
+        echo -e "${YELLOW}Running cross-framework benchmarks (all categories)${NC}\n"
         run_benchmark "Core Operations" "net.ghoula.eru.bench.fair.CoreOperationsBench"
         run_benchmark "Error Handling" "net.ghoula.eru.bench.fair.ErrorHandlingBench"
         run_benchmark "State Management" "net.ghoula.eru.bench.fair.StateManagementBench"
@@ -259,9 +261,9 @@ case $MODE in
 
     scaling)
         echo -e "${YELLOW}Running scaling benchmarks (parametric analysis)${NC}\n"
-        echo -e "${RED}Scaling benchmarks not yet implemented${NC}"
-        echo "Run 'comparative' mode for full comparison benchmarks"
-        exit 0
+        run_benchmark "Concurrency Scaling" "net.ghoula.eru.bench.matrix.ConcurrencyScalingBench" 600
+        run_benchmark "Depth Scaling" "net.ghoula.eru.bench.matrix.DepthScalingBench" 600
+        run_benchmark "Data Size Scaling" "net.ghoula.eru.bench.matrix.DataSizeScalingBench" 600
         ;;
 
     memory)

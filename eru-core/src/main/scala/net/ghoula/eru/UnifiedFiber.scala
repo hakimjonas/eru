@@ -25,11 +25,17 @@ enum UnifiedFiberState[+E, +A] {
     *   atomic reference holding the result once available
     * @param threadRef
     *   atomic reference to the executing thread for interruption
+    * @param observerRef
+    *   atomic reference to the observer for lifecycle events
+    * @param fiberId
+    *   the unique identifier for this fiber (needed for observer events)
     */
   case Active[E, A](
     latch: CountDownLatch,
     exitRef: AtomicReference[Exit[E, A]],
-    threadRef: AtomicReference[Option[Thread]]
+    threadRef: AtomicReference[Option[Thread]],
+    observerRef: AtomicReference[Option[EruObserver]],
+    fiberId: FiberId
   ) extends UnifiedFiberState[E, A]
 }
 
@@ -61,7 +67,7 @@ final class UnifiedFiber[+E, +A](
     case UnifiedFiberState.Completed(exit) =>
       Eru.succeed(exit)
 
-    case UnifiedFiberState.Active(latch, exitRef, _) =>
+    case UnifiedFiberState.Active(latch, exitRef, _, _, _) =>
       Eru.interruptibleBlocking {
         latch.await()
         exitRef.get()
@@ -86,7 +92,7 @@ final class UnifiedFiber[+E, +A](
     case UnifiedFiberState.Completed(_) =>
       Eru.unit
 
-    case UnifiedFiberState.Active(_, _, threadRef) =>
+    case UnifiedFiberState.Active(_, _, threadRef, _, _) =>
       Eru.effect {
         threadRef.get().foreach(_.interrupt())
       }.attempt.flatMap(_ => Eru.unit)
@@ -133,33 +139,52 @@ object UnifiedFiber {
     *
     * @param id
     *   the fiber identifier
+    * @param observer
+    *   optional observer for fiber lifecycle events
     * @return
     *   an active UnifiedFiber with coordination primitives
     */
-  def active[E, A](id: FiberId): UnifiedFiber[E, A] = {
+  def active[E, A](id: FiberId, observer: Option[EruObserver] = None): UnifiedFiber[E, A] = {
     val latch = new CountDownLatch(1)
     val exitRef = new AtomicReference[Exit[E, A]]()
     val threadRef = new AtomicReference[Option[Thread]](None)
-    new UnifiedFiber(id, UnifiedFiberState.Active(latch, exitRef, threadRef))
+    val observerRef = new AtomicReference[Option[EruObserver]](observer)
+    new UnifiedFiber(id, UnifiedFiberState.Active(latch, exitRef, threadRef, observerRef, id))
   }
 
   /** Completes an active fiber with the given exit result.
     *
     * This method is used by runtime backends to transition an active fiber to the completed state
-    * by setting its result and releasing waiters.
+    * by setting its result and releasing waiters. If the fiber has an observer, it emits a
+    * FiberCompleted event.
     *
     * @param fiber
     *   the active fiber to complete
     * @param exit
     *   the completion result
+    * @param skipObserver
+    *   if true, skip emitting observer event (use when caller will emit it)
     */
-  def complete[E, A](fiber: UnifiedFiber[E, A], exit: Exit[E, A]): Unit = {
+  def complete[E, A](fiber: UnifiedFiber[E, A], exit: Exit[E, A], skipObserver: Boolean = false): Unit = {
     fiber.state match {
-      case UnifiedFiberState.Active(latch, exitRef, _) =>
+      case UnifiedFiberState.Active(latch, exitRef, _, observerRef, fiberId) =>
+        // Safe: fiber state machine guarantees matching type parameters
         exitRef match {
           case ref: AtomicReference[Exit[E, A]] @unchecked =>
             ref.set(exit)
             latch.countDown()
+
+            if !skipObserver then {
+              observerRef.getAndSet(None).foreach { obs =>
+                val widenedExit: Exit[Any, Any] = exit match {
+                  case Exit.Success(a) => Exit.Success(a)
+                  case Exit.Failure(e) => Exit.Failure(e)
+                  case Exit.Die(t) => Exit.Die(t)
+                  case Exit.Interrupt(id, c) => Exit.Interrupt(id, c)
+                }
+                obs.onEvent(EruObserver.EruEvent.FiberCompleted(fiberId, widenedExit))
+              }
+            }
         }
       case UnifiedFiberState.Completed(_) =>
         ()
@@ -178,7 +203,7 @@ object UnifiedFiber {
     */
   def setThread[E, A](fiber: UnifiedFiber[E, A], thread: Thread): Unit = {
     fiber.state match {
-      case UnifiedFiberState.Active(_, _, threadRef) =>
+      case UnifiedFiberState.Active(_, _, threadRef, _, _) =>
         threadRef.set(Some(thread))
       case UnifiedFiberState.Completed(_) =>
         ()

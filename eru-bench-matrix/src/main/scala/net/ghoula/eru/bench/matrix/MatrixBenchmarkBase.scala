@@ -27,48 +27,23 @@ import net.ghoula.eru.prelude.*
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 3, timeUnit = TimeUnit.SECONDS)
-@Fork(value = 3) // Multiple forks for statistical confidence
+@Fork(value = 3, jvmArgsAppend = Array("-XX:+UseZGC"))
 abstract class MatrixBenchmarkBase {
 
   // =============================================================================
-  // Concurrency Matrix Parameters
+  // Benchmark parameters — abstract so each subclass declares only its scaling
+  // dimensions as @Param var (JMH's required mutation point) and fixes the rest
+  // as val. This avoids the combinatorial explosion of a full cross-product.
   // =============================================================================
 
-  @Param(Array("1", "2", "4", "8", "16"))
-  var threadCount: Int = 1
-
-  @Param(Array("10", "100", "1000"))
-  var fiberCount: Int = 100
-
-  @Param(Array("100", "1000", "10000"))
-  var concurrencyLevel: Int = 1000
-
-  // =============================================================================
-  // Data Size Matrix Parameters
-  // =============================================================================
-
-  @Param(Array("10", "100", "1000"))
-  var collectionSize: Int = 100
-
-  @Param(Array("small", "medium", "large"))
-  var dataSize: String = "medium"
-
-  // =============================================================================
-  // Depth Matrix Parameters
-  // =============================================================================
-
-  @Param(Array("10", "50", "100", "500"))
-  var chainDepth: Int = 100
-
-  @Param(Array("5", "10", "25"))
-  var nestingLevel: Int = 10
-
-  // =============================================================================
-  // Workload Pattern Parameters
-  // =============================================================================
-
-  @Param(Array("cpu-bound", "io-bound", "mixed"))
-  var workloadType: String = "cpu-bound"
+  def threadCount: Int
+  def fiberCount: Int
+  def concurrencyLevel: Int
+  def collectionSize: Int
+  def dataSize: String
+  def chainDepth: Int
+  def nestingLevel: Int
+  def workloadType: String
 
   // =============================================================================
   // Runtime Setup
