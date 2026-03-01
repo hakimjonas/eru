@@ -122,6 +122,22 @@ object prelude {
   /** Exposes the KeyedSemaphore companion for factory methods. */
   val KeyedSemaphore = net.ghoula.eru.KeyedSemaphore
 
+  /** Computation that may suspend indefinitely (no `unsafeRunSync`).
+    * @tparam E
+    *   error type
+    * @tparam A
+    *   success type
+    */
+  type Suspending[+E, +A] = net.ghoula.eru.Suspending[E, A]
+
+  /** Computation that completes immediately (has `unsafeRunSync`).
+    * @tparam E
+    *   error type
+    * @tparam A
+    *   success type
+    */
+  type Immediate[+E, +A] = net.ghoula.eru.Immediate[E, A]
+
   /** Type alias for runtime fibers, re-exposed for discoverability.
     * @tparam E
     *   typed error of the fiber
