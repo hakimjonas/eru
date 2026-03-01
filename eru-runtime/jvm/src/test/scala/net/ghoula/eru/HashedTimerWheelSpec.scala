@@ -1,15 +1,15 @@
 package net.ghoula.eru
 
-import java.util.concurrent.{CountDownLatch, TimeUnit}
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
+import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import net.ghoula.eru.internal.HashedTimerWheel
 
 /** Tests for the real HashedTimerWheel implementation.
   *
   * Unlike TimerWheelSpec (which tests Eru.at/after via a mock), these tests exercise the actual
-  * hashed wheel timer: bucket distribution, scheduling accuracy, shutdown semantics, and
-  * concurrent safety.
+  * hashed wheel timer: bucket distribution, scheduling accuracy, shutdown semantics, and concurrent
+  * safety.
   */
 final class HashedTimerWheelSpec extends munit.FunSuite {
 
@@ -27,10 +27,13 @@ final class HashedTimerWheelSpec extends munit.FunSuite {
       val firedAt = new AtomicLong(0L)
 
       val target = System.currentTimeMillis() + 50L
-      wheel.schedule(target, () => {
-        firedAt.set(System.currentTimeMillis())
-        latch.countDown()
-      })
+      wheel.schedule(
+        target,
+        () => {
+          firedAt.set(System.currentTimeMillis())
+          latch.countDown()
+        }
+      )
 
       assert(latch.await(2, TimeUnit.SECONDS), "Task should fire within timeout")
       val drift = firedAt.get() - target
@@ -80,10 +83,13 @@ final class HashedTimerWheelSpec extends munit.FunSuite {
       val before = System.currentTimeMillis()
 
       // Schedule in the past (epoch 0)
-      wheel.schedule(0L, () => {
-        firedAt.set(System.currentTimeMillis())
-        latch.countDown()
-      })
+      wheel.schedule(
+        0L,
+        () => {
+          firedAt.set(System.currentTimeMillis())
+          latch.countDown()
+        }
+      )
 
       assert(latch.await(2, TimeUnit.SECONDS), "Past-due task should fire promptly")
       val elapsed = firedAt.get() - before
@@ -105,10 +111,13 @@ final class HashedTimerWheelSpec extends munit.FunSuite {
       // Schedule from multiple threads concurrently
       val threads = (0 until totalTasks).map { i =>
         Thread.startVirtualThread { () =>
-          wheel.schedule(now + 30L + (i % 50), () => {
-            counter.incrementAndGet()
-            allFired.countDown()
-          })
+          wheel.schedule(
+            now + 30L + (i % 50),
+            () => {
+              counter.incrementAndGet()
+              allFired.countDown()
+            }
+          )
         }
       }
 
