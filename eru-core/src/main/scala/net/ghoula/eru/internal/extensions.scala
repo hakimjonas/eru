@@ -338,7 +338,7 @@ object extensions {
       eru.recoverWith { error =>
         fallbacks.lift(error) match {
           case Some(value) => Eru.succeed(value)
-          case None        => Eru.fail(error)
+          case None => Eru.fail(error)
         }
       }
     }

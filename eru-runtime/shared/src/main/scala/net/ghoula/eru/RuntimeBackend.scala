@@ -75,7 +75,7 @@ private object StructuredConcurrency {
         def drain(acc: List[UnifiedFiber[?, ?]]): List[UnifiedFiber[?, ?]] =
           Option(queue.poll()) match {
             case Some(fiber) => drain(fiber :: acc)
-            case None        => acc.reverse
+            case None => acc.reverse
           }
 
         drain(Nil).foreach { fiberToCleanup =>

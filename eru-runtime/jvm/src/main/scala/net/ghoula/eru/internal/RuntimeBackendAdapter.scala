@@ -176,7 +176,7 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
       def drain(acc: List[UnifiedFiber[?, ?]]): List[UnifiedFiber[?, ?]] =
         Option(rootFibers.poll()) match {
           case Some(fiber) => drain(fiber :: acc)
-          case None        => acc.reverse
+          case None => acc.reverse
         }
 
       val fibersToCleanup = drain(Nil)
@@ -187,38 +187,39 @@ private[eru] final class RuntimeBackendAdapter(backend: RuntimeBackend) extends 
         obs.onEvent(EruObserver.EruEvent.StructuredCleanupStarted(parentId, total))
       }
 
-      val (interrupted, alreadyCompleted) = fibersToCleanup.foldLeft((0, 0)) { case ((intAcc, compAcc), fiberToCleanup) =>
-        try {
-          val wasActive = fiberToCleanup.currentState match {
-            case UnifiedFiberState.Active(_, _, _, _, _) => true
-            case UnifiedFiberState.Completed(_) => false
-          }
+      val (interrupted, alreadyCompleted) = fibersToCleanup.foldLeft((0, 0)) {
+        case ((intAcc, compAcc), fiberToCleanup) =>
+          try {
+            val wasActive = fiberToCleanup.currentState match {
+              case UnifiedFiberState.Active(_, _, _, _, _) => true
+              case UnifiedFiberState.Completed(_) => false
+            }
 
-          observer.foreach { obs =>
-            obs.onEvent(
-              EruObserver.EruEvent.ChildInterruptionRequested(
-                parentId,
-                fiberToCleanup.id,
-                InterruptCause.ParentTerminated(parentId, Exit.Success(())),
-                wasActive
+            observer.foreach { obs =>
+              obs.onEvent(
+                EruObserver.EruEvent.ChildInterruptionRequested(
+                  parentId,
+                  fiberToCleanup.id,
+                  InterruptCause.ParentTerminated(parentId, Exit.Success(())),
+                  wasActive
+                )
               )
-            )
-          }
+            }
 
-          if wasActive then {
-            fiberToCleanup
-              .interrupt(InterruptCause.ParentTerminated(parentId, Exit.Success(())))
-              .attempt
-              .unsafeRunSync()
-            fiberToCleanup.await.attempt.unsafeRunSync()
-            (intAcc + 1, compAcc)
-          } else {
-            fiberToCleanup.await.attempt.unsafeRunSync()
-            (intAcc, compAcc + 1)
+            if wasActive then {
+              fiberToCleanup
+                .interrupt(InterruptCause.ParentTerminated(parentId, Exit.Success(())))
+                .attempt
+                .unsafeRunSync()
+              fiberToCleanup.await.attempt.unsafeRunSync()
+              (intAcc + 1, compAcc)
+            } else {
+              fiberToCleanup.await.attempt.unsafeRunSync()
+              (intAcc, compAcc + 1)
+            }
+          } catch {
+            case _: Exception => (intAcc, compAcc)
           }
-        } catch {
-          case _: Exception => (intAcc, compAcc)
-        }
       }
 
       observer.foreach { obs =>

@@ -168,3 +168,83 @@ Tests moved from wall-clock to deterministic TestClock.
 | Fibers interrupted | 381,443 | proportional |
 
 Verdict: **PASS** — no crash, heap well below baseline.
+
+## Run 8: +2C completeWith extraction
+
+Extracted duplicate `completedRef.set(Some(fiber)); callbackRef.get().foreach(cb => cb(fiber))`
+into local `def completeWith(fiber)` inside VTAsyncFiber's virtual thread lambda.
+Note: this is a local def (same method body), NOT a class method extraction like 2B.
+
+| Metric | Value | vs Baseline |
+|---|---|---|
+| Branch | audit-cherry-pick | |
+| Heap | 4GB | |
+| Duration | 600s | |
+| Exit | 0 (success) | same |
+| Total fetches | 416,130 | ~same |
+| M/N ratio | 0.544 | -0.011 |
+| New URLs | 966,198 | +3% |
+| 304 Not Modified | 45.6% | +1.1pp |
+| Errors | 0.7% | same |
+| Zombie ETags | 2,738 | ~same |
+| Heap used | 2,668 MB (65.1%) | -962 MB (better) |
+| Fibers interrupted | 416,161 | proportional |
+
+Verdict: **PASS** — no crash, local def extraction is safe (unlike 2B class method extraction).
+
+## Run 9: +3C+4C+4D (final 10-min batch)
+
+3C: shutdownRootFibers tailrec + foldLeft (RuntimeBackendAdapter).
+4C: fallback PF `isDefinedAt+apply` → `lift` (extensions.scala).
+4D: Platform.isJVM tuple pattern match (RuntimeBackend.scala).
+
+| Metric | Value | vs Baseline |
+|---|---|---|
+| Branch | audit-cherry-pick | |
+| Heap | 4GB | |
+| Duration | 600s | |
+| Exit | 0 (success) | same |
+| Total fetches | 426,484 | +3% |
+| M/N ratio | 0.518 | -0.037 |
+| New URLs | 1,014,740 | +8% |
+| 304 Not Modified | 48.2% | +3.7pp |
+| Errors | 0.7% | same |
+| Zombie ETags | 2,955 | ~same |
+| Heap used | 2,670 MB (65.2%) | -960 MB (better) |
+| Fibers interrupted | 426,530 | proportional |
+
+Verdict: **PASS** — all 12 changes validated individually, ready for extended run.
+
+## Run 10: 30-minute 16GB Final Validation
+
+All 12 changes applied. Extended duration (1800s) and larger heap (16GB) to confirm
+stability under sustained load. Previous SIGSEGV crashes on the full audit branch
+occurred at 10-25 minutes — this run must survive the full 30 minutes.
+
+Protocol: 100k domains, 1800s, ZGC + AlwaysPreTouch on fleet (16GB), ZGC on server (2GB).
+
+| Metric | Value | vs Baseline (scaled) |
+|---|---|---|
+| Branch | audit-cherry-pick | |
+| Heap | 16GB | 4× baseline |
+| Duration | 1800s | 3× baseline |
+| Exit | 0 (success) | same |
+| Total fetches | 1,687,202 | ~4× (linear scaling) |
+| M/N ratio | 0.565 | +0.010 |
+| New URLs | 4,878,364 | ~5× |
+| 304 Not Modified | 43.5% | ~same |
+| Errors | 0.7% | same |
+| Zombie ETags | 9,542 | proportional |
+| Heap used | 9,366 MB (57.2%) | similar % to 10-min runs |
+| Fibers interrupted | 1,687,254 | proportional |
+
+Verdict: **PASS** — clean exit after full 30 minutes, no SIGSEGV, heap at 57.2%.
+Confirms all changes are stable under sustained production-like load.
+
+## Dropped Change
+
+**2B: forkOnVirtualThread class method extraction** — permanently dropped.
+Extracting fork body into a class method altered C2 JIT inlining decisions on the hot
+fork path, triggering ZGC colored pointer barrier bugs in `Continuation.yield0` under
+high allocation pressure with virtual threads. Crashed with SIGSEGV at 10-25 minutes.
+Local defs (2A, 2C) are safe because Scala compiles them into the same method body.
