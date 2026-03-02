@@ -252,16 +252,6 @@ class ExtensionsSpec extends munit.FunSuite {
     assertEquals(optimized.unsafeRunSync(), 42)
   }
 
-  test("Eru failAfter extension provides timeout semantics") {
-    import extensions.*
-
-    val effect = succeed(42)
-
-    // Test failAfter extension (currently returns unchanged effect)
-    val withTimeout = effect.failAfter(java.time.Duration.ofSeconds(1), "timeout")
-    assertEquals(withTimeout.unsafeRunSync(), 42)
-  }
-
   test("Extensions maintain referential transparency") {
     import extensions.*
 

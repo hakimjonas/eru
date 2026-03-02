@@ -1,6 +1,6 @@
 package net.ghoula.eru.internal
 
-import java.time.{Duration, Instant}
+import java.time.Instant
 
 import net.ghoula.eru.{DomainTypes, Eru, Exit, Result, patterns, trace}
 
@@ -336,10 +336,9 @@ object extensions {
     /** Provides fallback values for specific error conditions. */
     def fallback[E1 >: E, A1 >: A](fallbacks: PartialFunction[E1, A1]): Eru[E1, A1] = {
       eru.recoverWith { error =>
-        if (fallbacks.isDefinedAt(error)) {
-          Eru.succeed(fallbacks(error))
-        } else {
-          Eru.fail(error)
+        fallbacks.lift(error) match {
+          case Some(value) => Eru.succeed(value)
+          case None => Eru.fail(error)
         }
       }
     }
@@ -347,12 +346,6 @@ object extensions {
     /** Adds contextual information to errors for better debugging. */
     def contextualizeError[E1](f: E => E1): Eru[E1, A] = {
       eru.mapError(f)
-    }
-
-    /** Times out with a specific error rather than a generic TimeoutException. */
-    def failAfter[E1 >: E](_timeout: Duration, _timeoutError: E1): Eru[E1, A] = {
-      val _ = (_timeout, _timeoutError)
-      eru
     }
 
     /** Wraps this effect with a trace span for observability.

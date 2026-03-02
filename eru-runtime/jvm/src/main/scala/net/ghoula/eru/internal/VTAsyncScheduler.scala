@@ -44,6 +44,11 @@ private final class VTAsyncFiber[E, A](
   private val latch = new CountDownLatch(1)
 
   private val thread = java.lang.Thread.startVirtualThread(() => {
+    def completeWith(fiber: EruFiber[E, A]): Unit = {
+      completedRef.set(Some(fiber))
+      callbackRef.get().foreach(cb => cb(fiber))
+    }
+
     observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
 
     try {
@@ -51,20 +56,15 @@ private final class VTAsyncFiber[E, A](
       val (exit, finalizers) = scheduler.executeWithFinalizers(computation)
 
       val completedFiber = EruFiber.withId(id, exit, finalizers)
-
       observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-
-      completedRef.set(Some(completedFiber))
-      callbackRef.get().foreach(cb => cb(completedFiber))
+      completeWith(completedFiber)
 
     } catch {
       case t: Throwable =>
         val exit = Exit.Die(t)
         val completedFiber = EruFiber.withId(id, exit, Nil)
         observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-
-        completedRef.set(Some(completedFiber))
-        callbackRef.get().foreach(cb => cb(completedFiber))
+        completeWith(completedFiber)
     } finally {
       latch.countDown()
     }

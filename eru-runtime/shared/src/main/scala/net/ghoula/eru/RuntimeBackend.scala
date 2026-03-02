@@ -21,17 +21,23 @@ private object StructuredConcurrency {
     try {
       action(newScope)
     } finally {
-      var child = Option(newScope.childFibers.poll())
-      while (child.nonEmpty) {
-        val fiber = child.get
-        try {
-          fiber.interrupt(InterruptCause.ParentTerminated(FiberId.fresh(), Exit.Success(()))).attempt.unsafeRunSync()
-          fiber.await.attempt.unsafeRunSync()
-        } catch {
-          case _: Exception => ()
+      @annotation.tailrec
+      def drainAndCleanup(): Unit =
+        Option(newScope.childFibers.poll()) match {
+          case Some(fiber) =>
+            try {
+              fiber
+                .interrupt(InterruptCause.ParentTerminated(FiberId.fresh(), Exit.Success(())))
+                .attempt
+                .unsafeRunSync()
+              fiber.await.attempt.unsafeRunSync()
+            } catch {
+              case _: Exception => ()
+            }
+            drainAndCleanup()
+          case None => ()
         }
-        child = Option(newScope.childFibers.poll())
-      }
+      drainAndCleanup()
       setCurrentScope(oldScope)
     }
   }
@@ -65,14 +71,14 @@ private object StructuredConcurrency {
   def cleanupRootFibers(rootFibers: Option[ConcurrentLinkedQueue[UnifiedFiber[?, ?]]]): Unit = {
     rootFibers match {
       case Some(queue) =>
-        val fibersToCleanup = scala.collection.mutable.ListBuffer.empty[UnifiedFiber[?, ?]]
-        var fiber = Option(queue.poll())
-        while (fiber.nonEmpty) {
-          fibersToCleanup += fiber.get
-          fiber = Option(queue.poll())
-        }
+        @annotation.tailrec
+        def drain(acc: List[UnifiedFiber[?, ?]]): List[UnifiedFiber[?, ?]] =
+          Option(queue.poll()) match {
+            case Some(fiber) => drain(fiber :: acc)
+            case None => acc.reverse
+          }
 
-        fibersToCleanup.foreach { fiberToCleanup =>
+        drain(Nil).foreach { fiberToCleanup =>
           try {
             fiberToCleanup
               .interrupt(InterruptCause.ParentTerminated(FiberId.fresh(), Exit.Success(())))
@@ -112,6 +118,20 @@ enum RuntimeBackend {
     */
   case VirtualThreads
 
+  /** Recovers from defects during fiber creation, returning a completed Die fiber. */
+  private def recoverForkDefect[E, A](
+    fiberEffect: Eru[Nothing, Fiber[E, A]],
+    observer: Option[EruObserver]
+  ): Eru[Nothing, Fiber[E, A]] =
+    fiberEffect.attempt.map {
+      case Result.Success(fiber) => fiber
+      case Result.Failure(t) =>
+        val id = FiberId.fresh()
+        val exit = Exit.Die(t)
+        observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
+        UnifiedFiber.completed(id, exit)
+    }
+
   /** Launches a computation as a fiber using this backend's execution model.
     *
     * @param fa
@@ -130,169 +150,145 @@ enum RuntimeBackend {
   ): Eru[Nothing, Fiber[E, A]] =
     this match {
       case Synchronous =>
-        Eru.effectTotal {
-          val id = FiberId.fresh()
-          observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
-
-          val (exit, finalizers) = Eru.executeWithFinalizers(fa)
-          observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-
-          finalizers.foreach { finalizer =>
-            try finalizer().unsafeRunSync()
-            catch case _: Exception => ()
-          }
-
-          UnifiedFiber.completed(id, exit): Fiber[E, A]
-        }.attempt.map {
-          case Result.Success(fiber) => fiber
-          case Result.Failure(t) =>
+        recoverForkDefect(
+          Eru.effectTotal {
             val id = FiberId.fresh()
-            val exit = Exit.Die(t)
+            observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+
+            val (exit, finalizers) = Eru.executeWithFinalizers(fa)
             observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-            UnifiedFiber.completed(id, exit)
-        }
+
+            finalizers.foreach { finalizer =>
+              try finalizer().unsafeRunSync()
+              catch case _: Exception => ()
+            }
+
+            UnifiedFiber.completed(id, exit): Fiber[E, A]
+          },
+          observer
+        )
 
       case VirtualThreads =>
         import Eru.Internals.View.*
         Eru.Internals.view(fa) match {
           case VSucceed(value) =>
-            Eru.effectTotal {
-              val id = FiberId.fresh()
-              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
-              val exit = Exit.Success(value)
-              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-              UnifiedFiber.completed(id, exit): Fiber[E, A]
-            }.attempt.map {
-              case Result.Success(fiber) => fiber
-              case Result.Failure(t) =>
+            recoverForkDefect(
+              Eru.effectTotal {
                 val id = FiberId.fresh()
-                val exit = Exit.Die(t)
+                observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+                val exit = Exit.Success(value)
                 observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-                UnifiedFiber.completed(id, exit)
-            }
+                UnifiedFiber.completed(id, exit): Fiber[E, A]
+              },
+              observer
+            )
 
           case VFail(error) =>
-            Eru.effectTotal {
-              val id = FiberId.fresh()
-              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
-              val exit = Exit.Failure(error)
-              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-              UnifiedFiber.completed(id, exit): Fiber[E, A]
-            }.attempt.map {
-              case Result.Success(fiber) => fiber
-              case Result.Failure(t) =>
+            recoverForkDefect(
+              Eru.effectTotal {
                 val id = FiberId.fresh()
-                val exit = Exit.Die(t)
+                observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+                val exit = Exit.Failure(error)
                 observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-                UnifiedFiber.completed(id, exit)
-            }
+                UnifiedFiber.completed(id, exit): Fiber[E, A]
+              },
+              observer
+            )
 
           case VMapChain(source, f) =>
             Eru.Internals.view(source) match {
               case VSucceed(value) =>
-                Eru.effectTotal {
-                  val id = FiberId.fresh()
-                  observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
-                  val mappedValue = f(value)
-                  val exit = Exit.Success(mappedValue)
-                  observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-                  UnifiedFiber.completed(id, exit): Fiber[E, A]
-                }.attempt.map {
-                  case Result.Success(fiber) => fiber
-                  case Result.Failure(t) =>
+                recoverForkDefect(
+                  Eru.effectTotal {
                     val id = FiberId.fresh()
-                    val exit = Exit.Die(t)
+                    observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+                    val mappedValue = f(value)
+                    val exit = Exit.Success(mappedValue)
                     observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-                    UnifiedFiber.completed(id, exit)
-                }
+                    UnifiedFiber.completed(id, exit): Fiber[E, A]
+                  },
+                  observer
+                )
               case _ =>
-                Eru.effectTotal {
-                  val id = FiberId.fresh()
-                  val fiber = UnifiedFiber.active[E, A](id, observer)
-                  val parentScope = StructuredConcurrency.getCurrentScope()
-
-                  StructuredConcurrency.addChildFiber(fiber, rootFibers)
-
-                  observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
-
-                  Thread.startVirtualThread { () =>
-                    UnifiedFiber.setThread(fiber, Thread.currentThread())
-                    // Restore parent scope and timer service in new thread
-                    StructuredConcurrency.setCurrentScope(parentScope)
-
-                    try {
-                      StructuredConcurrency.withNewScope { _ =>
-                        val (exit, finalizers) = Eru.executeWithFinalizers(fa)
-
-                        finalizers.foreach { finalizer =>
-                          try finalizer().unsafeRunSync()
-                          catch case _: Exception => ()
-                        }
-
-                        UnifiedFiber.complete(fiber, exit)
-                      }
-                    } catch {
-                      case _: InterruptedException =>
-                        UnifiedFiber.complete(fiber, Exit.Interrupt(id, InterruptCause.Cancelled()))
-                      case t: Throwable =>
-                        UnifiedFiber.complete(fiber, Exit.Die(t))
-                    }
-                  }
-
-                  fiber: Fiber[E, A]
-                }.attempt.map {
-                  case Result.Success(fiber) => fiber
-                  case Result.Failure(t) =>
+                recoverForkDefect(
+                  Eru.effectTotal {
                     val id = FiberId.fresh()
-                    val exit = Exit.Die(t)
-                    observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-                    UnifiedFiber.completed(id, exit)
-                }
+                    val fiber = UnifiedFiber.active[E, A](id, observer)
+                    val parentScope = StructuredConcurrency.getCurrentScope()
+
+                    StructuredConcurrency.addChildFiber(fiber, rootFibers)
+
+                    observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+
+                    Thread.startVirtualThread { () =>
+                      UnifiedFiber.setThread(fiber, Thread.currentThread())
+                      // Restore parent scope and timer service in new thread
+                      StructuredConcurrency.setCurrentScope(parentScope)
+
+                      try {
+                        StructuredConcurrency.withNewScope { _ =>
+                          val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+
+                          finalizers.foreach { finalizer =>
+                            try finalizer().unsafeRunSync()
+                            catch case _: Exception => ()
+                          }
+
+                          UnifiedFiber.complete(fiber, exit)
+                        }
+                      } catch {
+                        case _: InterruptedException =>
+                          UnifiedFiber.complete(fiber, Exit.Interrupt(id, InterruptCause.Cancelled()))
+                        case t: Throwable =>
+                          UnifiedFiber.complete(fiber, Exit.Die(t))
+                      }
+                    }
+
+                    fiber: Fiber[E, A]
+                  },
+                  observer
+                )
             }
 
           case _ =>
-            Eru.effectTotal {
-              val id = FiberId.fresh()
-              val fiber = UnifiedFiber.active[E, A](id, observer)
-              val parentScope = StructuredConcurrency.getCurrentScope()
-
-              StructuredConcurrency.addChildFiber(fiber, rootFibers)
-
-              observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
-
-              Thread.startVirtualThread { () =>
-                UnifiedFiber.setThread(fiber, Thread.currentThread())
-                // Restore parent scope and timer service in new thread
-                StructuredConcurrency.setCurrentScope(parentScope)
-
-                try {
-                  StructuredConcurrency.withNewScope { _ =>
-                    val (exit, finalizers) = Eru.executeWithFinalizers(fa)
-
-                    finalizers.foreach { finalizer =>
-                      try finalizer().unsafeRunSync()
-                      catch case _: Exception => ()
-                    }
-
-                    UnifiedFiber.complete(fiber, exit)
-                  }
-                } catch {
-                  case _: InterruptedException =>
-                    UnifiedFiber.complete(fiber, Exit.Interrupt(id, InterruptCause.Cancelled()))
-                  case t: Throwable =>
-                    UnifiedFiber.complete(fiber, Exit.Die(t))
-                }
-              }
-
-              fiber: Fiber[E, A]
-            }.attempt.map {
-              case Result.Success(fiber) => fiber
-              case Result.Failure(t) =>
+            recoverForkDefect(
+              Eru.effectTotal {
                 val id = FiberId.fresh()
-                val exit = Exit.Die(t)
-                observer.foreach(_.onEvent(EruObserver.EruEvent.FiberCompleted(id, exit)))
-                UnifiedFiber.completed(id, exit)
-            }
+                val fiber = UnifiedFiber.active[E, A](id, observer)
+                val parentScope = StructuredConcurrency.getCurrentScope()
+
+                StructuredConcurrency.addChildFiber(fiber, rootFibers)
+
+                observer.foreach(_.onEvent(EruObserver.EruEvent.FiberStarted(id)))
+
+                Thread.startVirtualThread { () =>
+                  UnifiedFiber.setThread(fiber, Thread.currentThread())
+                  // Restore parent scope and timer service in new thread
+                  StructuredConcurrency.setCurrentScope(parentScope)
+
+                  try {
+                    StructuredConcurrency.withNewScope { _ =>
+                      val (exit, finalizers) = Eru.executeWithFinalizers(fa)
+
+                      finalizers.foreach { finalizer =>
+                        try finalizer().unsafeRunSync()
+                        catch case _: Exception => ()
+                      }
+
+                      UnifiedFiber.complete(fiber, exit)
+                    }
+                  } catch {
+                    case _: InterruptedException =>
+                      UnifiedFiber.complete(fiber, Exit.Interrupt(id, InterruptCause.Cancelled()))
+                    case t: Throwable =>
+                      UnifiedFiber.complete(fiber, Exit.Die(t))
+                  }
+                }
+
+                fiber: Fiber[E, A]
+              },
+              observer
+            )
         }
     }
 
@@ -532,14 +528,13 @@ object Platform {
     *
     * Uses a simple heuristic based on system properties that differ between platforms.
     */
-  val isJVM: Boolean = {
-    val javaVersion = Option(System.getProperty("java.version"))
-    val javaVendor = Option(System.getProperty("java.vendor"))
-
-    javaVersion.isDefined && javaVendor.isDefined &&
-    javaVersion.exists(v => v.contains(".") || v.toIntOption.exists(_ >= 8)) &&
-    javaVendor.exists(v => !v.toLowerCase.contains("scala"))
-  }
+  val isJVM: Boolean =
+    (Option(System.getProperty("java.version")), Option(System.getProperty("java.vendor"))) match {
+      case (Some(version), Some(vendor)) =>
+        (version.contains(".") || version.toIntOption.exists(_ >= 8)) &&
+        !vendor.toLowerCase.contains("scala")
+      case _ => false
+    }
 
   /** The runtime backend for this platform. */
   val backend: RuntimeBackend =

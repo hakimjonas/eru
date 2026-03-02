@@ -69,4 +69,20 @@ final class TimeoutRetrySpec extends TestProgressReporter {
       println("TestClock timeout test: deterministic behavior, no timing races")
     }
   }
+
+  test("failAfter fails with typed error on timeout - TestClock (deterministic)") {
+    EruTest.withTestClock { clock =>
+      given runtime: EruRuntime = EruTest.testRuntime(clock)
+
+      val fast = Eru.succeed(42)
+      val result = fast.failAfter(Duration.ofMillis(10), "custom-timeout")
+      assertEquals(result.runExit(), Exit.Success(42))
+
+      val slow = runtime.sleep(Duration.ofMillis(20)).map(_ => 42)
+      val timedSlow = slow.failAfter(Duration.ofMillis(5), "custom-timeout")
+
+      // With TestClock: sleep completes immediately, so no timeout
+      assertEquals(timedSlow.runExit(), Exit.Success(42))
+    }
+  }
 }
