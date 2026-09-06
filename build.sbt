@@ -42,7 +42,10 @@ lazy val sharedScalacOptions = Seq(
 
 /* Less strict for tests. */
 lazy val testScalacOptions = Seq(
-  "-Wunused:imports"
+  "-Wunused:imports",
+  // Validate quotes/splices at expansion time: the test suites exercise every
+  // EruMacros expansion, so ill-typed trees surface in CI, not at user sites.
+  "-Xcheck-macros"
 )
 
 /* ===== Common Settings ===== */
