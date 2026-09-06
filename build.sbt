@@ -1,7 +1,7 @@
 /* ===== Build-wide Settings ===== */
 ThisBuild / organization := "net.ghoula"
 ThisBuild / versionScheme := Some("early-semver")
-ThisBuild / scalaVersion := "3.8.4"
+ThisBuild / scalaVersion := "3.9.0"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
@@ -32,6 +32,7 @@ ThisBuild / scmInfo := Some(
 
 /* ===== Compiler Settings ===== */
 lazy val sharedScalacOptions = Seq(
+  "-deprecation",
   "-feature",
   "-Werror",
   "-Wunused:all",
