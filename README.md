@@ -63,4 +63,4 @@ Eru is at version 1.0.0-alpha. The core API is stable; breaking changes may stil
 
 ## Contributing
 
-Eru is designed and developed by Hakim Jonas Ghoula and licensed under the GNU General Public License v3.0 or later. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, quality standards, and build commands.
+Eru is designed and developed by Hakim Jonas Ghoula and licensed under the GNU Lesser General Public License v3.0 or later. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, quality standards, and build commands.

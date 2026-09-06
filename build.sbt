@@ -20,7 +20,7 @@ ThisBuild / publishTo := {
 ThisBuild / publishMavenStyle := true
 ThisBuild / pomIncludeRepository := { _ => false }
 
-ThisBuild / licenses := Seq("GPL-3.0-or-later" -> uri("https://www.gnu.org/licenses/gpl-3.0.txt"))
+ThisBuild / licenses := Seq("LGPL-3.0-or-later" -> uri("https://www.gnu.org/licenses/lgpl-3.0.txt"))
 ThisBuild / homepage := Some(uri("https://github.com/hakimjonas/eru"))
 ThisBuild / description := "Eru: a pragmatic and ergonomic effect system for Scala 3 on Java virtual threads."
 ThisBuild / developers := List(
